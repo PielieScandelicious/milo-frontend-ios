@@ -1,0 +1,129 @@
+//
+//  StoreDetailView.swift
+//  Dobby
+//
+//  Created by Gilles Moenaert on 18/01/2026.
+//
+
+import SwiftUI
+
+struct StoreDetailView: View {
+    let storeBreakdown: StoreBreakdown
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ZStack {
+            Color(white: 0.05).ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header card
+                    VStack(spacing: 12) {
+                        Text(storeBreakdown.storeName)
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text(storeBreakdown.period)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        Text(String(format: "€%.2f", storeBreakdown.totalStoreSpend))
+                            .font(.system(size: 48, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.top, 8)
+                    }
+                    .padding(.vertical, 32)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(Color.white.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
+                    
+                    // Large donut chart
+                    VStack(spacing: 20) {
+                        DonutChartView(
+                            title: "",
+                            subtitle: "Total",
+                            totalAmount: storeBreakdown.totalStoreSpend,
+                            segments: storeBreakdown.categories.toChartSegments(),
+                            size: 220
+                        )
+                        .padding(.top, 20)
+                        
+                        // Legend
+                        VStack(spacing: 12) {
+                            ForEach(Array(storeBreakdown.categories.toChartSegments().enumerated()), id: \.element.id) { _, segment in
+                                HStack {
+                                    Circle()
+                                        .fill(segment.color)
+                                        .frame(width: 12, height: 12)
+                                    
+                                    Text(segment.label)
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(.white)
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(segment.percentage)%")
+                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.white.opacity(0.6))
+                                        .frame(width: 45, alignment: .trailing)
+                                    
+                                    Text(String(format: "€%.2f", segment.value))
+                                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                        .frame(width: 70, alignment: .trailing)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.white.opacity(0.05))
+                                )
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.bottom, 32)
+                }
+                .padding(.top, 20)
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(.white.opacity(0.6))
+                        .symbolRenderingMode(.hierarchical)
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    NavigationStack {
+        StoreDetailView(storeBreakdown: StoreBreakdown(
+            storeName: "COLRUYT",
+            period: "January 2026",
+            totalStoreSpend: 189.90,
+            categories: [
+                Category(name: "Meat & Fish", spent: 65.40, percentage: 34),
+                Category(name: "Alcohol", spent: 42.50, percentage: 22),
+                Category(name: "Drinks (Soft/Soda)", spent: 28.00, percentage: 15),
+                Category(name: "Household", spent: 35.00, percentage: 18),
+                Category(name: "Snacks & Sweets", spent: 19.00, percentage: 11)
+            ]
+        ))
+    }
+    .preferredColorScheme(.dark)
+}
