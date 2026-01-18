@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var transactionManager = TransactionManager()
+    
     var body: some View {
         TabView {
             ViewTab()
@@ -25,6 +27,7 @@ struct ContentView: View {
                     Label("Dobby", systemImage: "sparkles")
                 }
         }
+        .environmentObject(transactionManager)
         .preferredColorScheme(.dark)
     }
 }
@@ -43,15 +46,8 @@ struct ViewTab: View {
 struct ScanTab: View {
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(white: 0.05).ignoresSafeArea()
-                
-                VStack {
-                    // Empty content
-                }
-            }
-            .navigationTitle("Scan")
-            .navigationBarTitleDisplayMode(.large)
+            ReceiptScanView()
+                .navigationBarHidden(true)
         }
     }
 }

@@ -20,6 +20,7 @@ enum StoreFilter: String, CaseIterable {
 }
 
 struct OverviewView: View {
+    @EnvironmentObject var transactionManager: TransactionManager
     @StateObject private var dataManager = StoreDataManager()
     @State private var selectedPeriod: String = "January 2026"
     @State private var selectedSort: SortOption = .highestSpend
@@ -84,6 +85,12 @@ struct OverviewView: View {
                 selectedSort: $selectedSort,
                 selectedStoreFilter: $selectedStoreFilter
             )
+        }
+        .onAppear {
+            dataManager.configure(with: transactionManager)
+        }
+        .onChange(of: transactionManager.transactions) { oldValue, newValue in
+            dataManager.regenerateBreakdowns()
         }
     }
     

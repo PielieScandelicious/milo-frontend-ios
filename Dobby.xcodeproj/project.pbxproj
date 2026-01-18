@@ -6,8 +6,35 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2999B8A32F1D9879002ACAF3 /* env.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A22F1D986B002ACAF3 /* env.swift */; };
+		2999B8A52F1D99F0002ACAF3 /* AnthropicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */; };
+		2999B8A72F1D9A05002ACAF3 /* ReceiptImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */; };
+		2999B8A92F1D9A29002ACAF3 /* ReceiptScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A82F1D9A29002ACAF3 /* ReceiptScanView.swift */; };
+		2999B8AB2F1D9A48002ACAF3 /* ReceiptReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8AA2F1D9A48002ACAF3 /* ReceiptReviewView.swift */; };
+		2999B8AD2F1D9ABC002ACAF3 /* SETUP_GUIDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */; };
+		2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */; };
+		2999B8B12F1D9AEB002ACAF3 /* TEST_RECEIPTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */; };
+		2999B8B32F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B22F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md */; };
+		2999B8B52F1D9B3C002ACAF3 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B42F1D9B3C002ACAF3 /* README.md */; };
+		2999B8B72F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */; };
+		2999B8B92F1D9BA7002ACAF3 /* ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		294D4FBD2F1D695B001B9193 /* Dobby.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dobby.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2999B8A22F1D986B002ACAF3 /* env.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = env.swift; sourceTree = "<group>"; };
+		2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicService.swift; sourceTree = "<group>"; };
+		2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptImportService.swift; sourceTree = "<group>"; };
+		2999B8A82F1D9A29002ACAF3 /* ReceiptScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptScanView.swift; sourceTree = "<group>"; };
+		2999B8AA2F1D9A48002ACAF3 /* ReceiptReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptReviewView.swift; sourceTree = "<group>"; };
+		2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SETUP_GUIDE.md; sourceTree = "<group>"; };
+		2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-additions.plist"; sourceTree = "<group>"; };
+		2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = TEST_RECEIPTS.md; sourceTree = "<group>"; };
+		2999B8B22F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = IMPLEMENTATION_SUMMARY.md; sourceTree = "<group>"; };
+		2999B8B42F1D9B3C002ACAF3 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BUILD_CHECKLIST.md; sourceTree = "<group>"; };
+		2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -37,9 +64,21 @@
 		294D4FB42F1D695B001B9193 = {
 			isa = PBXGroup;
 			children = (
+				2999B8A22F1D986B002ACAF3 /* env.swift */,
 				294D4FD32F1D6A65001B9193 /* mockdata */,
 				294D4FBF2F1D695B001B9193 /* Dobby */,
 				294D4FBE2F1D695B001B9193 /* Products */,
+				2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */,
+				2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */,
+				2999B8A82F1D9A29002ACAF3 /* ReceiptScanView.swift */,
+				2999B8AA2F1D9A48002ACAF3 /* ReceiptReviewView.swift */,
+				2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */,
+				2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */,
+				2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */,
+				2999B8B22F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md */,
+				2999B8B42F1D9B3C002ACAF3 /* README.md */,
+				2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */,
+				2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -116,6 +155,13 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2999B8B92F1D9BA7002ACAF3 /* ARCHITECTURE.md in Resources */,
+				2999B8B12F1D9AEB002ACAF3 /* TEST_RECEIPTS.md in Resources */,
+				2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */,
+				2999B8B52F1D9B3C002ACAF3 /* README.md in Resources */,
+				2999B8B72F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md in Resources */,
+				2999B8B32F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md in Resources */,
+				2999B8AD2F1D9ABC002ACAF3 /* SETUP_GUIDE.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -126,6 +172,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2999B8AB2F1D9A48002ACAF3 /* ReceiptReviewView.swift in Sources */,
+				2999B8A72F1D9A05002ACAF3 /* ReceiptImportService.swift in Sources */,
+				2999B8A52F1D99F0002ACAF3 /* AnthropicService.swift in Sources */,
+				2999B8A32F1D9879002ACAF3 /* env.swift in Sources */,
+				2999B8A92F1D9A29002ACAF3 /* ReceiptScanView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
