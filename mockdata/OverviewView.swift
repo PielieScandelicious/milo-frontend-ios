@@ -7,20 +7,52 @@
 
 import SwiftUI
 
+enum SortOption: String, CaseIterable {
+    case highestSpend = "Highest Spend"
+    case lowestSpend = "Lowest Spend"
+    case storeName = "Store Name"
+}
+
+enum StoreFilter: String, CaseIterable {
+    case all = "All Stores"
+    case colruyt = "COLRUYT"
+    case aldi = "ALDI"
+}
+
 struct OverviewView: View {
     @StateObject private var dataManager = StoreDataManager()
     @State private var selectedPeriod: String = "January 2026"
+    @State private var selectedSort: SortOption = .highestSpend
+    @State private var selectedStoreFilter: StoreFilter = .all
+    @State private var showingFilterSheet = false
     
     private var availablePeriods: [String] {
         dataManager.breakdownsByPeriod().keys.sorted()
     }
     
     private var currentBreakdowns: [StoreBreakdown] {
-        dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
+        var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
+        
+        // Apply store filter
+        if selectedStoreFilter != .all {
+            breakdowns = breakdowns.filter { $0.storeName == selectedStoreFilter.rawValue }
+        }
+        
+        // Apply sorting
+        switch selectedSort {
+        case .highestSpend:
+            breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
+        case .lowestSpend:
+            breakdowns.sort { $0.totalStoreSpend < $1.totalStoreSpend }
+        case .storeName:
+            breakdowns.sort { $0.storeName < $1.storeName }
+        }
+        
+        return breakdowns
     }
     
     private var totalPeriodSpending: Double {
-        dataManager.totalSpending(for: selectedPeriod)
+        currentBreakdowns.reduce(0) { $0 + $1.totalStoreSpend }
     }
     
     var body: some View {
@@ -34,6 +66,9 @@ struct OverviewView: View {
                         periodSelector
                     }
                     
+                    // Filter bar
+                    filterBar
+                    
                     // Total spending card
                     totalSpendingCard
                     
@@ -44,6 +79,91 @@ struct OverviewView: View {
                 .padding(.bottom, 32)
             }
         }
+        .sheet(isPresented: $showingFilterSheet) {
+            FilterSheet(
+                selectedSort: $selectedSort,
+                selectedStoreFilter: $selectedStoreFilter
+            )
+        }
+    }
+    
+    private var filterBar: some View {
+        HStack(spacing: 12) {
+            // Store filter button
+            Menu {
+                ForEach(StoreFilter.allCases, id: \.self) { filter in
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedStoreFilter = filter
+                        }
+                    } label: {
+                        HStack {
+                            Text(filter.rawValue)
+                            if selectedStoreFilter == filter {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.system(size: 16, weight: .medium))
+                    Text(selectedStoreFilter.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(selectedStoreFilter != .all ? Color.blue.opacity(0.2) : Color.white.opacity(0.1))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(selectedStoreFilter != .all ? Color.blue.opacity(0.4) : Color.white.opacity(0.15), lineWidth: 1)
+                )
+            }
+            
+            // Sort button
+            Menu {
+                ForEach(SortOption.allCases, id: \.self) { option in
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedSort = option
+                        }
+                    } label: {
+                        HStack {
+                            Text(option.rawValue)
+                            if selectedSort == option {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 16, weight: .medium))
+                    Text(selectedSort.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.1))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                )
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal)
     }
     
     private var periodSelector: some View {
@@ -154,6 +274,79 @@ struct ScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Filter Sheet
+struct FilterSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedSort: SortOption
+    @Binding var selectedStoreFilter: StoreFilter
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(white: 0.05).ignoresSafeArea()
+                
+                List {
+                    Section {
+                        ForEach(StoreFilter.allCases, id: \.self) { filter in
+                            Button {
+                                selectedStoreFilter = filter
+                            } label: {
+                                HStack {
+                                    Text(filter.rawValue)
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    if selectedStoreFilter == filter {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Store")
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .listRowBackground(Color.white.opacity(0.05))
+                    
+                    Section {
+                        ForEach(SortOption.allCases, id: \.self) { option in
+                            Button {
+                                selectedSort = option
+                            } label: {
+                                HStack {
+                                    Text(option.rawValue)
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    if selectedSort == option {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Sort By")
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .listRowBackground(Color.white.opacity(0.05))
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Filters")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
 

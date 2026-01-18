@@ -10,6 +10,7 @@ import SwiftUI
 struct StoreDetailView: View {
     let storeBreakdown: StoreBreakdown
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedCategory: String?
     
     var body: some View {
         ZStack {
@@ -55,40 +56,67 @@ struct StoreDetailView: View {
                         )
                         .padding(.top, 20)
                         
-                        // Legend
+                        // Legend with tap interaction
                         VStack(spacing: 12) {
                             ForEach(Array(storeBreakdown.categories.toChartSegments().enumerated()), id: \.element.id) { _, segment in
-                                HStack {
-                                    Circle()
-                                        .fill(segment.color)
-                                        .frame(width: 12, height: 12)
-                                    
-                                    Text(segment.label)
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(.white)
-                                    
-                                    Spacer()
-                                    
-                                    Text("\(segment.percentage)%")
-                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.6))
-                                        .frame(width: 45, alignment: .trailing)
-                                    
-                                    Text(String(format: "€%.2f", segment.value))
-                                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                                        .foregroundColor(.white)
-                                        .frame(width: 70, alignment: .trailing)
+                                NavigationLink(destination: TransactionDisplayView(
+                                    storeName: storeBreakdown.storeName,
+                                    period: storeBreakdown.period,
+                                    category: segment.label,
+                                    categoryColor: segment.color
+                                )) {
+                                    categoryRow(segment: segment)
                                 }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.white.opacity(0.05))
-                                )
+                                .buttonStyle(CategoryRowButtonStyle())
                             }
                         }
                         .padding(.horizontal)
                     }
+                    .padding(.bottom, 32)
+                    
+                    // View all transactions button
+                    NavigationLink(destination: TransactionDisplayView(
+                        storeName: storeBreakdown.storeName,
+                        period: storeBreakdown.period,
+                        category: nil,
+                        categoryColor: nil
+                    )) {
+                        HStack {
+                            Image(systemName: "list.bullet.rectangle")
+                                .font(.system(size: 16, weight: .semibold))
+                            
+                            Text("View All Transactions")
+                                .font(.system(size: 16, weight: .semibold))
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 18)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.blue.opacity(0.3),
+                                            Color.purple.opacity(0.2)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .padding(.horizontal)
                     .padding(.bottom, 32)
                 }
                 .padding(.top, 20)
@@ -107,6 +135,54 @@ struct StoreDetailView: View {
                 }
             }
         }
+    }
+    
+    private func categoryRow(segment: ChartSegment) -> some View {
+        HStack {
+            Circle()
+                .fill(segment.color)
+                .frame(width: 12, height: 12)
+            
+            Text(segment.label)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.white)
+            
+            Spacer()
+            
+            Text("\(segment.percentage)%")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.6))
+                .frame(width: 45, alignment: .trailing)
+            
+            Text(String(format: "€%.2f", segment.value))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .frame(width: 70, alignment: .trailing)
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.3))
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Custom Button Style for Category Rows
+struct CategoryRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
