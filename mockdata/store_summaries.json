@@ -1,0 +1,30 @@
+[
+  {
+    "total_spend": 284.40,
+    "period": "January 2026",
+    "stores": [
+      {
+        "store_name": "COLRUYT",
+        "amount_spent": 189.90
+      },
+      {
+        "store_name": "ALDI",
+        "amount_spent": 94.50
+      }
+    ]
+  },
+  {
+    "total_spend": 215.75,
+    "period": "February 2026",
+    "stores": [
+      {
+        "store_name": "COLRUYT",
+        "amount_spent": 85.25
+      },
+      {
+        "store_name": "ALDI",
+        "amount_spent": 130.50
+      }
+    ]
+  }
+]

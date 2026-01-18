@@ -16,6 +16,11 @@
 			path = Dobby;
 			sourceTree = "<group>";
 		};
+		294D4FD32F1D6A65001B9193 /* mockdata */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = mockdata;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +37,7 @@
 		294D4FB42F1D695B001B9193 = {
 			isa = PBXGroup;
 			children = (
+				294D4FD32F1D6A65001B9193 /* mockdata */,
 				294D4FBF2F1D695B001B9193 /* Dobby */,
 				294D4FBE2F1D695B001B9193 /* Products */,
 			);
@@ -62,6 +68,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				294D4FBF2F1D695B001B9193 /* Dobby */,
+				294D4FD32F1D6A65001B9193 /* mockdata */,
 			);
 			name = Dobby;
 			packageProductDependencies = (
