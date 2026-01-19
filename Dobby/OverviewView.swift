@@ -26,6 +26,7 @@ struct OverviewView: View {
     @State private var draggingItem: StoreBreakdown?
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
+    @State private var showingAllStoresBreakdown = false
     
     private var availablePeriods: [String] {
         dataManager.breakdownsByPeriod().keys.sorted()
@@ -130,16 +131,10 @@ struct OverviewView: View {
                     .padding(.bottom, 32)
                 }
             }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.always)
+            .scrollDismissesKeyboard(.interactively)
             .background(Color(white: 0.05))
-            .contentShape(Rectangle())
-            .onTapGesture {
-                // Exit edit mode when tapping anywhere in scroll view
-                if isEditMode {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        isEditMode = false
-                    }
-                }
-            }
             
             // Edit mode exit button overlay
             if isEditMode {
@@ -173,6 +168,9 @@ struct OverviewView: View {
         .navigationBarTitleDisplayMode(.large)
         .navigationDestination(item: $selectedBreakdown) { breakdown in
             StoreDetailView(storeBreakdown: breakdown)
+        }
+        .navigationDestination(isPresented: $showingAllStoresBreakdown) {
+            AllStoresBreakdownView(period: selectedPeriod, breakdowns: currentBreakdowns)
         }
         .sheet(isPresented: $showingFilterSheet) {
             FilterSheet(
@@ -270,40 +268,36 @@ struct OverviewView: View {
     }
     
     private var totalSpendingCard: some View {
-        VStack(spacing: 8) {
-            Text("Total Spending")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-                .textCase(.uppercase)
-                .tracking(1.2)
-            
-            Text(String(format: "€%.0f", totalPeriodSpending))
-                .font(.system(size: 44, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
-            
-            Text(selectedPeriod)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.5))
+        Button {
+            showingAllStoresBreakdown = true
+        } label: {
+            VStack(spacing: 8) {
+                Text("Total Spending")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                
+                Text(String(format: "€%.0f", totalPeriodSpending))
+                    .font(.system(size: 44, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Text(selectedPeriod)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
         }
-        .padding(.vertical, 28)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.2, green: 0.3, blue: 0.5).opacity(0.3),
-                            Color(red: 0.3, green: 0.2, blue: 0.5).opacity(0.2)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-        )
+        .buttonStyle(TotalSpendingCardButtonStyle())
         .padding(.horizontal)
     }
     
@@ -341,18 +335,15 @@ struct OverviewView: View {
                             storeChartCard(breakdown)
                         }
                         .buttonStyle(StoreCardButtonStyle())
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.5)
-                                .onEnded { _ in
-                                    // Enter edit mode on long press
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        isEditMode = true
-                                    }
-                                    // Haptic feedback
-                                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                                    generator.impactOccurred()
-                                }
-                        )
+                        .onLongPressGesture(minimumDuration: 0.5) {
+                            // Enter edit mode on long press
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                isEditMode = true
+                            }
+                            // Haptic feedback
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.impactOccurred()
+                        }
                     }
                     
                     // Delete button (X) in edit mode
@@ -391,7 +382,9 @@ struct OverviewView: View {
                 segments: breakdown.categories.toChartSegments(),
                 size: 90
             )
-            .padding(16)
+            .padding(.top, 16)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity)
         .background(
@@ -525,6 +518,16 @@ struct StoreCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Total Spending Card Button Style
+struct TotalSpendingCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }

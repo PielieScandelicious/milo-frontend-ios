@@ -83,7 +83,7 @@ struct DobbyAIChatView: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 20)
+                .frame(height: 25)
                 
                 HStack(alignment: .bottom, spacing: 8) {
                     // Message input field
@@ -126,7 +126,8 @@ struct DobbyAIChatView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 24))
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
                 .background(Color(.systemBackground))
             }
         }

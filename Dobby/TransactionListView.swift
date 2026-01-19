@@ -280,20 +280,8 @@ struct TransactionRowView: View {
     }
     
     private func categoryColor(for category: String) -> Color {
-        switch category {
-        case "Meat & Fish": return Color(red: 0.9, green: 0.4, blue: 0.4)
-        case "Alcohol": return Color(red: 0.7, green: 0.3, blue: 0.7)
-        case "Drinks (Soft/Soda)", "Drinks (Water)": return Color(red: 0.3, green: 0.7, blue: 1.0)
-        case "Household": return Color(red: 0.4, green: 0.8, blue: 0.5)
-        case "Snacks & Sweets": return Color(red: 1.0, green: 0.7, blue: 0.3)
-        case "Fresh Produce": return Color(red: 0.4, green: 0.9, blue: 0.4)
-        case "Dairy & Eggs": return Color(red: 0.9, green: 0.9, blue: 0.5)
-        case "Ready Meals": return Color(red: 1.0, green: 0.5, blue: 0.3)
-        case "Bakery": return Color(red: 0.9, green: 0.7, blue: 0.4)
-        case "Pantry": return Color(red: 0.7, green: 0.5, blue: 0.3)
-        case "Personal Care": return Color(red: 0.6, green: 0.5, blue: 1.0)
-        default: return Color.gray
-        }
+        // Use the smart category color extension
+        return category.categoryColor
     }
 }
 

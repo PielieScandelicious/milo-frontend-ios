@@ -17,7 +17,7 @@ struct DonutChartView: View {
     @State private var animationProgress: CGFloat = 0
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             ZStack {
                 // Background circle
                 Circle()
@@ -103,16 +103,6 @@ struct ChartSegment: Identifiable {
 extension Array where Element == Category {
     func toChartSegments() -> [ChartSegment] {
         var currentAngle: Double = 0
-        let colors: [Color] = [
-            Color(red: 0.3, green: 0.7, blue: 1.0),   // Blue
-            Color(red: 0.4, green: 0.8, blue: 0.5),   // Green
-            Color(red: 1.0, green: 0.7, blue: 0.3),   // Orange
-            Color(red: 0.9, green: 0.4, blue: 0.6),   // Pink
-            Color(red: 0.7, green: 0.5, blue: 1.0),   // Purple
-            Color(red: 0.3, green: 0.9, blue: 0.9),   // Cyan
-            Color(red: 1.0, green: 0.6, blue: 0.4),   // Coral
-            Color(red: 0.6, green: 0.9, blue: 0.4),   // Lime
-        ]
         
         return enumerated().map { index, category in
             let percentage = Double(category.percentage) / 100.0
@@ -120,7 +110,7 @@ extension Array where Element == Category {
             let segment = ChartSegment(
                 startAngle: .degrees(currentAngle),
                 endAngle: .degrees(currentAngle + angleRange),
-                color: colors[index % colors.count],
+                color: category.intelligentColor,
                 value: category.spent,
                 label: category.name,
                 percentage: category.percentage
@@ -130,3 +120,12 @@ extension Array where Element == Category {
         }
     }
 }
+// MARK: - Category Color Extension
+extension Category {
+    /// Intelligently assigns colors to categories based on their names and health characteristics
+    var intelligentColor: Color {
+        // Use the centralized category color logic
+        return name.categoryColor
+    }
+}
+

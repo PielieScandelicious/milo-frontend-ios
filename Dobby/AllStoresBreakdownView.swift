@@ -50,42 +50,38 @@ struct AllStoresBreakdownView: View {
             Color(white: 0.05).ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 32) {
+                VStack(spacing: 24) {
                     // Header
-                    VStack(spacing: 8) {
-                        Text("All Stores")
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                    VStack(spacing: 6) {
+                        Text("Stores")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                         
                         Text(period)
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
-                        
-                        Text(String(format: "€%.0f", totalSpending))
-                            .font(.system(size: 48, weight: .heavy, design: .rounded))
-                            .foregroundColor(.white)
-                            .padding(.top, 8)
                     }
-                    .padding(.vertical, 32)
+                    .padding(.vertical, 16)
                     .frame(maxWidth: .infinity)
                     .background(
-                        RoundedRectangle(cornerRadius: 24)
+                        RoundedRectangle(cornerRadius: 20)
                             .fill(Color.white.opacity(0.05))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 24)
+                        RoundedRectangle(cornerRadius: 20)
                             .stroke(Color.white.opacity(0.1), lineWidth: 1)
                     )
                     .padding(.horizontal)
                     
                     // Large combined donut chart
-                    VStack(spacing: 20) {
+                    VStack(spacing: 32) {
                         AllStoresDonutChart(
                             totalAmount: totalSpending,
                             segments: storeSegments,
                             size: 220
                         )
-                        .padding(.top, 20)
+                        .padding(.top, 24)
+                        .padding(.bottom, 12)
                         
                         // Legend
                         VStack(spacing: 12) {
@@ -97,7 +93,7 @@ struct AllStoresBreakdownView: View {
                     }
                     .padding(.bottom, 32)
                 }
-                .padding(.top, 20)
+                .padding(.top, 8)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
