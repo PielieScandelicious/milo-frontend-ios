@@ -22,6 +22,7 @@ struct ReceiptUploadResponse: Codable {
 enum ReceiptUploadError: LocalizedError {
     case invalidURL
     case imageConversionFailed
+    case pdfReadFailed
     case invalidResponse
     case uploadFailed(String)
     case serverError(statusCode: Int)
@@ -32,6 +33,8 @@ enum ReceiptUploadError: LocalizedError {
             return "Invalid upload URL"
         case .imageConversionFailed:
             return "Failed to convert image to JPEG format"
+        case .pdfReadFailed:
+            return "Failed to read PDF file"
         case .invalidResponse:
             return "Invalid response from server"
         case .uploadFailed(let message):
@@ -188,10 +191,73 @@ actor ReceiptUploadService {
     }
     
     /// Generate a timestamp-based filename for receipts
-    private func generateFilename() -> String {
+    private func generateFilename(extension: String = "jpg") -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
         let timestamp = dateFormatter.string(from: Date())
-        return "receipt_\(timestamp).jpg"
+        return "receipt_\(timestamp).\(`extension`)"
+    }
+    
+    /// Upload a PDF receipt directly without conversion
+    /// - Parameters:
+    ///   - pdfURL: The URL of the PDF file
+    ///   - filename: Optional custom filename (defaults to timestamp-based name)
+    /// - Returns: The upload response containing the S3 key
+    func uploadPDFReceipt(from pdfURL: URL, filename: String? = nil) async throws -> ReceiptUploadResponse {
+        // Validate URL
+        guard let url = URL(string: uploadURL) else {
+            throw ReceiptUploadError.invalidURL
+        }
+        
+        // Read PDF data
+        guard let pdfData = try? Data(contentsOf: pdfURL) else {
+            throw ReceiptUploadError.pdfReadFailed
+        }
+        
+        // Generate filename if not provided
+        let finalFilename = filename ?? generateFilename(extension: "pdf")
+        
+        // Create multipart form data
+        let boundary = UUID().uuidString
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        // Build request body
+        var body = Data()
+        
+        // Add PDF file data
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(finalFilename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/pdf\r\n\r\n".data(using: .utf8)!)
+        body.append(pdfData)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add closing boundary
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        // Perform upload
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        // Check HTTP response
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ReceiptUploadError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw ReceiptUploadError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        // Parse response
+        let decoder = JSONDecoder()
+        let uploadResponse = try decoder.decode(ReceiptUploadResponse.self, from: data)
+        
+        guard uploadResponse.isSuccess else {
+            throw ReceiptUploadError.uploadFailed("Server returned non-success status")
+        }
+        
+        return uploadResponse
     }
 }

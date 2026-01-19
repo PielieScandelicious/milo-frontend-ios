@@ -5,21 +5,9 @@
       location = "self:">
    </FileRef>
    <FileRef
-      location = "group:FIX_DUPLICATE_ERRORS.md">
+      location = "group:FIX_MULTIPLE_INFO_PLIST.md">
    </FileRef>
    <FileRef
-      location = "group:CLEAN_DobbyAIChatService.swift">
-   </FileRef>
-   <FileRef
-      location = "group:CLEAN_DobbyAIChatView.swift">
-   </FileRef>
-   <FileRef
-      location = "group:STEP_BY_STEP_FIX.md">
-   </FileRef>
-   <FileRef
-      location = "group:ReceiptScanView 2.swift">
-   </FileRef>
-   <FileRef
-      location = "group:BUILD_ERROR_FIXES.md">
+      location = "group:FIX_LOCAL_STORAGE_ISSUE.md">
    </FileRef>
 </Workspace>

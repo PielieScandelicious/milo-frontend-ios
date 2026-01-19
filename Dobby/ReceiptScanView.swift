@@ -61,12 +61,12 @@ struct ReceiptScanView: View {
     }
     
     private var placeholderView: some View {
-        ScrollView {
-            VStack(spacing: 28) {
-                // Quick Action Button - Prominent at top
-                Button {
-                    showDocumentScanner = true
-                } label: {
+        Button {
+            showDocumentScanner = true
+        } label: {
+            ScrollView {
+                VStack(spacing: 28) {
+                    // Quick Action Button - Prominent at top
                     VStack(spacing: 16) {
                         ZStack {
                             Circle()
@@ -90,56 +90,47 @@ struct ReceiptScanView: View {
                                 .font(.title3)
                                 .fontWeight(.bold)
                                 .foregroundStyle(.primary)
-                            
-                            HStack(spacing: 4) {
-                                Text("Tap to scan")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                Image(systemName: "arrow.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.blue)
-                            }
                         }
                     }
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
                     .background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 20)
-                .padding(.top, 32)
-                
-                // Steps
-                VStack(alignment: .leading, spacing: 16) {
-                    InstructionStep(
-                        number: 1,
-                        icon: "viewfinder",
-                        iconColor: .blue,
-                        title: "Tap Scan Receipt",
-                        description: "Tap the button above to open the scanner"
-                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 32)
                     
-                    InstructionStep(
-                        number: 2,
-                        icon: "camera.fill",
-                        iconColor: .green,
-                        title: "Position Receipt",
-                        description: "Hold your device steady over the receipt"
-                    )
-                    
-                    InstructionStep(
-                        number: 3,
-                        icon: "checkmark.circle.fill",
-                        iconColor: .orange,
-                        title: "Scan & Review",
-                        description: "Capture one or more scans - the app will automatically select the best one"
-                    )
+                    // Steps
+                    VStack(alignment: .leading, spacing: 16) {
+                        InstructionStep(
+                            number: 1,
+                            icon: "viewfinder",
+                            iconColor: .blue,
+                            title: "Tap Anywhere to Scan",
+                            description: "Tap anywhere on this screen to open the scanner"
+                        )
+                        
+                        InstructionStep(
+                            number: 2,
+                            icon: "camera.fill",
+                            iconColor: .green,
+                            title: "Position Receipt",
+                            description: "Hold your device steady over the receipt"
+                        )
+                        
+                        InstructionStep(
+                            number: 3,
+                            icon: "checkmark.circle.fill",
+                            iconColor: .orange,
+                            title: "Scan & Review",
+                            description: "Capture one or more scans - the app will automatically select the best one"
+                        )
+                    }
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
             }
+            .background(Color(uiColor: .systemGroupedBackground))
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .buttonStyle(.plain)
     }
     
     private func processReceipt(image: UIImage) {
@@ -155,9 +146,10 @@ struct ReceiptScanView: View {
         
         Task {
             do {
-                // Save image to receipts directory
-                let savedURL = try saveReceiptImage(image)
-                print("Receipt saved successfully to: \(savedURL.path)")
+                // Upload receipt to server - THIS IS THE ONLY STORAGE
+                print("Uploading receipt to server...")
+                let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+                print("Receipt uploaded successfully - S3 Key: \(response.s3_key)")
                 
                 await MainActor.run {
                     capturedImage = nil
@@ -182,7 +174,7 @@ struct ReceiptScanView: View {
                     }
                 }
             } catch {
-                print("Error saving receipt: \(error.localizedDescription)")
+                print("Error uploading receipt: \(error.localizedDescription)")
                 
                 await MainActor.run {
                     isProcessing = false
@@ -191,58 +183,10 @@ struct ReceiptScanView: View {
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.error)
                     
-                    errorMessage = "Failed to save receipt: \(error.localizedDescription)"
+                    errorMessage = "Failed to upload receipt: \(error.localizedDescription)"
                     showError = true
                 }
             }
-        }
-    }
-    
-    private func saveReceiptImage(_ image: UIImage) throws -> URL {
-        // Get documents directory
-        let fileManager = FileManager.default
-        guard let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            throw ReceiptError.directoryNotFound
-        }
-        
-        // Create receipts directory if it doesn't exist
-        let receiptsDirectory = documentsDirectory.appendingPathComponent("receipts", isDirectory: true)
-        
-        if !fileManager.fileExists(atPath: receiptsDirectory.path) {
-            try fileManager.createDirectory(at: receiptsDirectory, withIntermediateDirectories: true)
-        }
-        
-        // Generate filename with timestamp
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        let timestamp = dateFormatter.string(from: Date())
-        let filename = "receipt_\(timestamp).jpg"
-        
-        let fileURL = receiptsDirectory.appendingPathComponent(filename)
-        
-        // Convert image to JPEG data and save
-        guard let imageData = image.jpegData(compressionQuality: 0.9) else {
-            throw ReceiptError.imageConversionFailed
-        }
-        
-        try imageData.write(to: fileURL)
-        
-        return fileURL
-    }
-}
-
-// MARK: - Errors
-
-enum ReceiptError: LocalizedError {
-    case directoryNotFound
-    case imageConversionFailed
-    
-    var errorDescription: String? {
-        switch self {
-        case .directoryNotFound:
-            return "Could not find documents directory"
-        case .imageConversionFailed:
-            return "Failed to convert image to JPEG format"
         }
     }
 }
@@ -519,22 +463,15 @@ struct InstructionStep: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            // Number badge
+            // Icon badge
             ZStack {
                 Circle()
                     .fill(iconColor.opacity(0.15))
                     .frame(width: 56, height: 56)
                 
-                VStack(spacing: 2) {
-                    Image(systemName: icon)
-                        .font(.system(size: 20))
-                        .foregroundStyle(iconColor)
-                    
-                    Text("\(number)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(iconColor.opacity(0.7))
-                }
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundStyle(iconColor)
             }
             
             // Content

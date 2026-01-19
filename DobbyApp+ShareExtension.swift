@@ -10,7 +10,8 @@ import SwiftUI
 
 // MARK: - Example: Main App Entry Point
 // Add this to your existing DobbyApp file
-// No automatic processing needed - receipts are just stored
+// Receipts are uploaded directly to the server via the Share Extension
+// No local processing needed in the main app
 
 /*
 @main
@@ -26,7 +27,7 @@ struct DobbyApp: App {
 }
 */
 
-// MARK: - Example: Add Receipts to Your Navigation
+// MARK: - Example: Add Receipt Upload to Your Navigation
 
 /*
 struct SettingsView: View {
@@ -34,9 +35,9 @@ struct SettingsView: View {
         List {
             Section("Receipts") {
                 NavigationLink {
-                    SavedReceiptsView()
+                    ReceiptUploadView()
                 } label: {
-                    Label("Saved Receipts", systemImage: "doc.text.image")
+                    Label("Upload Receipt", systemImage: "doc.text.image")
                 }
                 
                 NavigationLink {
@@ -49,275 +50,223 @@ struct SettingsView: View {
             Section("Data") {
                 Button {
                     Task {
-                        await checkReceiptsStatus()
+                        await checkUploadStatus()
                     }
                 } label: {
-                    Label("Check Pending Receipts", systemImage: "tray.full")
+                    Label("Check Upload Status", systemImage: "cloud.fill")
                 }
             }
         }
     }
     
-    private func checkReceiptsStatus() async {
-        let pending = await SharedReceiptManager.shared.getPendingReceipts()
-        let saved = await SharedReceiptManager.shared.listSavedReceipts()
-        
-        print("📥 Pending receipts: \(pending.count)")
-        print("💾 Saved receipts: \(saved.count)")
+    private func checkUploadStatus() async {
+        print("☁️ Receipts are uploaded directly to the server")
+        print("💾 Check your backend for uploaded receipts")
     }
 }
 */
 
-// MARK: - Example: Receipt List View - View All Saved Receipts
+// MARK: - Example: Receipt Upload View
 
-struct ReceiptListView: View {
-    @State private var pendingReceipts: [SharedReceipt] = []
-    @State private var savedReceipts: [URL] = []
+struct ReceiptUploadView: View {
+    @State private var selectedImage: UIImage?
+    @State private var showingImagePicker = false
+    @State private var isUploading = false
+    @State private var uploadResult: String?
     
     var body: some View {
-        List {
-            Section("Recently Added") {
-                if pendingReceipts.isEmpty {
-                    Text("No new receipts")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(pendingReceipts) { receipt in
-                        NavigationLink {
-                            ReceiptDetailView(imagePath: receipt.imagePath, date: receipt.date)
-                        } label: {
-                            VStack(alignment: .leading) {
-                                Text("Receipt")
-                                    .font(.headline)
-                                Text(receipt.date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-            
-            Section("All Receipts") {
-                if savedReceipts.isEmpty {
-                    Text("No saved receipts")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(savedReceipts, id: \.self) { url in
-                        NavigationLink {
-                            ReceiptDetailView(url: url)
-                        } label: {
-                            Text(url.lastPathComponent)
-                        }
-                    }
-                }
-            }
-        }
-        .navigationTitle("Receipts")
-        .task {
-            await loadReceipts()
-        }
-        .refreshable {
-            await loadReceipts()
-        }
-        .toolbar {
-            Button("Clear New Badge") {
-                Task {
-                    await SharedReceiptManager.shared.markReceiptsAsViewed()
-                    await loadReceipts()
-                }
-            }
-        }
-    }
-    
-    private func loadReceipts() async {
-        let pending = await SharedReceiptManager.shared.getPendingReceipts()
-        let saved = await SharedReceiptManager.shared.listSavedReceipts()
-        
-        await MainActor.run {
-            pendingReceipts = pending
-            savedReceipts = saved
-        }
-    }
-}
-
-struct ReceiptDetailView: View {
-    let imagePath: String?
-    let url: URL?
-    let date: Date?
-    
-    init(imagePath: String, date: Date) {
-        self.imagePath = imagePath
-        self.url = nil
-        self.date = date
-    }
-    
-    init(url: URL) {
-        self.url = url
-        self.imagePath = nil
-        self.date = nil
-    }
-    
-    var body: some View {
-        ScrollView {
-            if let image = loadImage() {
+        VStack(spacing: 20) {
+            if let image = selectedImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .padding()
+                    .frame(maxHeight: 300)
+                    .cornerRadius(12)
+                
+                if isUploading {
+                    ProgressView("Uploading to server...")
+                } else if let result = uploadResult {
+                    Text(result)
+                        .foregroundColor(result.contains("Success") ? .green : .red)
+                        .multilineTextAlignment(.center)
+                }
+                
+                HStack {
+                    Button("Choose Different Image") {
+                        selectedImage = nil
+                        uploadResult = nil
+                    }
+                    
+                    if !isUploading {
+                        Button("Upload") {
+                            Task {
+                                await uploadReceipt()
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
             } else {
                 ContentUnavailableView(
-                    "Cannot Load Receipt",
-                    systemImage: "photo",
-                    description: Text("The receipt image could not be loaded")
+                    "No Receipt Selected",
+                    systemImage: "photo.badge.plus",
+                    description: Text("Select a receipt image to upload to the server")
                 )
+                
+                Button("Select Image") {
+                    showingImagePicker = true
+                }
+                .buttonStyle(.borderedProminent)
             }
         }
-        .navigationTitle("Receipt")
-        .navigationBarTitleDisplayMode(.inline)
+        .padding()
+        .navigationTitle("Upload Receipt")
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(image: $selectedImage)
+        }
     }
     
-    private func loadImage() -> UIImage? {
-        if let imagePath = imagePath {
-            return UIImage(contentsOfFile: imagePath)
-        } else if let url = url {
-            return UIImage(contentsOfFile: url.path)
+    private func uploadReceipt() async {
+        guard let image = selectedImage else { return }
+        
+        isUploading = true
+        uploadResult = nil
+        
+        do {
+            let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+            uploadResult = "Success! S3 Key: \(response.s3_key)"
+        } catch {
+            uploadResult = "Error: \(error.localizedDescription)"
         }
-        return nil
+        
+        isUploading = false
     }
 }
 
+// MARK: - Simple Image Picker
 
-// MARK: - Example: Receipt Statistics View
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.image = image
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}
 
-struct ReceiptStatsView: View {
-    @State private var stats: ReceiptStats?
+// MARK: - Example: Upload Status
+
+/// Check if receipts have been uploaded by monitoring your backend
+/// The Share Extension uploads directly to: https://3edaeenmik.eu-west-1.awsapprunner.com/upload
+struct UploadStatusView: View {
+    @State private var lastUploadInfo = "No recent uploads"
     
     var body: some View {
         List {
-            if let stats = stats {
-                Section("Statistics") {
-                    LabeledContent("Total Receipts", value: "\(stats.totalReceipts)")
-                    LabeledContent("Pending", value: "\(stats.pendingCount)")
-                    LabeledContent("Processed", value: "\(stats.processedCount)")
-                }
+            Section("Upload Configuration") {
+                LabeledContent("Endpoint", value: "AWS App Runner")
+                LabeledContent("Storage", value: "S3 Bucket")
+                LabeledContent("Method", value: "Direct Upload")
+            }
+            
+            Section("How It Works") {
+                Text("When you share a receipt image:")
+                    .font(.headline)
                 
-                Section("By Store") {
-                    ForEach(stats.receiptsByStore.sorted(by: { $0.key < $1.key }), id: \.key) { store, count in
-                        LabeledContent(store, value: "\(count)")
-                    }
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Share Extension receives the image/PDF", systemImage: "1.circle.fill")
+                    Label("PDFs are uploaded as-is (preserved)", systemImage: "2.circle.fill")
+                    Label("Images are converted to JPEG", systemImage: "2.circle.fill")
+                    Label("Uploaded to your server via API", systemImage: "3.circle.fill")
+                    Label("Server processes and stores in S3", systemImage: "4.circle.fill")
+                    Label("Success confirmation shown", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
                 }
-                
-                if let dir = stats.storageLocation {
-                    Section("Storage") {
-                        VStack(alignment: .leading) {
-                            Text("Location")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(dir)
-                                .font(.caption)
-                                .foregroundStyle(.blue)
+                .font(.callout)
+            }
+            
+            Section("Format Support") {
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "doc.fill")
+                                .foregroundStyle(.red)
+                            Text("PDF Receipts")
+                                .font(.headline)
                         }
+                        Text("• Uploaded in original PDF format\n• Preserves vector quality\n• Maintains text layer\n• Supports multi-page")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "photo.fill")
+                                .foregroundStyle(.blue)
+                            Text("Image Receipts")
+                                .font(.headline)
+                        }
+                        Text("• Converted to JPEG (90% quality)\n• Supports JPG, PNG, HEIC, etc.\n• Optimized for storage")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
-            } else {
-                ProgressView()
+                .padding(.vertical, 4)
             }
-        }
-        .navigationTitle("Receipt Stats")
-        .task {
-            await loadStats()
-        }
-        .refreshable {
-            await loadStats()
-        }
-    }
-    
-    private func loadStats() async {
-        let pending = await SharedReceiptManager.shared.getPendingReceipts()
-        let saved = await SharedReceiptManager.shared.listSavedReceipts()
-        let dir = await SharedReceiptManager.shared.getReceiptsDirectory()
-        
-        let totalSaved = saved.count
-        // Since we don't have store information in the saved receipts yet,
-        // we'll create a simple count dictionary
-        let receiptsByStore: [String: Int] = totalSaved > 0 ? ["All Receipts": totalSaved] : [:]
-        
-        await MainActor.run {
-            stats = ReceiptStats(
-                totalReceipts: totalSaved + pending.count,
-                pendingCount: pending.count,
-                processedCount: totalSaved,
-                receiptsByStore: receiptsByStore,
-                storageLocation: dir?.path
-            )
-        }
-    }
-}
-
-struct ReceiptStats {
-    let totalReceipts: Int
-    let pendingCount: Int
-    let processedCount: Int
-    let receiptsByStore: [String: Int]
-    let storageLocation: String?
-}
-
-// MARK: - Example: Receipt Count Badge
-
-struct ReceiptBadge: View {
-    @State private var pendingCount = 0
-    
-    var body: some View {
-        NavigationLink {
-            ReceiptListView()
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "doc.text.image")
-                    .font(.title2)
-                
-                if pendingCount > 0 {
-                    Text("\(pendingCount)")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.white)
-                        .padding(4)
-                        .background(Circle().fill(Color.red))
-                        .offset(x: 8, y: -8)
+            
+            Section("Testing") {
+                NavigationLink {
+                    ReceiptUploadView()
+                } label: {
+                    Label("Test Upload", systemImage: "arrow.up.circle")
                 }
             }
         }
-        .task {
-            await updateBadge()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            Task {
-                await updateBadge()
-            }
-        }
-    }
-    
-    private func updateBadge() async {
-        let receipts = await SharedReceiptManager.shared.getPendingReceipts()
-        await MainActor.run {
-            pendingCount = receipts.count
-        }
+        .navigationTitle("Receipt Upload Info")
     }
 }
 
 // MARK: - Example: Preview
 
-#Preview("Receipt List") {
+#Preview("Upload View") {
     NavigationStack {
-        ReceiptListView()
+        ReceiptUploadView()
     }
 }
 
-#Preview("Stats View") {
+#Preview("Upload Status") {
     NavigationStack {
-        ReceiptStatsView()
+        UploadStatusView()
     }
 }
 
-#Preview("Badge") {
-    ReceiptBadge()
-        .padding()
-}

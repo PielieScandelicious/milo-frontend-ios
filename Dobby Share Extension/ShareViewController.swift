@@ -68,8 +68,6 @@ class ShareViewController: UIViewController {
         return imageView
     }()
     
-    // MARK: - Properties
-    private let appGroupIdentifier = "group.com.dobby.app"
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -285,9 +283,8 @@ class ShareViewController: UIViewController {
                 return
             }
             
-            guard let url = item as? URL,
-                  let image = self.convertPDFToImage(url: url) else {
-                self.updateStatus(error: "Could not convert PDF to image")
+            guard let url = item as? URL else {
+                self.updateStatus(error: "Could not load PDF from file")
                 Task {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     await MainActor.run {
@@ -297,8 +294,9 @@ class ShareViewController: UIViewController {
                 return
             }
             
+            // Upload PDF directly without conversion
             Task {
-                await self.saveReceiptImage(image)
+                await self.uploadPDFReceipt(from: url)
             }
         }
     }
@@ -409,22 +407,10 @@ class ShareViewController: UIViewController {
                     }
                 }
             } else if pathExtension == "pdf" {
-                // Try to convert PDF
-                print("🔄 Attempting to convert PDF to image...")
-                if let pdfImage = self.convertPDFToImage(url: fileURL) {
-                    print("✅ Converted PDF to image: \(pdfImage.size)")
-                    Task {
-                        await self.saveReceiptImage(pdfImage)
-                    }
-                } else {
-                    print("❌ Could not convert PDF - convertPDFToImage returned nil")
-                    self.updateStatus(error: "Could not convert PDF to image")
-                    Task {
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
-                        await MainActor.run {
-                            self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 9, userInfo: nil))
-                        }
-                    }
+                // Upload PDF directly without conversion
+                print("📄 Uploading PDF directly...")
+                Task {
+                    await self.uploadPDFReceipt(from: fileURL)
                 }
             } else {
                 print("❌ Unsupported file type: \(pathExtension)")
@@ -624,9 +610,63 @@ class ShareViewController: UIViewController {
         return image
     }
     
-    // MARK: - Save Receipt Image
+    // MARK: - Upload PDF Receipt
+    private func uploadPDFReceipt(from pdfURL: URL) async {
+        print("📄 uploadPDFReceipt started for: \(pdfURL)")
+        
+        do {
+            // Show loading state
+            await MainActor.run {
+                self.titleLabel.text = "Uploading PDF..."
+                self.statusLabel.text = "Preserving original format"
+            }
+            
+            // Add a delay to ensure UI is visible before processing
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            
+            // Upload PDF directly to API
+            print("☁️ Uploading PDF receipt to server...")
+            let response = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
+            print("✅ PDF uploaded successfully - S3 Key: \(response.s3_key)")
+            
+            // Success! Show success state
+            await showSuccess(message: "PDF receipt uploaded successfully!")
+            
+            // Keep success visible
+            try? await Task.sleep(nanoseconds: 900_000_000) // 0.9 seconds
+            
+            // Animate dismissal
+            await animateDismissal()
+            
+            // Complete the request
+            await MainActor.run {
+                self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            }
+            
+            print("✅ PDF upload completed successfully")
+            
+        } catch let error as ReceiptError {
+            print("❌ ReceiptError: \(error.localizedDescription)")
+            updateStatus(error: error.errorDescription ?? "Unknown error")
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await animateDismissal()
+            await MainActor.run {
+                self.extensionContext?.cancelRequest(withError: error)
+            }
+        } catch {
+            print("❌ Error: \(error.localizedDescription)")
+            updateStatus(error: "Failed to upload PDF: \(error.localizedDescription)")
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await animateDismissal()
+            await MainActor.run {
+                self.extensionContext?.cancelRequest(withError: error)
+            }
+        }
+    }
+    
+    // MARK: - Upload Receipt Image
     private func saveReceiptImage(_ image: UIImage) async {
-        print("💾 saveReceiptImage started")
+        print("💾 uploadReceiptImage started")
         
         do {
             // Show image preview with animation
@@ -635,7 +675,7 @@ class ShareViewController: UIViewController {
             print("📸 Image preview shown")
             
             // Add a delay to ensure UI is visible before processing
-            print("⏳ Waiting before save...")
+            print("⏳ Waiting before upload...")
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
             
             // Validate image
@@ -643,16 +683,15 @@ class ShareViewController: UIViewController {
                 throw ReceiptError.invalidImage
             }
             
-            print("💾 Saving receipt to file...")
-            let savedPath = try saveReceipt(image: image)
+            // ✅ UPLOAD TO API ONLY - No local storage
+            print("☁️ Uploading receipt to server...")
+            let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+            print("✅ Receipt uploaded successfully - S3 Key: \(response.s3_key)")
             
-            // Notify main app
-            notifyMainApp(imagePath: savedPath)
-            
-            print("✅ Receipt saved, showing success animation...")
+            print("✅ Receipt uploaded, showing success animation...")
             
             // Success! Show success state with animation and WAIT for it
-            await showSuccess(message: "Receipt saved successfully!")
+            await showSuccess(message: "Receipt uploaded successfully!")
             
             print("✅ Success animation complete, waiting 0.9 seconds...")
             
@@ -683,7 +722,7 @@ class ShareViewController: UIViewController {
             }
         } catch {
             print("❌ Error: \(error.localizedDescription)")
-            updateStatus(error: "Failed to save: \(error.localizedDescription)")
+            updateStatus(error: "Failed to upload: \(error.localizedDescription)")
             try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
             await animateDismissal()
             await MainActor.run {
@@ -736,85 +775,7 @@ class ShareViewController: UIViewController {
         }
     }
 
-    
-    // MARK: - Save Receipt
-    private func saveReceipt(image: UIImage) throws -> String {
-        // Get shared container directory
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) else {
-            print("❌ Failed to get App Group container URL")
-            throw ReceiptError.appGroupNotFound
-        }
-        
-        print("✅ App Group container: \(containerURL.path)")
-        
-        // Create receipts directory
-        let receiptsURL = containerURL.appendingPathComponent("receipts")
-        
-        do {
-            try FileManager.default.createDirectory(at: receiptsURL, withIntermediateDirectories: true, attributes: nil)
-            print("✅ Receipts directory created/verified: \(receiptsURL.path)")
-        } catch {
-            print("❌ Failed to create directory: \(error)")
-            throw error
-        }
-        
-        // Generate unique filename with milliseconds for uniqueness
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
-        let timestamp = dateFormatter.string(from: Date())
-        let milliseconds = Int(Date().timeIntervalSince1970 * 1000) % 1000
-        let filename = "receipt_\(timestamp)_\(milliseconds).jpg"
-        let fileURL = receiptsURL.appendingPathComponent(filename)
-        
-        print("📝 Saving to: \(fileURL.path)")
-        
-        // Save image with error handling
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            print("❌ Failed to compress image")
-            throw ReceiptError.imageCompressionFailed
-        }
-        
-        print("✅ Image compressed: \(imageData.count) bytes")
-        
-        do {
-            try imageData.write(to: fileURL, options: .atomic)
-            print("✅ File written successfully")
-        } catch {
-            print("❌ Failed to write file: \(error)")
-            throw ReceiptError.fileWriteFailed
-        }
-        
-        // Verify file was written
-        if FileManager.default.fileExists(atPath: fileURL.path) {
-            print("✅ File verified at: \(fileURL.path)")
-        } else {
-            print("❌ File does not exist after write")
-            throw ReceiptError.fileWriteFailed
-        }
-        
-        return fileURL.path
-    }
-    
-    // MARK: - Notify Main App
-    private func notifyMainApp(imagePath: String) {
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            return
-        }
-        
-        // Store latest receipt info
-        let receiptInfo: [String: Any] = [
-            "imagePath": imagePath,
-            "timestamp": Date().timeIntervalSince1970
-        ]
-        
-        // Get existing receipts
-        var receipts = sharedDefaults.array(forKey: "pendingReceipts") as? [[String: Any]] ?? []
-        receipts.append(receiptInfo)
-        
-        // Save updated receipts
-        sharedDefaults.set(receipts, forKey: "pendingReceipts")
-        sharedDefaults.synchronize()
-    }
+
     
     // MARK: - Update UI Status
     private func updateStatus(message: String) {
@@ -879,20 +840,14 @@ class ShareViewController: UIViewController {
 // MARK: - Supporting Types
 enum ReceiptError: LocalizedError {
     case invalidImage
-    case appGroupNotFound
-    case imageCompressionFailed
-    case fileWriteFailed
+    case uploadFailed
     
     var errorDescription: String? {
         switch self {
         case .invalidImage:
             return "The image appears to be invalid or empty"
-        case .appGroupNotFound:
-            return "App configuration error. Please reinstall the app."
-        case .imageCompressionFailed:
-            return "Could not compress the image"
-        case .fileWriteFailed:
-            return "Could not save the file. Check storage permissions."
+        case .uploadFailed:
+            return "Failed to upload receipt to server"
         }
     }
 }
