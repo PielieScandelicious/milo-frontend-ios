@@ -72,16 +72,14 @@ struct DonutSegment: View {
     let animationProgress: CGFloat
     
     var body: some View {
+        let startFraction = startAngle.degrees / 360.0
+        let endFraction = endAngle.degrees / 360.0
+        let animatedEndFraction = startFraction + (endFraction - startFraction) * animationProgress
+        
         Circle()
-            .trim(from: 0, to: calculateTrimEnd())
+            .trim(from: startFraction, to: animatedEndFraction)
             .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
             .rotationEffect(.degrees(-90))
-            .rotationEffect(startAngle)
-    }
-    
-    private func calculateTrimEnd() -> CGFloat {
-        let totalAngle = (endAngle.degrees - startAngle.degrees) / 360.0
-        return totalAngle * animationProgress
     }
 }
 

@@ -25,6 +25,7 @@ struct OverviewView: View {
     @State private var isEditMode = false
     @State private var draggingItem: StoreBreakdown?
     @State private var displayedBreakdowns: [StoreBreakdown] = []
+    @State private var selectedBreakdown: StoreBreakdown?
     
     private var availablePeriods: [String] {
         dataManager.breakdownsByPeriod().keys.sorted()
@@ -155,6 +156,9 @@ struct OverviewView: View {
             }
         }
         .navigationBarTitleDisplayMode(.large)
+        .navigationDestination(item: $selectedBreakdown) { breakdown in
+            StoreDetailView(storeBreakdown: breakdown)
+        }
         .sheet(isPresented: $showingFilterSheet) {
             FilterSheet(
                 selectedSort: $selectedSort
@@ -200,23 +204,18 @@ struct OverviewView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 16, weight: .medium))
-                    Text(selectedSort.rawValue)
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.1))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                )
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white.opacity(0.1))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
             }
             
             Spacer()
@@ -309,20 +308,24 @@ struct OverviewView: View {
                                 draggingItem: $draggingItem
                             ))
                     } else {
-                        storeChartCard(breakdown)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                // Navigate to detail - will implement with NavigationLink later
-                            }
-                            .onLongPressGesture(minimumDuration: 0.5) {
-                                // Enter edit mode on long press
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    isEditMode = true
+                        Button {
+                            selectedBreakdown = breakdown
+                        } label: {
+                            storeChartCard(breakdown)
+                        }
+                        .buttonStyle(StoreCardButtonStyle())
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5)
+                                .onEnded { _ in
+                                    // Enter edit mode on long press
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        isEditMode = true
+                                    }
+                                    // Haptic feedback
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
                                 }
-                                // Haptic feedback
-                                let generator = UIImpactFeedbackGenerator(style: .medium)
-                                generator.impactOccurred()
-                            }
+                        )
                     }
                     
                     // Delete button (X) in edit mode
@@ -487,6 +490,16 @@ struct JiggleModifier: ViewModifier {
                     try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
                 }
             }
+    }
+}
+
+// MARK: - Store Card Button Style
+struct StoreCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 

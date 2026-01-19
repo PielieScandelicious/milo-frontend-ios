@@ -41,7 +41,11 @@ struct ContentView: View {
 // MARK: - View Tab
 struct ViewTab: View {
     var body: some View {
-        OverviewView()
+        NavigationStack {
+            OverviewView()
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .navigationBar)
+        }
     }
 }
 

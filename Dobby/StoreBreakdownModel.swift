@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 
-struct StoreBreakdown: Codable, Identifiable, Equatable {
+struct StoreBreakdown: Codable, Identifiable, Equatable, Hashable {
     let storeName: String
     let period: String
     let totalStoreSpend: Double
@@ -27,14 +27,24 @@ struct StoreBreakdown: Codable, Identifiable, Equatable {
     static func == (lhs: StoreBreakdown, rhs: StoreBreakdown) -> Bool {
         return lhs.id == rhs.id
     }
+    
+    // Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
-struct Category: Codable, Identifiable, Equatable {
+struct Category: Codable, Identifiable, Equatable, Hashable {
     let name: String
     let spent: Double
     let percentage: Int
     
     var id: String { name }
+    
+    // Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(name)
+    }
 }
 
 // MARK: - Data Manager
