@@ -36,17 +36,13 @@ struct DobbyAIChatView: View {
                             // Messages - no extra padding needed
                             ForEach(viewModel.messages) { message in
                                 MessageBubbleView(message: message)
+                                    .environmentObject(viewModel)
                                     .id(message.id)
                                     .transition(.asymmetric(
                                         insertion: .opacity.combined(with: .move(edge: .bottom)),
                                         removal: .opacity
                                     ))
                             }
-                        }
-                        
-                        if viewModel.isLoading {
-                            TypingIndicatorView()
-                                .id("typing")
                         }
                         
                         // Bottom padding for input area
@@ -61,21 +57,12 @@ struct DobbyAIChatView: View {
                         }
                     }
                 }
-                .onChange(of: viewModel.isLoading) { isLoading in
-                    if isLoading {
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            proxy.scrollTo("typing", anchor: .bottom)
-                        }
-                    }
-                }
                 .onChange(of: isInputFocused) { focused in
                     if focused {
                         // Scroll to bottom when keyboard appears
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             withAnimation {
-                                if viewModel.isLoading {
-                                    proxy.scrollTo("typing", anchor: .bottom)
-                                } else if let lastMessage = viewModel.messages.last {
+                                if let lastMessage = viewModel.messages.last {
                                     proxy.scrollTo(lastMessage.id, anchor: .bottom)
                                 }
                             }
@@ -361,6 +348,7 @@ struct ScaleButtonStyle: ButtonStyle {
 struct MessageBubbleView: View {
     let message: ChatMessage
     @State private var isVisible = false
+    @EnvironmentObject var viewModel: ChatViewModel
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -388,7 +376,10 @@ struct MessageBubbleView: View {
             
             // Message content with smooth slide-in animation
             Group {
-                if message.role == .assistant {
+                if message.role == .assistant && message.content.isEmpty && message.id == viewModel.streamingMessageId && viewModel.isLoading {
+                    // Show typing indicator inline
+                    TypingDotsView()
+                } else if message.role == .assistant {
                     MarkdownMessageView(content: message.content)
                         .textSelection(.enabled)
                 } else {
@@ -414,6 +405,36 @@ struct MessageBubbleView: View {
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
         .background(message.role == .assistant ? Color(.systemGray6).opacity(0.5) : Color.clear)
+    }
+}
+
+// MARK: - Typing Dots (inline in message)
+struct TypingDotsView: View {
+    @State private var animating = false
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(Color.secondary)
+                    .frame(width: 8, height: 8)
+                    .opacity(animating ? 0.3 : 1.0)
+                    .animation(
+                        Animation
+                            .easeInOut(duration: 0.6)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.2),
+                        value: animating
+                    )
+            }
+        }
+        .padding(.top, 4)
+        .onAppear {
+            animating = true
+        }
+        .onDisappear {
+            animating = false
+        }
     }
 }
 
@@ -581,58 +602,6 @@ struct MarkdownTableView: View {
         }
         
         return (headers, rows)
-    }
-}
-
-// MARK: - Typing Indicator
-struct TypingIndicatorView: View {
-    @State private var animating = false
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            if let uiImage = UIImage(named: "avatar") {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 32, height: 32)
-                    .clipShape(Circle())
-            } else {
-                // Fallback icon
-                Image(systemName: "sparkles")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.blue)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color.blue.opacity(0.1)))
-            }
-            
-            HStack(spacing: 4) {
-                ForEach(0..<3) { index in
-                    Circle()
-                        .fill(Color.secondary)
-                        .frame(width: 8, height: 8)
-                        .opacity(animating ? 0.3 : 1.0)
-                        .animation(
-                            Animation
-                                .easeInOut(duration: 0.6)
-                                .repeatForever(autoreverses: true)
-                                .delay(Double(index) * 0.2),
-                            value: animating
-                        )
-                }
-            }
-            
-            Spacer(minLength: 20)
-        }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemGray6).opacity(0.5))
-        .onAppear {
-            animating = true
-        }
-        .onDisappear {
-            animating = false
-        }
     }
 }
 
