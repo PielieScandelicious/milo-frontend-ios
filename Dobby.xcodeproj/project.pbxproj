@@ -27,6 +27,14 @@
 		2999B8C82F1DA4F9002ACAF3 /* Dobby Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		29E60CBB2F1DC4E900C309B9 /* IconGeneratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */; };
 		29E60CBC2F1DC51C00C309B9 /* AppIconGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */; };
+		29E60D6C2F1DE55E00C309B9 /* SharedReceiptManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D6B2F1DE55E00C309B9 /* SharedReceiptManager.swift */; };
+		29E60D6E2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */; };
+		29E60D702F1DE59C00C309B9 /* SavedReceiptsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */; };
+		29E60D722F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D712F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md */; };
+		29E60D742F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D732F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md */; };
+		29E60D762F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */; };
+		29E60D782F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */; };
+		29E60D7A2F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +83,14 @@
 		2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Dobby Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppIconGenerator.swift; path = /Users/gillesmoenaert/Documents/projects/Dobby/AppIconGenerator.swift; sourceTree = "<absolute>"; };
 		29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconGeneratorView.swift; sourceTree = "<group>"; };
+		29E60D6B2F1DE55E00C309B9 /* SharedReceiptManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedReceiptManager.swift; sourceTree = "<group>"; };
+		29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_SETUP.md; sourceTree = "<group>"; };
+		29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedReceiptsView.swift; sourceTree = "<group>"; };
+		29E60D712F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_QUICK_START.md; sourceTree = "<group>"; };
+		29E60D732F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_INFO_PLIST.md; sourceTree = "<group>"; };
+		29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_SUMMARY.md; sourceTree = "<group>"; };
+		29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DobbyApp+ShareExtension.swift"; sourceTree = "<group>"; };
+		29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_ARCHITECTURE.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -162,6 +178,14 @@
 				2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */,
 				29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */,
 				29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */,
+				29E60D6B2F1DE55E00C309B9 /* SharedReceiptManager.swift */,
+				29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */,
+				29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */,
+				29E60D712F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md */,
+				29E60D732F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md */,
+				29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */,
+				29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */,
+				29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -270,6 +294,10 @@
 				2999B8B92F1D9BA7002ACAF3 /* ARCHITECTURE.md in Resources */,
 				2983F5F72F1DBC3200D79291 /* Info.plist.template in Resources */,
 				2983F5FB2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md in Resources */,
+				29E60D762F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md in Resources */,
+				29E60D722F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md in Resources */,
+				29E60D742F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md in Resources */,
+				29E60D7A2F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md in Resources */,
 				2999B8B12F1D9AEB002ACAF3 /* TEST_RECEIPTS.md in Resources */,
 				2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */,
 				2999B8B52F1D9B3C002ACAF3 /* README.md in Resources */,
@@ -277,6 +305,7 @@
 				2983F5F92F1DBC4100D79291 /* QUICK_FIX.md in Resources */,
 				2983F5FD2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md in Resources */,
 				2999B8B72F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md in Resources */,
+				29E60D6E2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md in Resources */,
 				2999B8B32F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md in Resources */,
 				2999B8AD2F1D9ABC002ACAF3 /* SETUP_GUIDE.md in Resources */,
 			);
@@ -296,7 +325,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				29E60D782F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift in Sources */,
+				29E60D6C2F1DE55E00C309B9 /* SharedReceiptManager.swift in Sources */,
 				29E60CBC2F1DC51C00C309B9 /* AppIconGenerator.swift in Sources */,
+				29E60D702F1DE59C00C309B9 /* SavedReceiptsView.swift in Sources */,
 				2999B8AB2F1D9A48002ACAF3 /* ReceiptReviewView.swift in Sources */,
 				2999B8A72F1D9A05002ACAF3 /* ReceiptImportService.swift in Sources */,
 				2999B8A52F1D99F0002ACAF3 /* AnthropicService.swift in Sources */,
