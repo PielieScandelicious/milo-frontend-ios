@@ -107,17 +107,6 @@ struct OverviewView: View {
     
     var body: some View {
         ZStack {
-            // Background tap to exit edit mode
-            if isEditMode {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            isEditMode = false
-                        }
-                    }
-            }
-            
             Color(white: 0.05).ignoresSafeArea()
             
             ScrollView {
@@ -125,13 +114,16 @@ struct OverviewView: View {
                     // Period selector
                     if availablePeriods.count > 1 {
                         periodSelector
+                            .allowsHitTesting(!isEditMode)
                     }
                     
                     // Filter bar
                     filterBar
+                        .allowsHitTesting(!isEditMode)
                     
                     // Total spending card
                     totalSpendingCard
+                        .allowsHitTesting(!isEditMode)
                     
                     // Store breakdowns grid
                     storeBreakdownsGrid
@@ -139,6 +131,16 @@ struct OverviewView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 32)
             }
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded { _ in
+                        if isEditMode {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                isEditMode = false
+                            }
+                        }
+                    }
+            )
         }
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingFilterSheet) {
