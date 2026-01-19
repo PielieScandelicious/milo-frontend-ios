@@ -1,8 +1,9 @@
 //
-//  ReceiptScanView.swift
+//  ReceiptScanView.swift (TEMPORARY FIX VERSION)
 //  Dobby
 //
-//  Created by Gilles Moenaert on 18/01/2026.
+//  This version has a button to open camera instead of auto-opening
+//  Use this while we debug the permission issue
 //
 
 import SwiftUI
@@ -39,19 +40,33 @@ struct ReceiptScanView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                // Placeholder state when camera is dismissed
-                VStack(spacing: 16) {
+                // Placeholder state with manual button
+                VStack(spacing: 24) {
                     Image(systemName: "camera.viewfinder")
-                        .font(.system(size: 60))
-                        .foregroundStyle(.secondary)
-                    
-                    Text("Ready to Scan")
-                        .font(.title2.bold())
+                        .font(.system(size: 70))
                         .foregroundStyle(.white)
                     
-                    Text("Tap the scan icon to open camera")
+                    Text("Ready to Scan")
+                        .font(.title.bold())
+                        .foregroundStyle(.white)
+                    
+                    Text("Take a photo of your receipt")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    
+                    // MANUAL CAMERA BUTTON
+                    Button {
+                        showCamera = true
+                    } label: {
+                        Label("Open Camera", systemImage: "camera.fill")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 32)
+                            .padding(.vertical, 16)
+                            .background(.blue.gradient)
+                            .cornerRadius(12)
+                    }
+                    .padding(.top, 8)
                 }
             }
         }
@@ -84,10 +99,10 @@ struct ReceiptScanView: View {
                 }
             }
         }
-        .onAppear {
-            // Auto-open camera when view appears
-            showCamera = true
-        }
+        // REMOVED AUTO-OPEN FOR DEBUGGING
+        // .onAppear {
+        //     showCamera = true
+        // }
     }
     
     // MARK: - Process Image

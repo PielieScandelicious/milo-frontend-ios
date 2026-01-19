@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2983F5F52F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5F42F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md */; };
+		2983F5F72F1DBC3200D79291 /* Info.plist.template in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5F62F1DBC3200D79291 /* Info.plist.template */; };
+		2983F5F92F1DBC4100D79291 /* QUICK_FIX.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5F82F1DBC4100D79291 /* QUICK_FIX.md */; };
+		2983F5FB2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */; };
+		2983F5FD2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */; };
 		2999B8A32F1D9879002ACAF3 /* env.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A22F1D986B002ACAF3 /* env.swift */; };
 		2999B8A52F1D99F0002ACAF3 /* AnthropicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */; };
 		2999B8A72F1D9A05002ACAF3 /* ReceiptImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */; };
@@ -19,10 +24,42 @@
 		2999B8B52F1D9B3C002ACAF3 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B42F1D9B3C002ACAF3 /* README.md */; };
 		2999B8B72F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */; };
 		2999B8B92F1D9BA7002ACAF3 /* ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */; };
+		2999B8C82F1DA4F9002ACAF3 /* Dobby Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		29E60CBB2F1DC4E900C309B9 /* IconGeneratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */; };
+		29E60CBC2F1DC51C00C309B9 /* AppIconGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2999B8C62F1DA4F9002ACAF3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 294D4FB52F1D695B001B9193 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2999B8BD2F1DA4F9002ACAF3;
+			remoteInfo = "Dobby Share Extension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		2999B8CD2F1DA4F9002ACAF3 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				2999B8C82F1DA4F9002ACAF3 /* Dobby Share Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		294D4FBD2F1D695B001B9193 /* Dobby.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dobby.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2983F5F42F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = FIX_BLACK_SCREEN.md; sourceTree = "<group>"; };
+		2983F5F62F1DBC3200D79291 /* Info.plist.template */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Info.plist.template; sourceTree = "<group>"; };
+		2983F5F82F1DBC4100D79291 /* QUICK_FIX.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = QUICK_FIX.md; sourceTree = "<group>"; };
+		2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ADD_CAMERA_PERMISSION.md; sourceTree = "<group>"; };
+		2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = EXACT_STEPS_NO_PLIST.md; sourceTree = "<group>"; };
 		2999B8A22F1D986B002ACAF3 /* env.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = env.swift; sourceTree = "<group>"; };
 		2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicService.swift; sourceTree = "<group>"; };
 		2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptImportService.swift; sourceTree = "<group>"; };
@@ -35,11 +72,34 @@
 		2999B8B42F1D9B3C002ACAF3 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BUILD_CHECKLIST.md; sourceTree = "<group>"; };
 		2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
+		2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Dobby Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppIconGenerator.swift; path = /Users/gillesmoenaert/Documents/projects/Dobby/AppIconGenerator.swift; sourceTree = "<absolute>"; };
+		29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconGeneratorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		2983F5FF2F1DBF3B00D79291 /* Exceptions for "Dobby" folder in "Dobby" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 294D4FBC2F1D695B001B9193 /* Dobby */;
+		};
+		2999B8C92F1DA4F9002ACAF3 /* Exceptions for "Dobby Share Extension" folder in "Dobby Share Extension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		294D4FBF2F1D695B001B9193 /* Dobby */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2983F5FF2F1DBF3B00D79291 /* Exceptions for "Dobby" folder in "Dobby" target */,
+			);
 			path = Dobby;
 			sourceTree = "<group>";
 		};
@@ -48,10 +108,25 @@
 			path = mockdata;
 			sourceTree = "<group>";
 		};
+		2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2999B8C92F1DA4F9002ACAF3 /* Exceptions for "Dobby Share Extension" folder in "Dobby Share Extension" target */,
+			);
+			path = "Dobby Share Extension";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		294D4FBA2F1D695B001B9193 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2999B8BB2F1DA4F9002ACAF3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -67,6 +142,7 @@
 				2999B8A22F1D986B002ACAF3 /* env.swift */,
 				294D4FD32F1D6A65001B9193 /* mockdata */,
 				294D4FBF2F1D695B001B9193 /* Dobby */,
+				2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */,
 				294D4FBE2F1D695B001B9193 /* Products */,
 				2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */,
 				2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */,
@@ -79,6 +155,13 @@
 				2999B8B42F1D9B3C002ACAF3 /* README.md */,
 				2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */,
 				2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */,
+				2983F5F42F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md */,
+				2983F5F62F1DBC3200D79291 /* Info.plist.template */,
+				2983F5F82F1DBC4100D79291 /* QUICK_FIX.md */,
+				2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */,
+				2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */,
+				29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */,
+				29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -86,6 +169,7 @@
 			isa = PBXGroup;
 			children = (
 				294D4FBD2F1D695B001B9193 /* Dobby.app */,
+				2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -100,10 +184,12 @@
 				294D4FB92F1D695B001B9193 /* Sources */,
 				294D4FBA2F1D695B001B9193 /* Frameworks */,
 				294D4FBB2F1D695B001B9193 /* Resources */,
+				2999B8CD2F1DA4F9002ACAF3 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				2999B8C72F1DA4F9002ACAF3 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				294D4FBF2F1D695B001B9193 /* Dobby */,
@@ -116,6 +202,28 @@
 			productReference = 294D4FBD2F1D695B001B9193 /* Dobby.app */;
 			productType = "com.apple.product-type.application";
 		};
+		2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2999B8CA2F1DA4F9002ACAF3 /* Build configuration list for PBXNativeTarget "Dobby Share Extension" */;
+			buildPhases = (
+				2999B8BA2F1DA4F9002ACAF3 /* Sources */,
+				2999B8BB2F1DA4F9002ACAF3 /* Frameworks */,
+				2999B8BC2F1DA4F9002ACAF3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */,
+			);
+			name = "Dobby Share Extension";
+			packageProductDependencies = (
+			);
+			productName = "Dobby Share Extension";
+			productReference = 2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -127,6 +235,9 @@
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					294D4FBC2F1D695B001B9193 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					2999B8BD2F1DA4F9002ACAF3 = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
@@ -146,6 +257,7 @@
 			projectRoot = "";
 			targets = (
 				294D4FBC2F1D695B001B9193 /* Dobby */,
+				2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */,
 			);
 		};
 /* End PBXProject section */
@@ -156,12 +268,24 @@
 			buildActionMask = 2147483647;
 			files = (
 				2999B8B92F1D9BA7002ACAF3 /* ARCHITECTURE.md in Resources */,
+				2983F5F72F1DBC3200D79291 /* Info.plist.template in Resources */,
+				2983F5FB2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md in Resources */,
 				2999B8B12F1D9AEB002ACAF3 /* TEST_RECEIPTS.md in Resources */,
 				2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */,
 				2999B8B52F1D9B3C002ACAF3 /* README.md in Resources */,
+				2983F5F52F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md in Resources */,
+				2983F5F92F1DBC4100D79291 /* QUICK_FIX.md in Resources */,
+				2983F5FD2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md in Resources */,
 				2999B8B72F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md in Resources */,
 				2999B8B32F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md in Resources */,
 				2999B8AD2F1D9ABC002ACAF3 /* SETUP_GUIDE.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2999B8BC2F1DA4F9002ACAF3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -172,15 +296,32 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				29E60CBC2F1DC51C00C309B9 /* AppIconGenerator.swift in Sources */,
 				2999B8AB2F1D9A48002ACAF3 /* ReceiptReviewView.swift in Sources */,
 				2999B8A72F1D9A05002ACAF3 /* ReceiptImportService.swift in Sources */,
 				2999B8A52F1D99F0002ACAF3 /* AnthropicService.swift in Sources */,
+				29E60CBB2F1DC4E900C309B9 /* IconGeneratorView.swift in Sources */,
 				2999B8A32F1D9879002ACAF3 /* env.swift in Sources */,
 				2999B8A92F1D9A29002ACAF3 /* ReceiptScanView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		2999B8BA2F1DA4F9002ACAF3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2999B8C72F1DA4F9002ACAF3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
+			targetProxy = 2999B8C62F1DA4F9002ACAF3 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		294D4FC62F1D695B001B9193 /* Debug */ = {
@@ -307,10 +448,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Dobby/Dobby.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Dobby/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -338,10 +483,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Dobby/Dobby.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Dobby/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -357,6 +506,64 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		2999B8CB2F1DA4F9002ACAF3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Dobby Share Extension/Dobby Share Extension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9A8M33Z82L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Dobby Share Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Dobby Share Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.deepmaind.Dobby.Dobby-Share-Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		2999B8CC2F1DA4F9002ACAF3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Dobby Share Extension/Dobby Share Extension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9A8M33Z82L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Dobby Share Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Dobby Share Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.deepmaind.Dobby.Dobby-Share-Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -381,6 +588,15 @@
 			buildConfigurations = (
 				294D4FC92F1D695B001B9193 /* Debug */,
 				294D4FCA2F1D695B001B9193 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2999B8CA2F1DA4F9002ACAF3 /* Build configuration list for PBXNativeTarget "Dobby Share Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2999B8CB2F1DA4F9002ACAF3 /* Debug */,
+				2999B8CC2F1DA4F9002ACAF3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

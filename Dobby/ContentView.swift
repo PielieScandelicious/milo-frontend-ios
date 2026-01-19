@@ -14,7 +14,7 @@ struct ContentView: View {
         TabView {
             ViewTab()
                 .tabItem {
-                    Label("View", systemImage: "eye")
+                    Label("View", systemImage: "chart.pie.fill")
                 }
             
             ScanTab()
