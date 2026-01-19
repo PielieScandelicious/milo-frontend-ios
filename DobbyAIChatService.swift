@@ -58,6 +58,7 @@ enum AnthropicError: LocalizedError {
     case invalidURL
     case invalidResponse
     case emptyResponse
+    case invalidAPIKey
     case apiError(statusCode: Int, message: String)
     
     var errorDescription: String? {
@@ -68,6 +69,8 @@ enum AnthropicError: LocalizedError {
             return "Invalid response from API"
         case .emptyResponse:
             return "Empty response from API"
+        case .invalidAPIKey:
+            return "Invalid or missing Anthropic API key. Please check your configuration in env.swift"
         case .apiError(let statusCode, let message):
             return "API error (\(statusCode)): \(message)"
         }
@@ -136,6 +139,7 @@ actor DobbyAIChatService {
     private func buildSystemPrompt(transactions: [Transaction]) -> String {
         let nutritionData = calculateNutritionInsights(from: transactions)
         let spendingData = calculateSpendingInsights(from: transactions)
+        let allTransactionsData = formatAllTransactions(transactions)
         
         return """
         You are Dobby, a friendly and knowledgeable AI assistant specialized in analyzing grocery shopping data and providing personalized dietary and financial insights.
@@ -146,25 +150,32 @@ actor DobbyAIChatService {
         - Proactive in suggesting improvements
         - Supportive and non-judgmental
         
-        You have access to the user's shopping transaction data. Here's what you know:
+        IMPORTANT: You have access to the COMPLETE transaction data below. When asked questions about spending or shopping:
+        1. Count and calculate from the actual transaction list, not from summaries
+        2. Be precise with numbers - verify your calculations
+        3. Reference specific items and dates when relevant
+        4. If you need to count items or sum amounts, do so carefully from the full list
         
-        ## Current Shopping Data Summary
+        ## Complete Transaction Data
+        Total transactions: \(transactions.count)
         
-        ### Nutrition Breakdown:
+        \(allTransactionsData)
+        
+        ## Pre-calculated Summaries (for reference)
+        
+        ### Nutrition Overview:
         \(nutritionData.summary)
         
-        ### Spending Breakdown:
+        ### Spending Overview:
         \(spendingData.summary)
         
-        ### Recent Transactions:
-        \(formatRecentTransactions(transactions))
-        
         When answering questions:
-        1. Reference specific data from the transactions when relevant
-        2. Provide actionable insights and suggestions
-        3. Compare spending/nutrition to general healthy guidelines
-        4. Be specific about numbers (e.g., "You spent €45.20 on meat this month")
-        5. Suggest healthier or more cost-effective alternatives when appropriate
+        1. ALWAYS refer to the complete transaction list above for accurate counts and totals
+        2. Double-check your math when calculating totals or percentages
+        3. Provide actionable insights and suggestions
+        4. Compare spending/nutrition to general healthy guidelines
+        5. Be specific about numbers and reference actual items from the list
+        6. Suggest healthier or more cost-effective alternatives when appropriate
         
         Common questions you should be able to answer:
         - "Do I have enough protein in my diet?"
@@ -173,8 +184,10 @@ actor DobbyAIChatService {
         - "How can I eat healthier?"
         - "Am I buying enough vegetables?"
         - "Where can I save money?"
+        - "How many times did I buy [item]?"
+        - "How much did I spend on [category/store]?"
         
-        Always be helpful, specific, and reference the actual data.
+        Always be helpful, specific, and reference the actual data from the complete transaction list.
         """
     }
     
@@ -241,7 +254,40 @@ actor DobbyAIChatService {
         return (summary, categoryTotals)
     }
     
-    // MARK: - Format Recent Transactions
+    // MARK: - Format All Transactions (Complete Data)
+    private func formatAllTransactions(_ transactions: [Transaction]) -> String {
+        let sorted = transactions.sorted { $0.date > $1.date }
+        
+        var formatted = "### All Transactions (sorted by date, newest first):\n\n"
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        // Group by category for better organization
+        var categorizedTransactions: [String: [Transaction]] = [:]
+        for transaction in sorted {
+            categorizedTransactions[transaction.category, default: []].append(transaction)
+        }
+        
+        // Also provide a chronological list
+        formatted += "**Chronological List:**\n"
+        for (index, transaction) in sorted.enumerated() {
+            formatted += "\(index + 1). [\(dateFormatter.string(from: transaction.date))] \(transaction.itemName) - €\(String(format: "%.2f", transaction.amount)) (Qty: \(transaction.quantity)) - \(transaction.category) at \(transaction.storeName)\n"
+        }
+        
+        formatted += "\n**Grouped by Category:**\n"
+        for (category, items) in categorizedTransactions.sorted(by: { $0.key < $1.key }) {
+            let categoryTotal = items.reduce(0.0) { $0 + $1.amount }
+            formatted += "\n### \(category) (Total: €\(String(format: "%.2f", categoryTotal)), \(items.count) items):\n"
+            for item in items {
+                formatted += "  - \(item.itemName): €\(String(format: "%.2f", item.amount)) x\(item.quantity) on \(dateFormatter.string(from: item.date)) at \(item.storeName)\n"
+            }
+        }
+        
+        return formatted
+    }
+    
+    // MARK: - Format Recent Transactions (Legacy - kept for reference)
     private func formatRecentTransactions(_ transactions: [Transaction]) -> String {
         let recent = transactions.sorted { $0.date > $1.date }.prefix(20)
         var formatted = "Last 20 transactions:\n"
@@ -258,6 +304,11 @@ actor DobbyAIChatService {
     
     // MARK: - Send Request to Anthropic (Streaming)
     private func streamRequest(systemPrompt: String, messages: [AnthropicMessage], onChunk: @escaping (String) -> Void) async throws {
+        // Check API key validity
+        guard AppConfiguration.isAPIKeyValid else {
+            throw AnthropicError.invalidAPIKey
+        }
+        
         guard let url = URL(string: apiURL) else {
             throw AnthropicError.invalidURL
         }
@@ -285,6 +336,9 @@ actor DobbyAIChatService {
         }
         
         guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw AnthropicError.invalidAPIKey
+            }
             throw AnthropicError.apiError(statusCode: httpResponse.statusCode, message: "Stream request failed")
         }
         
@@ -310,6 +364,11 @@ actor DobbyAIChatService {
     
     // MARK: - Send Request to Anthropic (Non-Streaming)
     private func sendRequest(systemPrompt: String, messages: [AnthropicMessage]) async throws -> String {
+        // Check API key validity
+        guard AppConfiguration.isAPIKeyValid else {
+            throw AnthropicError.invalidAPIKey
+        }
+        
         guard let url = URL(string: apiURL) else {
             throw AnthropicError.invalidURL
         }
@@ -336,6 +395,9 @@ actor DobbyAIChatService {
         }
         
         guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw AnthropicError.invalidAPIKey
+            }
             let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw AnthropicError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
         }

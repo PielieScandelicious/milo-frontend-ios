@@ -93,21 +93,6 @@ struct DobbyAIChatView: View {
                 .frame(height: 20)
                 
                 HStack(alignment: .bottom, spacing: 8) {
-                    // Voice input button (like ChatGPT)
-                    if messageText.isEmpty && !viewModel.isLoading {
-                        Button {
-                            // Voice input action
-                        } label: {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 20))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 36, height: 36)
-                                .background(Color(.systemGray5))
-                                .clipShape(Circle())
-                        }
-                        .transition(.scale.combined(with: .opacity))
-                    }
-                    
                     // Message input field
                     HStack(alignment: .bottom, spacing: 8) {
                         TextField("Message", text: $messageText, axis: .vertical)
@@ -351,13 +336,26 @@ struct MarkdownMessageView: View {
     let content: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             if hasMarkdownTable(content) {
                 renderContentWithTables(content)
             } else {
-                Text(.init(content))
-                    .font(.system(size: 16))
-                    .textSelection(.enabled)
+                // Split by double newlines to create paragraphs
+                let paragraphs = content.components(separatedBy: "\n\n").filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                
+                ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
+                    if let attributedString = try? AttributedString(markdown: paragraph) {
+                        Text(attributedString)
+                            .font(.system(size: 16))
+                            .lineSpacing(2)
+                            .textSelection(.enabled)
+                    } else {
+                        Text(paragraph)
+                            .font(.system(size: 16))
+                            .lineSpacing(2)
+                            .textSelection(.enabled)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -376,9 +374,22 @@ struct MarkdownMessageView: View {
                 MarkdownTableView(markdown: component.text)
                     .padding(.vertical, 4)
             } else if !component.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(.init(component.text))
-                    .font(.system(size: 16))
-                    .textSelection(.enabled)
+                // Also handle paragraphs in non-table content
+                let paragraphs = component.text.components(separatedBy: "\n\n").filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                
+                ForEach(Array(paragraphs.enumerated()), id: \.offset) { pIndex, paragraph in
+                    if let attributedString = try? AttributedString(markdown: paragraph) {
+                        Text(attributedString)
+                            .font(.system(size: 16))
+                            .lineSpacing(2)
+                            .textSelection(.enabled)
+                    } else {
+                        Text(paragraph)
+                            .font(.system(size: 16))
+                            .lineSpacing(2)
+                            .textSelection(.enabled)
+                    }
+                }
             }
         }
     }
