@@ -14,18 +14,13 @@ enum SortOption: String, CaseIterable {
     case storeName = "Store Name"
 }
 
-enum StoreFilter: String, CaseIterable {
-    case all = "All Stores"
-    case colruyt = "COLRUYT"
-    case aldi = "ALDI"
-}
+
 
 struct OverviewView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @StateObject private var dataManager = StoreDataManager()
     @State private var selectedPeriod: String = "January 2026"
     @State private var selectedSort: SortOption = .highestSpend
-    @State private var selectedStoreFilter: StoreFilter = .all
     @State private var showingFilterSheet = false
     @State private var isEditMode = false
     @State private var draggingItem: StoreBreakdown?
@@ -43,11 +38,6 @@ struct OverviewView: View {
         
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
         
-        // Apply store filter
-        if selectedStoreFilter != .all {
-            breakdowns = breakdowns.filter { $0.storeName == selectedStoreFilter.rawValue }
-        }
-        
         // Apply sorting
         switch selectedSort {
         case .highestSpend:
@@ -64,11 +54,6 @@ struct OverviewView: View {
     // Update displayed breakdowns when filters change
     private func updateDisplayedBreakdowns() {
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
-        
-        // Apply store filter
-        if selectedStoreFilter != .all {
-            breakdowns = breakdowns.filter { $0.storeName == selectedStoreFilter.rawValue }
-        }
         
         // Apply sorting
         switch selectedSort {
@@ -114,16 +99,13 @@ struct OverviewView: View {
                     // Period selector
                     if availablePeriods.count > 1 {
                         periodSelector
-                            .allowsHitTesting(!isEditMode)
                     }
                     
                     // Filter bar
                     filterBar
-                        .allowsHitTesting(!isEditMode)
                     
                     // Total spending card
                     totalSpendingCard
-                        .allowsHitTesting(!isEditMode)
                     
                     // Store breakdowns grid
                     storeBreakdownsGrid
@@ -131,22 +113,40 @@ struct OverviewView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 32)
             }
-            .simultaneousGesture(
-                TapGesture()
-                    .onEnded { _ in
-                        if isEditMode {
+            
+            // Edit mode exit button overlay
+            if isEditMode {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 isEditMode = false
                             }
+                        } label: {
+                            Text("Done")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.blue)
+                                )
                         }
+                        .padding(.trailing)
+                        .padding(.top, 20)
                     }
-            )
+                    Spacer()
+                }
+                .allowsHitTesting(true)
+                .transition(.opacity)
+            }
         }
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingFilterSheet) {
             FilterSheet(
-                selectedSort: $selectedSort,
-                selectedStoreFilter: $selectedStoreFilter
+                selectedSort: $selectedSort
             )
         }
         .onAppear {
@@ -163,9 +163,6 @@ struct OverviewView: View {
         .onChange(of: selectedSort) { oldValue, newValue in
             updateDisplayedBreakdowns()
         }
-        .onChange(of: selectedStoreFilter) { oldValue, newValue in
-            updateDisplayedBreakdowns()
-        }
         .onChange(of: dataManager.storeBreakdowns) { oldValue, newValue in
             if !isEditMode {
                 updateDisplayedBreakdowns()
@@ -175,42 +172,6 @@ struct OverviewView: View {
     
     private var filterBar: some View {
         HStack(spacing: 12) {
-            // Store filter button
-            Menu {
-                ForEach(StoreFilter.allCases, id: \.self) { filter in
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedStoreFilter = filter
-                        }
-                    } label: {
-                        HStack {
-                            Text(filter.rawValue)
-                            if selectedStoreFilter == filter {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .font(.system(size: 16, weight: .medium))
-                    Text(selectedStoreFilter.rawValue)
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(selectedStoreFilter != .all ? Color.blue.opacity(0.2) : Color.white.opacity(0.1))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(selectedStoreFilter != .all ? Color.blue.opacity(0.4) : Color.white.opacity(0.15), lineWidth: 1)
-                )
-            }
-            
             // Sort button
             Menu {
                 ForEach(SortOption.allCases, id: \.self) { option in
@@ -337,22 +298,20 @@ struct OverviewView: View {
                                 draggingItem: $draggingItem
                             ))
                     } else {
-                        NavigationLink(destination: StoreDetailView(storeBreakdown: breakdown)) {
-                            storeChartCard(breakdown)
-                        }
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.5)
-                                .onEnded { _ in
-                                    // Enter edit mode on long press
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        isEditMode = true
-                                    }
-                                    // Haptic feedback
-                                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                                    generator.impactOccurred()
+                        storeChartCard(breakdown)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                // Navigate to detail - will implement with NavigationLink later
+                            }
+                            .onLongPressGesture(minimumDuration: 0.5) {
+                                // Enter edit mode on long press
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    isEditMode = true
                                 }
-                        )
-                        .buttonStyle(ScaleButtonStyle())
+                                // Haptic feedback
+                                let generator = UIImpactFeedbackGenerator(style: .medium)
+                                generator.impactOccurred()
+                            }
                     }
                     
                     // Delete button (X) in edit mode
@@ -375,7 +334,6 @@ struct OverviewView: View {
                         .offset(x: 8, y: -8)
                         .transition(.scale.combined(with: .opacity))
                         .zIndex(1)
-                        .allowsHitTesting(true)
                     }
                 }
             }
@@ -419,7 +377,6 @@ struct ScaleButtonStyle: ButtonStyle {
 struct FilterSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedSort: SortOption
-    @Binding var selectedStoreFilter: StoreFilter
     
     var body: some View {
         NavigationStack {
@@ -427,28 +384,6 @@ struct FilterSheet: View {
                 Color(white: 0.05).ignoresSafeArea()
                 
                 List {
-                    Section {
-                        ForEach(StoreFilter.allCases, id: \.self) { filter in
-                            Button {
-                                selectedStoreFilter = filter
-                            } label: {
-                                HStack {
-                                    Text(filter.rawValue)
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    if selectedStoreFilter == filter {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(.blue)
-                                    }
-                                }
-                            }
-                        }
-                    } header: {
-                        Text("Store")
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                    .listRowBackground(Color.white.opacity(0.05))
-                    
                     Section {
                         ForEach(SortOption.allCases, id: \.self) { option in
                             Button {

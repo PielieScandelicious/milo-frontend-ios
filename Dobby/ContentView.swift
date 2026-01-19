@@ -9,36 +9,39 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var transactionManager = TransactionManager()
+    @State private var selectedTab = 0
     
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             ViewTab()
                 .tabItem {
                     Label("View", systemImage: "chart.pie.fill")
                 }
+                .tag(0)
             
             ScanTab()
                 .tabItem {
                     Label("Scan", systemImage: "qrcode.viewfinder")
                 }
+                .tag(1)
             
             DobbyTab()
                 .tabItem {
                     Label("Dobby", systemImage: "sparkles")
                 }
+                .tag(2)
         }
         .environmentObject(transactionManager)
         .preferredColorScheme(.dark)
     }
+    
+
 }
 
 // MARK: - View Tab
 struct ViewTab: View {
     var body: some View {
-        NavigationStack {
-            OverviewView()
-                .navigationBarHidden(true)
-        }
+        OverviewView()
     }
 }
 
@@ -47,7 +50,7 @@ struct ScanTab: View {
     var body: some View {
         NavigationStack {
             ReceiptScanView()
-                .navigationBarHidden(true)
+                .toolbar(.hidden, for: .navigationBar)
         }
     }
 }
