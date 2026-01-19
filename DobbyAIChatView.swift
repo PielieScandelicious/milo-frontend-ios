@@ -189,21 +189,32 @@ struct WelcomeView: View {
             
             // Hero section
             VStack(spacing: 16) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 64))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                // Avatar image - make sure avatar.png is added to Assets.xcassets
+                if let uiImage = UIImage(named: "avatar") {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 80, height: 80)
+                        .clipShape(Circle())
+                        .padding(.bottom, 8)
+                } else {
+                    // Fallback to sparkles if avatar not found
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 64))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .padding(.bottom, 8)
+                        .padding(.bottom, 8)
+                }
                 
                 Text("Dobby")
                     .font(.system(size: 34, weight: .bold))
                 
-                Text("Your AI shopping assistant")
+                Text("Your shopping elf")
                     .font(.system(size: 17))
                     .foregroundStyle(.secondary)
             }
@@ -304,9 +315,27 @@ struct MessageBubbleView: View {
     let message: ChatMessage
     
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .top, spacing: 12) {
             if message.role == .user {
                 Spacer(minLength: 20)
+            }
+            
+            // Avatar for assistant
+            if message.role == .assistant {
+                if let uiImage = UIImage(named: "avatar") {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 32, height: 32)
+                        .clipShape(Circle())
+                } else {
+                    // Fallback icon
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.blue)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color.blue.opacity(0.1)))
+                }
             }
             
             // Message content
@@ -503,7 +532,22 @@ struct TypingIndicatorView: View {
     @State private var animating = false
     
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .top, spacing: 12) {
+            if let uiImage = UIImage(named: "avatar") {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 32, height: 32)
+                    .clipShape(Circle())
+            } else {
+                // Fallback icon
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.blue)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.blue.opacity(0.1)))
+            }
+            
             HStack(spacing: 4) {
                 ForEach(0..<3) { index in
                     Circle()
