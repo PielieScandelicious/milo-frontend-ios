@@ -356,24 +356,6 @@ struct MessageBubbleView: View {
                 Spacer(minLength: 20)
             }
             
-            // Avatar for assistant
-            if message.role == .assistant {
-                if let uiImage = UIImage(named: "avatar") {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 32, height: 32)
-                        .clipShape(Circle())
-                } else {
-                    // Fallback icon
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.blue)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color.blue.opacity(0.1)))
-                }
-            }
-            
             // Message content with smooth slide-in animation
             Group {
                 if message.role == .assistant && message.content.isEmpty && message.id == viewModel.streamingMessageId && viewModel.isLoading {
