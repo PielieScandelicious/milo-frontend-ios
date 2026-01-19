@@ -45,16 +45,24 @@ struct StoreDetailView: View {
                     )
                     .padding(.horizontal)
                     
-                    // Large donut chart
+                    // Large donut chart - clickable to view all transactions
                     VStack(spacing: 20) {
-                        DonutChartView(
-                            title: "",
-                            subtitle: "Total",
-                            totalAmount: storeBreakdown.totalStoreSpend,
-                            segments: storeBreakdown.categories.toChartSegments(),
-                            size: 220
-                        )
-                        .padding(.top, 20)
+                        NavigationLink(destination: TransactionDisplayView(
+                            storeName: storeBreakdown.storeName,
+                            period: storeBreakdown.period,
+                            category: nil,
+                            categoryColor: nil
+                        )) {
+                            DonutChartView(
+                                title: "",
+                                subtitle: "Total",
+                                totalAmount: storeBreakdown.totalStoreSpend,
+                                segments: storeBreakdown.categories.toChartSegments(),
+                                size: 220
+                            )
+                            .padding(.top, 20)
+                        }
+                        .buttonStyle(DonutChartButtonStyle())
                         
                         // Legend with tap interaction
                         VStack(spacing: 12) {
@@ -72,51 +80,6 @@ struct StoreDetailView: View {
                         }
                         .padding(.horizontal)
                     }
-                    .padding(.bottom, 32)
-                    
-                    // View all transactions button
-                    NavigationLink(destination: TransactionDisplayView(
-                        storeName: storeBreakdown.storeName,
-                        period: storeBreakdown.period,
-                        category: nil,
-                        categoryColor: nil
-                    )) {
-                        HStack {
-                            Image(systemName: "list.bullet.rectangle")
-                                .font(.system(size: 16, weight: .semibold))
-                            
-                            Text("View All Transactions")
-                                .font(.system(size: 16, weight: .semibold))
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.5))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 18)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.blue.opacity(0.3),
-                                            Color.purple.opacity(0.2)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.horizontal)
                     .padding(.bottom, 32)
                 }
                 .padding(.top, 20)
@@ -176,12 +139,21 @@ struct StoreDetailView: View {
     }
 }
 
-// MARK: - Custom Button Style for Category Rows
+// MARK: - Custom Button Styles
 struct CategoryRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+struct DonutChartButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
