@@ -86,7 +86,7 @@ class ShareViewController: UIViewController {
         // Start processing after animation begins
         Task {
             // Small delay to ensure animation is visible
-            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
             processSharedContent()
         }
     }
@@ -636,7 +636,7 @@ class ShareViewController: UIViewController {
             
             // Add a delay to ensure UI is visible before processing
             print("⏳ Waiting before save...")
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
             
             // Validate image
             guard image.size.width > 0 && image.size.height > 0 else {
@@ -654,10 +654,10 @@ class ShareViewController: UIViewController {
             // Success! Show success state with animation and WAIT for it
             await showSuccess(message: "Receipt saved successfully!")
             
-            print("✅ Success animation complete, waiting 1.5 seconds...")
+            print("✅ Success animation complete, waiting 0.9 seconds...")
             
-            // Keep success fully visible - 1.5 seconds for quick but readable feedback
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+            // Keep success fully visible - 0.9 seconds for quick but readable feedback
+            try? await Task.sleep(nanoseconds: 900_000_000) // 0.9 seconds
             
             print("✅ Starting dismissal animation...")
             
@@ -716,7 +716,7 @@ class ShareViewController: UIViewController {
         }
         
         // Small delay after showing preview
-        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
     }
     
     // MARK: - Animate Dismissal
@@ -850,17 +850,17 @@ class ShareViewController: UIViewController {
         activityIndicator.stopAnimating()
         
         // Small delay before animating checkmark
-        try? await Task.sleep(nanoseconds: 150_000_000) // 0.15 seconds
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         print("🎉 Starting checkmark animation")
         
         // Animate checkmark in with a dramatic bounce
         checkmarkView.transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
         
-        // Snappier animation - 0.7 seconds instead of 1.0
+        // Snappier animation - 0.6 seconds
         return await withCheckedContinuation { continuation in
             UIView.animate(
-                withDuration: 0.7,
+                withDuration: 0.6,
                 delay: 0,
                 usingSpringWithDamping: 0.5,
                 initialSpringVelocity: 0.8,
