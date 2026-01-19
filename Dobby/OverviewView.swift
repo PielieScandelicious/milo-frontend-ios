@@ -387,7 +387,7 @@ struct OverviewView: View {
         VStack(spacing: 0) {
             DonutChartView(
                 title: breakdown.storeName,
-                subtitle: "Store",
+                subtitle: "",
                 totalAmount: breakdown.totalStoreSpend,
                 segments: breakdown.categories.toChartSegments(),
                 size: 90

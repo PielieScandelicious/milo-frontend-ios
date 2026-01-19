@@ -42,9 +42,11 @@ struct DonutChartView: View {
                         .font(.system(size: size * 0.16, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     
-                    Text(subtitle)
-                        .font(.system(size: size * 0.09, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
+                    if !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: size * 0.09, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
                 }
             }
             
