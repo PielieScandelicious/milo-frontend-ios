@@ -13,10 +13,6 @@
 		2983F5FB2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */; };
 		2983F5FD2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */; };
 		2999B8A32F1D9879002ACAF3 /* env.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A22F1D986B002ACAF3 /* env.swift */; };
-		2999B8A52F1D99F0002ACAF3 /* AnthropicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */; };
-		2999B8A72F1D9A05002ACAF3 /* ReceiptImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */; };
-		2999B8A92F1D9A29002ACAF3 /* ReceiptScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A82F1D9A29002ACAF3 /* ReceiptScanView.swift */; };
-		2999B8AB2F1D9A48002ACAF3 /* ReceiptReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8AA2F1D9A48002ACAF3 /* ReceiptReviewView.swift */; };
 		2999B8AD2F1D9ABC002ACAF3 /* SETUP_GUIDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */; };
 		2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */; };
 		2999B8B12F1D9AEB002ACAF3 /* TEST_RECEIPTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */; };
@@ -25,8 +21,6 @@
 		2999B8B72F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */; };
 		2999B8B92F1D9BA7002ACAF3 /* ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */; };
 		2999B8C82F1DA4F9002ACAF3 /* Dobby Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		29E60CBB2F1DC4E900C309B9 /* IconGeneratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */; };
-		29E60CBC2F1DC51C00C309B9 /* AppIconGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */; };
 		29E60D6C2F1DE55E00C309B9 /* SharedReceiptManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D6B2F1DE55E00C309B9 /* SharedReceiptManager.swift */; };
 		29E60D6E2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */; };
 		29E60D702F1DE59C00C309B9 /* SavedReceiptsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */; };
@@ -35,6 +29,8 @@
 		29E60D762F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */; };
 		29E60D782F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */; };
 		29E60D7A2F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */; };
+		29E60D8D2F1DF3D700C309B9 /* DobbyAIChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D7D2F1DEFB100C309B9 /* DobbyAIChatService.swift */; };
+		29E60D8E2F1DF3D700C309B9 /* DobbyAIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D7F2F1DEFCF00C309B9 /* DobbyAIChatView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,10 +65,6 @@
 		2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ADD_CAMERA_PERMISSION.md; sourceTree = "<group>"; };
 		2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = EXACT_STEPS_NO_PLIST.md; sourceTree = "<group>"; };
 		2999B8A22F1D986B002ACAF3 /* env.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = env.swift; sourceTree = "<group>"; };
-		2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicService.swift; sourceTree = "<group>"; };
-		2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptImportService.swift; sourceTree = "<group>"; };
-		2999B8A82F1D9A29002ACAF3 /* ReceiptScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptScanView.swift; sourceTree = "<group>"; };
-		2999B8AA2F1D9A48002ACAF3 /* ReceiptReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptReviewView.swift; sourceTree = "<group>"; };
 		2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SETUP_GUIDE.md; sourceTree = "<group>"; };
 		2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-additions.plist"; sourceTree = "<group>"; };
 		2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = TEST_RECEIPTS.md; sourceTree = "<group>"; };
@@ -81,8 +73,6 @@
 		2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BUILD_CHECKLIST.md; sourceTree = "<group>"; };
 		2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
 		2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Dobby Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
-		29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppIconGenerator.swift; path = /Users/gillesmoenaert/Documents/projects/Dobby/AppIconGenerator.swift; sourceTree = "<absolute>"; };
-		29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconGeneratorView.swift; sourceTree = "<group>"; };
 		29E60D6B2F1DE55E00C309B9 /* SharedReceiptManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedReceiptManager.swift; sourceTree = "<group>"; };
 		29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_SETUP.md; sourceTree = "<group>"; };
 		29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedReceiptsView.swift; sourceTree = "<group>"; };
@@ -91,6 +81,8 @@
 		29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_SUMMARY.md; sourceTree = "<group>"; };
 		29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DobbyApp+ShareExtension.swift"; sourceTree = "<group>"; };
 		29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_ARCHITECTURE.md; sourceTree = "<group>"; };
+		29E60D7D2F1DEFB100C309B9 /* DobbyAIChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DobbyAIChatService.swift; sourceTree = "<group>"; };
+		29E60D7F2F1DEFCF00C309B9 /* DobbyAIChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DobbyAIChatView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -160,10 +152,6 @@
 				294D4FBF2F1D695B001B9193 /* Dobby */,
 				2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */,
 				294D4FBE2F1D695B001B9193 /* Products */,
-				2999B8A42F1D99F0002ACAF3 /* AnthropicService.swift */,
-				2999B8A62F1D9A05002ACAF3 /* ReceiptImportService.swift */,
-				2999B8A82F1D9A29002ACAF3 /* ReceiptScanView.swift */,
-				2999B8AA2F1D9A48002ACAF3 /* ReceiptReviewView.swift */,
 				2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */,
 				2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */,
 				2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */,
@@ -176,8 +164,6 @@
 				2983F5F82F1DBC4100D79291 /* QUICK_FIX.md */,
 				2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */,
 				2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */,
-				29E60CBA2F1DC4E900C309B9 /* IconGeneratorView.swift */,
-				29E60CB92F1DC4E100C309B9 /* AppIconGenerator.swift */,
 				29E60D6B2F1DE55E00C309B9 /* SharedReceiptManager.swift */,
 				29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */,
 				29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */,
@@ -186,6 +172,8 @@
 				29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */,
 				29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */,
 				29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */,
+				29E60D7D2F1DEFB100C309B9 /* DobbyAIChatService.swift */,
+				29E60D7F2F1DEFCF00C309B9 /* DobbyAIChatView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -327,14 +315,10 @@
 			files = (
 				29E60D782F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift in Sources */,
 				29E60D6C2F1DE55E00C309B9 /* SharedReceiptManager.swift in Sources */,
-				29E60CBC2F1DC51C00C309B9 /* AppIconGenerator.swift in Sources */,
 				29E60D702F1DE59C00C309B9 /* SavedReceiptsView.swift in Sources */,
-				2999B8AB2F1D9A48002ACAF3 /* ReceiptReviewView.swift in Sources */,
-				2999B8A72F1D9A05002ACAF3 /* ReceiptImportService.swift in Sources */,
-				2999B8A52F1D99F0002ACAF3 /* AnthropicService.swift in Sources */,
-				29E60CBB2F1DC4E900C309B9 /* IconGeneratorView.swift in Sources */,
 				2999B8A32F1D9879002ACAF3 /* env.swift in Sources */,
-				2999B8A92F1D9A29002ACAF3 /* ReceiptScanView.swift in Sources */,
+				29E60D8D2F1DF3D700C309B9 /* DobbyAIChatService.swift in Sources */,
+				29E60D8E2F1DF3D700C309B9 /* DobbyAIChatView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

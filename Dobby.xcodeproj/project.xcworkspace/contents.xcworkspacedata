@@ -5,9 +5,21 @@
       location = "self:">
    </FileRef>
    <FileRef
-      location = "group:/Users/gillesmoenaert/Documents/projects/Dobby/AppIconGenerator.swift">
+      location = "group:FIX_DUPLICATE_ERRORS.md">
    </FileRef>
    <FileRef
-      location = "group:IconGeneratorView.swift">
+      location = "group:CLEAN_DobbyAIChatService.swift">
+   </FileRef>
+   <FileRef
+      location = "group:CLEAN_DobbyAIChatView.swift">
+   </FileRef>
+   <FileRef
+      location = "group:STEP_BY_STEP_FIX.md">
+   </FileRef>
+   <FileRef
+      location = "group:ReceiptScanView 2.swift">
+   </FileRef>
+   <FileRef
+      location = "group:BUILD_ERROR_FIXES.md">
    </FileRef>
 </Workspace>

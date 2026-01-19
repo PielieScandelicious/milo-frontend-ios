@@ -56,15 +56,8 @@ struct ScanTab: View {
 struct DobbyTab: View {
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(white: 0.05).ignoresSafeArea()
-                
-                VStack {
-                    // Empty content
-                }
-            }
-            .navigationTitle("Dobby")
-            .navigationBarTitleDisplayMode(.large)
+            DobbyAIChatView()
+                .toolbarBackground(.hidden, for: .navigationBar)
         }
     }
 }
