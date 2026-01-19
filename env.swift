@@ -7,7 +7,7 @@
 
 import Foundation
 struct AppConfiguration {
-    static let anthropicAPIKey = "REDACTED"
+    static let anthropicAPIKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? ""
 }
 
   
