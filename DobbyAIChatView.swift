@@ -360,6 +360,7 @@ struct ScaleButtonStyle: ButtonStyle {
 // MARK: - Message Bubble View
 struct MessageBubbleView: View {
     let message: ChatMessage
+    @State private var isVisible = false
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -385,15 +386,24 @@ struct MessageBubbleView: View {
                 }
             }
             
-            // Message content
-            if message.role == .assistant {
-                MarkdownMessageView(content: message.content)
-                    .textSelection(.enabled)
-            } else {
-                Text(message.content)
-                    .font(.system(size: 16))
-                    .foregroundStyle(.primary)
-                    .textSelection(.enabled)
+            // Message content with smooth slide-in animation
+            Group {
+                if message.role == .assistant {
+                    MarkdownMessageView(content: message.content)
+                        .textSelection(.enabled)
+                } else {
+                    Text(message.content)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.primary)
+                        .textSelection(.enabled)
+                }
+            }
+            .opacity(isVisible ? 1.0 : 0.0)
+            .offset(x: isVisible ? 0 : (message.role == .assistant ? -30 : 30))
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.6).delay(0.05)) {
+                    isVisible = true
+                }
             }
             
             if message.role == .assistant {
@@ -636,9 +646,12 @@ class ChatViewModel: ObservableObject {
     
     private var transactions: [Transaction] = []
     private var currentTask: Task<Void, Never>?
+    private var streamingTask: Task<Void, Never>?
     
     // Buffer for incoming chunks
     private var fullStreamedContent: String = ""
+    private let chunkSize = 150 // Characters per chunk for smooth streaming with large chunks
+    private let chunkInterval: Duration = .milliseconds(120) // Delay between chunks
     
     func setTransactions(_ transactions: [Transaction]) {
         self.transactions = transactions
@@ -658,6 +671,9 @@ class ChatViewModel: ObservableObject {
         displayedStreamingContent = ""
         fullStreamedContent = ""
         
+        // Start smooth streaming display
+        startSmoothStreaming(messageId: assistantMessageId)
+        
         // Create a cancellable task
         currentTask = Task {
             do {
@@ -670,6 +686,7 @@ class ChatViewModel: ObservableObject {
                 for try await chunk in stream {
                     // Check if cancelled
                     if Task.isCancelled {
+                        streamingTask?.cancel()
                         isLoading = false
                         streamingMessageId = nil
                         return
@@ -679,16 +696,22 @@ class ChatViewModel: ObservableObject {
                     fullStreamedContent += chunk
                 }
                 
-                // Update with complete message and fade in
+                // Wait for streaming display to catch up
+                while displayedStreamingContent.count < fullStreamedContent.count && !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(10))
+                }
+                
+                // Cancel streaming task
+                streamingTask?.cancel()
+                
+                // Final update with complete message
                 if let index = messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                    withAnimation(.easeIn(duration: 0.3)) {
-                        messages[index] = ChatMessage(
-                            id: assistantMessageId,
-                            role: .assistant,
-                            content: fullStreamedContent,
-                            timestamp: messages[index].timestamp
-                        )
-                    }
+                    messages[index] = ChatMessage(
+                        id: assistantMessageId,
+                        role: .assistant,
+                        content: fullStreamedContent,
+                        timestamp: messages[index].timestamp
+                    )
                 }
                 
                 streamingMessageId = nil
@@ -698,10 +721,14 @@ class ChatViewModel: ObservableObject {
             } catch {
                 // Check if cancelled
                 if Task.isCancelled {
+                    streamingTask?.cancel()
                     isLoading = false
                     streamingMessageId = nil
                     return
                 }
+                
+                // Cancel streaming
+                streamingTask?.cancel()
                 
                 // Replace placeholder with error message
                 if let index = messages.firstIndex(where: { $0.id == assistantMessageId }) {
@@ -723,20 +750,64 @@ class ChatViewModel: ObservableObject {
         await currentTask?.value
     }
     
+    private func startSmoothStreaming(messageId: UUID) {
+        streamingTask?.cancel()
+        
+        streamingTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: chunkInterval)
+                
+                guard !Task.isCancelled else { break }
+                
+                // Display characters in chunks progressively
+                if displayedStreamingContent.count < fullStreamedContent.count {
+                    let targetIndex = min(
+                        displayedStreamingContent.count + chunkSize,
+                        fullStreamedContent.count
+                    )
+                    
+                    let endIndex = fullStreamedContent.index(
+                        fullStreamedContent.startIndex,
+                        offsetBy: targetIndex
+                    )
+                    
+                    let newContent = String(fullStreamedContent[..<endIndex])
+                    
+                    // Update with smooth, slower animation for cooler effect
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        displayedStreamingContent = newContent
+                        
+                        // Update the message in the array
+                        if let index = messages.firstIndex(where: { $0.id == messageId }) {
+                            messages[index] = ChatMessage(
+                                id: messageId,
+                                role: .assistant,
+                                content: displayedStreamingContent,
+                                timestamp: messages[index].timestamp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     func stopGeneration() {
         currentTask?.cancel()
+        streamingTask?.cancel()
         currentTask = nil
+        streamingTask = nil
         isLoading = false
         
-        // If we have partial content, save it
+        // If we have partial content, save it with animation
         if let messageId = streamingMessageId,
            let index = messages.firstIndex(where: { $0.id == messageId }),
-           !fullStreamedContent.isEmpty {
-            withAnimation(.easeIn(duration: 0.3)) {
+           !displayedStreamingContent.isEmpty {
+            withAnimation(.easeOut(duration: 0.2)) {
                 messages[index] = ChatMessage(
                     id: messageId,
                     role: .assistant,
-                    content: fullStreamedContent,
+                    content: displayedStreamingContent,
                     timestamp: messages[index].timestamp
                 )
             }
@@ -749,7 +820,9 @@ class ChatViewModel: ObservableObject {
     
     func clearConversation() {
         currentTask?.cancel()
+        streamingTask?.cancel()
         currentTask = nil
+        streamingTask = nil
         messages.removeAll()
         isLoading = false
         streamingMessageId = nil
