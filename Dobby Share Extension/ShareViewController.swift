@@ -28,16 +28,6 @@ class ShareViewController: UIViewController {
         return label
     }()
     
-    private let storeLabel: UILabel = {
-        let label = UILabel()
-        label.text = "Saving to your library..."
-        label.font = .systemFont(ofSize: 16, weight: .regular)
-        label.textColor = .secondaryLabel
-        label.textAlignment = .center
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
     private let activityIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .large)
         indicator.translatesAutoresizingMaskIntoConstraints = false
@@ -55,6 +45,29 @@ class ShareViewController: UIViewController {
         return label
     }()
     
+    private let checkmarkView: UIImageView = {
+        let imageView = UIImageView()
+        let config = UIImage.SymbolConfiguration(pointSize: 60, weight: .bold)
+        imageView.image = UIImage(systemName: "checkmark.circle.fill", withConfiguration: config)
+        imageView.tintColor = .systemGreen
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.alpha = 0
+        return imageView
+    }()
+    
+    private let imagePreview: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFit
+        imageView.layer.cornerRadius = 8
+        imageView.layer.masksToBounds = true
+        imageView.layer.borderWidth = 1
+        imageView.layer.borderColor = UIColor.separator.cgColor
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.alpha = 0
+        return imageView
+    }()
+    
     // MARK: - Properties
     private let appGroupIdentifier = "group.com.dobby.app"
     
@@ -62,17 +75,31 @@ class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        processSharedContent()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // Animate in the container
+        animateIn()
+        
+        // Start processing after animation begins
+        Task {
+            // Small delay to ensure animation is visible
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+            processSharedContent()
+        }
     }
     
     // MARK: - UI Setup
     private func setupUI() {
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        view.backgroundColor = UIColor.black.withAlphaComponent(0)
         
         view.addSubview(containerView)
+        containerView.addSubview(imagePreview)
         containerView.addSubview(titleLabel)
-        containerView.addSubview(storeLabel)
         containerView.addSubview(activityIndicator)
+        containerView.addSubview(checkmarkView)
         containerView.addSubview(statusLabel)
         
         NSLayoutConstraint.activate([
@@ -81,16 +108,22 @@ class ShareViewController: UIViewController {
             containerView.widthAnchor.constraint(equalToConstant: 300),
             containerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
             
-            titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 32),
+            imagePreview.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 20),
+            imagePreview.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            imagePreview.widthAnchor.constraint(equalToConstant: 80),
+            imagePreview.heightAnchor.constraint(equalToConstant: 80),
+            
+            titleLabel.topAnchor.constraint(equalTo: imagePreview.bottomAnchor, constant: 16),
             titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
             titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
             
-            storeLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
-            storeLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
-            storeLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
-            
-            activityIndicator.topAnchor.constraint(equalTo: storeLabel.bottomAnchor, constant: 24),
+            activityIndicator.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 24),
             activityIndicator.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            
+            checkmarkView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 24),
+            checkmarkView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            checkmarkView.widthAnchor.constraint(equalToConstant: 80),
+            checkmarkView.heightAnchor.constraint(equalToConstant: 80),
             
             statusLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 16),
             statusLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
@@ -98,38 +131,93 @@ class ShareViewController: UIViewController {
             statusLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
         ])
         
+        // Start with container hidden for animation
+        containerView.alpha = 0
+        containerView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        
         activityIndicator.startAnimating()
+    }
+    
+    // MARK: - Animations
+    private func animateIn() {
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0, options: .curveEaseOut) {
+            self.view.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+            self.containerView.alpha = 1
+            self.containerView.transform = .identity
+        }
     }
     
     // MARK: - Process Shared Content
     private func processSharedContent() {
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
             updateStatus(error: "No content found")
-            completeRequest(withError: NSError(domain: "ShareExtension", code: 1, userInfo: nil))
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await MainActor.run {
+                    self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 1, userInfo: nil))
+                }
+            }
             return
         }
         
         guard let itemProvider = extensionItem.attachments?.first else {
             updateStatus(error: "No attachment found")
-            completeRequest(withError: NSError(domain: "ShareExtension", code: 1, userInfo: nil))
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await MainActor.run {
+                    self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 1, userInfo: nil))
+                }
+            }
             return
         }
         
-        // Try to load as image first
-        if itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-            loadImageFromProvider(itemProvider)
-        } 
-        // Try PDF (some receipt apps share as PDF)
-        else if itemProvider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) {
-            loadPDFFromProvider(itemProvider)
+        print("📋 Available type identifiers:")
+        for identifier in itemProvider.registeredTypeIdentifiers {
+            print("  - \(identifier)")
         }
-        // Try URL (might be a file URL to an image)
+        
+        // Try to load in priority order
+        // 1. Try image types first (most common - Photos, Safari)
+        if itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            print("✅ Found UTType.image, loading...")
+            loadImageFromProvider(itemProvider)
+        }
+        // 2. Try file URL (Preview's primary method)
+        else if itemProvider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            print("✅ Found UTType.fileURL, loading...")
+            loadFileURL(itemProvider)
+        }
+        // 3. Try generic URL
         else if itemProvider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+            print("✅ Found UTType.url, loading...")
             loadURLFromProvider(itemProvider)
         }
+        // 4. Try PDF
+        else if itemProvider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) {
+            print("✅ Found UTType.pdf, loading...")
+            loadPDFFromProvider(itemProvider)
+        }
+        // 5. Try common image UTIs directly
+        else if itemProvider.hasItemConformingToTypeIdentifier("public.jpeg") ||
+                itemProvider.hasItemConformingToTypeIdentifier("public.png") ||
+                itemProvider.hasItemConformingToTypeIdentifier("public.heic") {
+            print("✅ Found specific image format, loading...")
+            loadImageFromProvider(itemProvider)
+        }
+        // 6. Try public.data as last resort (can be ambiguous)
+        else if itemProvider.hasItemConformingToTypeIdentifier(UTType.data.identifier) {
+            print("✅ Found UTType.data, attempting to load as image...")
+            loadDataAsImage(itemProvider)
+        }
         else {
-            updateStatus(error: "Unsupported content type. Please share an image.")
-            completeRequest(withError: NSError(domain: "ShareExtension", code: 3, userInfo: nil))
+            let types = itemProvider.registeredTypeIdentifiers.joined(separator: ", ")
+            updateStatus(error: "Unsupported content type. Found: \(types)")
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                await MainActor.run {
+                    self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 3, userInfo: nil))
+                }
+            }
         }
     }
     
@@ -139,7 +227,12 @@ class ShareViewController: UIViewController {
             
             if let error = error {
                 self.updateStatus(error: "Failed to load image: \(error.localizedDescription)")
-                self.completeRequest(withError: error)
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: error)
+                    }
+                }
                 return
             }
             
@@ -161,7 +254,12 @@ class ShareViewController: UIViewController {
             
             guard let receiptImage = image else {
                 self.updateStatus(error: "Could not load image from file")
-                self.completeRequest(withError: NSError(domain: "ShareExtension", code: 2, userInfo: nil))
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 2, userInfo: nil))
+                    }
+                }
                 return
             }
             
@@ -178,14 +276,24 @@ class ShareViewController: UIViewController {
             
             if let error = error {
                 self.updateStatus(error: "Failed to load PDF: \(error.localizedDescription)")
-                self.completeRequest(withError: error)
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: error)
+                    }
+                }
                 return
             }
             
             guard let url = item as? URL,
                   let image = self.convertPDFToImage(url: url) else {
                 self.updateStatus(error: "Could not convert PDF to image")
-                self.completeRequest(withError: NSError(domain: "ShareExtension", code: 4, userInfo: nil))
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 4, userInfo: nil))
+                    }
+                }
                 return
             }
             
@@ -201,15 +309,27 @@ class ShareViewController: UIViewController {
             
             if let error = error {
                 self.updateStatus(error: "Failed to load URL: \(error.localizedDescription)")
-                self.completeRequest(withError: error)
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: error)
+                    }
+                }
                 return
             }
             
             guard let url = item as? URL else {
                 self.updateStatus(error: "Invalid URL")
-                self.completeRequest(withError: NSError(domain: "ShareExtension", code: 5, userInfo: nil))
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 5, userInfo: nil))
+                    }
+                }
                 return
             }
+            
+            print("📂 Loading from URL: \(url)")
             
             // Try to load image from URL
             var image: UIImage?
@@ -219,7 +339,12 @@ class ShareViewController: UIViewController {
             
             guard let receiptImage = image else {
                 self.updateStatus(error: "Could not load image from URL")
-                self.completeRequest(withError: NSError(domain: "ShareExtension", code: 6, userInfo: nil))
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 6, userInfo: nil))
+                    }
+                }
                 return
             }
             
@@ -229,56 +354,385 @@ class ShareViewController: UIViewController {
         }
     }
     
+    // MARK: - Load File URL (for Preview app)
+    private func loadFileURL(_ itemProvider: NSItemProvider) {
+        itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { [weak self] (item, error) in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("❌ Failed to load file URL: \(error)")
+                self.updateStatus(error: "Failed to load file: \(error.localizedDescription)")
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: error)
+                    }
+                }
+                return
+            }
+            
+            guard let fileURL = item as? URL else {
+                print("❌ Item is not a URL")
+                self.updateStatus(error: "Invalid file URL")
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 7, userInfo: nil))
+                    }
+                }
+                return
+            }
+            
+            print("📂 File URL: \(fileURL)")
+            print("📂 Path extension: \(fileURL.pathExtension)")
+            
+            // Check if it's an image file
+            let imageExtensions = ["jpg", "jpeg", "png", "heic", "heif", "gif", "bmp", "tiff", "tif"]
+            let pathExtension = fileURL.pathExtension.lowercased()
+            
+            if imageExtensions.contains(pathExtension) {
+                // Try to load as image
+                if let data = try? Data(contentsOf: fileURL),
+                   let image = UIImage(data: data) {
+                    print("✅ Loaded image from file URL")
+                    Task {
+                        await self.saveReceiptImage(image)
+                    }
+                } else {
+                    print("❌ Could not create image from file data")
+                    self.updateStatus(error: "Could not load image from file")
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        await MainActor.run {
+                            self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 8, userInfo: nil))
+                        }
+                    }
+                }
+            } else if pathExtension == "pdf" {
+                // Try to convert PDF
+                print("🔄 Attempting to convert PDF to image...")
+                if let pdfImage = self.convertPDFToImage(url: fileURL) {
+                    print("✅ Converted PDF to image: \(pdfImage.size)")
+                    Task {
+                        await self.saveReceiptImage(pdfImage)
+                    }
+                } else {
+                    print("❌ Could not convert PDF - convertPDFToImage returned nil")
+                    self.updateStatus(error: "Could not convert PDF to image")
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        await MainActor.run {
+                            self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 9, userInfo: nil))
+                        }
+                    }
+                }
+            } else {
+                print("❌ Unsupported file type: \(pathExtension)")
+                self.updateStatus(error: "Unsupported file type: .\(pathExtension)")
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 10, userInfo: nil))
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Load Data as Image (for Preview app)
+    private func loadDataAsImage(_ itemProvider: NSItemProvider) {
+        // Try loading as file URL first within the data type
+        if itemProvider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            print("📋 Data type also has fileURL, trying that instead...")
+            loadFileURL(itemProvider)
+            return
+        }
+        
+        itemProvider.loadItem(forTypeIdentifier: UTType.data.identifier, options: nil) { [weak self] (item, error) in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("❌ Failed to load data: \(error)")
+                // Try loading as image type as fallback
+                if itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    print("🔄 Retrying as image type...")
+                    self.loadImageFromProvider(itemProvider)
+                    return
+                }
+                self.updateStatus(error: "Failed to load data: \(error.localizedDescription)")
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: error)
+                    }
+                }
+                return
+            }
+            
+            print("📦 Data item type: \(type(of: item))")
+            
+            var imageData: Data?
+            var imageFromItem: UIImage?
+            
+            // Try different ways to extract the image
+            if let data = item as? Data {
+                print("✅ Got Data directly (\(data.count) bytes)")
+                imageData = data
+            } else if let url = item as? URL {
+                print("📂 Data provided as URL: \(url)")
+                print("📂 URL scheme: \(url.scheme ?? "none")")
+                
+                // Check if it's a file URL
+                if url.isFileURL {
+                    // Try to read the file
+                    if let data = try? Data(contentsOf: url) {
+                        print("✅ Read \(data.count) bytes from file URL")
+                        imageData = data
+                    } else {
+                        print("❌ Could not read data from file URL")
+                    }
+                } else {
+                    // Try to download from URL
+                    if let data = try? Data(contentsOf: url) {
+                        print("✅ Downloaded \(data.count) bytes from URL")
+                        imageData = data
+                    }
+                }
+            } else if let image = item as? UIImage {
+                print("✅ Got UIImage directly")
+                imageFromItem = image
+            }
+            
+            // If we got a UIImage directly, use it
+            if let image = imageFromItem {
+                print("✅ Using UIImage directly: \(image.size)")
+                Task {
+                    await self.saveReceiptImage(image)
+                }
+                return
+            }
+            
+            // Try to create image from data
+            guard let data = imageData else {
+                print("❌ Could not extract data from item")
+                // Try one more time with image type
+                if itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    print("🔄 Retrying as UTType.image...")
+                    self.loadImageFromProvider(itemProvider)
+                    return
+                }
+                self.updateStatus(error: "Could not extract image data")
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 11, userInfo: nil))
+                    }
+                }
+                return
+            }
+            
+            // Try to create UIImage from data
+            if let image = UIImage(data: data) {
+                print("✅ Created image from data: \(image.size)")
+                Task {
+                    await self.saveReceiptImage(image)
+                }
+            } else {
+                print("❌ Could not create image from data (\(data.count) bytes)")
+                print("📋 Data header (first 16 bytes): \(data.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " "))")
+                
+                // One last attempt - try all available image type identifiers
+                for identifier in itemProvider.registeredTypeIdentifiers {
+                    if identifier.contains("image") || identifier.contains("jpeg") || identifier.contains("png") {
+                        print("🔄 Found possible image identifier: \(identifier), trying that...")
+                        self.loadImageFromProvider(itemProvider)
+                        return
+                    }
+                }
+                
+                self.updateStatus(error: "Could not create image from data")
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run {
+                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 12, userInfo: nil))
+                    }
+                }
+            }
+        }
+    }
+    
     private func convertPDFToImage(url: URL) -> UIImage? {
-        guard let document = CGPDFDocument(url as CFURL),
-              let page = document.page(at: 1) else {
+        print("📄 Converting PDF at: \(url.path)")
+        
+        guard let document = CGPDFDocument(url as CFURL) else {
+            print("❌ Could not create CGPDFDocument from URL")
+            return nil
+        }
+        
+        print("📄 PDF has \(document.numberOfPages) pages")
+        
+        guard let page = document.page(at: 1) else {
+            print("❌ Could not get first page of PDF")
             return nil
         }
         
         let pageRect = page.getBoxRect(.mediaBox)
-        let renderer = UIGraphicsImageRenderer(size: pageRect.size)
+        print("📄 PDF page size: \(pageRect.size)")
         
-        let image = renderer.image { ctx in
-            UIColor.white.set()
-            ctx.fill(pageRect)
-            
-            ctx.cgContext.translateBy(x: 0.0, y: pageRect.size.height)
-            ctx.cgContext.scaleBy(x: 1.0, y: -1.0)
-            ctx.cgContext.drawPDFPage(page)
+        // Scale down if the PDF is too large (to prevent memory issues)
+        let maxDimension: CGFloat = 2048.0  // Maximum width or height
+        var renderSize = pageRect.size
+        
+        if renderSize.width > maxDimension || renderSize.height > maxDimension {
+            let scaleFactor = maxDimension / max(renderSize.width, renderSize.height)
+            renderSize = CGSize(width: renderSize.width * scaleFactor, 
+                               height: renderSize.height * scaleFactor)
+            print("📄 Scaling down to: \(renderSize)")
         }
         
+        // Create the image at the (possibly scaled) size
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0  // Don't use screen scale, we're controlling size ourselves
+        
+        let renderer = UIGraphicsImageRenderer(size: renderSize, format: format)
+        
+        let image = renderer.image { ctx in
+            // Fill with white background
+            UIColor.white.set()
+            ctx.fill(CGRect(origin: .zero, size: renderSize))
+            
+            // Save the graphics state
+            ctx.cgContext.saveGState()
+            
+            // Transform to render the PDF correctly
+            ctx.cgContext.translateBy(x: 0, y: renderSize.height)
+            ctx.cgContext.scaleBy(x: 1.0, y: -1.0)
+            
+            // Scale the PDF to fit our render size
+            let scaleX = renderSize.width / pageRect.width
+            let scaleY = renderSize.height / pageRect.height
+            ctx.cgContext.scaleBy(x: scaleX, y: scaleY)
+            
+            // Render the PDF
+            ctx.cgContext.drawPDFPage(page)
+            
+            // Restore the graphics state
+            ctx.cgContext.restoreGState()
+        }
+        
+        print("✅ PDF converted to image: \(image.size)")
         return image
     }
     
     // MARK: - Save Receipt Image
     private func saveReceiptImage(_ image: UIImage) async {
+        print("💾 saveReceiptImage started")
+        
         do {
-            // Save receipt image to shared storage
-            updateStatus(message: "Saving receipt...")
+            // Show image preview with animation
+            print("📸 Showing image preview...")
+            await showImagePreview(image)
+            print("📸 Image preview shown")
+            
+            // Add a delay to ensure UI is visible before processing
+            print("⏳ Waiting before save...")
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             
             // Validate image
             guard image.size.width > 0 && image.size.height > 0 else {
                 throw ReceiptError.invalidImage
             }
             
+            print("💾 Saving receipt to file...")
             let savedPath = try saveReceipt(image: image)
             
             // Notify main app
             notifyMainApp(imagePath: savedPath)
             
-            // Success!
-            updateStatus(success: "Receipt saved successfully!")
+            print("✅ Receipt saved, showing success animation...")
             
-            // Complete after a short delay
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-            completeRequest(withError: nil)
+            // Success! Show success state with animation and WAIT for it
+            await showSuccess(message: "Receipt saved successfully!")
+            
+            print("✅ Success animation complete, waiting 1.5 seconds...")
+            
+            // Keep success fully visible - 1.5 seconds for quick but readable feedback
+            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+            
+            print("✅ Starting dismissal animation...")
+            
+            // Animate dismissal and wait for it
+            await animateDismissal()
+            
+            print("✅ Dismissal complete, completing request...")
+            
+            // NOW complete the request after everything is done
+            await MainActor.run {
+                self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            }
+            
+            print("✅ Extension completed successfully")
             
         } catch let error as ReceiptError {
+            print("❌ ReceiptError: \(error.localizedDescription)")
             updateStatus(error: error.errorDescription ?? "Unknown error")
-            completeRequest(withError: error)
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            await animateDismissal()
+            await MainActor.run {
+                self.extensionContext?.cancelRequest(withError: error)
+            }
         } catch {
+            print("❌ Error: \(error.localizedDescription)")
             updateStatus(error: "Failed to save: \(error.localizedDescription)")
-            completeRequest(withError: error)
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            await animateDismissal()
+            await MainActor.run {
+                self.extensionContext?.cancelRequest(withError: error)
+            }
+        }
+    }
+    
+    // MARK: - Show Image Preview
+    @MainActor
+    private func showImagePreview(_ image: UIImage) async {
+        imagePreview.image = image
+        
+        imagePreview.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        
+        // Wait for the animation to complete
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            UIView.animate(
+                withDuration: 0.4,
+                delay: 0,
+                usingSpringWithDamping: 0.7,
+                initialSpringVelocity: 0.5,
+                options: .curveEaseOut
+            ) {
+                self.imagePreview.alpha = 1
+                self.imagePreview.transform = .identity
+            } completion: { _ in
+                continuation.resume()
+            }
+        }
+        
+        // Small delay after showing preview
+        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+    }
+    
+    // MARK: - Animate Dismissal
+    @MainActor
+    private func animateDismissal() async {
+        print("👋 Starting dismissal animation")
+        
+        // Smooth fade out animation
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            UIView.animate(withDuration: 0.4) {
+                self.containerView.alpha = 0
+                self.view.backgroundColor = UIColor.black.withAlphaComponent(0)
+            } completion: { finished in
+                print("👋 Dismissal animation finished: \(finished)")
+                continuation.resume()
+            }
         }
     }
 
@@ -378,22 +832,45 @@ class ShareViewController: UIViewController {
         }
     }
     
-    private func updateStatus(success: String) {
-        DispatchQueue.main.async {
-            self.titleLabel.text = "✓ Success"
-            self.statusLabel.text = success
-            self.statusLabel.textColor = .systemGreen
-            self.activityIndicator.stopAnimating()
-        }
-    }
-    
-    // MARK: - Complete Request
-    private func completeRequest(withError error: Error?) {
-        DispatchQueue.main.async {
-            if let error = error {
-                self.extensionContext?.cancelRequest(withError: error)
-            } else {
-                self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+    // MARK: - Show Success
+    @MainActor
+    private func showSuccess(message: String) async {
+        print("🎉 showSuccess called")
+        
+        // Haptic feedback
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+        
+        // Update text
+        titleLabel.text = "Success!"
+        statusLabel.text = ""
+        statusLabel.textColor = .systemGreen
+        
+        // Hide spinner
+        activityIndicator.stopAnimating()
+        
+        // Small delay before animating checkmark
+        try? await Task.sleep(nanoseconds: 150_000_000) // 0.15 seconds
+        
+        print("🎉 Starting checkmark animation")
+        
+        // Animate checkmark in with a dramatic bounce
+        checkmarkView.transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
+        
+        // Snappier animation - 0.7 seconds instead of 1.0
+        return await withCheckedContinuation { continuation in
+            UIView.animate(
+                withDuration: 0.7,
+                delay: 0,
+                usingSpringWithDamping: 0.5,
+                initialSpringVelocity: 0.8,
+                options: [.curveEaseOut, .allowUserInteraction]
+            ) {
+                self.checkmarkView.alpha = 1
+                self.checkmarkView.transform = .identity
+            } completion: { finished in
+                print("🎉 Checkmark animation finished: \(finished)")
+                continuation.resume()
             }
         }
     }

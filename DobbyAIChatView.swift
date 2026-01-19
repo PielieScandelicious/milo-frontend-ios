@@ -200,32 +200,20 @@ struct WelcomeView: View {
             
             // Hero section
             VStack(spacing: 16) {
-                // Avatar image - make sure avatar.png is added to Assets.xcassets
-                if let uiImage = UIImage(named: "avatar") {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
-                        .padding(.bottom, 8)
-                } else {
-                    // Fallback to sparkles if avatar not found
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 64))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .padding(.bottom, 8)
-                }
+                // Purple AI magic stars logo - transparent background
+                Image(systemName: "sparkles")
+                    .font(.system(size: 64, weight: .bold))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(
+                        Color(red: 0.45, green: 0.15, blue: 0.85),  // Deep vibrant purple
+                        Color(red: 0.55, green: 0.25, blue: 0.95)   // Slightly lighter purple accent
+                    )
+                    .padding(.bottom, 8)
                 
                 Text("Dobby")
                     .font(.system(size: 34, weight: .bold))
                 
-                Text("Your shopping elf")
+                Text("Your AI shopping assistant")
                     .font(.system(size: 17))
                     .foregroundStyle(.secondary)
             }

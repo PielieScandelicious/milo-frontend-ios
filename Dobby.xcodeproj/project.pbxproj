@@ -34,6 +34,8 @@
 		29E60D932F1E205800C309B9 /* avatar.png in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D922F1E205800C309B9 /* avatar.png */; };
 		29E60D952F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D942F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md */; };
 		29E60D972F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D962F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md */; };
+		29E60DE72F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60DE62F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md */; };
+		29E60DE92F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60DE82F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,6 +91,8 @@
 		29E60D922F1E205800C309B9 /* avatar.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = avatar.png; sourceTree = "<group>"; };
 		29E60D942F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ADD_AVATAR_TO_ASSETS.md; sourceTree = "<group>"; };
 		29E60D962F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = FIX_CAMERA_ERRORS.md; sourceTree = "<group>"; };
+		29E60DE62F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_UX_IMPROVEMENTS.md; sourceTree = "<group>"; };
+		29E60DE82F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ADVANCED_SHARE_EXTENSION_TIPS.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -183,6 +187,8 @@
 				29E60D7F2F1DEFCF00C309B9 /* DobbyAIChatView.swift */,
 				29E60D942F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md */,
 				29E60D962F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md */,
+				29E60DE62F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md */,
+				29E60DE82F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -293,6 +299,7 @@
 				29E60D932F1E205800C309B9 /* avatar.png in Resources */,
 				2983F5FB2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md in Resources */,
 				29E60D972F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md in Resources */,
+				29E60DE92F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md in Resources */,
 				29E60D762F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md in Resources */,
 				29E60D722F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md in Resources */,
 				29E60D742F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md in Resources */,
@@ -307,6 +314,7 @@
 				29E60D952F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md in Resources */,
 				29E60D6E2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md in Resources */,
 				2999B8B32F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md in Resources */,
+				29E60DE72F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md in Resources */,
 				2999B8AD2F1D9ABC002ACAF3 /* SETUP_GUIDE.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -483,7 +491,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Dobby/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = FreeDobby;
+				INFOPLIST_KEY_CFBundleDisplayName = Scandelicious;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -520,7 +528,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Dobby/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = FreeDobby;
+				INFOPLIST_KEY_CFBundleDisplayName = Scandelicious;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
