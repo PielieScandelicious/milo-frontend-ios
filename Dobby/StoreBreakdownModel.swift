@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 
-struct StoreBreakdown: Codable, Identifiable {
+struct StoreBreakdown: Codable, Identifiable, Equatable {
     let storeName: String
     let period: String
     let totalStoreSpend: Double
@@ -22,9 +22,14 @@ struct StoreBreakdown: Codable, Identifiable {
         case totalStoreSpend = "total_store_spend"
         case categories
     }
+    
+    // Equatable conformance
+    static func == (lhs: StoreBreakdown, rhs: StoreBreakdown) -> Bool {
+        return lhs.id == rhs.id
+    }
 }
 
-struct Category: Codable, Identifiable {
+struct Category: Codable, Identifiable, Equatable {
     let name: String
     let spent: Double
     let percentage: Int
@@ -116,5 +121,18 @@ class StoreDataManager: ObservableObject {
         storeBreakdowns
             .filter { $0.period == period }
             .reduce(0) { $0 + $1.totalStoreSpend }
+    }
+    
+    // Delete a store breakdown
+    func deleteBreakdown(_ breakdown: StoreBreakdown) {
+        storeBreakdowns.removeAll { $0.id == breakdown.id }
+    }
+    
+    // Delete a store breakdown at specific indices
+    func deleteBreakdowns(at offsets: IndexSet, from breakdowns: [StoreBreakdown]) {
+        let breakdownsToDelete = offsets.map { breakdowns[$0] }
+        for breakdown in breakdownsToDelete {
+            deleteBreakdown(breakdown)
+        }
     }
 }

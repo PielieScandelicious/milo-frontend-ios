@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum SortOption: String, CaseIterable {
     case highestSpend = "Highest Spend"
@@ -26,12 +27,20 @@ struct OverviewView: View {
     @State private var selectedSort: SortOption = .highestSpend
     @State private var selectedStoreFilter: StoreFilter = .all
     @State private var showingFilterSheet = false
+    @State private var isEditMode = false
+    @State private var draggingItem: StoreBreakdown?
+    @State private var displayedBreakdowns: [StoreBreakdown] = []
     
     private var availablePeriods: [String] {
         dataManager.breakdownsByPeriod().keys.sorted()
     }
     
     private var currentBreakdowns: [StoreBreakdown] {
+        // If in edit mode, use the displayed breakdowns to maintain order
+        if isEditMode {
+            return displayedBreakdowns
+        }
+        
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
         
         // Apply store filter
@@ -52,12 +61,63 @@ struct OverviewView: View {
         return breakdowns
     }
     
+    // Update displayed breakdowns when filters change
+    private func updateDisplayedBreakdowns() {
+        var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
+        
+        // Apply store filter
+        if selectedStoreFilter != .all {
+            breakdowns = breakdowns.filter { $0.storeName == selectedStoreFilter.rawValue }
+        }
+        
+        // Apply sorting
+        switch selectedSort {
+        case .highestSpend:
+            breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
+        case .lowestSpend:
+            breakdowns.sort { $0.totalStoreSpend < $1.totalStoreSpend }
+        case .storeName:
+            breakdowns.sort { $0.storeName < $1.storeName }
+        }
+        
+        displayedBreakdowns = breakdowns
+    }
+    
     private var totalPeriodSpending: Double {
         currentBreakdowns.reduce(0) { $0 + $1.totalStoreSpend }
     }
     
+    // MARK: - Delete Functions
+    private func deleteBreakdowns(at offsets: IndexSet) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            for index in offsets {
+                let breakdown = displayedBreakdowns[index]
+                dataManager.deleteBreakdown(breakdown)
+            }
+            updateDisplayedBreakdowns()
+        }
+    }
+    
+    private func deleteBreakdown(_ breakdown: StoreBreakdown) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            dataManager.deleteBreakdown(breakdown)
+            displayedBreakdowns.removeAll { $0.id == breakdown.id }
+        }
+    }
+    
     var body: some View {
         ZStack {
+            // Background tap to exit edit mode
+            if isEditMode {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isEditMode = false
+                        }
+                    }
+            }
+            
             Color(white: 0.05).ignoresSafeArea()
             
             ScrollView {
@@ -80,6 +140,7 @@ struct OverviewView: View {
                 .padding(.bottom, 32)
             }
         }
+        .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingFilterSheet) {
             FilterSheet(
                 selectedSort: $selectedSort,
@@ -88,9 +149,25 @@ struct OverviewView: View {
         }
         .onAppear {
             dataManager.configure(with: transactionManager)
+            updateDisplayedBreakdowns()
         }
         .onChange(of: transactionManager.transactions) { oldValue, newValue in
             dataManager.regenerateBreakdowns()
+            updateDisplayedBreakdowns()
+        }
+        .onChange(of: selectedPeriod) { oldValue, newValue in
+            updateDisplayedBreakdowns()
+        }
+        .onChange(of: selectedSort) { oldValue, newValue in
+            updateDisplayedBreakdowns()
+        }
+        .onChange(of: selectedStoreFilter) { oldValue, newValue in
+            updateDisplayedBreakdowns()
+        }
+        .onChange(of: dataManager.storeBreakdowns) { oldValue, newValue in
+            if !isEditMode {
+                updateDisplayedBreakdowns()
+            }
         }
     }
     
@@ -243,10 +320,62 @@ struct OverviewView: View {
             GridItem(.flexible(), spacing: 16)
         ], spacing: 20) {
             ForEach(currentBreakdowns) { breakdown in
-                NavigationLink(destination: StoreDetailView(storeBreakdown: breakdown)) {
-                    storeChartCard(breakdown)
+                ZStack(alignment: .topTrailing) {
+                    // The card itself
+                    if isEditMode {
+                        storeChartCard(breakdown)
+                            .modifier(JiggleModifier(isJiggling: isEditMode))
+                            .onDrag {
+                                self.draggingItem = breakdown
+                                return NSItemProvider(object: breakdown.id as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: DropViewDelegate(
+                                destinationItem: breakdown,
+                                items: $displayedBreakdowns,
+                                draggingItem: $draggingItem
+                            ))
+                    } else {
+                        NavigationLink(destination: StoreDetailView(storeBreakdown: breakdown)) {
+                            storeChartCard(breakdown)
+                        }
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5)
+                                .onEnded { _ in
+                                    // Enter edit mode on long press
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        isEditMode = true
+                                    }
+                                    // Haptic feedback
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
+                                }
+                        )
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                    
+                    // Delete button (X) in edit mode
+                    if isEditMode {
+                        Button {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                deleteBreakdown(breakdown)
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.red)
+                                .background(
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 18, height: 18)
+                                )
+                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                        }
+                        .offset(x: 8, y: -8)
+                        .transition(.scale.combined(with: .opacity))
+                        .zIndex(1)
+                        .allowsHitTesting(true)
+                    }
                 }
-                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(.horizontal)
@@ -354,6 +483,71 @@ struct FilterSheet: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Drop Delegate for Drag and Drop Reordering
+struct DropViewDelegate: DropDelegate {
+    let destinationItem: StoreBreakdown
+    @Binding var items: [StoreBreakdown]
+    @Binding var draggingItem: StoreBreakdown?
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        draggingItem = nil
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggingItem = draggingItem else { return }
+        
+        if draggingItem != destinationItem {
+            let fromIndex = items.firstIndex(of: draggingItem)
+            let toIndex = items.firstIndex(of: destinationItem)
+            
+            if let fromIndex = fromIndex, let toIndex = toIndex {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Jiggle Modifier for Edit Mode
+struct JiggleModifier: ViewModifier {
+    let isJiggling: Bool
+    @State private var rotation: Double = 0
+    
+    private let rotationAngle: Double = 2.5
+    private let duration: Double = 0.13
+    
+    func body(content: Content) -> some View {
+        content
+            .rotationEffect(.degrees(rotation))
+            .task(id: isJiggling) {
+                guard isJiggling else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        rotation = 0
+                    }
+                    return
+                }
+                
+                // Start with random direction for natural look
+                let startDirection: Double = Bool.random() ? rotationAngle : -rotationAngle
+                rotation = startDirection
+                
+                // Continuous jiggle loop
+                while isJiggling {
+                    withAnimation(.easeInOut(duration: duration)) {
+                        rotation = -rotation
+                    }
+                    try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+                }
+            }
     }
 }
 
