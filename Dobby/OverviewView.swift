@@ -107,10 +107,7 @@ struct OverviewView: View {
                 }
                 .padding(.top, 12)
                 .padding(.bottom, 12)
-                .background(
-                    Color(white: 0.05)
-                        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
-                )
+                .background(Color(white: 0.05))
                 .zIndex(1)
                 
                 // Scrollable content
@@ -125,6 +122,7 @@ struct OverviewView: View {
                     .padding(.top, 20)
                     .padding(.bottom, 32)
                 }
+                .background(Color(white: 0.05))
             }
             
             // Edit mode exit button overlay
