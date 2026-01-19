@@ -16,6 +16,7 @@ struct ReceiptScanView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showSuccessMessage = false
+    @State private var isProcessing = false
     
     var body: some View {
         ZStack {
@@ -34,7 +35,7 @@ struct ReceiptScanView: View {
                     .padding()
                     .background(.ultraThinMaterial)
                     .clipShape(Capsule())
-                    .padding(.bottom, 50)
+                    .padding(.bottom, 30)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -51,7 +52,9 @@ struct ReceiptScanView: View {
             DocumentScannerView(capturedImage: $capturedImage)
         }
         .onChange(of: capturedImage) { _, newImage in
+            print("onChange triggered - capturedImage: \(newImage != nil ? "present" : "nil")")
             if let image = newImage {
+                print("Processing receipt image...")
                 processReceipt(image: image)
             }
         }
@@ -140,14 +143,30 @@ struct ReceiptScanView: View {
     }
     
     private func processReceipt(image: UIImage) {
+        print("processReceipt called, isProcessing: \(isProcessing)")
+        
+        // Prevent multiple simultaneous processing
+        guard !isProcessing else { 
+            print("Already processing, skipping")
+            return 
+        }
+        isProcessing = true
+        print("Starting receipt processing...")
+        
         Task {
             do {
                 // Save image to receipts directory
                 let savedURL = try saveReceiptImage(image)
-                print("Receipt saved to: \(savedURL.path)")
+                print("Receipt saved successfully to: \(savedURL.path)")
                 
                 await MainActor.run {
                     capturedImage = nil
+                    isProcessing = false
+                    print("Processing complete, showing success message")
+                    
+                    // Trigger success haptic feedback
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
                     
                     // Show success message
                     withAnimation {
@@ -163,7 +182,15 @@ struct ReceiptScanView: View {
                     }
                 }
             } catch {
+                print("Error saving receipt: \(error.localizedDescription)")
+                
                 await MainActor.run {
+                    isProcessing = false
+                    
+                    // Trigger error haptic feedback
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                    
                     errorMessage = "Failed to save receipt: \(error.localizedDescription)"
                     showError = true
                 }
@@ -242,32 +269,57 @@ struct DocumentScannerView: UIViewControllerRepresentable {
     
     class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
         let parent: DocumentScannerView
+        private var isProcessing = false
         
         init(parent: DocumentScannerView) {
             self.parent = parent
         }
         
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
+            // Prevent duplicate processing
+            guard !isProcessing else { 
+                print("Already processing, ignoring duplicate call")
+                return 
+            }
+            isProcessing = true
+            
+            print("Document scanner finished with \(scan.pageCount) page(s)")
+            
             // Get all scanned pages and select the best one
             guard scan.pageCount > 0 else {
+                print("No pages scanned")
                 parent.dismiss()
                 return
             }
             
-            // If only one page, use it
+            // If only one page, use it immediately
             if scan.pageCount == 1 {
                 let image = scan.imageOfPage(at: 0)
-                parent.capturedImage = image
+                print("Single page scanned, using it directly")
+                
+                // Dismiss first, then set the image
                 parent.dismiss()
+                
+                // Set image after a brief delay to ensure dismiss completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.parent.capturedImage = image
+                }
                 return
             }
             
-            // Multiple pages - find the best one
+            // Multiple pages - find the best one asynchronously
+            print("Multiple pages scanned, analyzing quality...")
             Task {
                 let bestImage = await self.selectBestReceiptImage(from: scan)
+                
                 await MainActor.run {
-                    self.parent.capturedImage = bestImage
+                    print("Best image selected, dismissing scanner")
                     self.parent.dismiss()
+                    
+                    // Set image after a brief delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        self.parent.capturedImage = bestImage
+                    }
                 }
             }
         }
