@@ -38,9 +38,15 @@ struct DonutChartView: View {
                 
                 // Center content
                 VStack(spacing: 4) {
-                    Text(String(format: "€%.2f", totalAmount))
-                        .font(.system(size: size * 0.16, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                    if subtitle == "visits" {
+                        Text(String(format: "%.0f", totalAmount))
+                            .font(.system(size: size * 0.16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    } else {
+                        Text(String(format: "€%.0f", totalAmount))
+                            .font(.system(size: size * 0.16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    }
                     
                     if !subtitle.isEmpty {
                         Text(subtitle)

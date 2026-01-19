@@ -13,6 +13,7 @@ struct StoreBreakdown: Codable, Identifiable, Equatable, Hashable {
     let period: String
     let totalStoreSpend: Double
     let categories: [Category]
+    let visitCount: Int
     
     var id: String { "\(storeName)-\(period)" }
     
@@ -21,6 +22,7 @@ struct StoreBreakdown: Codable, Identifiable, Equatable, Hashable {
         case period
         case totalStoreSpend = "total_store_spend"
         case categories
+        case visitCount = "visit_count"
     }
     
     // Equatable conformance
@@ -112,11 +114,16 @@ class StoreDataManager: ObservableObject {
                 return Category(name: category, spent: spent, percentage: percentage)
             }.sorted { $0.spent > $1.spent }
             
+            // Calculate visit count (unique dates)
+            let uniqueDates = Set(transactions.map { calendar.startOfDay(for: $0.date) })
+            let visitCount = uniqueDates.count
+            
             return StoreBreakdown(
                 storeName: storeName,
                 period: period,
                 totalStoreSpend: totalSpend,
-                categories: categories
+                categories: categories,
+                visitCount: visitCount
             )
         }
     }

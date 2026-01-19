@@ -28,7 +28,7 @@ struct StoreDetailView: View {
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
                         
-                        Text(String(format: "€%.2f", storeBreakdown.totalStoreSpend))
+                        Text(String(format: "€%.0f", storeBreakdown.totalStoreSpend))
                             .font(.system(size: 48, weight: .heavy, design: .rounded))
                             .foregroundColor(.white)
                             .padding(.top, 8)
@@ -55,8 +55,8 @@ struct StoreDetailView: View {
                         )) {
                             DonutChartView(
                                 title: "",
-                                subtitle: "Total",
-                                totalAmount: storeBreakdown.totalStoreSpend,
+                                subtitle: "visits",
+                                totalAmount: Double(storeBreakdown.visitCount),
                                 segments: storeBreakdown.categories.toChartSegments(),
                                 size: 220
                             )
@@ -117,7 +117,7 @@ struct StoreDetailView: View {
                 .foregroundColor(.white.opacity(0.6))
                 .frame(width: 45, alignment: .trailing)
             
-            Text(String(format: "€%.2f", segment.value))
+            Text(String(format: "€%.0f", segment.value))
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
                 .frame(width: 70, alignment: .trailing)
@@ -170,7 +170,8 @@ struct DonutChartButtonStyle: ButtonStyle {
                 Category(name: "Drinks (Soft/Soda)", spent: 28.00, percentage: 15),
                 Category(name: "Household", spent: 35.00, percentage: 18),
                 Category(name: "Snacks & Sweets", spent: 19.00, percentage: 11)
-            ]
+            ],
+            visitCount: 15
         ))
     }
     .preferredColorScheme(.dark)

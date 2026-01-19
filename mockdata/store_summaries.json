@@ -5,11 +5,13 @@
     "stores": [
       {
         "store_name": "COLRUYT",
-        "amount_spent": 189.90
+        "amount_spent": 189.90,
+        "store_visits": 4
       },
       {
         "store_name": "ALDI",
-        "amount_spent": 94.50
+        "amount_spent": 94.50,
+        "store_visits": 3
       }
     ]
   },
@@ -19,11 +21,13 @@
     "stores": [
       {
         "store_name": "COLRUYT",
-        "amount_spent": 85.25
+        "amount_spent": 85.25,
+        "store_visits": 2
       },
       {
         "store_name": "ALDI",
-        "amount_spent": 130.50
+        "amount_spent": 130.50,
+        "store_visits": 4
       }
     ]
   }

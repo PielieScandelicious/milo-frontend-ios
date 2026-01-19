@@ -277,7 +277,7 @@ struct OverviewView: View {
                 .textCase(.uppercase)
                 .tracking(1.2)
             
-            Text(String(format: "€%.2f", totalPeriodSpending))
+            Text(String(format: "€%.0f", totalPeriodSpending))
                 .font(.system(size: 44, weight: .heavy, design: .rounded))
                 .foregroundColor(.white)
             

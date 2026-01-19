@@ -105,7 +105,7 @@ struct ReceiptScanView: View {
                             number: 1,
                             icon: "viewfinder",
                             iconColor: .blue,
-                            title: "Tap Anywhere to Scan",
+                            title: "Tap to Scan",
                             description: "Tap anywhere on this screen to open the scanner"
                         )
                         
@@ -121,7 +121,7 @@ struct ReceiptScanView: View {
                             number: 3,
                             icon: "checkmark.circle.fill",
                             iconColor: .orange,
-                            title: "Scan & Review",
+                            title: "Auto Scan",
                             description: "Capture one or more scans - the app will automatically select the best one"
                         )
                     }

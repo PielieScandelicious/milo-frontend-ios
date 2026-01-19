@@ -194,7 +194,7 @@ struct TransactionTableView: View {
                     .textCase(.uppercase)
                     .tracking(0.5)
                 
-                Text(String(format: "€%.2f", totalAmount))
+                Text(String(format: "€%.0f", totalAmount))
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
