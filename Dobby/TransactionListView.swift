@@ -55,15 +55,21 @@ struct TransactionListView: View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // Header
-                headerSection
-                
-                if transactions.isEmpty {
+            if transactions.isEmpty {
+                VStack(spacing: 0) {
+                    // Header
+                    headerSection
+                    
                     emptyState
-                } else {
-                    // Transaction list
-                    ScrollView {
+                }
+            } else {
+                // Full screen scrollable
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Header
+                        headerSection
+                        
+                        // Transaction list
                         LazyVStack(spacing: 24) {
                             ForEach(groupedTransactions, id: \.0) { date, dayTransactions in
                                 transactionSection(date: date, transactions: dayTransactions)

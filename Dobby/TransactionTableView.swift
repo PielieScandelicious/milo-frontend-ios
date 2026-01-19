@@ -64,18 +64,27 @@ struct TransactionTableView: View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // Search and sort bar
-                controlBar
-                
-                // Summary stats
-                statsBar
-                
-                if transactions.isEmpty {
+            if transactions.isEmpty {
+                VStack(spacing: 0) {
+                    // Summary stats
+                    statsBar
+                    
+                    // Search and sort bar
+                    controlBar
+                    
                     emptyState
-                } else {
-                    // Table
-                    ScrollView {
+                }
+            } else {
+                // Full screen scrollable
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Summary stats
+                        statsBar
+                        
+                        // Search and sort bar
+                        controlBar
+                        
+                        // Table
                         VStack(spacing: 0) {
                             // Table header
                             tableHeader
@@ -163,8 +172,7 @@ struct TransactionTableView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.vertical, 8)
     }
     
     private var statsBar: some View {
