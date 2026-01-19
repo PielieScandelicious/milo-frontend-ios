@@ -94,6 +94,14 @@ struct OverviewView: View {
     var body: some View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
+                .onTapGesture {
+                    // Exit edit mode when tapping background
+                    if isEditMode {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isEditMode = false
+                        }
+                    }
+                }
             
             ScrollView {
                 VStack(spacing: 0) {
@@ -123,6 +131,15 @@ struct OverviewView: View {
                 }
             }
             .background(Color(white: 0.05))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Exit edit mode when tapping anywhere in scroll view
+                if isEditMode {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        isEditMode = false
+                    }
+                }
+            }
             
             // Edit mode exit button overlay
             if isEditMode {
@@ -165,6 +182,12 @@ struct OverviewView: View {
         .onAppear {
             dataManager.configure(with: transactionManager)
             updateDisplayedBreakdowns()
+        }
+        .onDisappear {
+            // Exit edit mode when switching tabs or navigating away
+            if isEditMode {
+                isEditMode = false
+            }
         }
         .onChange(of: transactionManager.transactions) { oldValue, newValue in
             dataManager.regenerateBreakdowns()
@@ -296,6 +319,12 @@ struct OverviewView: View {
                     if isEditMode {
                         storeChartCard(breakdown)
                             .modifier(JiggleModifier(isJiggling: isEditMode))
+                            .onTapGesture {
+                                // Exit edit mode on tap, like iOS
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    isEditMode = false
+                                }
+                            }
                             .onDrag {
                                 self.draggingItem = breakdown
                                 return NSItemProvider(object: breakdown.id as NSString)
