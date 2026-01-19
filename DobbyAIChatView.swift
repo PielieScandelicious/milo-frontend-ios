@@ -636,12 +636,9 @@ class ChatViewModel: ObservableObject {
     
     private var transactions: [Transaction] = []
     private var currentTask: Task<Void, Never>?
-    private var typewriterTask: Task<Void, Never>?
     
     // Buffer for incoming chunks
     private var fullStreamedContent: String = ""
-    private let charactersPerFrame = 3 // Display multiple chars at once for smoother effect
-    private let frameInterval: Duration = .milliseconds(16) // ~60fps
     
     func setTransactions(_ transactions: [Transaction]) {
         self.transactions = transactions
@@ -661,9 +658,6 @@ class ChatViewModel: ObservableObject {
         displayedStreamingContent = ""
         fullStreamedContent = ""
         
-        // Start typewriter effect
-        startTypewriterEffect(messageId: assistantMessageId)
-        
         // Create a cancellable task
         currentTask = Task {
             do {
@@ -676,7 +670,6 @@ class ChatViewModel: ObservableObject {
                 for try await chunk in stream {
                     // Check if cancelled
                     if Task.isCancelled {
-                        typewriterTask?.cancel()
                         isLoading = false
                         streamingMessageId = nil
                         return
@@ -686,22 +679,16 @@ class ChatViewModel: ObservableObject {
                     fullStreamedContent += chunk
                 }
                 
-                // Wait for typewriter to catch up
-                while displayedStreamingContent.count < fullStreamedContent.count && !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(10))
-                }
-                
-                // Cancel typewriter task
-                typewriterTask?.cancel()
-                
-                // Final update with complete message
+                // Update with complete message and fade in
                 if let index = messages.firstIndex(where: { $0.id == assistantMessageId }) {
-                    messages[index] = ChatMessage(
-                        id: assistantMessageId,
-                        role: .assistant,
-                        content: fullStreamedContent,
-                        timestamp: messages[index].timestamp
-                    )
+                    withAnimation(.easeIn(duration: 0.3)) {
+                        messages[index] = ChatMessage(
+                            id: assistantMessageId,
+                            role: .assistant,
+                            content: fullStreamedContent,
+                            timestamp: messages[index].timestamp
+                        )
+                    }
                 }
                 
                 streamingMessageId = nil
@@ -711,14 +698,10 @@ class ChatViewModel: ObservableObject {
             } catch {
                 // Check if cancelled
                 if Task.isCancelled {
-                    typewriterTask?.cancel()
                     isLoading = false
                     streamingMessageId = nil
                     return
                 }
-                
-                // Cancel typewriter
-                typewriterTask?.cancel()
                 
                 // Replace placeholder with error message
                 if let index = messages.firstIndex(where: { $0.id == assistantMessageId }) {
@@ -740,59 +723,23 @@ class ChatViewModel: ObservableObject {
         await currentTask?.value
     }
     
-    private func startTypewriterEffect(messageId: UUID) {
-        typewriterTask?.cancel()
-        
-        typewriterTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: frameInterval)
-                
-                guard !Task.isCancelled else { break }
-                
-                // Display characters progressively
-                if displayedStreamingContent.count < fullStreamedContent.count {
-                    let targetIndex = min(
-                        displayedStreamingContent.count + charactersPerFrame,
-                        fullStreamedContent.count
-                    )
-                    
-                    let endIndex = fullStreamedContent.index(
-                        fullStreamedContent.startIndex,
-                        offsetBy: targetIndex
-                    )
-                    displayedStreamingContent = String(fullStreamedContent[..<endIndex])
-                    
-                    // Update the message in the array
-                    if let index = messages.firstIndex(where: { $0.id == messageId }) {
-                        messages[index] = ChatMessage(
-                            id: messageId,
-                            role: .assistant,
-                            content: displayedStreamingContent,
-                            timestamp: messages[index].timestamp
-                        )
-                    }
-                }
-            }
-        }
-    }
-    
     func stopGeneration() {
         currentTask?.cancel()
-        typewriterTask?.cancel()
         currentTask = nil
-        typewriterTask = nil
         isLoading = false
         
         // If we have partial content, save it
         if let messageId = streamingMessageId,
            let index = messages.firstIndex(where: { $0.id == messageId }),
-           !displayedStreamingContent.isEmpty {
-            messages[index] = ChatMessage(
-                id: messageId,
-                role: .assistant,
-                content: displayedStreamingContent,
-                timestamp: messages[index].timestamp
-            )
+           !fullStreamedContent.isEmpty {
+            withAnimation(.easeIn(duration: 0.3)) {
+                messages[index] = ChatMessage(
+                    id: messageId,
+                    role: .assistant,
+                    content: fullStreamedContent,
+                    timestamp: messages[index].timestamp
+                )
+            }
         }
         
         streamingMessageId = nil
@@ -802,9 +749,7 @@ class ChatViewModel: ObservableObject {
     
     func clearConversation() {
         currentTask?.cancel()
-        typewriterTask?.cancel()
         currentTask = nil
-        typewriterTask = nil
         messages.removeAll()
         isLoading = false
         streamingMessageId = nil
