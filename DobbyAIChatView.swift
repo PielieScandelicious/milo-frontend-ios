@@ -15,6 +15,7 @@ struct DobbyAIChatView: View {
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     @State private var scrollOffset: CGFloat = 0
+    @State private var showWelcome = true
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -22,7 +23,7 @@ struct DobbyAIChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        if viewModel.messages.isEmpty {
+                        if viewModel.messages.isEmpty && showWelcome {
                             WelcomeView(
                                 messageText: $messageText,
                                 isInputFocused: $isInputFocused,
@@ -30,11 +31,16 @@ struct DobbyAIChatView: View {
                             )
                             .padding(.horizontal)
                             .padding(.top, 20)
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         } else {
                             // Messages - no extra padding needed
                             ForEach(viewModel.messages) { message in
                                 MessageBubbleView(message: message)
                                     .id(message.id)
+                                    .transition(.asymmetric(
+                                        insertion: .opacity.combined(with: .move(edge: .bottom)),
+                                        removal: .opacity
+                                    ))
                             }
                         }
                         
@@ -143,8 +149,9 @@ struct DobbyAIChatView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(role: .destructive) {
-                        withAnimation {
+                        withAnimation(.easeInOut(duration: 0.3)) {
                             viewModel.clearConversation()
+                            showWelcome = true
                         }
                     } label: {
                         Label("Clear Chat", systemImage: "trash")
@@ -165,6 +172,23 @@ struct DobbyAIChatView: View {
         guard !text.isEmpty else { return }
         
         messageText = ""
+        
+        // Smooth transition: hide welcome screen first
+        if viewModel.messages.isEmpty {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showWelcome = false
+            }
+            
+            // Wait for welcome screen to fade out before sending
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                completeMessageSend(text: text)
+            }
+        } else {
+            completeMessageSend(text: text)
+        }
+    }
+    
+    private func completeMessageSend(text: String) {
         isInputFocused = false
         
         // Haptic feedback
@@ -276,8 +300,16 @@ struct SamplePromptCard: View {
     let subtitle: String
     let action: () -> Void
     
+    @State private var isPressed = false
+    
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            // Haptic feedback
+            let impact = UIImpactFeedbackGenerator(style: .light)
+            impact.impactOccurred()
+            
+            action()
+        }) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
@@ -305,8 +337,23 @@ struct SamplePromptCard: View {
             .padding(16)
             .background(Color(.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .scaleEffect(isPressed ? 0.97 : 1.0)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle(isPressed: $isPressed))
+    }
+}
+
+// Custom button style for smooth press effect
+struct ScaleButtonStyle: ButtonStyle {
+    @Binding var isPressed: Bool
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { pressed in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    isPressed = pressed
+                }
+            }
     }
 }
 
@@ -763,6 +810,10 @@ class ChatViewModel: ObservableObject {
         streamingMessageId = nil
         displayedStreamingContent = ""
         fullStreamedContent = ""
+    }
+    
+    func resetForNewConversation() {
+        clearConversation()
     }
 }
 

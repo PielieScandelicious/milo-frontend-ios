@@ -375,15 +375,6 @@ struct OverviewView: View {
     }
 }
 
-// MARK: - Custom Button Style for Scale Effect
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
-}
-
 // MARK: - Filter Sheet
 struct FilterSheet: View {
     @Environment(\.dismiss) private var dismiss
