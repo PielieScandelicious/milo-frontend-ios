@@ -94,8 +94,9 @@ struct OverviewView: View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: 24) {
+            VStack(spacing: 0) {
+                // Fixed header
+                VStack(spacing: 12) {
                     // Period selector
                     if availablePeriods.count > 1 {
                         periodSelector
@@ -103,15 +104,27 @@ struct OverviewView: View {
                     
                     // Filter bar
                     filterBar
-                    
-                    // Total spending card
-                    totalSpendingCard
-                    
-                    // Store breakdowns grid
-                    storeBreakdownsGrid
                 }
-                .padding(.top, 20)
-                .padding(.bottom, 32)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+                .background(
+                    Color(white: 0.05)
+                        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                )
+                .zIndex(1)
+                
+                // Scrollable content
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Total spending card
+                        totalSpendingCard
+                        
+                        // Store breakdowns grid
+                        storeBreakdownsGrid
+                    }
+                    .padding(.top, 20)
+                    .padding(.bottom, 32)
+                }
             }
             
             // Edit mode exit button overlay
