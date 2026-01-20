@@ -45,6 +45,7 @@
 		294D4FBD2F1D695B001B9193 /* Scandalicious.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Scandalicious.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-additions.plist"; sourceTree = "<group>"; };
 		2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Scandalicious Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		29B5D5842F1FEBA2000C48B2 /* Scandalicious-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Scandalicious-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -116,6 +117,7 @@
 		294D4FB42F1D695B001B9193 = {
 			isa = PBXGroup;
 			children = (
+				29B5D5842F1FEBA2000C48B2 /* Scandalicious-Info.plist */,
 				294D4FBF2F1D695B001B9193 /* scandalicous */,
 				2999B8BF2F1DA4F9002ACAF3 /* scandalicious-share-extension */,
 				294D4FBE2F1D695B001B9193 /* Products */,
@@ -403,7 +405,7 @@
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				INFOPLIST_FILE = "Scandalicious-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Scandelicious;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
@@ -440,7 +442,7 @@
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				INFOPLIST_FILE = "Scandalicious-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Scandelicious;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
