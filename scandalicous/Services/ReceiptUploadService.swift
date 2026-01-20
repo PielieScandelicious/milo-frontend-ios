@@ -7,9 +7,7 @@
 
 import Foundation
 import UIKit
-#if !SHARE_EXTENSION
 import FirebaseAuth
-#endif
 
 enum ReceiptUploadError: LocalizedError {
     case noImage
@@ -296,31 +294,76 @@ actor ReceiptUploadService {
     // MARK: - Get Auth Token
     
     private func getAuthToken() async throws -> String {
-        #if SHARE_EXTENSION
-        // In Share Extension: Read from shared keychain/user defaults
-        // First, try to read from App Group UserDefaults
-        if let sharedDefaults = UserDefaults(suiteName: "group.com.deepmaind.scandalicious"),
-           let token = sharedDefaults.string(forKey: "firebase_auth_token") {
+        // Use consistent App Group identifier
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+        
+        // Try method 1: Get directly from Firebase Auth (works if Firebase is configured in extension)
+        if let user = Auth.auth().currentUser {
+            do {
+                let token = try await user.getIDToken()
+                print("✅ Retrieved auth token directly from Firebase Auth")
+                
+                // Also save to shared storage for faster future access
+                KeychainHelper.shared.saveToken(token)
+                if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
+                    sharedDefaults.set(token, forKey: "firebase_auth_token")
+                }
+                
+                return token
+            } catch {
+                print("⚠️ Failed to get token from Firebase Auth: \(error.localizedDescription)")
+                // Fall through to try other methods
+            }
+        } else {
+            print("⚠️ No Firebase user found, trying shared storage...")
+        }
+        
+        // Method 2: Try Keychain (most reliable for sharing)
+        if let token = KeychainHelper.shared.retrieveToken() {
+            print("✅ Retrieved auth token from Keychain")
+            return token
+        } else {
+            print("⚠️ No token in Keychain, trying UserDefaults...")
+        }
+        
+        // Method 3: Try to read from shared App Group UserDefaults (obvious key first)
+        if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier),
+           let token = sharedDefaults.string(forKey: "SCANDALICIOUS_AUTH_TOKEN") {
+            print("✅ Retrieved auth token from shared UserDefaults (SCANDALICIOUS_AUTH_TOKEN)")
             return token
         }
         
-        // If not found, throw error
+        // Method 4: Try primary key
+        if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier),
+           let token = sharedDefaults.string(forKey: "firebase_auth_token") {
+            print("✅ Retrieved auth token from shared UserDefaults (firebase_auth_token)")
+            return token
+        }
+        
+        // Method 5: Try alternative key
+        if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier),
+           let token = sharedDefaults.string(forKey: "auth_token") {
+            print("✅ Retrieved auth token from UserDefaults (auth_token)")
+            return token
+        }
+        
+        // If all methods fail, throw error
+        print("❌ No auth token found - tried all methods:")
+        print("   1. Firebase Auth")
+        print("   2. Keychain")
+        print("   3. UserDefaults (firebase_auth_token)")
+        print("   4. UserDefaults (auth_token)")
+        print("   App Group: \(appGroupIdentifier)")
+        
+        // Debug: List all available keys in shared defaults
+        if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
+            let allKeys = sharedDefaults.dictionaryRepresentation().keys
+            print("   Available keys in shared defaults: \(Array(allKeys))")
+        } else {
+            print("   ❌ Could not access shared UserDefaults!")
+        }
+        
         throw ReceiptUploadError.noAuthToken
-        #else
-        // In Main App: Use Firebase Auth
-        guard let user = Auth.auth().currentUser else {
-            throw ReceiptUploadError.noAuthToken
-        }
-        
-        let token = try await user.getIDToken()
-        
-        // Save to shared storage for extension to use
-        if let sharedDefaults = UserDefaults(suiteName: "group.com.yourcompany.scandalicious") {
-            sharedDefaults.set(token, forKey: "firebase_auth_token")
-        }
-        
-        return token
-        #endif
     }
     
     // MARK: - Decode Response

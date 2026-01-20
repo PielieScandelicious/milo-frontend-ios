@@ -113,6 +113,14 @@ struct ProfileTab: View {
                 }
                 
                 Section {
+                    NavigationLink {
+                        AuthDebugView()
+                    } label: {
+                        Label("Auth Debug", systemImage: "ant.fill")
+                    }
+                }
+                
+                Section {
                     Button(role: .destructive) {
                         showSignOutConfirmation = true
                     } label: {
@@ -129,3 +137,5 @@ struct ProfileTab: View {
     ContentView()
         .environmentObject(AuthenticationManager())
 }
+
+

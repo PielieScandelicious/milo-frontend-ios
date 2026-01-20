@@ -5,6 +5,6 @@
       location = "self:">
    </FileRef>
    <FileRef
-      location = "group:Dobby Share ExtensionInfo.plist">
+      location = "group:KeychainHelper.swift">
    </FileRef>
 </Workspace>

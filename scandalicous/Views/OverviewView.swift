@@ -258,10 +258,6 @@ struct OverviewView: View {
                 isEditMode = false
             }
         }
-        .onChange(of: transactionManager.transactions) { oldValue, newValue in
-            dataManager.regenerateBreakdowns()
-            updateDisplayedBreakdowns()
-        }
         .onChange(of: selectedPeriod) { oldValue, newValue in
             updateDisplayedBreakdowns()
         }

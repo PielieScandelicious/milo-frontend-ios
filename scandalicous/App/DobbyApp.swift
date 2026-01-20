@@ -12,6 +12,7 @@ import GoogleSignIn
 @main
 struct ScandaLiciousApp: App {
     @StateObject private var authManager: AuthenticationManager
+    @Environment(\.scenePhase) private var scenePhase
     
     init() {
         // Configure Firebase FIRST
@@ -33,6 +34,12 @@ struct ScandaLiciousApp: App {
             .environmentObject(authManager)
             .onOpenURL { url in
                 GIDSignIn.sharedInstance.handle(url)
+            }
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                // Refresh token when app becomes active
+                if newPhase == .active {
+                    authManager.refreshTokenInSharedStorage()
+                }
             }
         }
     }

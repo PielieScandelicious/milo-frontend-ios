@@ -211,6 +211,8 @@ class StoreDataManager: ObservableObject {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         
+        print("🔄 Regenerating breakdowns from \(transactions.count) transactions")
+        
         // Group by store and period
         var breakdownDict: [String: [Transaction]] = [:]
         
@@ -220,8 +222,10 @@ class StoreDataManager: ObservableObject {
             breakdownDict[key, default: []].append(transaction)
         }
         
+        print("   Found \(breakdownDict.count) store-period combinations")
+        
         // Convert to StoreBreakdown objects
-        let localBreakdowns = breakdownDict.map { key, transactions in
+        let localBreakdowns = breakdownDict.map { key, transactions -> StoreBreakdown in
             let components = key.split(separator: "-")
             let storeName = String(components[0])
             let period = components.dropFirst().joined(separator: "-")
@@ -240,6 +244,8 @@ class StoreDataManager: ObservableObject {
             let uniqueDates = Set(transactions.map { calendar.startOfDay(for: $0.date) })
             let visitCount = uniqueDates.count
             
+            print("   📊 Created breakdown: \(storeName) - \(period) (€\(totalSpend), \(categories.count) categories)")
+            
             return StoreBreakdown(
                 storeName: storeName,
                 period: period,
@@ -249,11 +255,22 @@ class StoreDataManager: ObservableObject {
             )
         }
         
-        // Merge with existing backend data (avoid duplicates)
+        // Update or add breakdowns
+        // First, create a dictionary of existing breakdowns for fast lookup
+        var existingBreakdownsDict = Dictionary(uniqueKeysWithValues: storeBreakdowns.map { ($0.id, $0) })
+        
+        // Update or add local breakdowns
         for localBreakdown in localBreakdowns {
-            if !storeBreakdowns.contains(where: { $0.id == localBreakdown.id }) {
-                storeBreakdowns.append(localBreakdown)
-            }
+            existingBreakdownsDict[localBreakdown.id] = localBreakdown
+            print("   ✅ Updated/Added: \(localBreakdown.storeName) - \(localBreakdown.period)")
+        }
+        
+        // Convert back to array and sort by date (most recent first)
+        storeBreakdowns = Array(existingBreakdownsDict.values).sorted { breakdown1, breakdown2 in
+            // Extract date from period string for sorting
+            let date1 = dateFormatter.date(from: breakdown1.period) ?? Date.distantPast
+            let date2 = dateFormatter.date(from: breakdown2.period) ?? Date.distantPast
+            return date1 > date2
         }
         
         print("✅ Regenerated breakdowns - total: \(storeBreakdowns.count)")

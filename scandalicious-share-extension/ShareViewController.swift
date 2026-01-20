@@ -7,6 +7,8 @@
 
 import UIKit
 import UniformTypeIdentifiers
+import FirebaseCore
+import FirebaseAuth
 
 class ShareViewController: UIViewController {
     
@@ -72,7 +74,141 @@ class ShareViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // Initialize Firebase if not already configured
+        if FirebaseApp.app() == nil {
+            FirebaseApp.configure()
+            print("🔥 Firebase configured in Share Extension")
+        }
+        
+        // Debug: Check authentication status
+        debugAuthenticationStatus()
+        
         setupUI()
+    }
+    
+    // MARK: - Debug Authentication
+    private func debugAuthenticationStatus() {
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+        
+        print("🔍 ========================================")
+        print("🔍 Share Extension Authentication Debug")
+        print("🔍 ========================================")
+        
+        // Check if Firebase is configured
+        if FirebaseApp.app() != nil {
+            print("✅ Firebase is configured")
+        } else {
+            print("❌ Firebase is NOT configured!")
+        }
+        
+        // Print container path
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) {
+            print("📁 App Group Container Path:")
+            print("   \(containerURL.path)")
+        } else {
+            print("❌ Could not get container URL for App Group!")
+        }
+        
+        // Check Firebase Auth
+        if let user = Auth.auth().currentUser {
+            print("✅ Firebase user found:")
+            print("   UID: \(user.uid)")
+            print("   Email: \(user.email ?? "N/A")")
+            print("   isAnonymous: \(user.isAnonymous)")
+            
+            Task {
+                do {
+                    let token = try await user.getIDToken()
+                    print("✅ Successfully got token from Firebase")
+                    print("   Token length: \(token.count)")
+                    print("   Token prefix: \(token.prefix(20))...")
+                } catch {
+                    print("❌ Failed to get token from Firebase: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            print("❌ NO Firebase user in Share Extension")
+            print("   This means Firebase Auth state is not shared")
+        }
+        
+        // Check shared storage
+        print("\n📦 Checking App Group Storage:")
+        print("   Identifier: \(appGroupIdentifier)")
+        
+        if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
+            print("✅ Can access shared UserDefaults")
+            
+            // Check for test value first
+            if let testValue = sharedDefaults.string(forKey: "SCANDALICIOUS_TEST") {
+                print("✅✅✅ TEST VALUE FOUND: '\(testValue)'")
+                print("   This confirms we're accessing the SAME container as main app!")
+            } else {
+                print("❌❌❌ TEST VALUE NOT FOUND!")
+                print("   This means we're NOT accessing the same container!")
+            }
+            
+            // Check obvious key
+            if let token = sharedDefaults.string(forKey: "SCANDALICIOUS_AUTH_TOKEN") {
+                print("✅ Token found with obvious key!")
+                print("   Token length: \(token.count)")
+            }
+            
+            // Check primary key
+            if let token = sharedDefaults.string(forKey: "firebase_auth_token") {
+                print("✅ Token found in shared storage")
+                print("   Token length: \(token.count)")
+                print("   Token prefix: \(token.prefix(20))...")
+            } else {
+                print("❌ NO token in shared storage")
+                print("   Key 'firebase_auth_token' is missing")
+            }
+            
+            // Check alternative key
+            if let altToken = sharedDefaults.string(forKey: "auth_token") {
+                print("✅ Alternative token found (key: 'auth_token')")
+                print("   Token length: \(altToken.count)")
+            }
+            
+            // Check timestamp
+            if let timestamp = sharedDefaults.object(forKey: "firebase_auth_token_timestamp") as? TimeInterval {
+                let date = Date(timeIntervalSince1970: timestamp)
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm:ss"
+                print("ℹ️  Last token save: \(formatter.string(from: date))")
+            }
+            
+            // List all keys
+            let allKeys = Array(sharedDefaults.dictionaryRepresentation().keys).sorted()
+            print("\n📋 All keys in shared UserDefaults (\(allKeys.count) total):")
+            
+            // Print first 20 to look for our keys
+            for (index, key) in allKeys.prefix(20).enumerated() {
+                let value = sharedDefaults.object(forKey: key)
+                let valueType = type(of: value)
+                
+                // Highlight our keys
+                if key.contains("SCANDALICIOUS") || key.contains("firebase_auth") || key.contains("auth_token") {
+                    print("   [\(index + 1)] ⭐️ \(key) = \(valueType)")
+                } else {
+                    print("   [\(index + 1)] \(key) = \(valueType)")
+                }
+            }
+            
+            if allKeys.count > 20 {
+                print("   ... and \(allKeys.count - 20) more")
+            }
+            
+            if allKeys.isEmpty {
+                print("   ⚠️ Shared UserDefaults is EMPTY!")
+            }
+        } else {
+            print("❌ CANNOT access shared UserDefaults")
+            print("   App Group '\(appGroupIdentifier)' may not be configured")
+            print("   OR the identifier is wrong")
+        }
+        
+        print("\n🔍 ========================================")
     }
     
     override func viewDidAppear(_ animated: Bool) {
