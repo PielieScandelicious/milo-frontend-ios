@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "2620"
-   wasCreatedForAppExtension = "YES"
-   version = "2.0">
+   version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
@@ -16,24 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2999B8BD2F1DA4F9002ACAF3"
-               BuildableName = "Dobby Share Extension.appex"
-               BlueprintName = "Dobby Share Extension"
-               ReferencedContainer = "container:Dobby.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "294D4FBC2F1D695B001B9193"
                BuildableName = "Dobby.app"
                BlueprintName = "Dobby"
-               ReferencedContainer = "container:Dobby.xcodeproj">
+               ReferencedContainer = "container:Dobby-IOS.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -53,23 +38,21 @@
                BlueprintIdentifier = "294B13FC2F1F00D500D8BFBD"
                BuildableName = "DobbyTests.xctest"
                BlueprintName = "DobbyTests"
-               ReferencedContainer = "container:Dobby.xcodeproj">
+               ReferencedContainer = "container:Dobby-IOS.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
-      selectedDebuggerIdentifier = ""
-      selectedLauncherIdentifier = "Xcode.IDEFoundation.Launcher.PosixSpawn"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       launchStyle = "0"
-      askForAppToLaunch = "Yes"
       useCustomWorkingDirectory = "NO"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
-      allowLocationSimulation = "YES"
-      launchAutomaticallySubstyle = "2">
+      allowLocationSimulation = "YES">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
          <BuildableReference
@@ -77,7 +60,7 @@
             BlueprintIdentifier = "294D4FBC2F1D695B001B9193"
             BuildableName = "Dobby.app"
             BlueprintName = "Dobby"
-            ReferencedContainer = "container:Dobby.xcodeproj">
+            ReferencedContainer = "container:Dobby-IOS.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -86,9 +69,7 @@
       shouldUseLaunchSchemeArgsEnv = "YES"
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
-      debugDocumentVersioning = "YES"
-      askForAppToLaunch = "Yes"
-      launchAutomaticallySubstyle = "2">
+      debugDocumentVersioning = "YES">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
          <BuildableReference
@@ -96,7 +77,7 @@
             BlueprintIdentifier = "294D4FBC2F1D695B001B9193"
             BuildableName = "Dobby.app"
             BlueprintName = "Dobby"
-            ReferencedContainer = "container:Dobby.xcodeproj">
+            ReferencedContainer = "container:Dobby-IOS.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

@@ -1,6 +1,6 @@
 //
 //  DobbyAIChatView.swift
-//  Dobby
+//  dobby-ios
 //
 //  ChatGPT-like Experience
 //  Created by Gilles Moenaert on 19/01/2026.
@@ -50,15 +50,15 @@ struct DobbyAIChatView: View {
                             .frame(height: 100)
                     }
                 }
-                .onChange(of: viewModel.messages.count) { _ in
+                .onChange(of: viewModel.messages.count) {
                     withAnimation(.easeOut(duration: 0.3)) {
                         if let lastMessage = viewModel.messages.last {
                             proxy.scrollTo(lastMessage.id, anchor: .bottom)
                         }
                     }
                 }
-                .onChange(of: isInputFocused) { focused in
-                    if focused {
+                .onChange(of: isInputFocused) {
+                    if isInputFocused {
                         // Scroll to bottom when keyboard appears
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             withAnimation {
@@ -325,9 +325,9 @@ struct ScaleButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .onChange(of: configuration.isPressed) { pressed in
+            .onChange(of: configuration.isPressed) {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    isPressed = pressed
+                    isPressed = configuration.isPressed
                 }
             }
     }

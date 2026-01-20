@@ -1,6 +1,6 @@
 //
 //  ReceiptUploadService.swift
-//  Dobby
+//  dobby-ios
 //
 //  Created by Gilles Moenaert on 19/01/2026.
 //
@@ -9,11 +9,11 @@ import Foundation
 import UIKit
 
 /// Response from the receipt upload API (S3 upload)
-struct S3UploadResponse: Codable {
+struct S3UploadResponse: Sendable, Codable {
     let status: String
     let s3_key: String
-    
-    var isSuccess: Bool {
+
+    nonisolated var isSuccess: Bool {
         status.lowercased() == "success"
     }
 }
@@ -107,7 +107,9 @@ actor ReceiptUploadService {
         
         // Parse response
         let decoder = JSONDecoder()
-        let uploadResponse = try decoder.decode(S3UploadResponse.self, from: data)
+        let uploadResponse = try await MainActor.run {
+            try decoder.decode(S3UploadResponse.self, from: data)
+        }
         
         guard uploadResponse.isSuccess else {
             throw ReceiptUploadError.uploadFailed("Server returned non-success status")
@@ -181,7 +183,9 @@ actor ReceiptUploadService {
         
         // Parse response
         let decoder = JSONDecoder()
-        let uploadResponse = try decoder.decode(S3UploadResponse.self, from: data)
+        let uploadResponse = try await MainActor.run {
+            try decoder.decode(S3UploadResponse.self, from: data)
+        }
         
         guard uploadResponse.isSuccess else {
             throw ReceiptUploadError.uploadFailed("Server returned non-success status")
@@ -252,7 +256,9 @@ actor ReceiptUploadService {
         
         // Parse response
         let decoder = JSONDecoder()
-        let uploadResponse = try decoder.decode(S3UploadResponse.self, from: data)
+        let uploadResponse = try await MainActor.run {
+            try decoder.decode(S3UploadResponse.self, from: data)
+        }
         
         guard uploadResponse.isSuccess else {
             throw ReceiptUploadError.uploadFailed("Server returned non-success status")

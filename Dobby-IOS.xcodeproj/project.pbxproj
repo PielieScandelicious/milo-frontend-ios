@@ -245,7 +245,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Dobby" */;
+			buildConfigurationList = 294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Dobby-IOS" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -637,7 +637,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Dobby" */ = {
+		294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Dobby-IOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				294D4FC62F1D695B001B9193 /* Debug */,

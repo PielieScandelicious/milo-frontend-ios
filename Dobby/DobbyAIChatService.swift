@@ -1,6 +1,6 @@
 //
 //  DobbyAIChatService.swift
-//  Dobby
+//  dobby-ios
 //
 //  BACKEND VERSION - Uses Railway API
 //  Created by Gilles Moenaert on 19/01/2026.
@@ -12,7 +12,7 @@ import Foundation
 typealias DobbyTransaction = Transaction
 
 // MARK: - Chat Message Model
-struct ChatMessage: Identifiable, Codable {
+struct ChatMessage: Identifiable, Codable, Sendable {
     let id: UUID
     let role: ChatRole
     let content: String
@@ -26,25 +26,25 @@ struct ChatMessage: Identifiable, Codable {
     }
 }
 
-enum ChatRole: String, Codable {
+enum ChatRole: String, Codable, Sendable {
     case user
     case assistant
     case system
 }
 
 // MARK: - Backend API Models
-struct ChatRequest: Codable {
+struct ChatRequest: Sendable, Codable {
     let message: String
     let conversationHistory: [BackendChatMessage]
     let transactions: [TransactionData]
 }
 
-struct BackendChatMessage: Codable {
+struct BackendChatMessage: Sendable, Codable {
     let role: String
     let content: String
 }
 
-struct TransactionData: Codable {
+struct TransactionData: Sendable, Codable {
     let id: String
     let storeName: String
     let category: String
@@ -55,7 +55,7 @@ struct TransactionData: Codable {
     let paymentMethod: String
 }
 
-struct ChatResponse: Codable {
+struct ChatResponse: Sendable, Codable {
     let response: String
 }
 
@@ -104,8 +104,9 @@ actor DobbyAIChatService {
     }
     
     // MARK: - Send Chat Message
-    func sendMessage(_ userMessage: String, transactions: [DobbyTransaction], conversationHistory: [ChatMessage]) async throws -> String {
-        guard let url = URL(string: AppConfiguration.chatEndpoint) else {
+    nonisolated func sendMessage(_ userMessage: String, transactions: [DobbyTransaction], conversationHistory: [ChatMessage]) async throws -> String {
+        let endpoint = await MainActor.run { AppConfiguration.chatEndpoint }
+        guard let url = URL(string: endpoint) else {
             throw ChatServiceError.invalidURL
         }
         
@@ -139,8 +140,9 @@ actor DobbyAIChatService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let encoder = JSONEncoder()
-        request.httpBody = try encoder.encode(chatRequest)
+        request.httpBody = try await MainActor.run {
+            try JSONEncoder().encode(chatRequest)
+        }
         
         // Send request
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -155,8 +157,9 @@ actor DobbyAIChatService {
         }
         
         // Parse response
-        let decoder = JSONDecoder()
-        let chatResponse = try decoder.decode(ChatResponse.self, from: data)
+        let chatResponse = try await MainActor.run {
+            try JSONDecoder().decode(ChatResponse.self, from: data)
+        }
         
         guard !chatResponse.response.isEmpty else {
             throw ChatServiceError.emptyResponse

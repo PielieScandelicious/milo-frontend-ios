@@ -10,7 +10,7 @@ import UIKit
 import Vision
 
 // MARK: - Store Detection
-enum SupportedStore: String, CaseIterable {
+enum SupportedStore: String, CaseIterable, Sendable {
     case aldi = "ALDI"
     case colruyt = "COLRUYT"
     case delhaize = "DELHAIZE"
@@ -23,7 +23,7 @@ enum SupportedStore: String, CaseIterable {
     }
     
     // Store detection keywords
-    var keywords: [String] {
+    nonisolated var keywords: [String] {
         switch self {
         case .aldi:
             return ["aldi", "aldi nord", "aldi süd"]
@@ -52,11 +52,11 @@ struct ReceiptImportResult: Identifiable {
 }
 
 // MARK: - Receipt Categorization Models (Backend Response)
-struct ReceiptCategorizationResult: Codable {
+struct ReceiptCategorizationResult: Sendable, Codable {
     let items: [CategorizedItem]
 }
 
-struct CategorizedItem: Codable {
+struct CategorizedItem: Sendable, Codable {
     let itemName: String
     let category: String
     let amount: Double
@@ -105,7 +105,8 @@ actor ReceiptImportService {
     
     // MARK: - Process Receipt with Backend API
     private func processReceiptWithBackend(text: String) async throws -> ReceiptCategorizationResult {
-        guard let url = URL(string: AppConfiguration.processReceiptEndpoint) else {
+        let endpoint = await MainActor.run { AppConfiguration.processReceiptEndpoint }
+        guard let url = URL(string: endpoint) else {
             throw ReceiptImportError.invalidReceiptFormat
         }
         
@@ -129,7 +130,9 @@ actor ReceiptImportService {
             throw ReceiptImportError.invalidReceiptFormat
         }
         
-        let categorization = try JSONDecoder().decode(ReceiptCategorizationResult.self, from: data)
+        let categorization = try await MainActor.run {
+            try JSONDecoder().decode(ReceiptCategorizationResult.self, from: data)
+        }
         return categorization
     }
     
@@ -185,7 +188,9 @@ actor ReceiptImportService {
         let lowercasedText = text.lowercased()
         
         for store in SupportedStore.allCases where store != .unknown {
-            for keyword in store.keywords {
+            // Access keywords in nonisolated context
+            let storeKeywords = store.keywords
+            for keyword in storeKeywords {
                 if lowercasedText.contains(keyword.lowercased()) {
                     return store
                 }

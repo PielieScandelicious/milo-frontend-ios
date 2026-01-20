@@ -1,6 +1,6 @@
 //
 //  DonutChartView.swift
-//  Dobby
+//  dobby-ios
 //
 //  Created by Gilles Moenaert on 18/01/2026.
 //

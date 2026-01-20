@@ -1,6 +1,6 @@
 //
 //  ProfileView.swift
-//  Dobby
+//  dobby-ios
 //
 //  Created by Gilles Moenaert on 20/01/2026.
 //

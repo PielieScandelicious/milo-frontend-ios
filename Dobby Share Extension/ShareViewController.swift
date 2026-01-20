@@ -1,6 +1,6 @@
 //
 //  ShareViewController.swift
-//  Dobby Share Extension
+//  dobby-ios Share Extension
 //
 //  Created by Gilles Moenaert on 19/01/2026.
 //

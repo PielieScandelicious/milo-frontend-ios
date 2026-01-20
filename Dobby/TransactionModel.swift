@@ -1,6 +1,6 @@
 //
 //  TransactionModel.swift
-//  Dobby
+//  dobby-ios
 //
 //  Created by Gilles Moenaert on 18/01/2026.
 //
@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 
-struct Transaction: Identifiable, Codable, Equatable {
+struct Transaction: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let storeName: String
     let category: String

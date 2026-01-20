@@ -1,6 +1,6 @@
 //
 //  ReceiptScanView.swift
-//  Dobby
+//  dobby-ios
 //
 //  Created by Gilles Moenaert on 19/01/2026.
 //
