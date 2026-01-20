@@ -9,6 +9,8 @@ import SwiftUI
 import FirebaseAuth
 import FirebaseCore
 import GoogleSignIn
+import AuthenticationServices
+import CryptoKit
 
 struct LoginView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
@@ -19,6 +21,7 @@ struct LoginView: View {
     @State private var errorMessage = ""
     @State private var isLoading = false
     @State private var showResetPassword = false
+    @State private var currentNonce: String?
     
     var body: some View {
         NavigationStack {
@@ -142,6 +145,26 @@ struct LoginView: View {
                     .padding(.horizontal, 32)
                     .disabled(isLoading)
                     
+                    // Apple Sign In
+                    SignInWithAppleButton(
+                        onRequest: { request in
+                            let nonce = randomNonceString()
+                            currentNonce = nonce
+                            request.requestedScopes = [.fullName, .email]
+                            request.nonce = sha256(nonce)
+                        },
+                        onCompletion: { result in
+                            Task {
+                                await handleAppleSignIn(result: result)
+                            }
+                        }
+                    )
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 32)
+                    .disabled(isLoading)
+                    
                     Spacer()
                     
                     // Toggle Sign Up/Sign In
@@ -238,6 +261,74 @@ struct LoginView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+    
+    // MARK: - Apple Sign In Helper Methods
+    
+    private func handleAppleSignIn(result: Result<ASAuthorization, Error>) async {
+        errorMessage = ""
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            let authorization = try result.get()
+            
+            guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                errorMessage = "Failed to get Apple ID credential"
+                return
+            }
+            
+            guard let nonce = currentNonce else {
+                errorMessage = "Invalid state: A login callback was received, but no login request was sent."
+                return
+            }
+            
+            guard let appleIDToken = appleIDCredential.identityToken else {
+                errorMessage = "Unable to fetch identity token"
+                return
+            }
+            
+            guard let idTokenString = String(data: appleIDToken, encoding: .utf8) else {
+                errorMessage = "Unable to serialize token string from data: \(appleIDToken.debugDescription)"
+                return
+            }
+            
+            let credential = OAuthProvider.appleCredential(withIDToken: idTokenString,
+                                                          rawNonce: nonce,
+                                                          fullName: appleIDCredential.fullName)
+            
+            try await authManager.signInWithApple(credential: credential)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        if errorCode != errSecSuccess {
+            fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+        }
+        
+        let charset: [Character] =
+        Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        
+        let nonce = randomBytes.map { byte in
+            charset[Int(byte) % charset.count]
+        }
+        
+        return String(nonce)
+    }
+    
+    private func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashedData = SHA256.hash(data: inputData)
+        let hashString = hashedData.compactMap {
+            String(format: "%02x", $0)
+        }.joined()
+        
+        return hashString
     }
 }
 

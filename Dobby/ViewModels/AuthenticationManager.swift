@@ -8,6 +8,8 @@
 import Foundation
 import FirebaseAuth
 import Combine
+import CryptoKit
+import AuthenticationServices
 
 class AuthenticationManager: ObservableObject {
     @Published var user: User?
@@ -53,6 +55,13 @@ class AuthenticationManager: ObservableObject {
     // MARK: - Google Sign In
     
     func signInWithGoogle(credential: AuthCredential) async throws {
+        let result = try await Auth.auth().signIn(with: credential)
+        self.user = result.user
+    }
+    
+    // MARK: - Apple Sign In
+    
+    func signInWithApple(credential: AuthCredential) async throws {
         let result = try await Auth.auth().signIn(with: credential)
         self.user = result.user
     }
