@@ -13,11 +13,11 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
     let receiptId: String
     let status: ReceiptStatus
     let storeName: String?
-    let receiptDate: String?
+    let receiptDate: String?  // ISO format "YYYY-MM-DD"
     let totalAmount: Double?
     let itemsCount: Int  // Required field from backend (not optional)
     let transactions: [ReceiptTransaction]
-    let warnings: [String]  // Added missing warnings array
+    let warnings: [String]  // Required field - always returned as array (may be empty)
     
     enum CodingKeys: String, CodingKey {
         case receiptId = "receipt_id"
@@ -26,7 +26,7 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
         case receiptDate = "receipt_date"
         case totalAmount = "total_amount"
         case itemsCount = "items_count"
-        case transactions
+        case transactions  // Backend returns "transactions"
         case warnings
     }
     
