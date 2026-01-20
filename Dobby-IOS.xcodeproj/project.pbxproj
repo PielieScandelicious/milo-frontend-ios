@@ -8,8 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		294129322F1FC66500EAB7CE /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 294129312F1FC66500EAB7CE /* GoogleService-Info.plist */; };
-		294B13F62F1EFCA700D8BFBD /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 294B13F52F1EFCA700D8BFBD /* FirebaseCore */; };
-		294B13F82F1EFCB700D8BFBD /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 294B13F72F1EFCB700D8BFBD /* FirebaseAuth */; };
+		295F4B8D2F1FC95E003FD5BA /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B8C2F1FC95E003FD5BA /* FirebaseAuth */; };
+		295F4B8F2F1FC95E003FD5BA /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B8E2F1FC95E003FD5BA /* FirebaseCore */; };
+		295F4B922F1FC9DA003FD5BA /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B912F1FC9DA003FD5BA /* GoogleSignIn */; };
+		295F4B942F1FC9DA003FD5BA /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B932F1FC9DA003FD5BA /* GoogleSignInSwift */; };
 		2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */; };
 		2999B8C82F1DA4F9002ACAF3 /* Dobby Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -61,20 +63,19 @@
 			);
 			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
 		};
-		29E60E092F1E9A3300C309B9 /* Exceptions for "Dobby" folder in "Dobby Share Extension" target */ = {
+		29F7BE0E2F1FCE6500ACAA25 /* Exceptions for "Dobby" folder in "Dobby" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				ReceiptUploadService.swift,
-				ShareExtensionView.swift,
-			);
-			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
-		};
-		29E60E0E2F1E9D7800C309B9 /* Exceptions for "Dobby" folder in "Dobby" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
+				Resources/Info.plist,
 			);
 			target = 294D4FBC2F1D695B001B9193 /* Dobby */;
+		};
+		29F7BE102F1FCF2D00ACAA25 /* Exceptions for "Dobby" folder in "Dobby Share Extension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Services/ReceiptUploadService.swift,
+			);
+			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -87,8 +88,8 @@
 		294D4FBF2F1D695B001B9193 /* Dobby */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				29E60E0E2F1E9D7800C309B9 /* Exceptions for "Dobby" folder in "Dobby" target */,
-				29E60E092F1E9A3300C309B9 /* Exceptions for "Dobby" folder in "Dobby Share Extension" target */,
+				29F7BE0E2F1FCE6500ACAA25 /* Exceptions for "Dobby" folder in "Dobby" target */,
+				29F7BE102F1FCF2D00ACAA25 /* Exceptions for "Dobby" folder in "Dobby Share Extension" target */,
 			);
 			path = Dobby;
 			sourceTree = "<group>";
@@ -115,8 +116,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				294B13F62F1EFCA700D8BFBD /* FirebaseCore in Frameworks */,
-				294B13F82F1EFCB700D8BFBD /* FirebaseAuth in Frameworks */,
+				295F4B8F2F1FC95E003FD5BA /* FirebaseCore in Frameworks */,
+				295F4B8D2F1FC95E003FD5BA /* FirebaseAuth in Frameworks */,
+				295F4B922F1FC9DA003FD5BA /* GoogleSignIn in Frameworks */,
+				295F4B942F1FC9DA003FD5BA /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -197,8 +200,10 @@
 			);
 			name = Dobby;
 			packageProductDependencies = (
-				294B13F52F1EFCA700D8BFBD /* FirebaseCore */,
-				294B13F72F1EFCB700D8BFBD /* FirebaseAuth */,
+				295F4B8C2F1FC95E003FD5BA /* FirebaseAuth */,
+				295F4B8E2F1FC95E003FD5BA /* FirebaseCore */,
+				295F4B912F1FC9DA003FD5BA /* GoogleSignIn */,
+				295F4B932F1FC9DA003FD5BA /* GoogleSignInSwift */,
 			);
 			productName = Dobby;
 			productReference = 294D4FBD2F1D695B001B9193 /* Dobby.app */;
@@ -258,7 +263,8 @@
 			mainGroup = 294D4FB42F1D695B001B9193;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				294B13F32F1EF6E100D8BFBD /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				295F4B8B2F1FC95E003FD5BA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				295F4B902F1FC9DA003FD5BA /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 294D4FBE2F1D695B001B9193 /* Products */;
@@ -508,7 +514,7 @@
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Dobby/Info.plist;
+				INFOPLIST_FILE = "";
 				INFOPLIST_KEY_CFBundleDisplayName = Scandelicious;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
@@ -545,7 +551,7 @@
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Dobby/Info.plist;
+				INFOPLIST_FILE = "";
 				INFOPLIST_KEY_CFBundleDisplayName = Scandelicious;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
@@ -671,7 +677,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		294B13F32F1EF6E100D8BFBD /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+		295F4B8B2F1FC95E003FD5BA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
 			requirement = {
@@ -679,18 +685,36 @@
 				minimumVersion = 12.8.0;
 			};
 		};
+		295F4B902F1FC9DA003FD5BA /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		294B13F52F1EFCA700D8BFBD /* FirebaseCore */ = {
+		295F4B8C2F1FC95E003FD5BA /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 294B13F32F1EF6E100D8BFBD /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			package = 295F4B8B2F1FC95E003FD5BA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		295F4B8E2F1FC95E003FD5BA /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 295F4B8B2F1FC95E003FD5BA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCore;
 		};
-		294B13F72F1EFCB700D8BFBD /* FirebaseAuth */ = {
+		295F4B912F1FC9DA003FD5BA /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 294B13F32F1EF6E100D8BFBD /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAuth;
+			package = 295F4B902F1FC9DA003FD5BA /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		295F4B932F1FC9DA003FD5BA /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 295F4B902F1FC9DA003FD5BA /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

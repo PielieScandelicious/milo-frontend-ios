@@ -645,6 +645,14 @@ class ShareViewController: UIViewController {
             
             print("✅ PDF upload completed successfully")
             
+        } catch let error as ReceiptUploadError {
+            print("❌ ReceiptUploadError: \(error.localizedDescription)")
+            updateStatus(error: error.localizedDescription)
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await animateDismissal()
+            await MainActor.run {
+                self.extensionContext?.cancelRequest(withError: error)
+            }
         } catch let error as ReceiptError {
             print("❌ ReceiptError: \(error.localizedDescription)")
             updateStatus(error: error.errorDescription ?? "Unknown error")
