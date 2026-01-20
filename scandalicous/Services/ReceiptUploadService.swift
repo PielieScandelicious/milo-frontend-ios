@@ -91,8 +91,26 @@ actor ReceiptUploadService {
             switch httpResponse.statusCode {
             case 200...299:
                 // Success - parse response
+                
+                // Print raw JSON for debugging
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("📦 Raw server response (image upload):\n\(jsonString)")
+                }
+                
                 do {
                     let uploadResponse = try await decodeResponse(from: data)
+                    
+                    // Debug: Print parsed response
+                    print("✅ Successfully parsed response:")
+                    print("   Receipt ID: \(uploadResponse.receiptId)")
+                    print("   Status: \(uploadResponse.status.rawValue)")
+                    print("   Store: \(uploadResponse.storeName ?? "N/A")")
+                    print("   Items Count: \(uploadResponse.itemsCount)")
+                    print("   Transactions count: \(uploadResponse.transactions.count)")
+                    print("   Transaction details:")
+                    for (index, transaction) in uploadResponse.transactions.enumerated() {
+                        print("      [\(index)] \(transaction.itemName) - €\(transaction.itemPrice) x\(transaction.quantity)")
+                    }
                     
                     // Check if the receipt processing failed
                     if uploadResponse.status == .failed {
@@ -198,8 +216,26 @@ actor ReceiptUploadService {
             switch httpResponse.statusCode {
             case 200...299:
                 // Success - parse response
+                
+                // Print raw JSON for debugging
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("📦 Raw server response (PDF upload):\n\(jsonString)")
+                }
+                
                 do {
                     let uploadResponse = try await decodeResponse(from: data)
+                    
+                    // Debug: Print parsed response
+                    print("✅ Successfully parsed response:")
+                    print("   Receipt ID: \(uploadResponse.receiptId)")
+                    print("   Status: \(uploadResponse.status.rawValue)")
+                    print("   Store: \(uploadResponse.storeName ?? "N/A")")
+                    print("   Items Count: \(uploadResponse.itemsCount)")
+                    print("   Transactions count: \(uploadResponse.transactions.count)")
+                    print("   Transaction details:")
+                    for (index, transaction) in uploadResponse.transactions.enumerated() {
+                        print("      [\(index)] \(transaction.itemName) - €\(transaction.itemPrice) x\(transaction.quantity)")
+                    }
                     
                     // Check if the receipt processing failed
                     if uploadResponse.status == .failed {
@@ -289,8 +325,7 @@ actor ReceiptUploadService {
     
     // MARK: - Decode Response
     
-    // Nonisolated decoding to avoid actor isolation issues with Swift 6
-    nonisolated private func decodeResponse(from data: Data) async throws -> ReceiptUploadResponse {
+    private func decodeResponse(from data: Data) async throws -> ReceiptUploadResponse {
         let decoder = JSONDecoder()
         return try decoder.decode(ReceiptUploadResponse.self, from: data)
     }

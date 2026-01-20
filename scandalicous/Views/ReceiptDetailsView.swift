@@ -33,6 +33,24 @@ struct ReceiptDetailsView: View {
                     }
                 }
             }
+            .onAppear {
+                print("📋 ReceiptDetailsView appeared")
+                print("   Receipt ID: \(receipt.receiptId)")
+                print("   Store: \(receipt.storeName ?? "N/A")")
+                print("   Total: \(receipt.totalAmount ?? 0.0)")
+                print("   Items Count: \(receipt.itemsCount)")
+                print("   Transactions array count: \(receipt.transactions.count)")
+                print("   Transactions isEmpty: \(receipt.transactions.isEmpty)")
+                
+                if !receipt.transactions.isEmpty {
+                    print("   First few transactions:")
+                    for (index, transaction) in receipt.transactions.prefix(3).enumerated() {
+                        print("      [\(index)] \(transaction.itemName) - €\(transaction.itemPrice)")
+                    }
+                } else {
+                    print("   ⚠️ Transactions array is empty!")
+                }
+            }
         }
     }
     

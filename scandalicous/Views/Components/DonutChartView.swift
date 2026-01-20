@@ -129,3 +129,48 @@ extension Category {
     }
 }
 
+// MARK: - API CategoryBreakdown to ChartSegments
+extension Array where Element == CategoryBreakdown {
+    func toChartSegments() -> [ChartSegment] {
+        var currentAngle: Double = 0
+
+        return enumerated().map { index, category in
+            let percentage = category.percentage / 100.0
+            let angleRange = 360.0 * percentage
+            let segment = ChartSegment(
+                startAngle: .degrees(currentAngle),
+                endAngle: .degrees(currentAngle + angleRange),
+                color: category.name.categoryColor,
+                value: category.spent,
+                label: category.name,
+                percentage: Int(category.percentage)
+            )
+            currentAngle += angleRange
+            return segment
+        }
+    }
+}
+
+// MARK: - API StoreBreakdown to ChartSegments (for store comparison charts)
+extension Array where Element == APIStoreBreakdown {
+    func toChartSegments() -> [ChartSegment] {
+        var currentAngle: Double = 0
+        let storeColors: [Color] = [.blue, .green, .orange, .purple, .pink, .cyan, .yellow, .red]
+
+        return enumerated().map { index, store in
+            let percentage = store.percentage / 100.0
+            let angleRange = 360.0 * percentage
+            let segment = ChartSegment(
+                startAngle: .degrees(currentAngle),
+                endAngle: .degrees(currentAngle + angleRange),
+                color: storeColors[index % storeColors.count],
+                value: store.amountSpent,
+                label: store.storeName,
+                percentage: Int(store.percentage)
+            )
+            currentAngle += angleRange
+            return segment
+        }
+    }
+}
+

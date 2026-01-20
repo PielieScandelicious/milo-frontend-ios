@@ -13,38 +13,37 @@ struct TransactionListView: View {
     let category: String?
     let categoryColor: Color?
     
-    @StateObject private var transactionManager = TransactionManager()
+    @StateObject private var viewModel = TransactionsViewModel()
     @Environment(\.dismiss) private var dismiss
     
-    private var transactions: [Transaction] {
-        if let category = category {
-            return transactionManager.transactions(for: storeName, period: period, category: category)
-        } else {
-            return transactionManager.transactions(for: storeName, period: period)
-        }
+    private var transactions: [APITransaction] {
+        viewModel.transactions
     }
     
     private var totalAmount: Double {
-        transactions.reduce(0) { $0 + $1.amount }
+        transactions.reduce(0) { $0 + $1.totalPrice }
     }
     
-    private var groupedTransactions: [(String, [Transaction])] {
+    private var groupedTransactions: [(String, [APITransaction])] {
         let grouped = Dictionary(grouping: transactions) { transaction -> String in
+            guard let date = transaction.dateParsed else { return "Unknown" }
             let formatter = DateFormatter()
             formatter.dateFormat = "EEEE, MMMM d"
-            return formatter.string(from: transaction.date)
+            return formatter.string(from: date)
         }
         return grouped.sorted { first, second in
             guard let firstDate = transactions.first(where: { transaction in
+                guard let date = transaction.dateParsed else { return false }
                 let formatter = DateFormatter()
                 formatter.dateFormat = "EEEE, MMMM d"
-                return formatter.string(from: transaction.date) == first.0
-            })?.date,
+                return formatter.string(from: date) == first.0
+            })?.dateParsed,
             let secondDate = transactions.first(where: { transaction in
+                guard let date = transaction.dateParsed else { return false }
                 let formatter = DateFormatter()
                 formatter.dateFormat = "EEEE, MMMM d"
-                return formatter.string(from: transaction.date) == second.0
-            })?.date else {
+                return formatter.string(from: date) == second.0
+            })?.dateParsed else {
                 return false
             }
             return firstDate > secondDate
@@ -55,7 +54,17 @@ struct TransactionListView: View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
             
-            if transactions.isEmpty {
+            if viewModel.state.isLoading && transactions.isEmpty {
+                // Loading state
+                VStack(spacing: 0) {
+                    headerSection
+                    
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                        .frame(maxHeight: .infinity)
+                }
+            } else if transactions.isEmpty {
                 VStack(spacing: 0) {
                     // Header
                     headerSection
@@ -74,10 +83,38 @@ struct TransactionListView: View {
                             ForEach(groupedTransactions, id: \.0) { date, dayTransactions in
                                 transactionSection(date: date, transactions: dayTransactions)
                             }
+                            
+                            // Load more button
+                            if viewModel.hasMorePages {
+                                Button {
+                                    Task {
+                                        await viewModel.loadNextPage()
+                                    }
+                                } label: {
+                                    if viewModel.state.isLoading {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    } else {
+                                        Text("Load More")
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.white.opacity(0.1))
+                                )
+                                .padding(.horizontal, 20)
+                            }
                         }
                         .padding(.top, 20)
                         .padding(.bottom, 32)
                     }
+                }
+                .refreshable {
+                    await viewModel.refresh()
                 }
             }
         }
@@ -95,6 +132,68 @@ struct TransactionListView: View {
                 }
             }
         }
+        .task {
+            await loadTransactions()
+        }
+        .alert("Error", isPresented: .constant(viewModel.state.error != nil)) {
+            Button("OK") { }
+        } message: {
+            if let error = viewModel.state.error {
+                Text(error)
+            }
+        }
+    }
+    
+    private func loadTransactions() async {
+        // Parse period to get start and end dates
+        let (startDate, endDate) = parsePeriod(period)
+        
+        print("📋 Loading transactions for:")
+        print("   Store: \(storeName)")
+        print("   Period: \(period)")
+        print("   Start Date: \(startDate?.description ?? "nil")")
+        print("   End Date: \(endDate?.description ?? "nil")")
+        print("   Category: \(category ?? "nil")")
+        
+        // Configure filters
+        var filters = TransactionFilters()
+        filters.storeName = storeName
+        filters.startDate = startDate
+        filters.endDate = endDate
+        
+        // If category is specified, try to match it to an AnalyticsCategory
+        if let categoryName = category {
+            filters.category = AnalyticsCategory.allCases.first { $0.displayName == categoryName }
+            print("   Mapped to AnalyticsCategory: \(filters.category?.rawValue ?? "nil")")
+        }
+        
+        await viewModel.updateFilters(filters)
+    }
+    
+    private func parsePeriod(_ period: String) -> (Date?, Date?) {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        
+        guard let date = dateFormatter.date(from: period) else {
+            print("⚠️ Failed to parse period: \(period)")
+            return (nil, nil)
+        }
+        
+        let calendar = Calendar.current
+        
+        // Get start of month
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: date))
+        
+        // Get end of month (last second of the last day)
+        var endComponents = DateComponents()
+        endComponents.month = 1
+        endComponents.second = -1
+        let endOfMonth = calendar.date(byAdding: endComponents, to: startOfMonth ?? date)
+        
+        print("   Parsed dates: \(startOfMonth?.description ?? "nil") to \(endOfMonth?.description ?? "nil")")
+        
+        return (startOfMonth, endOfMonth)
     }
     
     private var headerSection: some View {
@@ -176,7 +275,7 @@ struct TransactionListView: View {
         .frame(maxHeight: .infinity)
     }
     
-    private func transactionSection(date: String, transactions: [Transaction]) -> some View {
+    private func transactionSection(date: String, transactions: [APITransaction]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // Date header
             HStack {
@@ -188,7 +287,7 @@ struct TransactionListView: View {
                 
                 Spacer()
                 
-                Text(String(format: "€%.0f", transactions.reduce(0) { $0 + $1.amount }))
+                Text(String(format: "€%.0f", transactions.reduce(0) { $0 + $1.totalPrice }))
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -197,7 +296,7 @@ struct TransactionListView: View {
             // Transaction cards
             VStack(spacing: 8) {
                 ForEach(transactions) { transaction in
-                    TransactionRowView(transaction: transaction)
+                    APITransactionRowView(transaction: transaction)
                 }
             }
             .padding(.horizontal, 20)
@@ -205,8 +304,8 @@ struct TransactionListView: View {
     }
 }
 
-struct TransactionRowView: View {
-    let transaction: Transaction
+struct APITransactionRowView: View {
+    let transaction: APITransaction
     
     var body: some View {
         HStack(spacing: 12) {
@@ -247,7 +346,7 @@ struct TransactionRowView: View {
             Spacer()
             
             // Amount
-            Text(String(format: "€%.2f", transaction.amount))
+            Text(String(format: "€%.2f", transaction.totalPrice))
                 .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
         }

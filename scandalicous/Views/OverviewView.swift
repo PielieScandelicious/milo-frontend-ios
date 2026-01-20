@@ -104,7 +104,52 @@ struct OverviewView: View {
                     }
                 }
             
-            ScrollView {
+            // Loading overlay
+            if dataManager.isLoading {
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    
+                    Text("Loading analytics...")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.3))
+            } else if let error = dataManager.error {
+                // Error state
+                VStack(spacing: 20) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(.red)
+                    
+                    Text("Failed to load data")
+                        .font(.headline)
+                    
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button {
+                        Task {
+                            await dataManager.fetchFromBackend(for: .month)
+                        }
+                    } label: {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                            .font(.headline)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundStyle(.white)
+                            .cornerRadius(10)
+                    }
+                }
+                .padding()
+            } else {
+                // Content
+                ScrollView {
                 VStack(spacing: 0) {
                     // Scrollable header
                     VStack(spacing: 12) {
@@ -135,6 +180,7 @@ struct OverviewView: View {
             .scrollBounceBehavior(.always)
             .scrollDismissesKeyboard(.interactively)
             .background(Color(white: 0.05))
+            }
             
             // Edit mode exit button overlay
             if isEditMode {
@@ -180,6 +226,31 @@ struct OverviewView: View {
         .onAppear {
             dataManager.configure(with: transactionManager)
             updateDisplayedBreakdowns()
+            
+            // Fetch data from backend
+            Task {
+                await dataManager.fetchFromBackend(for: .month)
+            }
+        }
+        .onChange(of: transactionManager.transactions) { oldValue, newValue in
+            // Regenerate breakdowns when transactions change
+            print("🔄 Transactions changed - regenerating breakdowns")
+            print("   Old count: \(oldValue.count), New count: \(newValue.count)")
+            dataManager.regenerateBreakdowns()
+            updateDisplayedBreakdowns()
+            
+            // Update selected period to current month if we added new transactions
+            if newValue.count > oldValue.count, let latestTransaction = newValue.first {
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "MMMM yyyy"
+                let newPeriod = dateFormatter.string(from: latestTransaction.date)
+                selectedPeriod = newPeriod
+                print("   📅 Switched to period: \(newPeriod)")
+            }
+        }
+        .refreshable {
+            // Pull to refresh - fetch latest data from backend
+            await dataManager.fetchFromBackend(for: .month)
         }
         .onDisappear {
             // Exit edit mode when switching tabs or navigating away

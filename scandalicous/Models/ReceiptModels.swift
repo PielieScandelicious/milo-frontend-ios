@@ -62,9 +62,8 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     let unitPrice: Double?
     let category: ReceiptCategory
     
-    var id: String {
-        "\(itemName)_\(itemPrice)_\(quantity)"
-    }
+    // Generate a unique ID using UUID to handle duplicate items
+    let id: UUID
     
     enum CodingKeys: String, CodingKey {
         case itemName = "item_name"
@@ -72,6 +71,38 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         case quantity
         case unitPrice = "unit_price"
         case category
+    }
+    
+    // Custom initializer to generate UUID
+    init(itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: ReceiptCategory) {
+        self.itemName = itemName
+        self.itemPrice = itemPrice
+        self.quantity = quantity
+        self.unitPrice = unitPrice
+        self.category = category
+        self.id = UUID()
+    }
+    
+    // Decode initializer
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        itemName = try container.decode(String.self, forKey: .itemName)
+        itemPrice = try container.decode(Double.self, forKey: .itemPrice)
+        quantity = try container.decode(Int.self, forKey: .quantity)
+        unitPrice = try container.decodeIfPresent(Double.self, forKey: .unitPrice)
+        category = try container.decode(ReceiptCategory.self, forKey: .category)
+        // Generate a unique ID for each decoded transaction
+        id = UUID()
+    }
+    
+    // Encode function (ID is not encoded, will be regenerated on decode)
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(itemName, forKey: .itemName)
+        try container.encode(itemPrice, forKey: .itemPrice)
+        try container.encode(quantity, forKey: .quantity)
+        try container.encodeIfPresent(unitPrice, forKey: .unitPrice)
+        try container.encode(category, forKey: .category)
     }
 }
 
@@ -108,7 +139,7 @@ enum ReceiptCategory: String, Codable, CaseIterable, Sendable {
         case .household: return "house.fill"
         case .snacksAndSweets: return "birthday.cake.fill"
         case .freshProduce: return "leaf.fill"
-        case .dairyAndEggs: return "carton.fill"
+        case .dairyAndEggs: return "mug.fill"  // Changed from "carton.fill" which doesn't exist
         case .readyMeals: return "takeoutbag.and.cup.and.straw.fill"
         case .bakery: return "croissant.fill"
         case .pantry: return "cabinet.fill"

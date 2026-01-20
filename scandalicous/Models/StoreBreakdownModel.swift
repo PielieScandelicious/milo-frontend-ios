@@ -52,35 +52,157 @@ struct Category: Codable, Identifiable, Equatable, Hashable {
 // MARK: - Data Manager
 class StoreDataManager: ObservableObject {
     @Published var storeBreakdowns: [StoreBreakdown] = []
+    @Published var isLoading = false
+    @Published var error: String?
     
     private var transactionManager: TransactionManager?
     
     init() {
-        loadData()
+        // Don't load local JSON anymore - will fetch from backend
     }
     
     // Inject transaction manager
     func configure(with transactionManager: TransactionManager) {
         self.transactionManager = transactionManager
-        regenerateBreakdowns()
     }
     
-    func loadData() {
-        guard let url = Bundle.main.url(forResource: "store_breakdowns", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
-            print("Failed to load store_breakdowns.json")
-            return
+    // MARK: - Fetch Data from Backend
+    
+    /// Fetch analytics data from backend API
+    func fetchFromBackend(for period: PeriodType = .month) async {
+        await MainActor.run {
+            isLoading = true
+            error = nil
         }
         
         do {
-            let decoder = JSONDecoder()
-            storeBreakdowns = try decoder.decode([StoreBreakdown].self, from: data)
+            print("📥 Fetching analytics from backend for period: \(period.rawValue)")
+            
+            // Create filters for the selected period
+            let filters: AnalyticsFilters
+            switch period {
+            case .week:
+                filters = .thisWeek
+            case .month:
+                filters = .thisMonth
+            case .year:
+                filters = .thisYear
+            }
+            
+            // Fetch summary from backend
+            let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+            
+            print("✅ Received \(summary.stores.count) stores from backend")
+            print("   Total spend: €\(summary.totalSpend)")
+            print("   Transaction count: \(summary.transactionCount)")
+            
+            // Convert API response to StoreBreakdown format
+            let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: period)
+            
+            await MainActor.run {
+                self.storeBreakdowns = breakdowns
+                self.isLoading = false
+                print("✅ Updated storeBreakdowns with \(breakdowns.count) stores")
+            }
+            
+        } catch let apiError as AnalyticsAPIError {
+            print("❌ Backend fetch error: \(apiError.localizedDescription)")
+            await MainActor.run {
+                self.error = apiError.localizedDescription
+                self.isLoading = false
+            }
         } catch {
-            print("Failed to decode store breakdowns: \(error)")
+            print("❌ Unexpected error fetching from backend: \(error.localizedDescription)")
+            await MainActor.run {
+                self.error = error.localizedDescription
+                self.isLoading = false
+            }
         }
     }
     
-    // Regenerate breakdowns from transactions
+    // MARK: - Convert API Response to StoreBreakdown
+    
+    private func convertToStoreBreakdowns(summary: SummaryResponse, periodType: PeriodType) async -> [StoreBreakdown] {
+        var breakdowns: [StoreBreakdown] = []
+        
+        // Format period string (e.g., "January 2026")
+        let periodString = formatPeriod(from: summary.startDate, to: summary.endDate, period: periodType)
+        
+        for apiStore in summary.stores {
+            // Fetch detailed breakdown for each store to get category info
+            do {
+                let filters = AnalyticsFilters(
+                    period: periodType,
+                    startDate: summary.startDateParsed,
+                    endDate: summary.endDateParsed,
+                    storeName: apiStore.storeName
+                )
+                
+                let storeDetails = try await AnalyticsAPIService.shared.getStoreDetails(
+                    storeName: apiStore.storeName,
+                    filters: filters
+                )
+                
+                // Convert categories
+                let categories = storeDetails.categories.map { categoryBreakdown in
+                    Category(
+                        name: categoryBreakdown.name,
+                        spent: categoryBreakdown.spent,
+                        percentage: Int(categoryBreakdown.percentage)
+                    )
+                }
+                
+                let breakdown = StoreBreakdown(
+                    storeName: apiStore.storeName,
+                    period: periodString,
+                    totalStoreSpend: apiStore.amountSpent,
+                    categories: categories,
+                    visitCount: apiStore.storeVisits
+                )
+                
+                breakdowns.append(breakdown)
+                
+            } catch {
+                print("⚠️ Failed to fetch details for \(apiStore.storeName): \(error.localizedDescription)")
+                
+                // Fallback: Create breakdown without category details
+                let breakdown = StoreBreakdown(
+                    storeName: apiStore.storeName,
+                    period: periodString,
+                    totalStoreSpend: apiStore.amountSpent,
+                    categories: [],
+                    visitCount: apiStore.storeVisits
+                )
+                
+                breakdowns.append(breakdown)
+            }
+        }
+        
+        return breakdowns
+    }
+    
+    private func formatPeriod(from startDateStr: String, to endDateStr: String, period: PeriodType) -> String {
+        guard let startDate = ISO8601DateFormatter().date(from: startDateStr) ??
+                DateFormatter.yyyyMMdd.date(from: startDateStr) else {
+            return "Unknown Period"
+        }
+        
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.month, .year], from: startDate)
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        
+        return dateFormatter.string(from: startDate)
+    }
+    
+    func loadData() {
+        // Deprecated - now fetching from backend
+        // Keeping for backward compatibility but does nothing
+        print("⚠️ loadData() called - this is deprecated, use fetchFromBackend() instead")
+    }
+    
+    // Regenerate breakdowns from transactions (for local data)
     func regenerateBreakdowns() {
         guard let transactionManager = transactionManager else { return }
         
@@ -99,10 +221,10 @@ class StoreDataManager: ObservableObject {
         }
         
         // Convert to StoreBreakdown objects
-        storeBreakdowns = breakdownDict.map { key, transactions in
+        let localBreakdowns = breakdownDict.map { key, transactions in
             let components = key.split(separator: "-")
             let storeName = String(components[0])
-            let period = String(components[1])
+            let period = components.dropFirst().joined(separator: "-")
             
             // Group by category
             let categoryDict = Dictionary(grouping: transactions, by: { $0.category })
@@ -126,6 +248,15 @@ class StoreDataManager: ObservableObject {
                 visitCount: visitCount
             )
         }
+        
+        // Merge with existing backend data (avoid duplicates)
+        for localBreakdown in localBreakdowns {
+            if !storeBreakdowns.contains(where: { $0.id == localBreakdown.id }) {
+                storeBreakdowns.append(localBreakdown)
+            }
+        }
+        
+        print("✅ Regenerated breakdowns - total: \(storeBreakdowns.count)")
     }
     
     // Group breakdowns by period for overview
@@ -153,3 +284,13 @@ class StoreDataManager: ObservableObject {
         }
     }
 }
+// MARK: - DateFormatter Extension
+
+extension DateFormatter {
+    static var yyyyMMdd: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }
+}
+

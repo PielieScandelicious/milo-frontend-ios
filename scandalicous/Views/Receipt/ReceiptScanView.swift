@@ -199,6 +199,16 @@ struct ReceiptScanView: View {
                         uploadState = .success(response)
                         uploadedReceipt = response
                         
+                        // Debug: Log what we're about to display
+                        print("🎉 Receipt upload successful!")
+                        print("   Setting uploadedReceipt with \(response.transactions.count) transactions")
+                        print("   About to show receipt details sheet")
+                        
+                        // Convert receipt transactions to app transactions and save them
+                        let newTransactions = convertReceiptToTransactions(response)
+                        transactionManager.addTransactions(newTransactions)
+                        print("✅ Added \(newTransactions.count) transactions to TransactionManager")
+                        
                         // Trigger success haptic feedback
                         let generator = UINotificationFeedbackGenerator()
                         generator.notificationOccurred(.success)
@@ -252,6 +262,26 @@ struct ReceiptScanView: View {
                     showError = true
                 }
             }
+        }
+    }
+    
+    // MARK: - Convert Receipt to Transactions
+    
+    private func convertReceiptToTransactions(_ receipt: ReceiptUploadResponse) -> [Transaction] {
+        let storeName = receipt.storeName ?? "Unknown Store"
+        let date = receipt.parsedDate ?? Date()
+        
+        return receipt.transactions.map { receiptTransaction in
+            Transaction(
+                id: UUID(),
+                storeName: storeName,
+                category: receiptTransaction.category.displayName,
+                itemName: receiptTransaction.itemName,
+                amount: receiptTransaction.itemPrice,
+                date: date,
+                quantity: receiptTransaction.quantity,
+                paymentMethod: "Unknown" // Receipt doesn't contain payment method info
+            )
         }
     }
 }
