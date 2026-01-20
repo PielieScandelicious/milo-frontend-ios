@@ -211,7 +211,7 @@ struct ShareExtensionView: View {
             
             do {
                 let response = try await uploadData(data, filename: filename, contentType: contentType)
-                print("✅ Uploaded: \(response.s3_key)")
+                print("✅ Uploaded: \(response.receiptId)")
                 
                 await MainActor.run {
                     uploadedCount += 1
@@ -264,7 +264,7 @@ struct ShareExtensionView: View {
                     if let data = image.jpegData(compressionQuality: 0.9) {
                         continuation.resume(returning: data)
                     } else {
-                        continuation.resume(throwing: ReceiptUploadError.imageConversionFailed)
+                        continuation.resume(throwing: ReceiptUploadError.serverError("Failed to convert image to JPEG"))
                     }
                     return
                 }
@@ -310,16 +310,20 @@ struct ShareExtensionView: View {
     
     // MARK: - Upload
     
-    private func uploadData(_ data: Data, filename: String, contentType: String) async throws -> S3UploadResponse {
-        guard let url = URL(string: "https://3edaeenmik.eu-west-1.awsapprunner.com/upload") else {
-            throw ReceiptUploadError.invalidURL
+    private func uploadData(_ data: Data, filename: String, contentType: String) async throws -> ReceiptUploadResponse {
+        guard let url = URL(string: "\(AppConfiguration.backendBaseURL)/api/v1/receipts/upload") else {
+            throw ReceiptUploadError.serverError("Invalid upload URL")
         }
+        
+        // Get auth token
+        let idToken = try await getAuthToken()
         
         // Create multipart form data
         let boundary = UUID().uuidString
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 60 // 60 second timeout
         
         // Build request body
@@ -346,18 +350,32 @@ struct ShareExtensionView: View {
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw ReceiptUploadError.serverError(statusCode: httpResponse.statusCode)
+            throw ReceiptUploadError.serverError("Server returned status code: \(httpResponse.statusCode)")
         }
         
         // Parse response
         let decoder = JSONDecoder()
-        let uploadResponse = try decoder.decode(S3UploadResponse.self, from: responseData)
+        let uploadResponse = try decoder.decode(ReceiptUploadResponse.self, from: responseData)
         
-        guard uploadResponse.isSuccess else {
-            throw ReceiptUploadError.uploadFailed("Server returned non-success status")
+        // Check if the receipt processing failed
+        if uploadResponse.status == .failed {
+            throw ReceiptUploadError.serverError("Receipt processing failed")
         }
         
         return uploadResponse
+    }
+    
+    // MARK: - Get Auth Token
+    
+    private func getAuthToken() async throws -> String {
+        // In Share Extension: Read from shared keychain/user defaults
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.deepmaind.scandalicious"),
+           let token = sharedDefaults.string(forKey: "firebase_auth_token") {
+            return token
+        }
+        
+        // If not found, throw error
+        throw ReceiptUploadError.noAuthToken
     }
     
     // MARK: - Helpers
@@ -382,3 +400,13 @@ struct ShareExtensionView: View {
 #Preview {
     ShareExtensionView(sharedItems: [])
 }
+// MARK: - Data Extension for Multipart Form Data
+
+private extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
+    }
+}
+

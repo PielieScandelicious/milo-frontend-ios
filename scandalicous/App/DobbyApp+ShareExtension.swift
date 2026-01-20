@@ -134,7 +134,7 @@ struct ExampleReceiptUploadView: View {
         
         do {
             let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
-            uploadResult = "Success! S3 Key: \(response.s3_key)"
+            uploadResult = "Success! Receipt ID: \(response.receiptId)\nStore: \(response.storeName ?? "Unknown")\nItems: \(response.itemsCount)"
         } catch {
             uploadResult = "Error: \(error.localizedDescription)"
         }

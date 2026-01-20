@@ -15,41 +15,78 @@ struct ReceiptScanView: View {
     @State private var capturedImage: UIImage?
     @State private var errorMessage: String?
     @State private var showError = false
-    @State private var showSuccessMessage = false
-    @State private var isProcessing = false
+    @State private var uploadState: ReceiptUploadState = .idle
+    @State private var uploadedReceipt: ReceiptUploadResponse?
+    @State private var showReceiptDetails = false
     
     var body: some View {
         ZStack {
             placeholderView
             
-            // Success message overlay
-            if showSuccessMessage {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("Receipt saved successfully")
-                            .foregroundStyle(.white)
-                    }
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
-                    .padding(.bottom, 30)
+            // Loading overlay with progress indicator
+            if case .uploading = uploadState {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    
+                    Text("Uploading receipt...")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    
+                    Text("Analyzing your receipt")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.8))
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .padding(32)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .transition(.scale.combined(with: .opacity))
+            }
+            
+            // Processing overlay
+            if case .processing = uploadState {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    
+                    Text("Processing receipt...")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    
+                    Text("Extracting items and prices")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+                .padding(32)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .transition(.scale.combined(with: .opacity))
             }
         }
-        .alert("Error", isPresented: $showError) {
+        .alert("Upload Failed", isPresented: $showError) {
             Button("OK") {
                 errorMessage = nil
                 capturedImage = nil
+                uploadState = .idle
             }
         } message: {
-            Text(errorMessage ?? "Failed to save receipt")
+            Text(errorMessage ?? "Failed to upload receipt")
         }
         .fullScreenCover(isPresented: $showDocumentScanner) {
             DocumentScannerView(capturedImage: $capturedImage)
+        }
+        .sheet(isPresented: $showReceiptDetails) {
+            if let receipt = uploadedReceipt {
+                ReceiptDetailsView(receipt: receipt)
+            }
         }
         .onChange(of: capturedImage) { _, newImage in
             print("onChange triggered - capturedImage: \(newImage != nil ? "present" : "nil")")
@@ -58,6 +95,7 @@ struct ReceiptScanView: View {
                 processReceipt(image: image)
             }
         }
+        .animation(.easeInOut, value: uploadState)
     }
     
     private var placeholderView: some View {
@@ -134,56 +172,83 @@ struct ReceiptScanView: View {
     }
     
     private func processReceipt(image: UIImage) {
-        print("processReceipt called, isProcessing: \(isProcessing)")
+        print("processReceipt called")
         
         // Prevent multiple simultaneous processing
-        guard !isProcessing else { 
+        guard uploadState == .idle else { 
             print("Already processing, skipping")
             return 
         }
-        isProcessing = true
+        
+        uploadState = .uploading
         print("Starting receipt processing...")
         
         Task {
             do {
-                // Upload receipt to server - THIS IS THE ONLY STORAGE
+                // Upload receipt to server
                 print("Uploading receipt to server...")
                 let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
-                print("Receipt uploaded successfully - S3 Key: \(response.s3_key)")
+                print("Receipt uploaded successfully - ID: \(response.receiptId)")
                 
                 await MainActor.run {
                     capturedImage = nil
-                    isProcessing = false
-                    print("Processing complete, showing success message")
                     
-                    // Trigger success haptic feedback
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
-                    
-                    // Show success message
-                    withAnimation {
-                        showSuccessMessage = true
-                    }
-                    
-                    // Hide success message after 2 seconds
-                    Task {
-                        try? await Task.sleep(for: .seconds(2))
-                        withAnimation {
-                            showSuccessMessage = false
+                    // Check status
+                    switch response.status {
+                    case .success, .completed:
+                        uploadState = .success(response)
+                        uploadedReceipt = response
+                        
+                        // Trigger success haptic feedback
+                        let generator = UINotificationFeedbackGenerator()
+                        generator.notificationOccurred(.success)
+                        
+                        // Show receipt details
+                        showReceiptDetails = true
+                        
+                        // Reset state after showing details
+                        Task {
+                            try? await Task.sleep(for: .seconds(1))
+                            uploadState = .idle
                         }
+                        
+                    case .pending, .processing:
+                        uploadState = .processing
+                        // In a real app, you might want to poll for status updates
+                        errorMessage = "Receipt is still being processed. Please check back later."
+                        showError = true
+                        uploadState = .idle
+                        
+                    case .failed:
+                        uploadState = .failed("Receipt processing failed")
+                        errorMessage = "The receipt could not be processed. Please try again with a clearer image."
+                        showError = true
                     }
                 }
-            } catch {
-                print("Error uploading receipt: \(error.localizedDescription)")
+            } catch let error as ReceiptUploadError {
+                print("Upload error: \(error.localizedDescription)")
                 
                 await MainActor.run {
-                    isProcessing = false
+                    uploadState = .failed(error.localizedDescription)
                     
                     // Trigger error haptic feedback
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.error)
                     
-                    errorMessage = "Failed to upload receipt: \(error.localizedDescription)"
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            } catch {
+                print("Unexpected error: \(error.localizedDescription)")
+                
+                await MainActor.run {
+                    uploadState = .failed(error.localizedDescription)
+                    
+                    // Trigger error haptic feedback
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                    
+                    errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
                     showError = true
                 }
             }

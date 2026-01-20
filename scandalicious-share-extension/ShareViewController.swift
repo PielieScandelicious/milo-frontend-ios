@@ -627,7 +627,7 @@ class ShareViewController: UIViewController {
             // Upload PDF directly to API
             print("☁️ Uploading PDF receipt to server...")
             let response = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
-            print("✅ PDF uploaded successfully - S3 Key: \(response.s3_key)")
+            print("✅ PDF uploaded successfully - Receipt ID: \(response.receiptId)")
             
             // Success! Show success state
             await showSuccess(message: "PDF receipt uploaded successfully!")
@@ -694,7 +694,7 @@ class ShareViewController: UIViewController {
             // ✅ UPLOAD TO API ONLY - No local storage
             print("☁️ Uploading receipt to server...")
             let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
-            print("✅ Receipt uploaded successfully - S3 Key: \(response.s3_key)")
+            print("✅ Receipt uploaded successfully - Receipt ID: \(response.receiptId)")
             
             print("✅ Receipt uploaded, showing success animation...")
             

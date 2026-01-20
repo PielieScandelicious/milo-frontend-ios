@@ -1,269 +1,308 @@
 //
 //  ReceiptUploadService.swift
-//  dobby-ios
+//  Scandalicious
 //
-//  Created by Gilles Moenaert on 19/01/2026.
+//  Created by Gilles Moenaert on 20/01/2026.
 //
 
 import Foundation
 import UIKit
+#if !SHARE_EXTENSION
+import FirebaseAuth
+#endif
 
-/// Response from the receipt upload API (S3 upload)
-struct S3UploadResponse: Sendable, Codable {
-    let status: String
-    let s3_key: String
-
-    nonisolated var isSuccess: Bool {
-        status.lowercased() == "success"
-    }
-}
-
-/// Errors that can occur during receipt upload
 enum ReceiptUploadError: LocalizedError {
-    case invalidURL
-    case imageConversionFailed
-    case pdfReadFailed
+    case noImage
     case invalidResponse
-    case uploadFailed(String)
-    case serverError(statusCode: Int)
+    case noAuthToken
+    case serverError(String)
+    case networkError(Error)
     
     var errorDescription: String? {
         switch self {
-        case .invalidURL:
-            return "Invalid upload URL"
-        case .imageConversionFailed:
-            return "Failed to convert image to JPEG format"
-        case .pdfReadFailed:
-            return "Failed to read PDF file"
+        case .noImage:
+            return "No image provided"
         case .invalidResponse:
-            return "Invalid response from server"
-        case .uploadFailed(let message):
-            return "Upload failed: \(message)"
-        case .serverError(let statusCode):
-            return "Server error (status code: \(statusCode))"
+            return "Invalid server response"
+        case .noAuthToken:
+            return "Not authenticated"
+        case .serverError(let message):
+            return "Server error: \(message)"
+        case .networkError(let error):
+            return "Network error: \(error.localizedDescription)"
         }
     }
 }
 
-/// Service for uploading receipts to the API
 actor ReceiptUploadService {
     static let shared = ReceiptUploadService()
     
-    private let uploadURL = "https://3edaeenmik.eu-west-1.awsapprunner.com/upload"
+    private let baseURL = "https://scandalicious-api-production.up.railway.app/api/v1"
     
     private init() {}
     
-    /// Upload a receipt image to the server
-    /// - Parameters:
-    ///   - image: The receipt image to upload
-    ///   - filename: Optional custom filename (defaults to timestamp-based name)
-    /// - Returns: The upload response containing the S3 key
-    func uploadReceipt(image: UIImage, filename: String? = nil) async throws -> S3UploadResponse {
-        // Validate URL
-        guard let url = URL(string: uploadURL) else {
-            throw ReceiptUploadError.invalidURL
-        }
+    // MARK: - Upload Receipt
+    
+    func uploadReceipt(image: UIImage) async throws -> ReceiptUploadResponse {
+        // Get auth token (from Firebase or shared storage)
+        let idToken = try await getAuthToken()
         
         // Convert image to JPEG data
-        guard let imageData = image.jpegData(compressionQuality: 0.9) else {
-            throw ReceiptUploadError.imageConversionFailed
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            throw ReceiptUploadError.noImage
         }
-        
-        // Generate filename if not provided
-        let finalFilename = filename ?? generateFilename()
         
         // Create multipart form data
         let boundary = UUID().uuidString
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        // Build request body
         var body = Data()
         
-        // Add file data
+        // Add image data
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(finalFilename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"receipt.jpg\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
         body.append(imageData)
         body.append("\r\n".data(using: .utf8)!)
-        
-        // Add closing boundary
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
-        request.httpBody = body
-        
-        // Perform upload
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        // Check HTTP response
-        guard let httpResponse = response as? HTTPURLResponse else {
+        // Create request
+        guard let url = URL(string: "\(baseURL)/receipts/upload") else {
             throw ReceiptUploadError.invalidResponse
         }
         
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw ReceiptUploadError.serverError(statusCode: httpResponse.statusCode)
-        }
-        
-        // Parse response
-        let decoder = JSONDecoder()
-        let uploadResponse = try await MainActor.run {
-            try decoder.decode(S3UploadResponse.self, from: data)
-        }
-        
-        guard uploadResponse.isSuccess else {
-            throw ReceiptUploadError.uploadFailed("Server returned non-success status")
-        }
-        
-        return uploadResponse
-    }
-    
-    /// Upload a receipt from a file URL
-    /// - Parameters:
-    ///   - fileURL: The URL of the file to upload
-    ///   - filename: Optional custom filename (defaults to the file's name)
-    /// - Returns: The upload response containing the S3 key
-    func uploadReceipt(from fileURL: URL, filename: String? = nil) async throws -> S3UploadResponse {
-        // Validate URL
-        guard let url = URL(string: uploadURL) else {
-            throw ReceiptUploadError.invalidURL
-        }
-        
-        // Read file data
-        let fileData = try Data(contentsOf: fileURL)
-        
-        // Determine filename
-        let finalFilename = filename ?? fileURL.lastPathComponent
-        
-        // Determine content type based on file extension
-        let contentType: String
-        switch fileURL.pathExtension.lowercased() {
-        case "jpg", "jpeg":
-            contentType = "image/jpeg"
-        case "png":
-            contentType = "image/png"
-        case "pdf":
-            contentType = "application/pdf"
-        default:
-            contentType = "application/octet-stream"
-        }
-        
-        // Create multipart form data
-        let boundary = UUID().uuidString
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        // Build request body
-        var body = Data()
-        
-        // Add file data
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(finalFilename)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(contentType)\r\n\r\n".data(using: .utf8)!)
-        body.append(fileData)
-        body.append("\r\n".data(using: .utf8)!)
-        
-        // Add closing boundary
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = body
         
+        // Set timeout for upload
+        request.timeoutInterval = 60
+        
         // Perform upload
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        // Check HTTP response
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw ReceiptUploadError.invalidResponse
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            // Check HTTP status
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw ReceiptUploadError.invalidResponse
+            }
+            
+            // Handle different status codes
+            switch httpResponse.statusCode {
+            case 200...299:
+                // Success - parse response
+                do {
+                    let uploadResponse = try await decodeResponse(from: data)
+                    
+                    // Check if the receipt processing failed
+                    if uploadResponse.status == .failed {
+                        throw ReceiptUploadError.serverError("Receipt processing failed")
+                    }
+                    
+                    return uploadResponse
+                } catch let decodingError as DecodingError {
+                    print("❌ Decoding error: \(decodingError)")
+                    // Print raw response for debugging
+                    if let jsonString = String(data: data, encoding: .utf8) {
+                        print("📄 Raw server response:\n\(jsonString)")
+                    }
+                    
+                    // Detailed decoding error information
+                    switch decodingError {
+                    case .keyNotFound(let key, let context):
+                        print("🔑 Missing key '\(key.stringValue)' - \(context.debugDescription)")
+                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .typeMismatch(let type, let context):
+                        print("⚠️ Type mismatch for type '\(type)' - \(context.debugDescription)")
+                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .valueNotFound(let type, let context):
+                        print("❓ Value not found for type '\(type)' - \(context.debugDescription)")
+                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .dataCorrupted(let context):
+                        print("💥 Data corrupted - \(context.debugDescription)")
+                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    @unknown default:
+                        print("❔ Unknown decoding error")
+                    }
+                    
+                    throw ReceiptUploadError.invalidResponse
+                }
+                
+            case 400...499:
+                // Client error
+                if let errorMessage = try? JSONDecoder().decode([String: String].self, from: data),
+                   let message = errorMessage["error"] ?? errorMessage["message"] {
+                    throw ReceiptUploadError.serverError(message)
+                }
+                throw ReceiptUploadError.serverError("Client error: \(httpResponse.statusCode)")
+                
+            case 500...599:
+                // Server error
+                throw ReceiptUploadError.serverError("Server error: \(httpResponse.statusCode)")
+                
+            default:
+                throw ReceiptUploadError.serverError("Unexpected status code: \(httpResponse.statusCode)")
+            }
+        } catch let error as ReceiptUploadError {
+            throw error
+        } catch {
+            throw ReceiptUploadError.networkError(error)
         }
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw ReceiptUploadError.serverError(statusCode: httpResponse.statusCode)
-        }
-        
-        // Parse response
-        let decoder = JSONDecoder()
-        let uploadResponse = try await MainActor.run {
-            try decoder.decode(S3UploadResponse.self, from: data)
-        }
-        
-        guard uploadResponse.isSuccess else {
-            throw ReceiptUploadError.uploadFailed("Server returned non-success status")
-        }
-        
-        return uploadResponse
     }
     
-    /// Generate a timestamp-based filename for receipts
-    private func generateFilename(extension: String = "jpg") -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        let timestamp = dateFormatter.string(from: Date())
-        return "receipt_\(timestamp).\(`extension`)"
-    }
+    // MARK: - Upload PDF Receipt
     
-    /// Upload a PDF receipt directly without conversion
-    /// - Parameters:
-    ///   - pdfURL: The URL of the PDF file
-    ///   - filename: Optional custom filename (defaults to timestamp-based name)
-    /// - Returns: The upload response containing the S3 key
-    func uploadPDFReceipt(from pdfURL: URL, filename: String? = nil) async throws -> S3UploadResponse {
-        // Validate URL
-        guard let url = URL(string: uploadURL) else {
-            throw ReceiptUploadError.invalidURL
-        }
+    func uploadPDFReceipt(from pdfURL: URL) async throws -> ReceiptUploadResponse {
+        // Get auth token (from Firebase or shared storage)
+        let idToken = try await getAuthToken()
         
         // Read PDF data
-        guard let pdfData = try? Data(contentsOf: pdfURL) else {
-            throw ReceiptUploadError.pdfReadFailed
-        }
-        
-        // Generate filename if not provided
-        let finalFilename = filename ?? generateFilename(extension: "pdf")
+        let pdfData = try Data(contentsOf: pdfURL)
         
         // Create multipart form data
         let boundary = UUID().uuidString
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        // Build request body
         var body = Data()
         
-        // Add PDF file data
+        // Add PDF data
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(finalFilename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"receipt.pdf\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: application/pdf\r\n\r\n".data(using: .utf8)!)
         body.append(pdfData)
         body.append("\r\n".data(using: .utf8)!)
-        
-        // Add closing boundary
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
-        request.httpBody = body
-        
-        // Perform upload
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        // Check HTTP response
-        guard let httpResponse = response as? HTTPURLResponse else {
+        // Create request
+        guard let url = URL(string: "\(baseURL)/receipts/upload") else {
             throw ReceiptUploadError.invalidResponse
         }
         
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw ReceiptUploadError.serverError(statusCode: httpResponse.statusCode)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.httpBody = body
+        
+        // Set timeout for upload
+        request.timeoutInterval = 60
+        
+        // Perform upload
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            // Check HTTP status
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw ReceiptUploadError.invalidResponse
+            }
+            
+            // Handle different status codes
+            switch httpResponse.statusCode {
+            case 200...299:
+                // Success - parse response
+                do {
+                    let uploadResponse = try await decodeResponse(from: data)
+                    
+                    // Check if the receipt processing failed
+                    if uploadResponse.status == .failed {
+                        throw ReceiptUploadError.serverError("Receipt processing failed")
+                    }
+                    
+                    return uploadResponse
+                } catch let decodingError as DecodingError {
+                    print("❌ Decoding error: \(decodingError)")
+                    // Print raw response for debugging
+                    if let jsonString = String(data: data, encoding: .utf8) {
+                        print("📄 Raw server response:\n\(jsonString)")
+                    }
+                    
+                    // Detailed decoding error information
+                    switch decodingError {
+                    case .keyNotFound(let key, let context):
+                        print("🔑 Missing key '\(key.stringValue)' - \(context.debugDescription)")
+                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .typeMismatch(let type, let context):
+                        print("⚠️ Type mismatch for type '\(type)' - \(context.debugDescription)")
+                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .valueNotFound(let type, let context):
+                        print("❓ Value not found for type '\(type)' - \(context.debugDescription)")
+                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    case .dataCorrupted(let context):
+                        print("💥 Data corrupted - \(context.debugDescription)")
+                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+                    @unknown default:
+                        print("❔ Unknown decoding error")
+                    }
+                    
+                    throw ReceiptUploadError.invalidResponse
+                }
+                
+            case 400...499:
+                // Client error
+                if let errorMessage = try? JSONDecoder().decode([String: String].self, from: data),
+                   let message = errorMessage["error"] ?? errorMessage["message"] {
+                    throw ReceiptUploadError.serverError(message)
+                }
+                throw ReceiptUploadError.serverError("Client error: \(httpResponse.statusCode)")
+                
+            case 500...599:
+                // Server error
+                throw ReceiptUploadError.serverError("Server error: \(httpResponse.statusCode)")
+                
+            default:
+                throw ReceiptUploadError.serverError("Unexpected status code: \(httpResponse.statusCode)")
+            }
+        } catch let error as ReceiptUploadError {
+            throw error
+        } catch {
+            throw ReceiptUploadError.networkError(error)
+        }
+    }
+    
+    // MARK: - Get Auth Token
+    
+    private func getAuthToken() async throws -> String {
+        #if SHARE_EXTENSION
+        // In Share Extension: Read from shared keychain/user defaults
+        // First, try to read from App Group UserDefaults
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.deepmaind.scandalicious"),
+           let token = sharedDefaults.string(forKey: "firebase_auth_token") {
+            return token
         }
         
-        // Parse response
+        // If not found, throw error
+        throw ReceiptUploadError.noAuthToken
+        #else
+        // In Main App: Use Firebase Auth
+        guard let user = Auth.auth().currentUser else {
+            throw ReceiptUploadError.noAuthToken
+        }
+        
+        let token = try await user.getIDToken()
+        
+        // Save to shared storage for extension to use
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.yourcompany.scandalicious") {
+            sharedDefaults.set(token, forKey: "firebase_auth_token")
+        }
+        
+        return token
+        #endif
+    }
+    
+    // MARK: - Decode Response
+    
+    // Nonisolated decoding to avoid actor isolation issues with Swift 6
+    nonisolated private func decodeResponse(from data: Data) async throws -> ReceiptUploadResponse {
         let decoder = JSONDecoder()
-        let uploadResponse = try await MainActor.run {
-            try decoder.decode(S3UploadResponse.self, from: data)
-        }
-        
-        guard uploadResponse.isSuccess else {
-            throw ReceiptUploadError.uploadFailed("Server returned non-success status")
-        }
-        
-        return uploadResponse
+        return try decoder.decode(ReceiptUploadResponse.self, from: data)
     }
 }
+
+// MARK: - Data Extension for Multipart Form Data
+
+private extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
+    }
+}
+

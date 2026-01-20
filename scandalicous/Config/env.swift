@@ -9,7 +9,7 @@ import Foundation
 
 enum AppConfiguration {
     // Railway Backend API Configuration
-    static let backendBaseURL = "https://3edaeenmik.eu-west-1.awsapprunner.com"
+    static let backendBaseURL = "https://scandalicious-api-production.up.railway.app"
 
     // API Endpoints (computed properties to avoid actor isolation issues)
     static var uploadEndpoint: String { "\(backendBaseURL)/upload" }

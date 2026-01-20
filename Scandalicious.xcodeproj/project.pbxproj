@@ -63,9 +63,10 @@
 			);
 			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
 		};
-		29F7BE102F1FCF2D00ACAA25 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */ = {
+		29B5D5E12F1FFA89000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Models/ReceiptModels.swift,
 				Services/ReceiptUploadService.swift,
 			);
 			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
@@ -77,7 +78,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				29B5D5822F1FE633000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious" target */,
-				29F7BE102F1FCF2D00ACAA25 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */,
+				29B5D5E12F1FFA89000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */,
 			);
 			path = scandalicous;
 			sourceTree = "<group>";
@@ -485,6 +486,8 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				NEW_SETTING = "";
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-D SHARE_EXTENSION";
 				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -514,6 +517,8 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				NEW_SETTING = "";
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-D SHARE_EXTENSION";
 				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
