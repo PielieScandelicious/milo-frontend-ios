@@ -1,6 +1,6 @@
 //
-//  DobbyApp+ShareExtension.swift
-//  Dobby
+//  ScandaLiciousApp+ShareExtension.swift
+//  Scandalicious
 //
 //  Example integration for Share Extension
 //  Created by Gilles Moenaert on 19/01/2026.
@@ -15,7 +15,7 @@ import SwiftUI
 
 /*
 @main
-struct DobbyApp: App {
+struct ScandaLiciousApp: App {
     @StateObject private var transactionManager = TransactionManager()
     
     var body: some Scene {

@@ -13,17 +13,10 @@
 		295F4B922F1FC9DA003FD5BA /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B912F1FC9DA003FD5BA /* GoogleSignIn */; };
 		295F4B942F1FC9DA003FD5BA /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B932F1FC9DA003FD5BA /* GoogleSignInSwift */; };
 		2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */; };
-		2999B8C82F1DA4F9002ACAF3 /* Dobby Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2999B8C82F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		294B14012F1F00D500D8BFBD /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 294D4FB52F1D695B001B9193 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 294D4FBC2F1D695B001B9193;
-			remoteInfo = Dobby;
-		};
 		2999B8C62F1DA4F9002ACAF3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 294D4FB52F1D695B001B9193 /* Project object */;
@@ -40,7 +33,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				2999B8C82F1DA4F9002ACAF3 /* Dobby Share Extension.appex in Embed Foundation Extensions */,
+				2999B8C82F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -49,69 +42,56 @@
 
 /* Begin PBXFileReference section */
 		294129312F1FC66500EAB7CE /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
-		294B13FD2F1F00D500D8BFBD /* DobbyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DobbyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		294D4FBD2F1D695B001B9193 /* Dobby.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dobby.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		294D4FBD2F1D695B001B9193 /* Scandalicious.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Scandalicious.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-additions.plist"; sourceTree = "<group>"; };
-		2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Dobby Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Scandalicious Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		2999B8C92F1DA4F9002ACAF3 /* Exceptions for "Dobby Share Extension" folder in "Dobby Share Extension" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
-		};
-		29F7BE0E2F1FCE6500ACAA25 /* Exceptions for "Dobby" folder in "Dobby" target */ = {
+		29B5D5822F1FE633000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
 			);
-			target = 294D4FBC2F1D695B001B9193 /* Dobby */;
+			target = 294D4FBC2F1D695B001B9193 /* Scandalicious */;
 		};
-		29F7BE102F1FCF2D00ACAA25 /* Exceptions for "Dobby" folder in "Dobby Share Extension" target */ = {
+		29B5D5832F1FE63D000C48B2 /* Exceptions for "scandalicious-share-extension" folder in "Scandalicious Share Extension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
+		};
+		29F7BE102F1FCF2D00ACAA25 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Services/ReceiptUploadService.swift,
 			);
-			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
+			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		294B13FE2F1F00D500D8BFBD /* DobbyTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = DobbyTests;
-			sourceTree = "<group>";
-		};
-		294D4FBF2F1D695B001B9193 /* Dobby */ = {
+		294D4FBF2F1D695B001B9193 /* scandalicous */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				29F7BE0E2F1FCE6500ACAA25 /* Exceptions for "Dobby" folder in "Dobby" target */,
-				29F7BE102F1FCF2D00ACAA25 /* Exceptions for "Dobby" folder in "Dobby Share Extension" target */,
+				29B5D5822F1FE633000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious" target */,
+				29F7BE102F1FCF2D00ACAA25 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */,
 			);
-			path = Dobby;
+			path = scandalicous;
 			sourceTree = "<group>";
 		};
-		2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */ = {
+		2999B8BF2F1DA4F9002ACAF3 /* scandalicious-share-extension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				2999B8C92F1DA4F9002ACAF3 /* Exceptions for "Dobby Share Extension" folder in "Dobby Share Extension" target */,
+				29B5D5832F1FE63D000C48B2 /* Exceptions for "scandalicious-share-extension" folder in "Scandalicious Share Extension" target */,
 			);
-			path = "Dobby Share Extension";
+			path = "scandalicious-share-extension";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		294B13FA2F1F00D500D8BFBD /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		294D4FBA2F1D695B001B9193 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -136,9 +116,8 @@
 		294D4FB42F1D695B001B9193 = {
 			isa = PBXGroup;
 			children = (
-				294D4FBF2F1D695B001B9193 /* Dobby */,
-				2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */,
-				294B13FE2F1F00D500D8BFBD /* DobbyTests */,
+				294D4FBF2F1D695B001B9193 /* scandalicous */,
+				2999B8BF2F1DA4F9002ACAF3 /* scandalicious-share-extension */,
 				294D4FBE2F1D695B001B9193 /* Products */,
 				2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */,
 				294129312F1FC66500EAB7CE /* GoogleService-Info.plist */,
@@ -148,9 +127,8 @@
 		294D4FBE2F1D695B001B9193 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				294D4FBD2F1D695B001B9193 /* Dobby.app */,
-				2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */,
-				294B13FD2F1F00D500D8BFBD /* DobbyTests.xctest */,
+				294D4FBD2F1D695B001B9193 /* Scandalicious.app */,
+				2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -158,32 +136,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		294B13FC2F1F00D500D8BFBD /* DobbyTests */ = {
+		294D4FBC2F1D695B001B9193 /* Scandalicious */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 294B14032F1F00D500D8BFBD /* Build configuration list for PBXNativeTarget "DobbyTests" */;
-			buildPhases = (
-				294B13F92F1F00D500D8BFBD /* Sources */,
-				294B13FA2F1F00D500D8BFBD /* Frameworks */,
-				294B13FB2F1F00D500D8BFBD /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				294B14022F1F00D500D8BFBD /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				294B13FE2F1F00D500D8BFBD /* DobbyTests */,
-			);
-			name = DobbyTests;
-			packageProductDependencies = (
-			);
-			productName = DobbyTests;
-			productReference = 294B13FD2F1F00D500D8BFBD /* DobbyTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		294D4FBC2F1D695B001B9193 /* Dobby */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 294D4FC82F1D695B001B9193 /* Build configuration list for PBXNativeTarget "Dobby" */;
+			buildConfigurationList = 294D4FC82F1D695B001B9193 /* Build configuration list for PBXNativeTarget "Scandalicious" */;
 			buildPhases = (
 				294D4FB92F1D695B001B9193 /* Sources */,
 				294D4FBA2F1D695B001B9193 /* Frameworks */,
@@ -196,9 +151,9 @@
 				2999B8C72F1DA4F9002ACAF3 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				294D4FBF2F1D695B001B9193 /* Dobby */,
+				294D4FBF2F1D695B001B9193 /* scandalicous */,
 			);
-			name = Dobby;
+			name = Scandalicious;
 			packageProductDependencies = (
 				295F4B8C2F1FC95E003FD5BA /* FirebaseAuth */,
 				295F4B8E2F1FC95E003FD5BA /* FirebaseCore */,
@@ -206,12 +161,12 @@
 				295F4B932F1FC9DA003FD5BA /* GoogleSignInSwift */,
 			);
 			productName = Dobby;
-			productReference = 294D4FBD2F1D695B001B9193 /* Dobby.app */;
+			productReference = 294D4FBD2F1D695B001B9193 /* Scandalicious.app */;
 			productType = "com.apple.product-type.application";
 		};
-		2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */ = {
+		2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2999B8CA2F1DA4F9002ACAF3 /* Build configuration list for PBXNativeTarget "Dobby Share Extension" */;
+			buildConfigurationList = 2999B8CA2F1DA4F9002ACAF3 /* Build configuration list for PBXNativeTarget "Scandalicious Share Extension" */;
 			buildPhases = (
 				2999B8BA2F1DA4F9002ACAF3 /* Sources */,
 				2999B8BB2F1DA4F9002ACAF3 /* Frameworks */,
@@ -222,13 +177,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */,
+				2999B8BF2F1DA4F9002ACAF3 /* scandalicious-share-extension */,
 			);
-			name = "Dobby Share Extension";
+			name = "Scandalicious Share Extension";
 			packageProductDependencies = (
 			);
 			productName = "Dobby Share Extension";
-			productReference = 2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */;
+			productReference = 2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -241,10 +196,6 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
-					294B13FC2F1F00D500D8BFBD = {
-						CreatedOnToolsVersion = 26.2;
-						TestTargetID = 294D4FBC2F1D695B001B9193;
-					};
 					294D4FBC2F1D695B001B9193 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -253,7 +204,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Dobby-IOS" */;
+			buildConfigurationList = 294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Scandalicious" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -271,21 +222,13 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				294D4FBC2F1D695B001B9193 /* Dobby */,
-				2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */,
-				294B13FC2F1F00D500D8BFBD /* DobbyTests */,
+				294D4FBC2F1D695B001B9193 /* Scandalicious */,
+				2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		294B13FB2F1F00D500D8BFBD /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		294D4FBB2F1D695B001B9193 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -305,13 +248,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		294B13F92F1F00D500D8BFBD /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		294D4FB92F1D695B001B9193 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -329,61 +265,14 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		294B14022F1F00D500D8BFBD /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 294D4FBC2F1D695B001B9193 /* Dobby */;
-			targetProxy = 294B14012F1F00D500D8BFBD /* PBXContainerItemProxy */;
-		};
 		2999B8C72F1DA4F9002ACAF3 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
+			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
 			targetProxy = 2999B8C62F1DA4F9002ACAF3 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		294B14042F1F00D500D8BFBD /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9A8M33Z82L;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.DobbyTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dobby.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dobby";
-			};
-			name = Debug;
-		};
-		294B14052F1F00D500D8BFBD /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9A8M33Z82L;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.DobbyTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dobby.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dobby";
-			};
-			name = Release;
-		};
 		294D4FC62F1D695B001B9193 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -508,7 +397,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Dobby/Dobby.entitlements;
+				CODE_SIGN_ENTITLEMENTS = scandalicous/Scandalicious.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
@@ -528,7 +417,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.Dobby;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -545,7 +434,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Dobby/Dobby.entitlements;
+				CODE_SIGN_ENTITLEMENTS = scandalicous/Scandalicious.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
@@ -565,7 +454,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.Dobby;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -580,13 +469,13 @@
 		2999B8CB2F1DA4F9002ACAF3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "Dobby Share Extension/Dobby Share Extension.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "scandalicious-share-extension/Scandalicious Share Extension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Dobby Share Extension/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Dobby Share Extension";
+				INFOPLIST_FILE = "scandalicious-share-extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Scandalicious Share Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -594,7 +483,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.deepmaind.Dobby.Dobby-Share-Extension";
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -609,13 +498,13 @@
 		2999B8CC2F1DA4F9002ACAF3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "Dobby Share Extension/Dobby Share Extension.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "scandalicious-share-extension/Scandalicious Share Extension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Dobby Share Extension/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Dobby Share Extension";
+				INFOPLIST_FILE = "scandalicious-share-extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Scandalicious Share Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -623,7 +512,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.deepmaind.Dobby.Dobby-Share-Extension";
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -638,16 +527,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		294B14032F1F00D500D8BFBD /* Build configuration list for PBXNativeTarget "DobbyTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				294B14042F1F00D500D8BFBD /* Debug */,
-				294B14052F1F00D500D8BFBD /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Dobby-IOS" */ = {
+		294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Scandalicious" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				294D4FC62F1D695B001B9193 /* Debug */,
@@ -656,7 +536,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		294D4FC82F1D695B001B9193 /* Build configuration list for PBXNativeTarget "Dobby" */ = {
+		294D4FC82F1D695B001B9193 /* Build configuration list for PBXNativeTarget "Scandalicious" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				294D4FC92F1D695B001B9193 /* Debug */,
@@ -665,7 +545,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2999B8CA2F1DA4F9002ACAF3 /* Build configuration list for PBXNativeTarget "Dobby Share Extension" */ = {
+		2999B8CA2F1DA4F9002ACAF3 /* Build configuration list for PBXNativeTarget "Scandalicious Share Extension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2999B8CB2F1DA4F9002ACAF3 /* Debug */,

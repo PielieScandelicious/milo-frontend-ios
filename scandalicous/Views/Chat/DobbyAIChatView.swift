@@ -1,6 +1,6 @@
 //
-//  DobbyAIChatView.swift
-//  dobby-ios
+//  ScandaLiciousAIChatView.swift
+//  Scandalicious
 //
 //  ChatGPT-like Experience
 //  Created by Gilles Moenaert on 19/01/2026.
@@ -9,7 +9,7 @@
 import SwiftUI
 import Combine
 
-struct DobbyAIChatView: View {
+struct ScandaLiciousAIChatView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @StateObject private var viewModel = ChatViewModel()
     @State private var messageText = ""
@@ -778,7 +778,7 @@ class ChatViewModel: ObservableObject {
 // MARK: - Preview
 #Preview {
     NavigationStack {
-        DobbyAIChatView()
+        ScandaLiciousAIChatView()
             .environmentObject(TransactionManager())
     }
 }

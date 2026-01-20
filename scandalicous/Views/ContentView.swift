@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  dobby-ios
+//  Scandalicious
 //
 //  Created by Gilles Moenaert on 18/01/2026.
 //
@@ -28,9 +28,9 @@ struct ContentView: View {
                 }
                 .tag(1)
             
-            DobbyTab()
+            ScandaLiciousTab()
                 .tabItem {
-                    Label("Dobby", systemImage: "sparkles")
+                    Label("ScandaLicious", systemImage: "sparkles")
                 }
                 .tag(2)
             
@@ -80,11 +80,11 @@ struct ScanTab: View {
     }
 }
 
-// MARK: - Dobby Tab
-struct DobbyTab: View {
+// MARK: - ScandaLicious Tab
+struct ScandaLiciousTab: View {
     var body: some View {
         NavigationStack {
-            DobbyAIChatView()
+            ScandaLiciousAIChatView()
                 .toolbarBackground(.hidden, for: .navigationBar)
         }
     }

@@ -16,9 +16,23 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "294D4FBC2F1D695B001B9193"
-               BuildableName = "Dobby.app"
-               BlueprintName = "Dobby"
-               ReferencedContainer = "container:Dobby-IOS.xcodeproj">
+               BuildableName = "Scandalicious.app"
+               BlueprintName = "Scandalicious"
+               ReferencedContainer = "container:Scandalicious.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2999B8BD2F1DA4F9002ACAF3"
+               BuildableName = "Scandalicious Share Extension.appex"
+               BlueprintName = "Scandalicious Share Extension"
+               ReferencedContainer = "container:Scandalicious.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -38,7 +52,7 @@
                BlueprintIdentifier = "294B13FC2F1F00D500D8BFBD"
                BuildableName = "DobbyTests.xctest"
                BlueprintName = "DobbyTests"
-               ReferencedContainer = "container:Dobby-IOS.xcodeproj">
+               ReferencedContainer = "container:Scandalicious.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -58,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "294D4FBC2F1D695B001B9193"
-            BuildableName = "Dobby.app"
-            BlueprintName = "Dobby"
-            ReferencedContainer = "container:Dobby-IOS.xcodeproj">
+            BuildableName = "Scandalicious.app"
+            BlueprintName = "Scandalicious"
+            ReferencedContainer = "container:Scandalicious.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -75,9 +89,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "294D4FBC2F1D695B001B9193"
-            BuildableName = "Dobby.app"
-            BlueprintName = "Dobby"
-            ReferencedContainer = "container:Dobby-IOS.xcodeproj">
+            BuildableName = "Scandalicious.app"
+            BlueprintName = "Scandalicious"
+            ReferencedContainer = "container:Scandalicious.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

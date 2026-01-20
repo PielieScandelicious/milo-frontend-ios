@@ -1,6 +1,6 @@
 //
 //  ShareViewController.swift
-//  dobby-ios Share Extension
+//  Scandalicious Share Extension
 //
 //  Created by Gilles Moenaert on 19/01/2026.
 //

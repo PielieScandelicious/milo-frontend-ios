@@ -1,6 +1,6 @@
 //
-//  DobbyApp.swift
-//  dobby-ios
+//  ScandaLiciousApp.swift
+//  Scandalicious
 //
 //  Created by Gilles Moenaert on 18/01/2026.
 //
@@ -10,7 +10,7 @@ import FirebaseCore
 import GoogleSignIn
 
 @main
-struct DobbyApp: App {
+struct ScandaLiciousApp: App {
     @StateObject private var authManager: AuthenticationManager
     
     init() {

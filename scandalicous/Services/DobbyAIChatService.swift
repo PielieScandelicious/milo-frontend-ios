@@ -1,6 +1,6 @@
 //
-//  DobbyAIChatService.swift
-//  dobby-ios
+//  ScandaLiciousAIChatService.swift
+//  Scandalicious
 //
 //  BACKEND VERSION - Uses Railway API
 //  Created by Gilles Moenaert on 19/01/2026.
