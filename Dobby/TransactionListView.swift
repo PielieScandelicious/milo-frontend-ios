@@ -296,3 +296,4 @@ struct TransactionRowView: View {
     }
     .preferredColorScheme(.dark)
 }
+

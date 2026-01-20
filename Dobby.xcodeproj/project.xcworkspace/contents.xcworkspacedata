@@ -5,9 +5,9 @@
       location = "self:">
    </FileRef>
    <FileRef
-      location = "group:FIX_MULTIPLE_INFO_PLIST.md">
+      location = "group:ProfileView.swift">
    </FileRef>
    <FileRef
-      location = "group:FIX_LOCAL_STORAGE_ISSUE.md">
+      location = "group:AnthropicService.swift">
    </FileRef>
 </Workspace>

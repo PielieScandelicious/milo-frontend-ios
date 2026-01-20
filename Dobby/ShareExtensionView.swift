@@ -310,7 +310,7 @@ struct ShareExtensionView: View {
     
     // MARK: - Upload
     
-    private func uploadData(_ data: Data, filename: String, contentType: String) async throws -> ReceiptUploadResponse {
+    private func uploadData(_ data: Data, filename: String, contentType: String) async throws -> S3UploadResponse {
         guard let url = URL(string: "https://3edaeenmik.eu-west-1.awsapprunner.com/upload") else {
             throw ReceiptUploadError.invalidURL
         }
@@ -351,7 +351,7 @@ struct ShareExtensionView: View {
         
         // Parse response
         let decoder = JSONDecoder()
-        let uploadResponse = try decoder.decode(ReceiptUploadResponse.self, from: responseData)
+        let uploadResponse = try decoder.decode(S3UploadResponse.self, from: responseData)
         
         guard uploadResponse.isSuccess else {
             throw ReceiptUploadError.uploadFailed("Server returned non-success status")

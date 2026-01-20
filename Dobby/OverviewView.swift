@@ -238,6 +238,24 @@ struct OverviewView: View {
             }
             
             Spacer()
+            
+            // Profile button
+            NavigationLink {
+                ProfileView()
+            } label: {
+                Image(systemName: "person.circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white.opacity(0.1))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+            }
         }
         .padding(.horizontal)
     }

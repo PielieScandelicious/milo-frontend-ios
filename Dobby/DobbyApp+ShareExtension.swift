@@ -66,9 +66,9 @@ struct SettingsView: View {
 }
 */
 
-// MARK: - Example: Receipt Upload View
+// MARK: - Example: Receipt Upload View (Alternative Implementation)
 
-struct ReceiptUploadView: View {
+struct ExampleReceiptUploadView: View {
     @State private var selectedImage: UIImage?
     @State private var showingImagePicker = false
     @State private var isUploading = false
@@ -246,7 +246,7 @@ struct UploadStatusView: View {
             
             Section("Testing") {
                 NavigationLink {
-                    ReceiptUploadView()
+                    ExampleReceiptUploadView()
                 } label: {
                     Label("Test Upload", systemImage: "arrow.up.circle")
                 }
@@ -260,7 +260,7 @@ struct UploadStatusView: View {
 
 #Preview("Upload View") {
     NavigationStack {
-        ReceiptUploadView()
+        ExampleReceiptUploadView()
     }
 }
 

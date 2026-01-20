@@ -7,38 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2983F5F52F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5F42F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md */; };
-		2983F5F92F1DBC4100D79291 /* QUICK_FIX.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5F82F1DBC4100D79291 /* QUICK_FIX.md */; };
-		2983F5FB2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */; };
-		2983F5FD2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */; };
-		2999B8A32F1D9879002ACAF3 /* env.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999B8A22F1D986B002ACAF3 /* env.swift */; };
-		2999B8AD2F1D9ABC002ACAF3 /* SETUP_GUIDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */; };
+		294B13F62F1EFCA700D8BFBD /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 294B13F52F1EFCA700D8BFBD /* FirebaseCore */; };
+		294B13F82F1EFCB700D8BFBD /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 294B13F72F1EFCB700D8BFBD /* FirebaseAuth */; };
 		2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */; };
-		2999B8B12F1D9AEB002ACAF3 /* TEST_RECEIPTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */; };
-		2999B8B32F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B22F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md */; };
-		2999B8B52F1D9B3C002ACAF3 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B42F1D9B3C002ACAF3 /* README.md */; };
-		2999B8B72F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */; };
-		2999B8B92F1D9BA7002ACAF3 /* ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */; };
 		2999B8C82F1DA4F9002ACAF3 /* Dobby Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		29E60D6E2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */; };
-		29E60D702F1DE59C00C309B9 /* SavedReceiptsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */; };
-		29E60D722F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D712F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md */; };
-		29E60D742F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D732F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md */; };
-		29E60D762F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */; };
-		29E60D782F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */; };
-		29E60D7A2F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */; };
-		29E60D8D2F1DF3D700C309B9 /* DobbyAIChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D7D2F1DEFB100C309B9 /* DobbyAIChatService.swift */; };
-		29E60D8E2F1DF3D700C309B9 /* DobbyAIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60D7F2F1DEFCF00C309B9 /* DobbyAIChatView.swift */; };
-		29E60D932F1E205800C309B9 /* avatar.png in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D922F1E205800C309B9 /* avatar.png */; };
-		29E60D952F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D942F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md */; };
-		29E60D972F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60D962F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md */; };
-		29E60DE72F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60DE62F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md */; };
-		29E60DE92F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60DE82F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md */; };
-		29E60E102F1EA08F00C309B9 /* PDF_SUPPORT_SUMMARY.md in Resources */ = {isa = PBXBuildFile; fileRef = 29E60E0F2F1EA08F00C309B9 /* PDF_SUPPORT_SUMMARY.md */; };
-		29E60E122F1EA0E400C309B9 /* SharedReceiptManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E60E112F1EA0E400C309B9 /* SharedReceiptManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		294B14012F1F00D500D8BFBD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 294D4FB52F1D695B001B9193 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 294D4FBC2F1D695B001B9193;
+			remoteInfo = Dobby;
+		};
 		2999B8C62F1DA4F9002ACAF3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 294D4FB52F1D695B001B9193 /* Project object */;
@@ -63,37 +45,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		294B13FD2F1F00D500D8BFBD /* DobbyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DobbyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		294D4FBD2F1D695B001B9193 /* Dobby.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dobby.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		2983F5F42F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = FIX_BLACK_SCREEN.md; sourceTree = "<group>"; };
-		2983F5F62F1DBC3200D79291 /* Info.plist.template */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Info.plist.template; sourceTree = "<group>"; };
-		2983F5F82F1DBC4100D79291 /* QUICK_FIX.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = QUICK_FIX.md; sourceTree = "<group>"; };
-		2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ADD_CAMERA_PERMISSION.md; sourceTree = "<group>"; };
-		2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = EXACT_STEPS_NO_PLIST.md; sourceTree = "<group>"; };
-		2999B8A22F1D986B002ACAF3 /* env.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = env.swift; sourceTree = "<group>"; };
-		2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SETUP_GUIDE.md; sourceTree = "<group>"; };
 		2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-additions.plist"; sourceTree = "<group>"; };
-		2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = TEST_RECEIPTS.md; sourceTree = "<group>"; };
-		2999B8B22F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = IMPLEMENTATION_SUMMARY.md; sourceTree = "<group>"; };
-		2999B8B42F1D9B3C002ACAF3 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BUILD_CHECKLIST.md; sourceTree = "<group>"; };
-		2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
 		2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Dobby Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
-		29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_SETUP.md; sourceTree = "<group>"; };
-		29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedReceiptsView.swift; sourceTree = "<group>"; };
-		29E60D712F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_QUICK_START.md; sourceTree = "<group>"; };
-		29E60D732F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_INFO_PLIST.md; sourceTree = "<group>"; };
-		29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_SUMMARY.md; sourceTree = "<group>"; };
-		29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DobbyApp+ShareExtension.swift"; sourceTree = "<group>"; };
-		29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_ARCHITECTURE.md; sourceTree = "<group>"; };
-		29E60D7D2F1DEFB100C309B9 /* DobbyAIChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DobbyAIChatService.swift; sourceTree = "<group>"; };
-		29E60D7F2F1DEFCF00C309B9 /* DobbyAIChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DobbyAIChatView.swift; sourceTree = "<group>"; };
-		29E60D922F1E205800C309B9 /* avatar.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = avatar.png; sourceTree = "<group>"; };
-		29E60D942F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ADD_AVATAR_TO_ASSETS.md; sourceTree = "<group>"; };
-		29E60D962F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = FIX_CAMERA_ERRORS.md; sourceTree = "<group>"; };
-		29E60DE62F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SHARE_EXTENSION_UX_IMPROVEMENTS.md; sourceTree = "<group>"; };
-		29E60DE82F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ADVANCED_SHARE_EXTENSION_TIPS.md; sourceTree = "<group>"; };
-		29E60E0F2F1EA08F00C309B9 /* PDF_SUPPORT_SUMMARY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PDF_SUPPORT_SUMMARY.md; sourceTree = "<group>"; };
-		29E60E112F1EA0E400C309B9 /* SharedReceiptManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedReceiptManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -122,6 +77,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		294B13FE2F1F00D500D8BFBD /* DobbyTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DobbyTests;
+			sourceTree = "<group>";
+		};
 		294D4FBF2F1D695B001B9193 /* Dobby */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -129,11 +89,6 @@
 				29E60E092F1E9A3300C309B9 /* Exceptions for "Dobby" folder in "Dobby Share Extension" target */,
 			);
 			path = Dobby;
-			sourceTree = "<group>";
-		};
-		294D4FD32F1D6A65001B9193 /* mockdata */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = mockdata;
 			sourceTree = "<group>";
 		};
 		2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */ = {
@@ -147,10 +102,19 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		294B13FA2F1F00D500D8BFBD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		294D4FBA2F1D695B001B9193 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				294B13F62F1EFCA700D8BFBD /* FirebaseCore in Frameworks */,
+				294B13F82F1EFCB700D8BFBD /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -167,39 +131,11 @@
 		294D4FB42F1D695B001B9193 = {
 			isa = PBXGroup;
 			children = (
-				29E60D922F1E205800C309B9 /* avatar.png */,
-				2999B8A22F1D986B002ACAF3 /* env.swift */,
-				294D4FD32F1D6A65001B9193 /* mockdata */,
 				294D4FBF2F1D695B001B9193 /* Dobby */,
 				2999B8BF2F1DA4F9002ACAF3 /* Dobby Share Extension */,
+				294B13FE2F1F00D500D8BFBD /* DobbyTests */,
 				294D4FBE2F1D695B001B9193 /* Products */,
-				2999B8AC2F1D9ABC002ACAF3 /* SETUP_GUIDE.md */,
 				2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */,
-				2999B8B02F1D9AEB002ACAF3 /* TEST_RECEIPTS.md */,
-				2999B8B22F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md */,
-				2999B8B42F1D9B3C002ACAF3 /* README.md */,
-				2999B8B62F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md */,
-				2999B8B82F1D9BA7002ACAF3 /* ARCHITECTURE.md */,
-				2983F5F42F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md */,
-				2983F5F62F1DBC3200D79291 /* Info.plist.template */,
-				2983F5F82F1DBC4100D79291 /* QUICK_FIX.md */,
-				2983F5FA2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md */,
-				2983F5FC2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md */,
-				29E60D6D2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md */,
-				29E60D6F2F1DE59C00C309B9 /* SavedReceiptsView.swift */,
-				29E60D712F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md */,
-				29E60D732F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md */,
-				29E60D752F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md */,
-				29E60D772F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift */,
-				29E60D792F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md */,
-				29E60D7D2F1DEFB100C309B9 /* DobbyAIChatService.swift */,
-				29E60D7F2F1DEFCF00C309B9 /* DobbyAIChatView.swift */,
-				29E60D942F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md */,
-				29E60D962F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md */,
-				29E60DE62F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md */,
-				29E60DE82F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md */,
-				29E60E0F2F1EA08F00C309B9 /* PDF_SUPPORT_SUMMARY.md */,
-				29E60E112F1EA0E400C309B9 /* SharedReceiptManager.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -208,6 +144,7 @@
 			children = (
 				294D4FBD2F1D695B001B9193 /* Dobby.app */,
 				2999B8BE2F1DA4F9002ACAF3 /* Dobby Share Extension.appex */,
+				294B13FD2F1F00D500D8BFBD /* DobbyTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -215,6 +152,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		294B13FC2F1F00D500D8BFBD /* DobbyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 294B14032F1F00D500D8BFBD /* Build configuration list for PBXNativeTarget "DobbyTests" */;
+			buildPhases = (
+				294B13F92F1F00D500D8BFBD /* Sources */,
+				294B13FA2F1F00D500D8BFBD /* Frameworks */,
+				294B13FB2F1F00D500D8BFBD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				294B14022F1F00D500D8BFBD /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				294B13FE2F1F00D500D8BFBD /* DobbyTests */,
+			);
+			name = DobbyTests;
+			packageProductDependencies = (
+			);
+			productName = DobbyTests;
+			productReference = 294B13FD2F1F00D500D8BFBD /* DobbyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		294D4FBC2F1D695B001B9193 /* Dobby */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 294D4FC82F1D695B001B9193 /* Build configuration list for PBXNativeTarget "Dobby" */;
@@ -231,10 +191,11 @@
 			);
 			fileSystemSynchronizedGroups = (
 				294D4FBF2F1D695B001B9193 /* Dobby */,
-				294D4FD32F1D6A65001B9193 /* mockdata */,
 			);
 			name = Dobby;
 			packageProductDependencies = (
+				294B13F52F1EFCA700D8BFBD /* FirebaseCore */,
+				294B13F72F1EFCB700D8BFBD /* FirebaseAuth */,
 			);
 			productName = Dobby;
 			productReference = 294D4FBD2F1D695B001B9193 /* Dobby.app */;
@@ -272,6 +233,10 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					294B13FC2F1F00D500D8BFBD = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 294D4FBC2F1D695B001B9193;
+					};
 					294D4FBC2F1D695B001B9193 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -289,6 +254,9 @@
 			);
 			mainGroup = 294D4FB42F1D695B001B9193;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				294B13F32F1EF6E100D8BFBD /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 294D4FBE2F1D695B001B9193 /* Products */;
 			projectDirPath = "";
@@ -296,37 +264,24 @@
 			targets = (
 				294D4FBC2F1D695B001B9193 /* Dobby */,
 				2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */,
+				294B13FC2F1F00D500D8BFBD /* DobbyTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		294B13FB2F1F00D500D8BFBD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		294D4FBB2F1D695B001B9193 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2999B8B92F1D9BA7002ACAF3 /* ARCHITECTURE.md in Resources */,
-				29E60D932F1E205800C309B9 /* avatar.png in Resources */,
-				2983F5FB2F1DBD0900D79291 /* ADD_CAMERA_PERMISSION.md in Resources */,
-				29E60D972F1E248E00C309B9 /* FIX_CAMERA_ERRORS.md in Resources */,
-				29E60DE92F1E6DEF00C309B9 /* ADVANCED_SHARE_EXTENSION_TIPS.md in Resources */,
-				29E60D762F1DE61700C309B9 /* SHARE_EXTENSION_SUMMARY.md in Resources */,
-				29E60D722F1DE5C500C309B9 /* SHARE_EXTENSION_QUICK_START.md in Resources */,
-				29E60D742F1DE5E000C309B9 /* SHARE_EXTENSION_INFO_PLIST.md in Resources */,
-				29E60D7A2F1DE67D00C309B9 /* SHARE_EXTENSION_ARCHITECTURE.md in Resources */,
-				29E60E102F1EA08F00C309B9 /* PDF_SUPPORT_SUMMARY.md in Resources */,
-				2999B8B12F1D9AEB002ACAF3 /* TEST_RECEIPTS.md in Resources */,
 				2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */,
-				2999B8B52F1D9B3C002ACAF3 /* README.md in Resources */,
-				2983F5F52F1DBC2C00D79291 /* FIX_BLACK_SCREEN.md in Resources */,
-				2983F5F92F1DBC4100D79291 /* QUICK_FIX.md in Resources */,
-				2983F5FD2F1DBD2300D79291 /* EXACT_STEPS_NO_PLIST.md in Resources */,
-				2999B8B72F1D9B5D002ACAF3 /* BUILD_CHECKLIST.md in Resources */,
-				29E60D952F1E215700C309B9 /* ADD_AVATAR_TO_ASSETS.md in Resources */,
-				29E60D6E2F1DE57F00C309B9 /* SHARE_EXTENSION_SETUP.md in Resources */,
-				2999B8B32F1D9B28002ACAF3 /* IMPLEMENTATION_SUMMARY.md in Resources */,
-				29E60DE72F1E6DB300C309B9 /* SHARE_EXTENSION_UX_IMPROVEMENTS.md in Resources */,
-				2999B8AD2F1D9ABC002ACAF3 /* SETUP_GUIDE.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -340,16 +295,17 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		294B13F92F1F00D500D8BFBD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		294D4FB92F1D695B001B9193 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				29E60D782F1DE63A00C309B9 /* DobbyApp+ShareExtension.swift in Sources */,
-				29E60D702F1DE59C00C309B9 /* SavedReceiptsView.swift in Sources */,
-				2999B8A32F1D9879002ACAF3 /* env.swift in Sources */,
-				29E60D8D2F1DF3D700C309B9 /* DobbyAIChatService.swift in Sources */,
-				29E60E122F1EA0E400C309B9 /* SharedReceiptManager.swift in Sources */,
-				29E60D8E2F1DF3D700C309B9 /* DobbyAIChatView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -363,6 +319,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		294B14022F1F00D500D8BFBD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 294D4FBC2F1D695B001B9193 /* Dobby */;
+			targetProxy = 294B14012F1F00D500D8BFBD /* PBXContainerItemProxy */;
+		};
 		2999B8C72F1DA4F9002ACAF3 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 2999B8BD2F1DA4F9002ACAF3 /* Dobby Share Extension */;
@@ -371,6 +332,48 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		294B14042F1F00D500D8BFBD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9A8M33Z82L;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.DobbyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dobby.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dobby";
+			};
+			name = Debug;
+		};
+		294B14052F1F00D500D8BFBD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9A8M33Z82L;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.DobbyTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dobby.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dobby";
+			};
+			name = Release;
+		};
 		294D4FC62F1D695B001B9193 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -625,6 +628,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		294B14032F1F00D500D8BFBD /* Build configuration list for PBXNativeTarget "DobbyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				294B14042F1F00D500D8BFBD /* Debug */,
+				294B14052F1F00D500D8BFBD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		294D4FB82F1D695B001B9193 /* Build configuration list for PBXProject "Dobby" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -653,6 +665,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		294B13F32F1EF6E100D8BFBD /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.8.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		294B13F52F1EFCA700D8BFBD /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 294B13F32F1EF6E100D8BFBD /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		294B13F72F1EFCB700D8BFBD /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 294B13F32F1EF6E100D8BFBD /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 294D4FB52F1D695B001B9193 /* Project object */;
 }

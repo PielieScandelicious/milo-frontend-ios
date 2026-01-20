@@ -51,6 +51,18 @@ struct ReceiptImportResult: Identifiable {
     let transactions: [Transaction]
 }
 
+// MARK: - Receipt Categorization Models (Backend Response)
+struct ReceiptCategorizationResult: Codable {
+    let items: [CategorizedItem]
+}
+
+struct CategorizedItem: Codable {
+    let itemName: String
+    let category: String
+    let amount: Double
+    let quantity: Int
+}
+
 // MARK: - Receipt Import Service
 actor ReceiptImportService {
     static let shared = ReceiptImportService()
@@ -65,8 +77,8 @@ actor ReceiptImportService {
         // Extract date from receipt (or use current date)
         let receiptDate = extractDate(from: text) ?? Date()
         
-        // Categorize items using Anthropic
-        let categorization = try await AnthropicService.shared.categorizeReceiptItems(text)
+        // Process receipt using backend API
+        let categorization = try await processReceiptWithBackend(text: text)
         
         // Convert to transactions
         let transactions = categorization.items.map { item in
@@ -89,6 +101,36 @@ actor ReceiptImportService {
             date: receiptDate,
             transactions: transactions
         )
+    }
+    
+    // MARK: - Process Receipt with Backend API
+    private func processReceiptWithBackend(text: String) async throws -> ReceiptCategorizationResult {
+        guard let url = URL(string: AppConfiguration.processReceiptEndpoint) else {
+            throw ReceiptImportError.invalidReceiptFormat
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let requestBody: [String: Any] = [
+            "text": text
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ReceiptImportError.invalidReceiptFormat
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw ReceiptImportError.invalidReceiptFormat
+        }
+        
+        let categorization = try JSONDecoder().decode(ReceiptCategorizationResult.self, from: data)
+        return categorization
     }
     
     // MARK: - Import Receipt from Image

@@ -8,8 +8,8 @@
 import Foundation
 import UIKit
 
-/// Response from the receipt upload API
-struct ReceiptUploadResponse: Codable {
+/// Response from the receipt upload API (S3 upload)
+struct S3UploadResponse: Codable {
     let status: String
     let s3_key: String
     
@@ -58,7 +58,7 @@ actor ReceiptUploadService {
     ///   - image: The receipt image to upload
     ///   - filename: Optional custom filename (defaults to timestamp-based name)
     /// - Returns: The upload response containing the S3 key
-    func uploadReceipt(image: UIImage, filename: String? = nil) async throws -> ReceiptUploadResponse {
+    func uploadReceipt(image: UIImage, filename: String? = nil) async throws -> S3UploadResponse {
         // Validate URL
         guard let url = URL(string: uploadURL) else {
             throw ReceiptUploadError.invalidURL
@@ -107,7 +107,7 @@ actor ReceiptUploadService {
         
         // Parse response
         let decoder = JSONDecoder()
-        let uploadResponse = try decoder.decode(ReceiptUploadResponse.self, from: data)
+        let uploadResponse = try decoder.decode(S3UploadResponse.self, from: data)
         
         guard uploadResponse.isSuccess else {
             throw ReceiptUploadError.uploadFailed("Server returned non-success status")
@@ -121,7 +121,7 @@ actor ReceiptUploadService {
     ///   - fileURL: The URL of the file to upload
     ///   - filename: Optional custom filename (defaults to the file's name)
     /// - Returns: The upload response containing the S3 key
-    func uploadReceipt(from fileURL: URL, filename: String? = nil) async throws -> ReceiptUploadResponse {
+    func uploadReceipt(from fileURL: URL, filename: String? = nil) async throws -> S3UploadResponse {
         // Validate URL
         guard let url = URL(string: uploadURL) else {
             throw ReceiptUploadError.invalidURL
@@ -181,7 +181,7 @@ actor ReceiptUploadService {
         
         // Parse response
         let decoder = JSONDecoder()
-        let uploadResponse = try decoder.decode(ReceiptUploadResponse.self, from: data)
+        let uploadResponse = try decoder.decode(S3UploadResponse.self, from: data)
         
         guard uploadResponse.isSuccess else {
             throw ReceiptUploadError.uploadFailed("Server returned non-success status")
@@ -203,7 +203,7 @@ actor ReceiptUploadService {
     ///   - pdfURL: The URL of the PDF file
     ///   - filename: Optional custom filename (defaults to timestamp-based name)
     /// - Returns: The upload response containing the S3 key
-    func uploadPDFReceipt(from pdfURL: URL, filename: String? = nil) async throws -> ReceiptUploadResponse {
+    func uploadPDFReceipt(from pdfURL: URL, filename: String? = nil) async throws -> S3UploadResponse {
         // Validate URL
         guard let url = URL(string: uploadURL) else {
             throw ReceiptUploadError.invalidURL
@@ -252,7 +252,7 @@ actor ReceiptUploadService {
         
         // Parse response
         let decoder = JSONDecoder()
-        let uploadResponse = try decoder.decode(ReceiptUploadResponse.self, from: data)
+        let uploadResponse = try decoder.decode(S3UploadResponse.self, from: data)
         
         guard uploadResponse.isSuccess else {
             throw ReceiptUploadError.uploadFailed("Server returned non-success status")
