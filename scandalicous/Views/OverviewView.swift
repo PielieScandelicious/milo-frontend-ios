@@ -27,7 +27,11 @@ struct OverviewView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var dataManager = StoreDataManager()
-    @State private var selectedPeriod: String = "January 2026"
+    @State private var selectedPeriod: String = {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        return dateFormatter.string(from: Date())
+    }()
     @State private var selectedSort: SortOption = .highestSpend
     @State private var showingFilterSheet = false
     @State private var isEditMode = false
@@ -39,7 +43,23 @@ struct OverviewView: View {
     @Binding var showSignOutConfirmation: Bool
     
     private var availablePeriods: [String] {
-        dataManager.breakdownsByPeriod().keys.sorted()
+        let periods = dataManager.breakdownsByPeriod().keys.sorted()
+        
+        // If no periods available, generate at least the last 6 months
+        if periods.isEmpty {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            let calendar = Calendar.current
+            
+            return (0..<6).compactMap { monthsAgo in
+                guard let date = calendar.date(byAdding: .month, value: -monthsAgo, to: Date()) else {
+                    return nil
+                }
+                return dateFormatter.string(from: date)
+            }
+        }
+        
+        return periods
     }
     
     private var currentBreakdowns: [StoreBreakdown] {
@@ -161,17 +181,17 @@ struct OverviewView: View {
                 // Content
                 ScrollView {
                 VStack(spacing: 0) {
+                    // Liquid Glass Period Filter at the top
+                    liquidGlassPeriodFilter
+                        .padding(.top, 12)
+                        .padding(.bottom, 4)
+                    
                     // Scrollable header
                     VStack(spacing: 12) {
-                        // Period selector
-                        if availablePeriods.count > 1 {
-                            periodSelector
-                        }
-                        
                         // Filter bar
                         filterBar
                     }
-                    .padding(.top, 12)
+                    .padding(.top, 8)
                     .padding(.bottom, 12)
                     
                     // Content
@@ -359,6 +379,46 @@ struct OverviewView: View {
             }
         }
         .padding(.horizontal)
+    }
+    
+    private var liquidGlassPeriodFilter: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(availablePeriods, id: \.self) { period in
+                    periodButton(for: period)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+    }
+    
+    private func periodButton(for period: String) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                selectedPeriod = period
+                // Haptic feedback
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+            }
+        } label: {
+            Text(period)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(selectedPeriod == period ? Color.black : Color.white.opacity(0.7))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background {
+                    if selectedPeriod == period {
+                        Capsule()
+                            .fill(Color.white)
+                            .shadow(color: .white.opacity(0.3), radius: 8, x: 0, y: 4)
+                    } else {
+                        Capsule()
+                            .fill(Color.white.opacity(0.08))
+                    }
+                }
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     private var periodSelector: some View {
