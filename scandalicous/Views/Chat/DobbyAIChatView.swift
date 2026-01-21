@@ -393,7 +393,7 @@ struct MessageBubbleView: View {
             .opacity(isVisible ? 1.0 : 0.0)
             .offset(x: isVisible ? 0 : (message.role == .assistant ? -30 : 30))
             .onAppear {
-                withAnimation(.easeInOut(duration: 0.6).delay(0.05)) {
+                withAnimation(.easeInOut(duration: 0.8).delay(0.1)) {
                     isVisible = true
                 }
             }
@@ -744,7 +744,7 @@ class ChatViewModel: ObservableObject {
                     let newContent = String(fullStreamedContent[..<endIndex])
                     
                     // Update with smooth, slower animation for cooler effect
-                    withAnimation(.easeInOut(duration: 0.5)) {
+                    withAnimation(.easeInOut(duration: 1.2)) {
                         displayedStreamingContent = newContent
                         
                         // Update the message in the array
