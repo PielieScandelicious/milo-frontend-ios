@@ -10,6 +10,16 @@ import SwiftUI
 import UniformTypeIdentifiers
 import FirebaseAuth
 
+// MARK: - View Extension for Hiding Drag Preview
+extension View {
+    func hideDragPreview() -> some View {
+        self.overlay(
+            Color.clear
+                .contentShape(Rectangle())
+        )
+    }
+}
+
 // MARK: - Notification for Receipt Upload Success
 extension Notification.Name {
     static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")
@@ -34,14 +44,25 @@ struct OverviewView: View {
     }()
     @State private var selectedSort: SortOption = .highestSpend
     @State private var showingFilterSheet = false
-    @State private var isEditMode = false
+    @State private var isEditMode = false {
+        didSet {
+            print("🔵🔵🔵 isEditMode changed from \(oldValue) to \(isEditMode)")
+        }
+    }
     @State private var draggingItem: StoreBreakdown?
+    @State private var dragOffset: CGSize = .zero
+    @State private var isDragging = false
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var showingAllStoresBreakdown = false
     @State private var showingAllTransactions = false
     @State private var showingProfileMenu = false
+    @State private var breakdownToDelete: StoreBreakdown?
+    @State private var showingDeleteConfirmation = false
     @Binding var showSignOutConfirmation: Bool
+    
+    // User defaults key for storing order
+    private let orderStorageKey = "StoreBreakdownsOrder"
     
     private var availablePeriods: [String] {
         let periods = dataManager.breakdownsByPeriod().keys.sorted()
@@ -64,11 +85,16 @@ struct OverviewView: View {
     }
     
     private var currentBreakdowns: [StoreBreakdown] {
-        // If in edit mode, use the displayed breakdowns to maintain order
-        if isEditMode {
-            return displayedBreakdowns
+        // Always use displayedBreakdowns to maintain consistent ordering
+        // This prevents items from jumping when entering/exiting edit mode
+        if displayedBreakdowns.isEmpty {
+            updateDisplayedBreakdownsSync()
         }
-        
+        return displayedBreakdowns
+    }
+    
+    // Synchronous version for use in computed properties
+    private func updateDisplayedBreakdownsSync() {
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
         
         // Apply sorting
@@ -81,7 +107,10 @@ struct OverviewView: View {
             breakdowns.sort { $0.storeName < $1.storeName }
         }
         
-        return breakdowns
+        // Apply saved custom order if available
+        breakdowns = applyCustomOrder(to: breakdowns, for: selectedPeriod)
+        
+        displayedBreakdowns = breakdowns
     }
     
     // Update displayed breakdowns when filters change
@@ -98,7 +127,48 @@ struct OverviewView: View {
             breakdowns.sort { $0.storeName < $1.storeName }
         }
         
+        // Apply saved custom order if available
+        breakdowns = applyCustomOrder(to: breakdowns, for: selectedPeriod)
+        
         displayedBreakdowns = breakdowns
+    }
+    
+    // MARK: - Custom Order Persistence
+    
+    private func saveCustomOrder() {
+        // Save the current order for this period
+        let storeIds = displayedBreakdowns.map { $0.id }
+        let key = "\(orderStorageKey)_\(selectedPeriod)"
+        UserDefaults.standard.set(storeIds, forKey: key)
+        print("💾 Saved custom order for \(selectedPeriod): \(storeIds)")
+    }
+    
+    private func applyCustomOrder(to breakdowns: [StoreBreakdown], for period: String) -> [StoreBreakdown] {
+        let key = "\(orderStorageKey)_\(period)"
+        guard let savedOrder = UserDefaults.standard.array(forKey: key) as? [String] else {
+            // No saved order, return as-is
+            return breakdowns
+        }
+        
+        // Create a dictionary for quick lookup
+        var breakdownDict = Dictionary(uniqueKeysWithValues: breakdowns.map { ($0.id, $0) })
+        
+        // Build ordered array based on saved order
+        var orderedBreakdowns: [StoreBreakdown] = []
+        
+        // First, add items in the saved order
+        for id in savedOrder {
+            if let breakdown = breakdownDict[id] {
+                orderedBreakdowns.append(breakdown)
+                breakdownDict.removeValue(forKey: id)
+            }
+        }
+        
+        // Then append any new items that weren't in the saved order
+        orderedBreakdowns.append(contentsOf: breakdownDict.values.sorted { $0.storeName < $1.storeName })
+        
+        print("📋 Applied custom order for \(period), \(orderedBreakdowns.count) items")
+        return orderedBreakdowns
     }
     
     private var totalPeriodSpending: Double {
@@ -126,14 +196,22 @@ struct OverviewView: View {
     var body: some View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
-                .onTapGesture {
-                    // Exit edit mode when tapping background
-                    if isEditMode {
+            
+            // Subtle overlay in edit mode - catches taps on empty space
+            if isEditMode {
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .contentShape(Rectangle()) // Make entire overlay tappable
+                    .onTapGesture {
+                        // Exit edit mode when tapping background
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             isEditMode = false
                         }
                     }
-                }
+                    .allowsHitTesting(true) // Ensure it catches taps
+                    .zIndex(0.5) // Above background but below content
+            }
             
             // Loading overlay - only show on initial load
             if dataManager.isLoading {
@@ -141,10 +219,6 @@ struct OverviewView: View {
                     ProgressView()
                         .scaleEffect(1.5)
                         .tint(.white)
-                    
-                    Text("Loading analytics...")
-                        .font(.headline)
-                        .foregroundStyle(.white)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black.opacity(0.3))
@@ -205,6 +279,7 @@ struct OverviewView: View {
                 .scrollBounceBehavior(.always)
                 .scrollDismissesKeyboard(.interactively)
                 .background(Color(white: 0.05))
+                .zIndex(1) // Above the overlay
                 .refreshable {
                     // Pull to refresh - smooth animation
                     let startTime = Date()
@@ -232,24 +307,28 @@ struct OverviewView: View {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 isEditMode = false
                             }
+                            // Haptic feedback
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
                         } label: {
                             Text("Done")
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
                                 .background(
                                     Capsule()
                                         .fill(Color.blue)
+                                        .shadow(color: .blue.opacity(0.5), radius: 10, x: 0, y: 4)
                                 )
                         }
-                        .padding(.trailing)
+                        .padding(.trailing, 20)
                         .padding(.top, 20)
                     }
                     Spacer()
                 }
                 .allowsHitTesting(true)
-                .transition(.opacity)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -271,6 +350,29 @@ struct OverviewView: View {
             FilterSheet(
                 selectedSort: $selectedSort
             )
+        }
+        .confirmationDialog(
+            "Delete \(breakdownToDelete?.storeName ?? "Store")?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                // Haptic feedback
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+                
+                if let breakdown = breakdownToDelete {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        deleteBreakdown(breakdown)
+                    }
+                }
+                breakdownToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                breakdownToDelete = nil
+            }
+        } message: {
+            Text("This will remove all transactions for this store from \(selectedPeriod). This action cannot be undone.")
         }
         .onAppear {
             // Configure with transaction manager if not already configured
@@ -311,9 +413,17 @@ struct OverviewView: View {
             }
         }
         .onChange(of: selectedPeriod) { oldValue, newValue in
+            // Exit edit mode when changing periods to avoid inconsistency
+            if isEditMode {
+                isEditMode = false
+            }
             updateDisplayedBreakdowns()
         }
         .onChange(of: selectedSort) { oldValue, newValue in
+            // Exit edit mode when changing sort to avoid inconsistency
+            if isEditMode {
+                isEditMode = false
+            }
             updateDisplayedBreakdowns()
         }
         .onChange(of: dataManager.storeBreakdowns) { oldValue, newValue in
@@ -520,76 +630,139 @@ struct OverviewView: View {
     }
     
     private var storeBreakdownsGrid: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 16),
-            GridItem(.flexible(), spacing: 16),
-            GridItem(.flexible(), spacing: 16)
-        ], spacing: 20) {
-            ForEach(currentBreakdowns) { breakdown in
-                ZStack(alignment: .topTrailing) {
-                    // The card itself
-                    if isEditMode {
-                        storeChartCard(breakdown)
-                            .modifier(JiggleModifier(isJiggling: isEditMode))
-                            .onTapGesture {
-                                // Exit edit mode on tap, like iOS
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    isEditMode = false
-                                }
-                            }
-                            .onDrag {
-                                self.draggingItem = breakdown
-                                return NSItemProvider(object: breakdown.id as NSString)
-                            }
-                            .onDrop(of: [.text], delegate: DropViewDelegate(
-                                destinationItem: breakdown,
-                                items: $displayedBreakdowns,
-                                draggingItem: $draggingItem
-                            ))
-                    } else {
-                        Button {
-                            selectedBreakdown = breakdown
-                        } label: {
+        VStack(spacing: 0) {
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16)
+            ], spacing: 20) {
+                ForEach(currentBreakdowns) { breakdown in
+                    ZStack(alignment: .topTrailing) {
+                        // The card itself
+                        if isEditMode {
                             storeChartCard(breakdown)
+                                .modifier(JiggleModifier(isJiggling: isEditMode && draggingItem?.id != breakdown.id))
+                                .scaleEffect(draggingItem?.id == breakdown.id ? 1.05 : 1.0)
+                                .opacity(draggingItem?.id == breakdown.id ? 0.5 : 1.0) // Show we're dragging
+                                .zIndex(draggingItem?.id == breakdown.id ? 1 : 0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: draggingItem?.id == breakdown.id)
+                                .onDrag {
+                                    self.draggingItem = breakdown
+                                    // Haptic feedback when starting drag
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                    
+                                    return NSItemProvider(object: breakdown.id as NSString)
+                                }
+                                .onDrop(of: [UTType.text], delegate: DropViewDelegate(
+                                    destinationItem: breakdown,
+                                    items: $displayedBreakdowns,
+                                    draggingItem: $draggingItem,
+                                    onReorder: saveCustomOrder
+                                ))
+                        } else {
+                            // Use gesture with high priority to ensure long press works
+                            storeChartCard(breakdown)
+                                .contentShape(Rectangle()) // Ensure entire card area is tappable
+                                .onTapGesture {
+                                    selectedBreakdown = breakdown
+                                }
+                                .onLongPressGesture(minimumDuration: 0.5) {
+                                    // Enter edit mode on long press
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        isEditMode = true
+                                    }
+                                    
+                                    // Haptic feedback
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
+                                }
                         }
-                        .buttonStyle(StoreCardButtonStyle())
-                        .onLongPressGesture(minimumDuration: 0.5) {
-                            // Enter edit mode on long press
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                isEditMode = true
+                        
+                        // Delete button (X) in edit mode
+                        if isEditMode {
+                            Button {
+                                // Show confirmation dialog
+                                breakdownToDelete = breakdown
+                                showingDeleteConfirmation = true
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.red)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.white)
+                                            .frame(width: 18, height: 18)
+                                    )
+                                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                             }
-                            // Haptic feedback
-                            let generator = UIImpactFeedbackGenerator(style: .medium)
-                            generator.impactOccurred()
+                            .buttonStyle(DeleteButtonStyle())
+                            .offset(x: 8, y: -8)
+                            .transition(.scale.combined(with: .opacity))
+                            .zIndex(1)
                         }
-                    }
-                    
-                    // Delete button (X) in edit mode
-                    if isEditMode {
-                        Button {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                deleteBreakdown(breakdown)
-                            }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.red)
-                                .background(
-                                    Circle()
-                                        .fill(Color.white)
-                                        .frame(width: 18, height: 18)
-                                )
-                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                        }
-                        .offset(x: 8, y: -8)
-                        .transition(.scale.combined(with: .opacity))
-                        .zIndex(1)
                     }
                 }
             }
+            .padding(.horizontal)
+            
+            // Spacer that catches taps in empty space (in edit mode)
+            if isEditMode {
+                Color.clear
+                    .frame(height: 100)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isEditMode = false
+                        }
+                    }
+            }
         }
-        .padding(.horizontal)
     }
+    
+// MARK: - Drop Delegate for Drag and Drop Reordering
+struct DropViewDelegate: DropDelegate {
+    let destinationItem: StoreBreakdown
+    @Binding var items: [StoreBreakdown]
+    @Binding var draggingItem: StoreBreakdown?
+    let onReorder: () -> Void // Callback to save order
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        // Haptic feedback on drop completion
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        
+        draggingItem = nil
+        
+        // Save the new order after drop completes
+        onReorder()
+        
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggingItem = draggingItem else { return }
+        
+        if draggingItem != destinationItem {
+            let fromIndex = items.firstIndex(of: draggingItem)
+            let toIndex = items.firstIndex(of: destinationItem)
+            
+            if let fromIndex = fromIndex, let toIndex = toIndex {
+                // Haptic feedback on reorder
+                let generator = UISelectionFeedbackGenerator()
+                generator.selectionChanged()
+                
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+                }
+            }
+        }
+    }
+}
     
     private func storeChartCard(_ breakdown: StoreBreakdown) -> some View {
         VStack(spacing: 0) {
@@ -666,65 +839,59 @@ struct FilterSheet: View {
     }
 }
 
-// MARK: - Drop Delegate for Drag and Drop Reordering
-struct DropViewDelegate: DropDelegate {
-    let destinationItem: StoreBreakdown
-    @Binding var items: [StoreBreakdown]
-    @Binding var draggingItem: StoreBreakdown?
-    
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        return DropProposal(operation: .move)
-    }
-    
-    func performDrop(info: DropInfo) -> Bool {
-        draggingItem = nil
-        return true
-    }
-    
-    func dropEntered(info: DropInfo) {
-        guard let draggingItem = draggingItem else { return }
-        
-        if draggingItem != destinationItem {
-            let fromIndex = items.firstIndex(of: draggingItem)
-            let toIndex = items.firstIndex(of: destinationItem)
-            
-            if let fromIndex = fromIndex, let toIndex = toIndex {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Jiggle Modifier for Edit Mode
 struct JiggleModifier: ViewModifier {
     let isJiggling: Bool
     @State private var rotation: Double = 0
+    @State private var offset: CGSize = .zero
     
-    private let rotationAngle: Double = 2.5
-    private let duration: Double = 0.13
+    // Random but consistent values per instance
+    private let rotationAngle: Double
+    private let duration: Double
+    private let offsetMagnitude: CGFloat
+    
+    init(isJiggling: Bool) {
+        self.isJiggling = isJiggling
+        // Slight randomization for more natural feel
+        self.rotationAngle = Double.random(in: 2.0...3.0)
+        self.duration = Double.random(in: 0.12...0.14)
+        self.offsetMagnitude = CGFloat.random(in: 0.3...0.6)
+    }
     
     func body(content: Content) -> some View {
         content
             .rotationEffect(.degrees(rotation))
+            .offset(offset)
             .task(id: isJiggling) {
                 guard isJiggling else {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         rotation = 0
+                        offset = .zero
                     }
                     return
                 }
                 
                 // Start with random direction for natural look
-                let startDirection: Double = Bool.random() ? rotationAngle : -rotationAngle
-                rotation = startDirection
+                let startRotation: Double = Bool.random() ? rotationAngle : -rotationAngle
+                let startOffsetX: CGFloat = Bool.random() ? offsetMagnitude : -offsetMagnitude
+                let startOffsetY: CGFloat = Bool.random() ? offsetMagnitude : -offsetMagnitude
                 
-                // Continuous jiggle loop
+                rotation = startRotation
+                offset = CGSize(width: startOffsetX, height: startOffsetY)
+                
+                // Continuous jiggle loop with varied timing
                 while isJiggling {
+                    // Rotation jiggle
                     withAnimation(.easeInOut(duration: duration)) {
                         rotation = -rotation
                     }
+                    
+                    // Offset jiggle (slightly different timing for organic feel)
+                    withAnimation(.easeInOut(duration: duration * 1.1)) {
+                        offset.width = -offset.width
+                        offset.height = offset.height * 0.9 // Subtle variation
+                    }
+                    
                     try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
                 }
             }
@@ -748,6 +915,24 @@ struct TotalSpendingCardButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Delete Button Style
+struct DeleteButtonStyle: ButtonStyle {
+    @State private var isPulsing = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.85 : (isPulsing ? 1.1 : 1.0))
+            .opacity(configuration.isPressed ? 0.7 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+            .onAppear {
+                // Subtle pulse animation on appear
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    isPulsing = true
+                }
+            }
     }
 }
 

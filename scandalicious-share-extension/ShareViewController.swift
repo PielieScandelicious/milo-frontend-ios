@@ -15,23 +15,29 @@ class ShareViewController: UIViewController {
     // MARK: - UI Components
     private let containerView: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemBackground
-        view.layer.cornerRadius = 16
+        view.backgroundColor = UIColor(white: 0.15, alpha: 1.0) // Dark gray background
+        view.layer.cornerRadius = 20
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.3
+        view.layer.shadowOffset = CGSize(width: 0, height: 10)
+        view.layer.shadowRadius = 20
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
     
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "Saving Receipt..."
-        label.font = .systemFont(ofSize: 20, weight: .semibold)
+        label.text = "Processing..."
+        label.font = .systemFont(ofSize: 22, weight: .semibold)
         label.textAlignment = .center
+        label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     
     private let activityIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .large)
+        indicator.color = .white
         indicator.translatesAutoresizingMaskIntoConstraints = false
         return indicator
     }()
@@ -40,7 +46,7 @@ class ShareViewController: UIViewController {
         let label = UILabel()
         label.text = ""
         label.font = .systemFont(ofSize: 14, weight: .regular)
-        label.textColor = .tertiaryLabel
+        label.textColor = UIColor(white: 0.7, alpha: 1.0) // Light gray
         label.textAlignment = .center
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -51,20 +57,8 @@ class ShareViewController: UIViewController {
         let imageView = UIImageView()
         let config = UIImage.SymbolConfiguration(pointSize: 60, weight: .bold)
         imageView.image = UIImage(systemName: "checkmark.circle.fill", withConfiguration: config)
-        imageView.tintColor = .systemGreen
+        imageView.tintColor = UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0) // Modern green
         imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.alpha = 0
-        return imageView
-    }()
-    
-    private let imagePreview: UIImageView = {
-        let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFit
-        imageView.layer.cornerRadius = 8
-        imageView.layer.masksToBounds = true
-        imageView.layer.borderWidth = 1
-        imageView.layer.borderColor = UIColor.separator.cgColor
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.alpha = 0
         return imageView
@@ -230,7 +224,6 @@ class ShareViewController: UIViewController {
         view.backgroundColor = UIColor.black.withAlphaComponent(0)
         
         view.addSubview(containerView)
-        containerView.addSubview(imagePreview)
         containerView.addSubview(titleLabel)
         containerView.addSubview(activityIndicator)
         containerView.addSubview(checkmarkView)
@@ -240,29 +233,25 @@ class ShareViewController: UIViewController {
             containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             containerView.widthAnchor.constraint(equalToConstant: 300),
-            containerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
+            containerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 150),
             
-            imagePreview.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 20),
-            imagePreview.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            imagePreview.widthAnchor.constraint(equalToConstant: 80),
-            imagePreview.heightAnchor.constraint(equalToConstant: 80),
-            
-            titleLabel.topAnchor.constraint(equalTo: imagePreview.bottomAnchor, constant: 16),
+            // Title label now at the top with minimal padding
+            titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 24),
             titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
             titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
             
-            activityIndicator.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 24),
+            activityIndicator.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
             activityIndicator.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
             
-            checkmarkView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 24),
+            checkmarkView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
             checkmarkView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            checkmarkView.widthAnchor.constraint(equalToConstant: 80),
-            checkmarkView.heightAnchor.constraint(equalToConstant: 80),
+            checkmarkView.widthAnchor.constraint(equalToConstant: 60),
+            checkmarkView.heightAnchor.constraint(equalToConstant: 60),
             
             statusLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 16),
             statusLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
             statusLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
-            statusLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
+            statusLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -24)
         ])
         
         // Start with container hidden for animation
@@ -274,8 +263,8 @@ class ShareViewController: UIViewController {
     
     // MARK: - Animations
     private func animateIn() {
-        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0, options: .curveEaseOut) {
-            self.view.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0, options: .curveEaseOut) {
+            self.view.backgroundColor = UIColor.black.withAlphaComponent(0.75) // Darker overlay
             self.containerView.alpha = 1
             self.containerView.transform = .identity
         }
@@ -751,12 +740,6 @@ class ShareViewController: UIViewController {
         print("📄 uploadPDFReceipt started for: \(pdfURL)")
         
         do {
-            // Show loading state
-            await MainActor.run {
-                self.titleLabel.text = "Uploading PDF..."
-                self.statusLabel.text = "Preserving original format"
-            }
-            
             // Add a delay to ensure UI is visible before processing
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
             
@@ -878,27 +861,8 @@ class ShareViewController: UIViewController {
     // MARK: - Show Image Preview
     @MainActor
     private func showImagePreview(_ image: UIImage) async {
-        imagePreview.image = image
-        
-        imagePreview.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
-        
-        // Wait for the animation to complete
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            UIView.animate(
-                withDuration: 0.4,
-                delay: 0,
-                usingSpringWithDamping: 0.7,
-                initialSpringVelocity: 0.5,
-                options: .curveEaseOut
-            ) {
-                self.imagePreview.alpha = 1
-                self.imagePreview.transform = .identity
-            } completion: { _ in
-                continuation.resume()
-            }
-        }
-        
-        // Small delay after showing preview
+        // Image preview removed for cleaner UI
+        // Small delay to ensure UI updates
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
     }
     
@@ -931,8 +895,9 @@ class ShareViewController: UIViewController {
     private func updateStatus(error: String) {
         DispatchQueue.main.async {
             self.titleLabel.text = "Error"
+            self.titleLabel.textColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0) // Modern red
             self.statusLabel.text = error
-            self.statusLabel.textColor = .systemRed
+            self.statusLabel.textColor = UIColor(white: 0.8, alpha: 1.0)
             self.activityIndicator.stopAnimating()
         }
     }
@@ -942,33 +907,30 @@ class ShareViewController: UIViewController {
     private func showSuccess(message: String) async {
         print("🎉 showSuccess called")
         
-        // Haptic feedback
+        // Immediate haptic feedback
         let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
         generator.notificationOccurred(.success)
         
-        // Update text
+        // Update text - keep it simple
         titleLabel.text = "Success!"
         statusLabel.text = ""
-        statusLabel.textColor = .systemGreen
         
         // Hide spinner
         activityIndicator.stopAnimating()
         
-        // Small delay before animating checkmark
-        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        print("🎉 Starting instant checkmark animation")
         
-        print("🎉 Starting checkmark animation")
+        // Start slightly smaller for quick scale animation
+        checkmarkView.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
         
-        // Animate checkmark in with a dramatic bounce
-        checkmarkView.transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
-        
-        // Snappier animation - 0.6 seconds
+        // Very fast, snappy animation - 0.2 seconds
         return await withCheckedContinuation { continuation in
             UIView.animate(
-                withDuration: 0.6,
+                withDuration: 0.2,
                 delay: 0,
-                usingSpringWithDamping: 0.5,
-                initialSpringVelocity: 0.8,
+                usingSpringWithDamping: 0.7,
+                initialSpringVelocity: 1.0,
                 options: [.curveEaseOut, .allowUserInteraction]
             ) {
                 self.checkmarkView.alpha = 1

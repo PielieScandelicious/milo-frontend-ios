@@ -36,13 +36,9 @@ struct ShareExtensionView: View {
     @State private var showError = false
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Background
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 24) {
+        NavigationStack {
+            List {
+                Section {
                     if isProcessing {
                         processingView
                     } else if let error = errorMessage {
@@ -51,8 +47,8 @@ struct ShareExtensionView: View {
                         readyView
                     }
                 }
-                .padding()
             }
+            .listStyle(.insetGrouped)
             .navigationTitle("Upload Receipt")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -72,76 +68,43 @@ struct ShareExtensionView: View {
     // MARK: - Subviews
     
     private var readyView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "doc.viewfinder.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.blue)
-            
-            Text("Preparing to upload...")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-        }
+        Text("Preparing to upload...")
+            .font(.headline)
+            .foregroundStyle(.secondary)
     }
     
     private var processingView: some View {
-        VStack(spacing: 24) {
-            // Upload icon with animation
-            ZStack {
-                Circle()
-                    .stroke(Color.blue.opacity(0.2), lineWidth: 4)
-                    .frame(width: 100, height: 100)
-                
-                Circle()
-                    .trim(from: 0, to: uploadProgress)
-                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .frame(width: 100, height: 100)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.linear, value: uploadProgress)
-                
-                Image(systemName: "arrow.up.doc.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.blue)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Uploading Receipts")
+                .font(.headline)
+            
+            if totalCount > 1 {
+                Text("\(uploadedCount) of \(totalCount) uploaded")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
             
-            VStack(spacing: 8) {
-                Text("Uploading Receipts")
-                    .font(.headline)
-                
-                if totalCount > 1 {
-                    Text("\(uploadedCount) of \(totalCount) uploaded")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                
-                if !currentFileName.isEmpty {
-                    Text(currentFileName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+            if !currentFileName.isEmpty {
+                Text(currentFileName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
             
             ProgressView(value: uploadProgress)
-                .progressViewStyle(.linear)
                 .tint(.blue)
         }
     }
     
     private func errorView(_ message: String) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.red)
-            
+        VStack(alignment: .leading, spacing: 12) {
             Text("Upload Failed")
                 .font(.headline)
             
             Text(message)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
             
             Button("Dismiss") {
                 cancelExtension()
