@@ -216,9 +216,11 @@ class StoreDataManager: ObservableObject {
     
     private func convertToStoreBreakdowns(summary: SummaryResponse, periodType: PeriodType) async -> [StoreBreakdown] {
         var breakdowns: [StoreBreakdown] = []
-        
+
         // Format period string (e.g., "January 2026")
         let periodString = formatPeriod(from: summary.startDate, to: summary.endDate, period: periodType)
+        print("📅 Converting breakdowns - API dates: \(summary.startDate) to \(summary.endDate)")
+        print("📅 Generated period string: '\(periodString)'")
         
         for apiStore in summary.stores {
             // Fetch detailed breakdown for each store to get category info

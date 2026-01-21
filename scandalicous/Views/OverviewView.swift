@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 import FirebaseAuth
 
@@ -37,6 +38,11 @@ struct OverviewView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject var dataManager: StoreDataManager
+    @Environment(\.scenePhase) private var scenePhase
+
+    // Track the last time we checked for Share Extension uploads
+    @State private var lastCheckedUploadTimestamp: TimeInterval = 0
+
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
@@ -116,8 +122,17 @@ struct OverviewView: View {
     
     // Update displayed breakdowns when filters change
     private func updateDisplayedBreakdowns() {
+        print("🔄 updateDisplayedBreakdowns called")
+        print("   selectedPeriod: '\(selectedPeriod)'")
+        print("   Total breakdowns in dataManager: \(dataManager.storeBreakdowns.count)")
+
+        // Debug: Print all periods in the data
+        let allPeriods = Set(dataManager.storeBreakdowns.map { $0.period })
+        print("   Available periods: \(allPeriods)")
+
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
-        
+        print("   Filtered breakdowns for '\(selectedPeriod)': \(breakdowns.count)")
+
         // Apply sorting
         switch selectedSort {
         case .highestSpend:
@@ -127,11 +142,12 @@ struct OverviewView: View {
         case .storeName:
             breakdowns.sort { $0.storeName < $1.storeName }
         }
-        
+
         // Apply saved custom order if available
         breakdowns = applyCustomOrder(to: breakdowns, for: selectedPeriod)
-        
+
         displayedBreakdowns = breakdowns
+        print("   Final displayedBreakdowns count: \(displayedBreakdowns.count)")
     }
     
     // MARK: - Custom Order Persistence
@@ -437,6 +453,10 @@ struct OverviewView: View {
                 dataManager.configure(with: transactionManager)
             }
             updateDisplayedBreakdowns()
+
+            // Check for Share Extension uploads when view appears
+            // This handles the case when user switches tabs
+            checkForShareExtensionUploads()
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
             print("📬 Received receipt upload notification - refreshing backend data")
@@ -486,6 +506,67 @@ struct OverviewView: View {
         .onChange(of: dataManager.storeBreakdowns) { oldValue, newValue in
             if !isEditMode {
                 updateDisplayedBreakdowns()
+            }
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Check for Share Extension uploads when app becomes active
+            print("🔄 scenePhase changed: \(oldPhase) -> \(newPhase)")
+            if newPhase == .active {
+                checkForShareExtensionUploads()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Backup: Also check when app becomes active via notification (more reliable)
+            print("🔄 App became active (UIApplication notification)")
+            checkForShareExtensionUploads()
+        }
+    }
+
+    // MARK: - Share Extension Upload Detection
+
+    /// Checks if the Share Extension uploaded a receipt while the app was in the background
+    private func checkForShareExtensionUploads() {
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
+            print("❌ Could not access shared UserDefaults with App Group: \(appGroupIdentifier)")
+            return
+        }
+
+        // Check if there's a new upload timestamp
+        let uploadTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
+        print("📋 Share Extension check - uploadTimestamp: \(uploadTimestamp), lastChecked: \(lastCheckedUploadTimestamp)")
+
+        // If there's a new upload (timestamp is newer than last checked)
+        if uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0 {
+            print("📬 Detected Share Extension upload (timestamp: \(uploadTimestamp)) - refreshing data")
+
+            // Update last checked timestamp
+            lastCheckedUploadTimestamp = uploadTimestamp
+
+            // Trigger refresh
+            Task {
+                // Wait for backend to process the receipt (backend needs time to extract items and update analytics)
+                print("⏳ Waiting 2 seconds for backend to process receipt...")
+                try? await Task.sleep(for: .seconds(2.0))
+
+                // Get current month period string (where new receipts appear)
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "MMMM yyyy"
+                let currentMonthPeriod = dateFormatter.string(from: Date())
+
+                print("📥 Refreshing data for current month: '\(currentMonthPeriod)'")
+                await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
+                print("✅ Data refreshed after Share Extension upload")
+
+                // If user is viewing current month, update displayed breakdowns
+                await MainActor.run {
+                    if selectedPeriod == currentMonthPeriod {
+                        print("📊 User is viewing current month - updating display")
+                        updateDisplayedBreakdowns()
+                    } else {
+                        print("ℹ️ User is viewing '\(selectedPeriod)', not '\(currentMonthPeriod)' - may need to switch periods to see new data")
+                    }
+                }
             }
         }
     }

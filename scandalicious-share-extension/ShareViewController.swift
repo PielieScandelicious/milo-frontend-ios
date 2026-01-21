@@ -539,15 +539,18 @@ class ShareViewController: UIViewController {
             
             // Show success
             updateStatus(.success(message: ""))
-            
+
+            // Signal main app that it needs to refresh data
+            signalMainAppToRefresh()
+
             // Keep success visible
             try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-            
+
             // Complete the request
             await MainActor.run {
                 self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
             }
-            
+
             print("✅ PDF upload completed successfully")
             
         } catch let error as ReceiptUploadError {
@@ -578,17 +581,20 @@ class ShareViewController: UIViewController {
             
             // Show success
             updateStatus(.success(message: ""))
-            
+
+            // Signal main app that it needs to refresh data
+            signalMainAppToRefresh()
+
             print("✅ Success shown, waiting 1.5 seconds...")
-            
+
             // Keep success visible
             try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-            
+
             // Complete the request
             await MainActor.run {
                 self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
             }
-            
+
             print("✅ Extension completed successfully")
             
         } catch let error as ReceiptError {
@@ -633,8 +639,32 @@ class ShareViewController: UIViewController {
         showStatus(newStatus)
     }
     
+    // MARK: - Signal Main App to Refresh
+
+    /// Saves a timestamp to shared UserDefaults to signal the main app that new data is available
+    private func signalMainAppToRefresh() {
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
+            print("⚠️ Could not access shared UserDefaults to signal refresh")
+            print("⚠️ App Group identifier: \(appGroupIdentifier)")
+            return
+        }
+
+        // Save current timestamp - main app will check this when it becomes active
+        let timestamp = Date().timeIntervalSince1970
+        sharedDefaults.set(timestamp, forKey: "receipt_upload_timestamp")
+        sharedDefaults.synchronize()
+
+        // Verify the write succeeded
+        let verifyTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
+        print("✅ Signaled main app to refresh")
+        print("   Written timestamp: \(timestamp)")
+        print("   Verified timestamp: \(verifyTimestamp)")
+        print("   Write successful: \(timestamp == verifyTimestamp)")
+    }
+
     // MARK: - User-Friendly Error Messages
-    
+
     private func getUserFriendlyError(from error: Error) -> String {
         if let receiptError = error as? ReceiptError {
             switch receiptError {
