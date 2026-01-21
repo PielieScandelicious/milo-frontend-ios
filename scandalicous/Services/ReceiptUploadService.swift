@@ -42,15 +42,20 @@ actor ReceiptUploadService {
     // MARK: - Upload Receipt
     
     func uploadReceipt(image: UIImage) async throws -> ReceiptUploadResponse {
-        // Get auth token (from Firebase or shared storage)
+        print("🚀 Starting receipt upload process")
+        
+        // Get auth token
         let idToken = try await getAuthToken()
         
-        // Convert image to JPEG data
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+        // Optimize image for upload while maintaining quality
+        // Use higher compression quality (0.9) since we've already verified quality
+        guard let imageData = optimizeImage(image, targetQuality: 0.9) else {
             throw ReceiptUploadError.noImage
         }
         
-        // Create multipart form data
+        print("📦 Image optimized: \(imageData.count / 1024)KB")
+        
+        // Create multipart form data for SINGLE receipt upload
         let boundary = UUID().uuidString
         var body = Data()
         
@@ -72,110 +77,52 @@ actor ReceiptUploadService {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = body
+        request.timeoutInterval = 90 // Increased timeout for Claude Vision API processing
         
-        // Set timeout for upload
-        request.timeoutInterval = 60
+        // Use shared upload logic
+        return try await performUpload(request: request)
+    }
+    
+    // MARK: - Image Optimization
+    
+    /// Optimizes image for upload while maintaining readability
+    private func optimizeImage(_ image: UIImage, targetQuality: CGFloat) -> Data? {
+        // Ensure image is in a reasonable size range for API processing
+        let maxDimension: CGFloat = 2400 // Optimal for Claude Vision API
+        let size = image.size
         
-        // Perform upload
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+        var optimizedImage = image
+        
+        // Resize if needed while maintaining aspect ratio
+        if size.width > maxDimension || size.height > maxDimension {
+            let scale = min(maxDimension / size.width, maxDimension / size.height)
+            let newSize = CGSize(width: size.width * scale, height: size.height * scale)
             
-            // Check HTTP status
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw ReceiptUploadError.invalidResponse
+            let renderer = UIGraphicsImageRenderer(size: newSize)
+            optimizedImage = renderer.image { context in
+                image.draw(in: CGRect(origin: .zero, size: newSize))
             }
             
-            // Handle different status codes
-            switch httpResponse.statusCode {
-            case 200...299:
-                // Success - parse response
-                
-                // Print raw JSON for debugging
-                if let jsonString = String(data: data, encoding: .utf8) {
-                    print("📦 Raw server response (image upload):\n\(jsonString)")
-                }
-                
-                do {
-                    let uploadResponse = try await decodeResponse(from: data)
-                    
-                    // Debug: Print parsed response
-                    print("✅ Successfully parsed response:")
-                    print("   Receipt ID: \(uploadResponse.receiptId)")
-                    print("   Status: \(uploadResponse.status.rawValue)")
-                    print("   Store: \(uploadResponse.storeName ?? "N/A")")
-                    print("   Items Count: \(uploadResponse.itemsCount)")
-                    print("   Transactions count: \(uploadResponse.transactions.count)")
-                    print("   Transaction details:")
-                    for (index, transaction) in uploadResponse.transactions.enumerated() {
-                        print("      [\(index)] \(transaction.itemName) - €\(transaction.itemPrice) x\(transaction.quantity)")
-                    }
-                    
-                    // Check if the receipt processing failed
-                    if uploadResponse.status == .failed {
-                        throw ReceiptUploadError.serverError("Receipt processing failed")
-                    }
-                    
-                    return uploadResponse
-                } catch let decodingError as DecodingError {
-                    print("❌ Decoding error: \(decodingError)")
-                    // Print raw response for debugging
-                    if let jsonString = String(data: data, encoding: .utf8) {
-                        print("📄 Raw server response:\n\(jsonString)")
-                    }
-                    
-                    // Detailed decoding error information
-                    switch decodingError {
-                    case .keyNotFound(let key, let context):
-                        print("🔑 Missing key '\(key.stringValue)' - \(context.debugDescription)")
-                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                    case .typeMismatch(let type, let context):
-                        print("⚠️ Type mismatch for type '\(type)' - \(context.debugDescription)")
-                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                    case .valueNotFound(let type, let context):
-                        print("❓ Value not found for type '\(type)' - \(context.debugDescription)")
-                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                    case .dataCorrupted(let context):
-                        print("💥 Data corrupted - \(context.debugDescription)")
-                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                    @unknown default:
-                        print("❔ Unknown decoding error")
-                    }
-                    
-                    throw ReceiptUploadError.invalidResponse
-                }
-                
-            case 400...499:
-                // Client error
-                if let errorMessage = try? JSONDecoder().decode([String: String].self, from: data),
-                   let message = errorMessage["error"] ?? errorMessage["message"] {
-                    throw ReceiptUploadError.serverError(message)
-                }
-                throw ReceiptUploadError.serverError("Client error: \(httpResponse.statusCode)")
-                
-            case 500...599:
-                // Server error
-                throw ReceiptUploadError.serverError("Server error: \(httpResponse.statusCode)")
-                
-            default:
-                throw ReceiptUploadError.serverError("Unexpected status code: \(httpResponse.statusCode)")
-            }
-        } catch let error as ReceiptUploadError {
-            throw error
-        } catch {
-            throw ReceiptUploadError.networkError(error)
+            print("📐 Resized image from \(size) to \(newSize)")
         }
+        
+        // Convert to JPEG with specified quality
+        return optimizedImage.jpegData(compressionQuality: targetQuality)
     }
     
     // MARK: - Upload PDF Receipt
     
     func uploadPDFReceipt(from pdfURL: URL) async throws -> ReceiptUploadResponse {
-        // Get auth token (from Firebase or shared storage)
+        print("🚀 Starting PDF receipt upload process")
+        
+        // Get auth token
         let idToken = try await getAuthToken()
         
         // Read PDF data
         let pdfData = try Data(contentsOf: pdfURL)
+        print("📦 PDF size: \(pdfData.count / 1024)KB")
         
-        // Create multipart form data
+        // Create multipart form data for SINGLE PDF receipt upload
         let boundary = UUID().uuidString
         var body = Data()
         
@@ -197,45 +144,38 @@ actor ReceiptUploadService {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = body
+        request.timeoutInterval = 90
         
-        // Set timeout for upload
-        request.timeoutInterval = 60
-        
-        // Perform upload
+        // Perform upload (reuse same logic as image upload)
+        return try await performUpload(request: request)
+    }
+    
+    // MARK: - Shared Upload Logic
+    
+    private func performUpload(request: URLRequest) async throws -> ReceiptUploadResponse {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             
-            // Check HTTP status
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw ReceiptUploadError.invalidResponse
             }
             
-            // Handle different status codes
+            print("📥 Server response: HTTP \(httpResponse.statusCode)")
+            
             switch httpResponse.statusCode {
             case 200...299:
-                // Success - parse response
-                
-                // Print raw JSON for debugging
                 if let jsonString = String(data: data, encoding: .utf8) {
-                    print("📦 Raw server response (PDF upload):\n\(jsonString)")
+                    print("📄 Raw server response:\n\(jsonString)")
                 }
                 
                 do {
                     let uploadResponse = try await decodeResponse(from: data)
                     
-                    // Debug: Print parsed response
                     print("✅ Successfully parsed response:")
                     print("   Receipt ID: \(uploadResponse.receiptId)")
                     print("   Status: \(uploadResponse.status.rawValue)")
-                    print("   Store: \(uploadResponse.storeName ?? "N/A")")
-                    print("   Items Count: \(uploadResponse.itemsCount)")
-                    print("   Transactions count: \(uploadResponse.transactions.count)")
-                    print("   Transaction details:")
-                    for (index, transaction) in uploadResponse.transactions.enumerated() {
-                        print("      [\(index)] \(transaction.itemName) - €\(transaction.itemPrice) x\(transaction.quantity)")
-                    }
+                    print("   Items: \(uploadResponse.transactions.count)")
                     
-                    // Check if the receipt processing failed
                     if uploadResponse.status == .failed {
                         throw ReceiptUploadError.serverError("Receipt processing failed")
                     }
@@ -243,34 +183,11 @@ actor ReceiptUploadService {
                     return uploadResponse
                 } catch let decodingError as DecodingError {
                     print("❌ Decoding error: \(decodingError)")
-                    // Print raw response for debugging
-                    if let jsonString = String(data: data, encoding: .utf8) {
-                        print("📄 Raw server response:\n\(jsonString)")
-                    }
-                    
-                    // Detailed decoding error information
-                    switch decodingError {
-                    case .keyNotFound(let key, let context):
-                        print("🔑 Missing key '\(key.stringValue)' - \(context.debugDescription)")
-                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                    case .typeMismatch(let type, let context):
-                        print("⚠️ Type mismatch for type '\(type)' - \(context.debugDescription)")
-                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                    case .valueNotFound(let type, let context):
-                        print("❓ Value not found for type '\(type)' - \(context.debugDescription)")
-                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                    case .dataCorrupted(let context):
-                        print("💥 Data corrupted - \(context.debugDescription)")
-                        print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-                    @unknown default:
-                        print("❔ Unknown decoding error")
-                    }
-                    
+                    logDecodingError(decodingError)
                     throw ReceiptUploadError.invalidResponse
                 }
                 
             case 400...499:
-                // Client error
                 if let errorMessage = try? JSONDecoder().decode([String: String].self, from: data),
                    let message = errorMessage["error"] ?? errorMessage["message"] {
                     throw ReceiptUploadError.serverError(message)
@@ -278,7 +195,6 @@ actor ReceiptUploadService {
                 throw ReceiptUploadError.serverError("Client error: \(httpResponse.statusCode)")
                 
             case 500...599:
-                // Server error
                 throw ReceiptUploadError.serverError("Server error: \(httpResponse.statusCode)")
                 
             default:
@@ -371,6 +287,27 @@ actor ReceiptUploadService {
     private func decodeResponse(from data: Data) async throws -> ReceiptUploadResponse {
         let decoder = JSONDecoder()
         return try decoder.decode(ReceiptUploadResponse.self, from: data)
+    }
+    
+    // MARK: - Logging Helpers
+    
+    private func logDecodingError(_ error: DecodingError) {
+        switch error {
+        case .keyNotFound(let key, let context):
+            print("🔑 Missing key '\(key.stringValue)' - \(context.debugDescription)")
+            print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+        case .typeMismatch(let type, let context):
+            print("⚠️ Type mismatch for type '\(type)' - \(context.debugDescription)")
+            print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+        case .valueNotFound(let type, let context):
+            print("❓ Value not found for type '\(type)' - \(context.debugDescription)")
+            print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+        case .dataCorrupted(let context):
+            print("💥 Data corrupted - \(context.debugDescription)")
+            print("📍 Coding path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
+        @unknown default:
+            print("❔ Unknown decoding error")
+        }
     }
 }
 
