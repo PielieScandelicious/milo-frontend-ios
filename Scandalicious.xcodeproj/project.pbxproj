@@ -133,7 +133,6 @@
 				294D4FBE2F1D695B001B9193 /* Products */,
 				2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */,
 				294129312F1FC66500EAB7CE /* GoogleService-Info.plist */,
-				29CD76112F2028B1003DD40E /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -144,13 +143,6 @@
 				2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		29CD76112F2028B1003DD40E /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
