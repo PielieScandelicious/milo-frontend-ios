@@ -873,7 +873,7 @@ struct OverviewView: View {
                                 .font(.system(size: 22, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
 
-                            Text("Average for \(selectedPeriod)")
+                            Text("Average")
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.white.opacity(0.5))
                         } else {

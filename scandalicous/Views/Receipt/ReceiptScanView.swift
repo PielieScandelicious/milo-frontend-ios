@@ -70,21 +70,21 @@ struct ReceiptScanView: View {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
 
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(.white)
 
                 Text("Processing receipt...")
-                    .font(.headline)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
 
                 Text("Extracting items and prices")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
             }
             .padding(32)
-            .background(.ultraThinMaterial)
+            .background(Color.white.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .transition(.scale.combined(with: .opacity))
         }
@@ -120,14 +120,13 @@ struct ReceiptScanView: View {
                     }
 
                     // Title and description
-                    VStack(spacing: 8) {
+                    VStack(spacing: 10) {
                         Text("Snap Your Receipt")
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
 
                         Text("Take a photo and we'll extract all items automatically")
-                            .font(.subheadline)
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.white.opacity(0.6))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
@@ -140,17 +139,16 @@ struct ReceiptScanView: View {
                 // Bottom tip
                 HStack(spacing: 12) {
                     Image(systemName: "square.and.arrow.up.fill")
-                        .font(.title3)
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(.purple)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text("Got a digital receipt?")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
 
                         Text("Use the Share button from any app")
-                            .font(.caption)
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.5))
                     }
 

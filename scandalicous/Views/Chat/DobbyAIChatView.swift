@@ -369,11 +369,12 @@ struct WelcomeView: View {
                     .padding(.bottom, 8)
 
                 Text("Dobby")
-                    .font(.system(size: 34, weight: .bold))
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
 
                 Text("Your AI shopping assistant")
-                    .font(.system(size: 17))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
             }
             .padding(.bottom, 40)
 
@@ -445,31 +446,31 @@ struct SamplePromptCard: View {
         }) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(iconColor)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 36, height: 36)
                     .background(iconColor.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                
-                VStack(alignment: .leading, spacing: 2) {
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    
+                        .foregroundStyle(.white)
+
                     Text(subtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.3))
             }
-            .padding(16)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(14)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
             .scaleEffect(isPressed ? 0.97 : 1.0)
         }
         .buttonStyle(ScaleButtonStyle(isPressed: $isPressed))
