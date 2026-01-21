@@ -8,14 +8,17 @@
 
 import SwiftUI
 import Combine
+import FirebaseAuth
 
 struct ScandaLiciousAIChatView: View {
     @EnvironmentObject var transactionManager: TransactionManager
+    @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var viewModel = ChatViewModel()
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     @State private var scrollOffset: CGFloat = 0
     @State private var showWelcome = true
+    @Binding var showSignOutConfirmation: Bool
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -134,6 +137,33 @@ struct ScandaLiciousAIChatView: View {
         .navigationTitle(viewModel.messages.isEmpty ? "" : "Dobby")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Profile button - leading (left side)
+            ToolbarItem(placement: .navigationBarLeading) {
+                Menu {
+                    // User Email
+                    if let user = authManager.user {
+                        Section {
+                            Text(user.email ?? "No email")
+                                .font(.headline)
+                        }
+                    }
+                    
+                    // Sign Out
+                    Section {
+                        Button(role: .destructive) {
+                            showSignOutConfirmation = true
+                        } label: {
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "person.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            // Clear chat button - trailing (right side)
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(role: .destructive) {
@@ -778,7 +808,8 @@ class ChatViewModel: ObservableObject {
 // MARK: - Preview
 #Preview {
     NavigationStack {
-        ScandaLiciousAIChatView()
+        ScandaLiciousAIChatView(showSignOutConfirmation: .constant(false))
             .environmentObject(TransactionManager())
+            .environmentObject(AuthenticationManager())
     }
 }

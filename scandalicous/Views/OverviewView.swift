@@ -184,15 +184,7 @@ struct OverviewView: View {
                     // Liquid Glass Period Filter at the top
                     liquidGlassPeriodFilter
                         .padding(.top, 12)
-                        .padding(.bottom, 4)
-                    
-                    // Scrollable header
-                    VStack(spacing: 12) {
-                        // Filter bar
-                        filterBar
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
+                        .padding(.bottom, 12)
                     
                     // Content
                     VStack(spacing: 24) {
@@ -202,7 +194,7 @@ struct OverviewView: View {
                         // Store breakdowns grid
                         storeBreakdownsGrid
                     }
-                    .padding(.top, 20)
+                    .padding(.top, 8)
                     .padding(.bottom, 32)
                 }
             }
