@@ -72,22 +72,16 @@ struct OverviewView: View {
     private let orderStorageKey = "StoreBreakdownsOrder"
     
     private var availablePeriods: [String] {
+        // Only show periods that have actual data
         let periods = dataManager.breakdownsByPeriod().keys.sorted()
-        
-        // If no periods available, generate at least the last 6 months
+
+        // If no periods with data, show only the current month (empty state)
         if periods.isEmpty {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "MMMM yyyy"
-            let calendar = Calendar.current
-            
-            return (0..<6).compactMap { monthsAgo in
-                guard let date = calendar.date(byAdding: .month, value: -monthsAgo, to: Date()) else {
-                    return nil
-                }
-                return dateFormatter.string(from: date)
-            }
+            return [dateFormatter.string(from: Date())]
         }
-        
+
         return periods
     }
     
@@ -396,11 +390,13 @@ struct OverviewView: View {
                 selectedSort: $selectedSort
             )
         }
-        .confirmationDialog(
+        .alert(
             "Delete \(breakdownToDelete?.storeName ?? "Store")?",
-            isPresented: $showingDeleteConfirmation,
-            titleVisibility: .visible
+            isPresented: $showingDeleteConfirmation
         ) {
+            Button("Cancel", role: .cancel) {
+                breakdownToDelete = nil
+            }
             Button("Delete", role: .destructive) {
                 // Haptic feedback
                 let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -411,9 +407,6 @@ struct OverviewView: View {
                         await deleteBreakdown(breakdown)
                     }
                 }
-                breakdownToDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
                 breakdownToDelete = nil
             }
         } message: {
@@ -771,7 +764,8 @@ struct OverviewView: View {
 
     private var healthScoreCard: some View {
         // Use the average health score from the data manager (fetched from backend)
-        let averageScore: Double? = dataManager.averageHealthScore
+        // Only show score if there are breakdowns for the current period
+        let averageScore: Double? = currentBreakdowns.isEmpty ? nil : dataManager.averageHealthScore
 
         return Button {
             showingHealthScoreTransactions = true
