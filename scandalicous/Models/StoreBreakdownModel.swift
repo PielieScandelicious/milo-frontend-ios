@@ -251,21 +251,23 @@ class StoreDataManager: ObservableObject {
                     period: periodString,
                     totalStoreSpend: apiStore.amountSpent,
                     categories: categories,
-                    visitCount: apiStore.storeVisits
+                    visitCount: apiStore.storeVisits,
+                    averageHealthScore: storeDetails.averageHealthScore ?? apiStore.averageHealthScore
                 )
-                
+
                 breakdowns.append(breakdown)
-                
+
             } catch {
                 print("⚠️ Failed to fetch details for \(apiStore.storeName): \(error.localizedDescription)")
-                
+
                 // Fallback: Create breakdown without category details
                 let breakdown = StoreBreakdown(
                     storeName: apiStore.storeName,
                     period: periodString,
                     totalStoreSpend: apiStore.amountSpent,
                     categories: [],
-                    visitCount: apiStore.storeVisits
+                    visitCount: apiStore.storeVisits,
+                    averageHealthScore: apiStore.averageHealthScore
                 )
                 
                 breakdowns.append(breakdown)

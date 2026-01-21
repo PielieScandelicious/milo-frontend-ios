@@ -16,11 +16,13 @@ struct ScandaLiciousAIChatView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var viewModel = ChatViewModel()
     @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @StateObject private var rateLimitManager = RateLimitManager.shared
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     @State private var scrollOffset: CGFloat = 0
     @State private var showWelcome = true
     @State private var showManageSubscription = false
+    @State private var showRateLimitAlert = false
     @Binding var showSignOutConfirmation: Bool
     
     var body: some View {
@@ -151,8 +153,16 @@ struct ScandaLiciousAIChatView: View {
                         }
                     }
 
-                    // Subscription Management
+                    // Usage & Subscription
                     Section {
+                        // Rate limit usage display
+                        Label {
+                            Text(rateLimitManager.usageDisplayString)
+                        } icon: {
+                            Image(systemName: usageIconName)
+                                .foregroundStyle(usageColor)
+                        }
+
                         // Show subscription status
                         Label(subscriptionManager.subscriptionStatus.displayText, systemImage: "crown.fill")
 
@@ -173,9 +183,21 @@ struct ScandaLiciousAIChatView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.secondary)
+                    ZStack(alignment: .bottomTrailing) {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.secondary)
+
+                        // Usage indicator dot
+                        Circle()
+                            .fill(usageColor)
+                            .frame(width: 10, height: 10)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color(.systemBackground), lineWidth: 1.5)
+                            )
+                            .offset(x: 2, y: 2)
+                    }
                 }
             }
 
@@ -197,23 +219,70 @@ struct ScandaLiciousAIChatView: View {
             }
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
+        .alert("Message Limit Reached", isPresented: $showRateLimitAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(rateLimitManager.rateLimitMessage ?? "You've used all your messages for this period. Your limit resets on \(rateLimitManager.resetDateFormatted).")
+        }
         .onAppear {
             viewModel.setTransactions(transactionManager.transactions)
+            // Sync rate limit on appear
+            Task {
+                await rateLimitManager.syncFromBackend()
+            }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Sync rate limit when app returns to foreground
+            Task {
+                await rateLimitManager.syncFromBackend()
+            }
+        }
+    }
+
+    // MARK: - Usage Display Helpers
+
+    private var usageIconName: String {
+        let used = rateLimitManager.usagePercentage
+        if used >= 0.95 {
+            return "exclamationmark.bubble.fill"
+        } else if used >= 0.8 {
+            return "bubble.left.and.exclamationmark.bubble.right.fill"
+        } else {
+            return "bubble.left.fill"
+        }
+    }
+
+    private var usageColor: Color {
+        let used = rateLimitManager.usagePercentage
+        // Interpolate from green (0% used) to red (100% used)
+        // Green: RGB(0.2, 0.8, 0.2) -> Red: RGB(0.9, 0.2, 0.2)
+        let red = 0.2 + (used * 0.7)    // 0.2 -> 0.9
+        let green = 0.8 - (used * 0.6)  // 0.8 -> 0.2
+        let blue = 0.2
+        return Color(red: red, green: green, blue: blue)
     }
     
     private func sendMessage() {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        
+
+        // Check rate limit
+        guard rateLimitManager.canSendMessage(for: subscriptionManager.subscriptionStatus) else {
+            showRateLimitAlert = true
+            return
+        }
+
         messageText = ""
-        
+
+        // Optimistically decrement the local counter
+        rateLimitManager.decrementLocal()
+
         // Smooth transition: hide welcome screen first
         if viewModel.messages.isEmpty {
             withAnimation(.easeInOut(duration: 0.3)) {
                 showWelcome = false
             }
-            
+
             // Wait for welcome screen to fade out before sending
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 completeMessageSend(text: text)

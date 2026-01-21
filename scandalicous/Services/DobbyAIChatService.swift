@@ -75,7 +75,8 @@ enum ChatServiceError: LocalizedError {
     case tokenRefreshFailed
     case serverError(statusCode: Int, message: String)
     case streamingError(String)
-    
+    case rateLimitExceeded(String)
+
     var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -92,15 +93,40 @@ enum ChatServiceError: LocalizedError {
             return "Server error (\(statusCode)): \(message)"
         case .streamingError(let message):
             return "Streaming error: \(message)"
+        case .rateLimitExceeded(let message):
+            return message
         }
+    }
+
+    var isRateLimitError: Bool {
+        if case .rateLimitExceeded = self { return true }
+        return false
     }
 }
 
 // MARK: - Dobby AI Chat Service (Backend Version with Firebase Auth)
 actor DobbyAIChatService {
     static let shared = DobbyAIChatService()
-    
+
     private init() {}
+
+    // MARK: - Rate Limit Header Parsing
+
+    /// Parse X-RateLimit-* headers from response and sync with RateLimitManager
+    private static func parseAndSyncRateLimitHeaders(from response: HTTPURLResponse) async {
+        guard let limitStr = response.value(forHTTPHeaderField: "X-RateLimit-Limit"),
+              let remainingStr = response.value(forHTTPHeaderField: "X-RateLimit-Remaining"),
+              let resetStr = response.value(forHTTPHeaderField: "X-RateLimit-Reset"),
+              let limit = Int(limitStr),
+              let remaining = Int(remainingStr),
+              let reset = TimeInterval(resetStr) else {
+            return
+        }
+
+        await MainActor.run {
+            RateLimitManager.shared.syncFromHeaders(limit: limit, remaining: remaining, resetTimestamp: reset)
+        }
+    }
     
     // MARK: - Get Firebase Auth Token
     private func getAuthToken() async throws -> String {
@@ -165,12 +191,40 @@ actor DobbyAIChatService {
                         continuation.finish(throwing: ChatServiceError.authenticationRequired)
                         return
                     }
-                    
+
+                    // Handle rate limit exceeded (429)
+                    if httpResponse.statusCode == 429 {
+                        // Try to parse the rate limit error response
+                        var errorBody = ""
+                        for try await byte in asyncBytes {
+                            errorBody.append(Character(UnicodeScalar(byte)))
+                        }
+
+                        if let data = errorBody.data(using: .utf8) {
+                            let decoder = JSONDecoder()
+                            decoder.dateDecodingStrategy = .iso8601
+                            if let rateLimitError = try? decoder.decode(RateLimitExceededError.self, from: data) {
+                                // Update rate limit manager on main thread
+                                await MainActor.run {
+                                    RateLimitManager.shared.handleRateLimitExceeded(rateLimitError)
+                                }
+                                continuation.finish(throwing: ChatServiceError.rateLimitExceeded(rateLimitError.message))
+                                return
+                            }
+                        }
+
+                        continuation.finish(throwing: ChatServiceError.rateLimitExceeded("You've reached your message limit for this period."))
+                        return
+                    }
+
                     guard httpResponse.statusCode == 200 else {
                         let errorMessage = "HTTP \(httpResponse.statusCode)"
                         continuation.finish(throwing: ChatServiceError.serverError(statusCode: httpResponse.statusCode, message: errorMessage))
                         return
                     }
+
+                    // Parse rate limit headers and sync
+                    await Self.parseAndSyncRateLimitHeaders(from: httpResponse)
                     
                     // Parse SSE stream
                     var buffer = ""

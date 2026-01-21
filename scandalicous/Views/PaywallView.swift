@@ -199,6 +199,7 @@ struct PaywallView: View {
                     period: "year",
                     weeklyPrice: subscriptionManager.weeklyPrice(for: yearly),
                     badge: "BEST VALUE",
+                    messageLimit: "\(RateLimitConfig.defaultMessagesPerMonth) AI messages/month",
                     isSelected: selectedProduct?.id == yearly.id
                 ) {
                     withAnimation(.spring(response: 0.3)) {
@@ -215,6 +216,7 @@ struct PaywallView: View {
                     period: "month",
                     weeklyPrice: subscriptionManager.weeklyPrice(for: monthly),
                     badge: nil,
+                    messageLimit: "\(RateLimitConfig.defaultMessagesPerMonth) AI messages/month",
                     isSelected: selectedProduct?.id == monthly.id
                 ) {
                     withAnimation(.spring(response: 0.3)) {
@@ -356,6 +358,7 @@ struct CompactPricingCard: View {
     let period: String
     let weeklyPrice: String
     let badge: String?
+    let messageLimit: String
     let isSelected: Bool
     let onSelect: () -> Void
 
@@ -399,9 +402,19 @@ struct CompactPricingCard: View {
                         }
                     }
 
-                    Text("\(weeklyPrice)/week")
-                        .font(.caption)
-                        .foregroundStyle(.purple)
+                    HStack(spacing: 6) {
+                        Text("\(weeklyPrice)/week")
+                            .font(.caption)
+                            .foregroundStyle(.purple)
+
+                        Text("•")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.3))
+
+                        Text(messageLimit)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
                 }
 
                 Spacer()
