@@ -8,6 +8,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import FirebaseAuth
 
 // MARK: - Notification for Receipt Upload Success
 extension Notification.Name {
@@ -24,6 +25,7 @@ enum SortOption: String, CaseIterable {
 
 struct OverviewView: View {
     @EnvironmentObject var transactionManager: TransactionManager
+    @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var dataManager = StoreDataManager()
     @State private var selectedPeriod: String = "January 2026"
     @State private var selectedSort: SortOption = .highestSpend
@@ -33,6 +35,8 @@ struct OverviewView: View {
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var showingAllStoresBreakdown = false
+    @State private var showingProfileMenu = false
+    @Binding var showSignOutConfirmation: Bool
     
     private var availablePeriods: [String] {
         dataManager.breakdownsByPeriod().keys.sorted()
@@ -217,7 +221,7 @@ struct OverviewView: View {
                 .transition(.opacity)
             }
         }
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $selectedBreakdown) { breakdown in
             StoreDetailView(storeBreakdown: breakdown)
         }
@@ -322,10 +326,25 @@ struct OverviewView: View {
             Spacer()
             
             // Profile button
-            NavigationLink {
-                ProfileView()
+            Menu {
+                // User Email
+                if let user = authManager.user {
+                    Section {
+                        Text(user.email ?? "No email")
+                            .font(.headline)
+                    }
+                }
+                
+                // Sign Out
+                Section {
+                    Button(role: .destructive) {
+                        showSignOutConfirmation = true
+                    } label: {
+                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                }
             } label: {
-                Image(systemName: "person.circle")
+                Image(systemName: "person.circle.fill")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white)
                     .padding(10)
@@ -635,9 +654,9 @@ struct TotalSpendingCardButtonStyle: ButtonStyle {
 
 #Preview {
     NavigationStack {
-        OverviewView()
-            .navigationTitle("View")
-            .navigationBarTitleDisplayMode(.large)
+        OverviewView(showSignOutConfirmation: .constant(false))
+            .environmentObject(TransactionManager())
+            .environmentObject(AuthenticationManager())
     }
     .preferredColorScheme(.dark)
 }
