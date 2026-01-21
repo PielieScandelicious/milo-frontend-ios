@@ -39,6 +39,7 @@ struct OverviewView: View {
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var showingAllStoresBreakdown = false
+    @State private var showingAllTransactions = false
     @State private var showingProfileMenu = false
     @Binding var showSignOutConfirmation: Bool
     
@@ -220,38 +221,6 @@ struct OverviewView: View {
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
                 }
-                .overlay {
-                    // Elegant refreshing indicator overlay
-                    if dataManager.isRefreshing {
-                        VStack {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                    .tint(.white)
-                                    .scaleEffect(0.9)
-                                
-                                Text("Refreshing...")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.white)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(
-                                Capsule()
-                                    .fill(Color.black.opacity(0.75))
-                                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-                            )
-                            .padding(.top, 80)
-                            
-                            Spacer()
-                        }
-                        .allowsHitTesting(false)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
-                    }
-                }
-                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: dataManager.isRefreshing)
             }
             
             // Edit mode exit button overlay
@@ -289,6 +258,14 @@ struct OverviewView: View {
         }
         .navigationDestination(isPresented: $showingAllStoresBreakdown) {
             AllStoresBreakdownView(period: selectedPeriod, breakdowns: currentBreakdowns)
+        }
+        .navigationDestination(isPresented: $showingAllTransactions) {
+            TransactionDisplayView(
+                storeName: "All Stores",
+                period: selectedPeriod,
+                category: nil,
+                categoryColor: nil
+            )
         }
         .sheet(isPresented: $showingFilterSheet) {
             FilterSheet(

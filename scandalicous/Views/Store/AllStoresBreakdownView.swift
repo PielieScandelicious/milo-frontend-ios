@@ -11,6 +11,7 @@ struct AllStoresBreakdownView: View {
     let period: String
     let breakdowns: [StoreBreakdown]
     @Environment(\.dismiss) private var dismiss
+    @State private var showingAllTransactions = false
     
     private var totalSpending: Double {
         breakdowns.reduce(0) { $0 + $1.totalStoreSpend }
@@ -75,13 +76,18 @@ struct AllStoresBreakdownView: View {
                     
                     // Large combined donut chart
                     VStack(spacing: 32) {
-                        AllStoresDonutChart(
-                            totalAmount: totalSpending,
-                            segments: storeSegments,
-                            size: 220
-                        )
-                        .padding(.top, 24)
-                        .padding(.bottom, 12)
+                        Button {
+                            showingAllTransactions = true
+                        } label: {
+                            AllStoresDonutChart(
+                                totalAmount: totalSpending,
+                                segments: storeSegments,
+                                size: 220
+                            )
+                            .padding(.top, 24)
+                            .padding(.bottom, 12)
+                        }
+                        .buttonStyle(DonutChartButtonStyle())
                         
                         // Legend
                         VStack(spacing: 12) {
@@ -97,6 +103,14 @@ struct AllStoresBreakdownView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showingAllTransactions) {
+            TransactionDisplayView(
+                storeName: "All Stores",
+                period: period,
+                category: nil,
+                categoryColor: nil
+            )
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {

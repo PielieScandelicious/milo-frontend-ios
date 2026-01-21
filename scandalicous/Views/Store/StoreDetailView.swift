@@ -18,31 +18,39 @@ struct StoreDetailView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header card
-                    VStack(spacing: 12) {
-                        Text(storeBreakdown.storeName)
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                        
-                        Text(storeBreakdown.period)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
-                        
-                        Text(String(format: "€%.0f", storeBreakdown.totalStoreSpend))
-                            .font(.system(size: 48, weight: .heavy, design: .rounded))
-                            .foregroundColor(.white)
-                            .padding(.top, 8)
+                    // Header card - clickable to view all store transactions
+                    NavigationLink(destination: TransactionDisplayView(
+                        storeName: storeBreakdown.storeName,
+                        period: storeBreakdown.period,
+                        category: nil,
+                        categoryColor: nil
+                    )) {
+                        VStack(spacing: 12) {
+                            Text(storeBreakdown.storeName)
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Text(storeBreakdown.period)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                            
+                            Text(String(format: "€%.0f", storeBreakdown.totalStoreSpend))
+                                .font(.system(size: 48, weight: .heavy, design: .rounded))
+                                .foregroundColor(.white)
+                                .padding(.top, 8)
+                        }
+                        .padding(.vertical, 32)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color.white.opacity(0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
                     }
-                    .padding(.vertical, 32)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(Color.white.opacity(0.05))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 24)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
+                    .buttonStyle(StoreHeaderButtonStyle())
                     .padding(.horizontal)
                     
                     // Large donut chart - clickable to view all transactions
@@ -140,6 +148,15 @@ struct StoreDetailView: View {
 }
 
 // MARK: - Custom Button Styles
+struct StoreHeaderButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
 struct CategoryRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
