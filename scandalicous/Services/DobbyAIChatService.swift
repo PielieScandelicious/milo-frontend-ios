@@ -2,11 +2,12 @@
 //  ScandaLiciousAIChatService.swift
 //  Scandalicious
 //
-//  BACKEND VERSION - Uses Railway API
+//  BACKEND VERSION - Uses Railway API with Firebase Auth & SSE Streaming
 //  Created by Gilles Moenaert on 19/01/2026.
 //
 
 import Foundation
+import FirebaseAuth
 
 // Disambiguate Transaction type from SwiftData
 typealias DobbyTransaction = Transaction
@@ -36,7 +37,11 @@ enum ChatRole: String, Codable, Sendable {
 struct ChatRequest: Sendable, Codable {
     let message: String
     let conversationHistory: [BackendChatMessage]
-    let transactions: [TransactionData]
+    
+    enum CodingKeys: String, CodingKey {
+        case message
+        case conversationHistory = "conversation_history"
+    }
 }
 
 struct BackendChatMessage: Sendable, Codable {
@@ -44,19 +49,21 @@ struct BackendChatMessage: Sendable, Codable {
     let content: String
 }
 
-struct TransactionData: Sendable, Codable {
-    let id: String
-    let storeName: String
-    let category: String
-    let itemName: String
-    let amount: Double
-    let date: String
-    let quantity: Int
-    let paymentMethod: String
-}
-
 struct ChatResponse: Sendable, Codable {
     let response: String
+    let createdAt: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case response
+        case createdAt = "created_at"
+    }
+}
+
+// MARK: - SSE Stream Event Models
+struct ChatStreamEvent: Sendable, Codable {
+    let type: String
+    let content: String?
+    let error: String?
 }
 
 // MARK: - Chat Service Errors
@@ -64,7 +71,10 @@ enum ChatServiceError: LocalizedError {
     case invalidURL
     case invalidResponse
     case emptyResponse
+    case authenticationRequired
+    case tokenRefreshFailed
     case serverError(statusCode: Int, message: String)
+    case streamingError(String)
     
     var errorDescription: String? {
         switch self {
@@ -74,40 +84,163 @@ enum ChatServiceError: LocalizedError {
             return "Invalid response from server"
         case .emptyResponse:
             return "Empty response from server"
+        case .authenticationRequired:
+            return "Authentication required. Please sign in again."
+        case .tokenRefreshFailed:
+            return "Failed to refresh authentication token"
         case .serverError(let statusCode, let message):
             return "Server error (\(statusCode)): \(message)"
+        case .streamingError(let message):
+            return "Streaming error: \(message)"
         }
     }
 }
 
-// MARK: - Dobby AI Chat Service (Backend Version)
+// MARK: - Dobby AI Chat Service (Backend Version with Firebase Auth)
 actor DobbyAIChatService {
     static let shared = DobbyAIChatService()
     
     private init() {}
     
-    // MARK: - Send Chat Message (Streaming)
-    func sendMessageStreaming(_ userMessage: String, transactions: [DobbyTransaction], conversationHistory: [ChatMessage]) -> AsyncThrowingStream<String, Error> {
+    // MARK: - Get Firebase Auth Token
+    private func getAuthToken() async throws -> String {
+        guard let user = Auth.auth().currentUser else {
+            throw ChatServiceError.authenticationRequired
+        }
+        
+        do {
+            let token = try await user.getIDToken()
+            return token
+        } catch {
+            print("❌ Failed to get Firebase ID token: \(error)")
+            throw ChatServiceError.tokenRefreshFailed
+        }
+    }
+    
+    // MARK: - Send Chat Message (Streaming) - RECOMMENDED
+    nonisolated func sendMessageStreaming(_ userMessage: String, transactions: [DobbyTransaction], conversationHistory: [ChatMessage]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    // For now, use non-streaming and yield the full response
-                    // You can update this when backend supports streaming
-                    let response = try await sendMessage(userMessage, transactions: transactions, conversationHistory: conversationHistory)
-                    continuation.yield(response)
+                    let endpoint = await MainActor.run { AppConfiguration.chatStreamEndpoint }
+                    guard let url = URL(string: endpoint) else {
+                        continuation.finish(throwing: ChatServiceError.invalidURL)
+                        return
+                    }
+                    
+                    // Get auth token
+                    let authToken = try await DobbyAIChatService.shared.getAuthToken()
+                    
+                    // Convert conversation history to backend format
+                    let backendHistory = conversationHistory
+                        .filter { $0.role != .system }
+                        .map { BackendChatMessage(role: $0.role.rawValue, content: $0.content) }
+                    
+                    // Create request
+                    let chatRequest = ChatRequest(
+                        message: userMessage,
+                        conversationHistory: backendHistory
+                    )
+                    
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+                    request.timeoutInterval = 60 // 60 second timeout for streaming
+                    
+                    let encoder = JSONEncoder()
+                    encoder.keyEncodingStrategy = .convertToSnakeCase
+                    request.httpBody = try encoder.encode(chatRequest)
+                    
+                    // Create streaming session
+                    let (asyncBytes, response) = try await URLSession.shared.bytes(for: request)
+                    
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        continuation.finish(throwing: ChatServiceError.invalidResponse)
+                        return
+                    }
+                    
+                    // Handle authentication errors
+                    if httpResponse.statusCode == 401 {
+                        continuation.finish(throwing: ChatServiceError.authenticationRequired)
+                        return
+                    }
+                    
+                    guard httpResponse.statusCode == 200 else {
+                        let errorMessage = "HTTP \(httpResponse.statusCode)"
+                        continuation.finish(throwing: ChatServiceError.serverError(statusCode: httpResponse.statusCode, message: errorMessage))
+                        return
+                    }
+                    
+                    // Parse SSE stream
+                    var buffer = ""
+                    for try await byte in asyncBytes {
+                        let char = Character(UnicodeScalar(byte))
+                        buffer.append(char)
+                        
+                        // SSE messages end with double newline
+                        if buffer.hasSuffix("\n\n") {
+                            let lines = buffer.components(separatedBy: "\n")
+                            
+                            for line in lines {
+                                // SSE events start with "data: "
+                                if line.hasPrefix("data: ") {
+                                    let jsonString = String(line.dropFirst(6))
+                                    
+                                    if let data = jsonString.data(using: .utf8),
+                                       let event = try? JSONDecoder().decode(ChatStreamEvent.self, from: data) {
+                                        
+                                        switch event.type {
+                                        case "text":
+                                            if let content = event.content {
+                                                continuation.yield(content)
+                                            }
+                                        case "done":
+                                            continuation.finish()
+                                            return
+                                        case "error":
+                                            let errorMsg = event.error ?? "Unknown streaming error"
+                                            continuation.finish(throwing: ChatServiceError.streamingError(errorMsg))
+                                            return
+                                        default:
+                                            print("⚠️ Unknown SSE event type: \(event.type)")
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            buffer = ""
+                        }
+                    }
+                    
+                    // Stream ended without "done" event
                     continuation.finish()
+                    
+                } catch let error as ChatServiceError {
+                    continuation.finish(throwing: error)
                 } catch {
+                    print("❌ Streaming error: \(error)")
                     continuation.finish(throwing: error)
                 }
             }
         }
     }
     
-    // MARK: - Send Chat Message
+    // MARK: - Send Chat Message (Non-streaming) - Fallback
     nonisolated func sendMessage(_ userMessage: String, transactions: [DobbyTransaction], conversationHistory: [ChatMessage]) async throws -> String {
         let endpoint = await MainActor.run { AppConfiguration.chatEndpoint }
         guard let url = URL(string: endpoint) else {
             throw ChatServiceError.invalidURL
+        }
+        
+        // Get auth token with retry logic
+        var authToken: String
+        do {
+            authToken = try await DobbyAIChatService.shared.getAuthToken()
+        } catch {
+            // Try one more time to refresh the token
+            try? await Task.sleep(for: .milliseconds(500))
+            authToken = try await DobbyAIChatService.shared.getAuthToken()
         }
         
         // Convert conversation history to backend format
@@ -115,34 +248,21 @@ actor DobbyAIChatService {
             .filter { $0.role != .system }
             .map { BackendChatMessage(role: $0.role.rawValue, content: $0.content) }
         
-        // Convert transactions to backend format
-        let transactionData = transactions.map { transaction in
-            TransactionData(
-                id: transaction.id.uuidString,
-                storeName: transaction.storeName,
-                category: transaction.category,
-                itemName: transaction.itemName,
-                amount: transaction.amount,
-                date: ISO8601DateFormatter().string(from: transaction.date),
-                quantity: transaction.quantity,
-                paymentMethod: transaction.paymentMethod
-            )
-        }
-        
         // Create request
         let chatRequest = ChatRequest(
             message: userMessage,
-            conversationHistory: backendHistory,
-            transactions: transactionData
+            conversationHistory: backendHistory
         )
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 30
         
-        request.httpBody = try await MainActor.run {
-            try JSONEncoder().encode(chatRequest)
-        }
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        request.httpBody = try encoder.encode(chatRequest)
         
         // Send request
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -151,15 +271,50 @@ actor DobbyAIChatService {
             throw ChatServiceError.invalidResponse
         }
         
+        // Handle authentication errors with retry
+        if httpResponse.statusCode == 401 {
+            print("⚠️ 401 Unauthorized - attempting token refresh...")
+            
+            // Try to refresh token and retry once
+            try? await Task.sleep(for: .milliseconds(500))
+            let newToken = try await DobbyAIChatService.shared.getAuthToken()
+            request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+            
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: request)
+            
+            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                throw ChatServiceError.invalidResponse
+            }
+            
+            if retryHttpResponse.statusCode == 401 {
+                throw ChatServiceError.authenticationRequired
+            }
+            
+            guard retryHttpResponse.statusCode == 200 else {
+                let errorMessage = String(data: retryData, encoding: .utf8) ?? "Unknown error"
+                throw ChatServiceError.serverError(statusCode: retryHttpResponse.statusCode, message: errorMessage)
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let chatResponse = try decoder.decode(ChatResponse.self, from: retryData)
+            
+            guard !chatResponse.response.isEmpty else {
+                throw ChatServiceError.emptyResponse
+            }
+            
+            return chatResponse.response
+        }
+        
         guard httpResponse.statusCode == 200 else {
             let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw ChatServiceError.serverError(statusCode: httpResponse.statusCode, message: errorMessage)
         }
         
         // Parse response
-        let chatResponse = try await MainActor.run {
-            try JSONDecoder().decode(ChatResponse.self, from: data)
-        }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let chatResponse = try decoder.decode(ChatResponse.self, from: data)
         
         guard !chatResponse.response.isEmpty else {
             throw ChatServiceError.emptyResponse

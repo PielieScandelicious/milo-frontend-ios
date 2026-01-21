@@ -68,6 +68,10 @@
 		29B5D5E12F1FFA89000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Authentication/DOBBY_API_DEBUGGING.md,
+				Authentication/DOBBY_API_EXAMPLES.md,
+				Authentication/DOBBY_API_INTEGRATION_SUMMARY.md,
+				Authentication/DOBBY_API_QUICKREF.md,
 				Authentication/KeychainHelper.swift,
 				Models/ReceiptModels.swift,
 				Services/ReceiptUploadService.swift,
