@@ -217,20 +217,30 @@ class TransactionsViewModel: ObservableObject {
             filters.page = 1
             transactions = []
         }
-        
+
         state = .loading
-        
+
         do {
             let response = try await apiService.getTransactions(filters: filters)
-            
+
             if reset {
                 transactions = response.transactions
             } else {
                 transactions.append(contentsOf: response.transactions)
             }
-            
+
             hasMorePages = response.page < response.totalPages
             state = .success(response)
+
+            // Debug: Log transaction totals
+            let sumItemPrice = transactions.reduce(0) { $0 + $1.itemPrice }
+            let sumTotalPrice = transactions.reduce(0) { $0 + $1.totalPrice }
+            let sumQuantity = transactions.reduce(0) { $0 + $1.quantity }
+            print("📊 Transaction Debug (page \(response.page)/\(response.totalPages), total: \(response.total)):")
+            print("   Sum of itemPrice: €\(String(format: "%.2f", sumItemPrice))")
+            print("   Sum of totalPrice (itemPrice × qty): €\(String(format: "%.2f", sumTotalPrice))")
+            print("   Total quantity: \(sumQuantity)")
+            print("   Transaction count loaded: \(transactions.count)")
         } catch {
             state = .error(error.localizedDescription)
         }

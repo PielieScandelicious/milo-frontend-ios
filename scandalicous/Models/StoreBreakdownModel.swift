@@ -119,8 +119,18 @@ class StoreDataManager: ObservableObject {
             let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
             
             print("✅ Received \(summary.stores.count) stores from backend")
-            print("   Total spend: €\(summary.totalSpend)")
+            print("   Total spend (from backend summary): €\(summary.totalSpend)")
             print("   Transaction count: \(summary.transactionCount)")
+
+            // Debug: Calculate sum of individual store amounts
+            let storeSum = summary.stores.reduce(0) { $0 + $1.amountSpent }
+            print("   Sum of store amounts: €\(storeSum)")
+            print("   ⚠️ Difference (summary - stores): €\(summary.totalSpend - storeSum)")
+
+            // Debug: Print each store's amount
+            for store in summary.stores {
+                print("   📍 \(store.storeName): €\(store.amountSpent) (\(store.percentage)%)")
+            }
             
             // Convert API response to StoreBreakdown format
             let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: period)
