@@ -198,6 +198,16 @@ struct ReceiptScanView: View {
                         )
                     }
                     .padding(.horizontal, 20)
+                    
+                    // Digital Receipt Tip
+                    InstructionStep(
+                        number: 4,
+                        icon: "square.and.arrow.up.fill",
+                        iconColor: .purple,
+                        title: "Upload Digital Receipts",
+                        description: "Use the Share button from any app to upload receipts directly."
+                    )
+                    .padding(.horizontal, 20)
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
