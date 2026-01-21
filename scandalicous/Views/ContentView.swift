@@ -11,8 +11,10 @@ import FirebaseAuth
 struct ContentView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @StateObject private var transactionManager = TransactionManager()
+    @StateObject private var dataManager = StoreDataManager()
     @State private var selectedTab: Tab = .view
     @State private var showSignOutConfirmation = false
+    @State private var hasLoadedInitialData = false
     
     enum Tab: Int, Hashable {
         case view = 0
@@ -22,7 +24,7 @@ struct ContentView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            ViewTab(showSignOutConfirmation: $showSignOutConfirmation)
+            ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
                 .tabItem {
                     Label("View", systemImage: "chart.pie.fill")
                 }
@@ -41,7 +43,22 @@ struct ContentView: View {
                 .tag(Tab.dobby)
         }
         .environmentObject(transactionManager)
+        .environmentObject(dataManager)
         .preferredColorScheme(.dark)
+        .onAppear {
+            // Configure data manager on first appear
+            if !hasLoadedInitialData {
+                dataManager.configure(with: transactionManager)
+                
+                // Fetch data in a persistent task
+                Task {
+                    print("🚀 App launched - fetching initial data")
+                    await dataManager.fetchFromBackend(for: .month)
+                    hasLoadedInitialData = true
+                    print("✅ Initial data loaded successfully")
+                }
+            }
+        }
         .onChange(of: selectedTab) { oldValue, newValue in
             print("🔄 Tab changed: \(oldValue.rawValue) → \(newValue.rawValue)")
         }
@@ -58,17 +75,16 @@ struct ContentView: View {
             Text("Are you sure you want to sign out?")
         }
     }
-    
-
 }
 
 // MARK: - View Tab
 struct ViewTab: View {
     @Binding var showSignOutConfirmation: Bool
+    @ObservedObject var dataManager: StoreDataManager
     
     var body: some View {
         NavigationStack {
-            OverviewView(showSignOutConfirmation: $showSignOutConfirmation)
+            OverviewView(dataManager: dataManager, showSignOutConfirmation: $showSignOutConfirmation)
                 .navigationBarTitleDisplayMode(.inline)
         }
         .id("ViewTab") // Prevent recreation

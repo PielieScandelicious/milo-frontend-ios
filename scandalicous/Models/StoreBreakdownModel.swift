@@ -53,9 +53,12 @@ struct Category: Codable, Identifiable, Equatable, Hashable {
 class StoreDataManager: ObservableObject {
     @Published var storeBreakdowns: [StoreBreakdown] = []
     @Published var isLoading = false
+    @Published var isRefreshing = false
     @Published var error: String?
+    @Published var lastFetchDate: Date?
     
-    private var transactionManager: TransactionManager?
+    var transactionManager: TransactionManager?
+    private var hasInitiallyFetched = false
     
     init() {
         // Don't load local JSON anymore - will fetch from backend
@@ -68,10 +71,17 @@ class StoreDataManager: ObservableObject {
     
     // MARK: - Fetch Data from Backend
     
-    /// Fetch analytics data from backend API
+    /// Fetch analytics data from backend API - Initial load
     func fetchFromBackend(for period: PeriodType = .month) async {
+        // Only show full loading indicator on initial fetch
+        let isInitialFetch = !hasInitiallyFetched
+        
         await MainActor.run {
-            isLoading = true
+            if isInitialFetch {
+                isLoading = true
+            } else {
+                isRefreshing = true
+            }
             error = nil
         }
         
@@ -102,22 +112,55 @@ class StoreDataManager: ObservableObject {
             await MainActor.run {
                 self.storeBreakdowns = breakdowns
                 self.isLoading = false
+                self.isRefreshing = false
+                self.lastFetchDate = Date()
+                self.hasInitiallyFetched = true
                 print("✅ Updated storeBreakdowns with \(breakdowns.count) stores")
             }
             
         } catch let apiError as AnalyticsAPIError {
+            // Check if it's a cancellation error
+            if case .networkError(let underlyingError) = apiError,
+               (underlyingError as NSError).code == NSURLErrorCancelled {
+                print("⚠️ Request was cancelled - ignoring error")
+                await MainActor.run {
+                    self.isLoading = false
+                    self.isRefreshing = false
+                }
+                return
+            }
+            
             print("❌ Backend fetch error: \(apiError.localizedDescription)")
             await MainActor.run {
-                self.error = apiError.localizedDescription
+                // Only show error if this is not a refresh (initial load is more important)
+                if isInitialFetch {
+                    self.error = apiError.localizedDescription
+                }
                 self.isLoading = false
+                self.isRefreshing = false
+            }
+        } catch is CancellationError {
+            // Task was cancelled - this is normal, don't show error
+            print("⚠️ Task cancelled - ignoring")
+            await MainActor.run {
+                self.isLoading = false
+                self.isRefreshing = false
             }
         } catch {
             print("❌ Unexpected error fetching from backend: \(error.localizedDescription)")
             await MainActor.run {
-                self.error = error.localizedDescription
+                if isInitialFetch {
+                    self.error = error.localizedDescription
+                }
                 self.isLoading = false
+                self.isRefreshing = false
             }
         }
+    }
+    
+    /// Refresh data from backend - for pull-to-refresh
+    func refreshData(for period: PeriodType = .month) async {
+        await fetchFromBackend(for: period)
     }
     
     // MARK: - Convert API Response to StoreBreakdown

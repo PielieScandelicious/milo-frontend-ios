@@ -26,7 +26,7 @@ enum SortOption: String, CaseIterable {
 struct OverviewView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
-    @StateObject private var dataManager = StoreDataManager()
+    @ObservedObject var dataManager: StoreDataManager
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
@@ -134,7 +134,7 @@ struct OverviewView: View {
                     }
                 }
             
-            // Loading overlay
+            // Loading overlay - only show on initial load
             if dataManager.isLoading {
                 VStack(spacing: 20) {
                     ProgressView()
@@ -147,6 +147,7 @@ struct OverviewView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black.opacity(0.3))
+                .transition(.opacity)
             } else if let error = dataManager.error {
                 // Error state
                 VStack(spacing: 20) {
@@ -177,31 +178,80 @@ struct OverviewView: View {
                     }
                 }
                 .padding()
+                .transition(.opacity)
             } else {
                 // Content
                 ScrollView {
-                VStack(spacing: 0) {
-                    // Liquid Glass Period Filter at the top
-                    liquidGlassPeriodFilter
-                        .padding(.top, 12)
-                        .padding(.bottom, 12)
-                    
-                    // Content
-                    VStack(spacing: 24) {
-                        // Total spending card
-                        totalSpendingCard
+                    VStack(spacing: 0) {
+                        // Liquid Glass Period Filter at the top
+                        liquidGlassPeriodFilter
+                            .padding(.top, 12)
+                            .padding(.bottom, 12)
                         
-                        // Store breakdowns grid
-                        storeBreakdownsGrid
+                        // Content
+                        VStack(spacing: 24) {
+                            // Total spending card
+                            totalSpendingCard
+                            
+                            // Store breakdowns grid
+                            storeBreakdownsGrid
+                        }
+                        .padding(.top, 8)
+                        .padding(.bottom, 32)
                     }
-                    .padding(.top, 8)
-                    .padding(.bottom, 32)
                 }
-            }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.always)
-            .scrollDismissesKeyboard(.interactively)
-            .background(Color(white: 0.05))
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.always)
+                .scrollDismissesKeyboard(.interactively)
+                .background(Color(white: 0.05))
+                .refreshable {
+                    // Pull to refresh - smooth animation
+                    let startTime = Date()
+                    
+                    await dataManager.refreshData(for: .month)
+                    
+                    // Ensure minimum refresh duration for smooth UX (at least 0.8 seconds)
+                    let elapsed = Date().timeIntervalSince(startTime)
+                    if elapsed < 0.8 {
+                        try? await Task.sleep(for: .seconds(0.8 - elapsed))
+                    }
+                    
+                    // Add haptic feedback on completion
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+                .overlay {
+                    // Elegant refreshing indicator overlay
+                    if dataManager.isRefreshing {
+                        VStack {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.9)
+                                
+                                Text("Refreshing...")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.white)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.75))
+                                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+                            )
+                            .padding(.top, 80)
+                            
+                            Spacer()
+                        }
+                        .allowsHitTesting(false)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.9).combined(with: .opacity)
+                        ))
+                    }
+                }
+                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: dataManager.isRefreshing)
             }
             
             // Edit mode exit button overlay
@@ -246,20 +296,18 @@ struct OverviewView: View {
             )
         }
         .onAppear {
-            dataManager.configure(with: transactionManager)
-            updateDisplayedBreakdowns()
-            
-            // Fetch data from backend
-            Task {
-                await dataManager.fetchFromBackend(for: .month)
+            // Configure with transaction manager if not already configured
+            if dataManager.transactionManager == nil {
+                dataManager.configure(with: transactionManager)
             }
+            updateDisplayedBreakdowns()
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
             print("📬 Received receipt upload notification - refreshing backend data")
             Task {
                 // Wait a moment for backend to fully process
                 try? await Task.sleep(for: .seconds(1))
-                await dataManager.fetchFromBackend(for: .month)
+                await dataManager.refreshData(for: .month)
                 print("✅ Backend data refreshed after receipt upload")
             }
         }
@@ -278,10 +326,6 @@ struct OverviewView: View {
                 selectedPeriod = newPeriod
                 print("   📅 Switched to period: \(newPeriod)")
             }
-        }
-        .refreshable {
-            // Pull to refresh - fetch latest data from backend
-            await dataManager.fetchFromBackend(for: .month)
         }
         .onDisappear {
             // Exit edit mode when switching tabs or navigating away
@@ -456,6 +500,14 @@ struct OverviewView: View {
                 Text(selectedPeriod)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
+                
+                // Last updated indicator
+                if let lastFetch = dataManager.lastFetchDate {
+                    Text("Updated \(timeAgo(from: lastFetch))")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(.white.opacity(0.4))
+                        .padding(.top, 4)
+                }
             }
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity)
@@ -470,6 +522,24 @@ struct OverviewView: View {
         }
         .buttonStyle(TotalSpendingCardButtonStyle())
         .padding(.horizontal)
+    }
+    
+    // Helper function to format time ago
+    private func timeAgo(from date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        
+        if seconds < 60 {
+            return "just now"
+        } else if seconds < 3600 {
+            let minutes = seconds / 60
+            return "\(minutes)m ago"
+        } else if seconds < 86400 {
+            let hours = seconds / 3600
+            return "\(hours)h ago"
+        } else {
+            let days = seconds / 86400
+            return "\(days)d ago"
+        }
     }
     
     private var storeBreakdownsGrid: some View {
@@ -706,9 +776,12 @@ struct TotalSpendingCardButtonStyle: ButtonStyle {
 
 #Preview {
     NavigationStack {
-        OverviewView(showSignOutConfirmation: .constant(false))
-            .environmentObject(TransactionManager())
-            .environmentObject(AuthenticationManager())
+        OverviewView(
+            dataManager: StoreDataManager(),
+            showSignOutConfirmation: .constant(false)
+        )
+        .environmentObject(TransactionManager())
+        .environmentObject(AuthenticationManager())
     }
     .preferredColorScheme(.dark)
 }
