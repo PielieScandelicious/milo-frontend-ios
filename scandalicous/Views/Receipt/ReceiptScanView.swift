@@ -124,11 +124,11 @@ struct ReceiptScanView: View {
                         Text("Snap Your Receipt")
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.white)
 
                         Text("Take a photo and we'll extract all items automatically")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.6))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                     }
@@ -147,23 +147,23 @@ struct ReceiptScanView: View {
                         Text("Got a digital receipt?")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.white)
 
                         Text("Use the Share button from any app")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.5))
                     }
 
                     Spacer()
                 }
                 .padding()
-                .background(.ultraThinMaterial)
+                .background(Color.white.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color(white: 0.05))
         }
         .buttonStyle(.plain)
     }

@@ -212,7 +212,7 @@ struct InsightSheetView: View {
                 Divider()
                     .background(Color.white.opacity(0.1))
 
-                Text("Powered by Dobby AI")
+                Text("Powered by Dobby")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.3))
                     .padding(.vertical, 12)

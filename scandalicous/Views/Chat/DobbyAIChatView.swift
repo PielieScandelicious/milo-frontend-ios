@@ -27,6 +27,10 @@ struct ScandaLiciousAIChatView: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
+            // Background
+            Color(white: 0.05)
+                .ignoresSafeArea()
+
             // Main chat area
             ScrollViewReader { proxy in
                 ScrollView {
@@ -130,13 +134,13 @@ struct ScandaLiciousAIChatView: View {
                         .padding(.trailing, 4)
                         .padding(.bottom, 4)
                     }
-                    .background(Color(.systemGray6))
+                    .background(Color.white.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 24))
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
-                .background(Color(.systemBackground))
+                .background(Color(white: 0.05))
             }
         }
         .navigationTitle(viewModel.messages.isEmpty ? "" : "Dobby")
