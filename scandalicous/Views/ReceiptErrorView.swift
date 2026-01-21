@@ -87,7 +87,8 @@ struct ReceiptStatusView: View {
         }
         .padding(.horizontal, 32)
         .padding(.vertical, 32)
-        .frame(maxWidth: 400)
+        .frame(minWidth: 280, maxWidth: 400)
+        .frame(minHeight: processingOrSuccessMinHeight)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .transition(.scale.combined(with: .opacity))
@@ -155,6 +156,18 @@ struct ReceiptStatusView: View {
             return message
         case .failed(let message, _):
             return message
+        }
+    }
+
+    /// Minimum height for processing/success states to ensure smooth transitions
+    private var processingOrSuccessMinHeight: CGFloat? {
+        switch status {
+        case .uploading, .processing, .success:
+            // Consistent min height for states without buttons
+            return 172
+        case .failed:
+            // No min height for failed state (has buttons)
+            return nil
         }
     }
 }
@@ -273,6 +286,7 @@ class ReceiptStatusViewController: UIViewController {
     
     // Constraints that need to be updated based on content visibility
     private var containerBottomConstraint: NSLayoutConstraint?
+    private var containerMinHeightConstraint: NSLayoutConstraint?
     private var messageLabelHeightConstraint: NSLayoutConstraint?
     
     // UI Components
@@ -285,6 +299,7 @@ class ReceiptStatusViewController: UIViewController {
         view.layer.shadowOffset = CGSize(width: 0, height: 10)
         view.layer.shadowRadius = 20
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.clipsToBounds = false
         return view
     }()
     
@@ -391,12 +406,13 @@ class ReceiptStatusViewController: UIViewController {
         messageLabelHeightConstraint = messageLabel.heightAnchor.constraint(equalToConstant: 0)
         messageLabelHeightConstraint?.priority = .defaultHigh
         
+        // Set a fixed width for consistent sizing during state transitions
+        let containerWidth = min(280, UIScreen.main.bounds.width - 64)
+
         NSLayoutConstraint.activate([
             containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            containerView.widthAnchor.constraint(lessThanOrEqualToConstant: 400),
-            containerView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            containerView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+            containerView.widthAnchor.constraint(equalToConstant: containerWidth),
             
             iconContainerView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 32),
             iconContainerView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
@@ -425,8 +441,10 @@ class ReceiptStatusViewController: UIViewController {
             dismissButton.heightAnchor.constraint(equalToConstant: 50),
         ])
         
-        // Don't set a default bottom constraint - we'll set it dynamically based on content
-        // This will be updated in updateUI() depending on what's visible
+        // Set up min height constraint for consistent sizing (used during processing/success states)
+        // Height for: 32 (top padding) + 60 (icon) + 20 (spacing) + ~28 (title) + 32 (bottom padding) = ~172
+        containerMinHeightConstraint = containerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 172)
+        containerMinHeightConstraint?.priority = .defaultHigh
     }
     
     private func updateUI(for status: ReceiptStatusType) {
@@ -436,10 +454,10 @@ class ReceiptStatusViewController: UIViewController {
                 view.removeFromSuperview()
             }
         }
-        
+
         // Deactivate previous bottom constraint
         containerBottomConstraint?.isActive = false
-        
+
         switch status {
         case .uploading(let subtitle):
             titleLabel.text = "Uploading Receipt..."
@@ -450,14 +468,17 @@ class ReceiptStatusViewController: UIViewController {
             activityIndicator.isHidden = false
             retryButton.isHidden = true
             dismissButton.isHidden = true
-            
+
+            // Enable min height for consistent sizing during transitions
+            containerMinHeightConstraint?.isActive = true
+
             // Set bottom constraint from title or message label (no buttons)
             if subtitle.isEmpty {
                 containerBottomConstraint = titleLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
             } else {
                 containerBottomConstraint = messageLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
             }
-            
+
         case .processing(let subtitle):
             titleLabel.text = "Processing..."
             messageLabel.text = subtitle
@@ -467,14 +488,17 @@ class ReceiptStatusViewController: UIViewController {
             activityIndicator.isHidden = false
             retryButton.isHidden = true
             dismissButton.isHidden = true
-            
+
+            // Enable min height for consistent sizing during transitions
+            containerMinHeightConstraint?.isActive = true
+
             // Set bottom constraint from title or message label (no buttons)
             if subtitle.isEmpty {
                 containerBottomConstraint = titleLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
             } else {
                 containerBottomConstraint = messageLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
             }
-            
+
         case .success(let message):
             titleLabel.text = "Success!"
             messageLabel.text = message
@@ -485,14 +509,17 @@ class ReceiptStatusViewController: UIViewController {
             setupSuccessIcon()
             retryButton.isHidden = true
             dismissButton.isHidden = true
-            
+
+            // Enable min height for consistent sizing during transitions
+            containerMinHeightConstraint?.isActive = true
+
             // Set bottom constraint from title or message label (no buttons)
             if message.isEmpty {
                 containerBottomConstraint = titleLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
             } else {
                 containerBottomConstraint = messageLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
             }
-            
+
         case .failed(let message, let canRetry):
             titleLabel.text = "Upload Failed"
             messageLabel.text = message
@@ -504,11 +531,14 @@ class ReceiptStatusViewController: UIViewController {
             retryButton.isHidden = !canRetry || onRetry == nil
             dismissButton.isHidden = false
             dismissButton.setTitle(canRetry ? "Cancel" : "Dismiss", for: .normal)
-            
+
+            // Disable min height for failed state (has buttons, needs more space)
+            containerMinHeightConstraint?.isActive = false
+
             // Set bottom constraint from dismiss button (buttons are visible)
             containerBottomConstraint = dismissButton.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -24)
         }
-        
+
         // Activate the new bottom constraint
         containerBottomConstraint?.isActive = true
     }
