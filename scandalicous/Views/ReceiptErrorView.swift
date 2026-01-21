@@ -384,6 +384,13 @@ class ReceiptStatusViewController: UIViewController {
     
     func updateStatus(_ newStatus: ReceiptStatusType) {
         currentStatus = newStatus
+
+        // Trigger haptic feedback immediately on success
+        if case .success = newStatus {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        }
+
         UIView.transition(with: containerView, duration: 0.3, options: .transitionCrossDissolve) {
             self.updateUI(for: newStatus)
         }
