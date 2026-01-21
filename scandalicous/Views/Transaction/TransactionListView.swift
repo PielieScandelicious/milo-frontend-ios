@@ -15,9 +15,21 @@ struct TransactionListView: View {
     
     @StateObject private var viewModel = TransactionsViewModel()
     @Environment(\.dismiss) private var dismiss
+    @State private var searchText: String = ""
+    @FocusState private var isSearchFocused: Bool
     
     private var transactions: [APITransaction] {
-        viewModel.transactions
+        let baseTransactions = viewModel.transactions
+        
+        // Filter by search text
+        if searchText.isEmpty {
+            return baseTransactions
+        } else {
+            return baseTransactions.filter {
+                $0.itemName.localizedCaseInsensitiveContains(searchText) ||
+                $0.category.localizedCaseInsensitiveContains(searchText)
+            }
+        }
     }
     
     private var totalAmount: Double {
@@ -69,6 +81,9 @@ struct TransactionListView: View {
                     // Header
                     headerSection
                     
+                    // Search bar
+                    searchBar
+                    
                     emptyState
                 }
             } else {
@@ -78,35 +93,33 @@ struct TransactionListView: View {
                         // Header
                         headerSection
                         
+                        // Search bar
+                        searchBar
+                        
                         // Transaction list
                         LazyVStack(spacing: 24) {
                             ForEach(groupedTransactions, id: \.0) { date, dayTransactions in
                                 transactionSection(date: date, transactions: dayTransactions)
+                                    .onAppear {
+                                        // Auto-load more when reaching near the end
+                                        if date == groupedTransactions.last?.0 && viewModel.hasMorePages {
+                                            Task {
+                                                await viewModel.loadNextPage()
+                                            }
+                                        }
+                                    }
                             }
                             
-                            // Load more button
-                            if viewModel.hasMorePages {
-                                Button {
-                                    Task {
-                                        await viewModel.loadNextPage()
-                                    }
-                                } label: {
-                                    if viewModel.state.isLoading {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    } else {
-                                        Text("Load More")
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundColor(.white)
-                                    }
+                            // Loading indicator at bottom when fetching more
+                            if viewModel.state.isLoading && !viewModel.transactions.isEmpty {
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(1.2)
+                                    Spacer()
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.white.opacity(0.1))
-                                )
-                                .padding(.horizontal, 20)
+                                .padding(.vertical, 20)
                             }
                         }
                         .padding(.top, 20)
@@ -262,22 +275,70 @@ struct TransactionListView: View {
     
     private var emptyState: some View {
         VStack(spacing: 16) {
-            Image(systemName: "cart.fill.badge.questionmark")
+            Image(systemName: searchText.isEmpty ? "cart.fill.badge.questionmark" : "magnifyingglass")
                 .font(.system(size: 60))
                 .foregroundColor(.white.opacity(0.3))
                 .padding(.top, 60)
             
-            Text("No Transactions")
+            Text(searchText.isEmpty ? "No Transactions" : "No Results")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundColor(.white)
             
-            Text("No transactions found for this period")
+            Text(searchText.isEmpty ? "No transactions found for this period" : "Try adjusting your search")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
         }
         .frame(maxHeight: .infinity)
+    }
+    
+    private var searchBar: some View {
+        HStack(spacing: 12) {
+            // Search icon
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(searchText.isEmpty ? .white.opacity(0.4) : .white.opacity(0.6))
+            
+            // Text field
+            TextField("Search transactions", text: $searchText)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.white)
+                .accentColor(.blue)
+                .focused($isSearchFocused)
+                .autocorrectionDisabled()
+            
+            // Clear button
+            if !searchText.isEmpty {
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        searchText = ""
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    isSearchFocused ? Color.blue.opacity(0.5) : Color.white.opacity(0.15),
+                    lineWidth: isSearchFocused ? 2 : 1
+                )
+        )
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+        .animation(.spring(response: 0.3), value: isSearchFocused)
     }
     
     private func transactionSection(date: String, transactions: [APITransaction]) -> some View {

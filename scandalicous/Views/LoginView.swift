@@ -55,17 +55,27 @@ struct LoginView: View {
                     VStack(spacing: 16) {
                         // Email field
                         TextField("Email", text: $email)
-                            .textFieldStyle(.roundedBorder)
+                            .padding()
+                            .background(Color(red: 1.0, green: 1.0, blue: 1.0))
+                            .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.1))
+                            .tint(.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                             .textContentType(.emailAddress)
                             .autocapitalization(.none)
                             .keyboardType(.emailAddress)
                             .disabled(isLoading)
+                            .colorScheme(.light)
                         
                         // Password field
                         SecureField("Password", text: $password)
-                            .textFieldStyle(.roundedBorder)
+                            .padding()
+                            .background(Color(red: 1.0, green: 1.0, blue: 1.0))
+                            .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.1))
+                            .tint(.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                             .textContentType(isSignUp ? .newPassword : .password)
                             .disabled(isLoading)
+                            .colorScheme(.light)
                         
                         // Error message
                         if !errorMessage.isEmpty {
@@ -131,8 +141,12 @@ struct LoginView: View {
                             await handleGoogleSignIn()
                         }
                     } label: {
-                        HStack {
-                            Image(systemName: "globe")
+                        HStack(spacing: 12) {
+                            // Modern Google G logo
+                            Image(systemName: "g.circle")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.black)
+                            
                             Text("Continue with Google")
                                 .fontWeight(.semibold)
                         }
@@ -159,7 +173,7 @@ struct LoginView: View {
                             }
                         }
                     )
-                    .signInWithAppleButtonStyle(.white)
+                    .signInWithAppleButtonStyle(.black)
                     .frame(height: 50)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal, 32)

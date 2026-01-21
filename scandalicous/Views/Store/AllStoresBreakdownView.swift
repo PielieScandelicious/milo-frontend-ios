@@ -134,18 +134,6 @@ struct AllStoresBreakdownView: View {
                 )
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(.white.opacity(0.6))
-                        .symbolRenderingMode(.hierarchical)
-                }
-            }
-        }
     }
     
     private func storeRow(segment: StoreChartSegment) -> some View {

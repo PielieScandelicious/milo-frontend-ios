@@ -369,43 +369,65 @@ struct MessageBubbleView: View {
     @State private var isVisible = false
     @EnvironmentObject var viewModel: ChatViewModel
     
+    // Check if this message is currently streaming
+    private var isStreaming: Bool {
+        message.id == viewModel.streamingMessageId && viewModel.isLoading
+    }
+    
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            if message.role == .user {
-                Spacer(minLength: 20)
-            }
-            
-            // Message content with smooth slide-in animation
-            Group {
-                if message.role == .assistant && message.content.isEmpty && message.id == viewModel.streamingMessageId && viewModel.isLoading {
-                    // Show typing indicator inline
-                    TypingDotsView()
-                } else if message.role == .assistant {
-                    MarkdownMessageView(content: message.content)
-                        .textSelection(.enabled)
-                } else {
-                    Text(message.content)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.primary)
-                        .textSelection(.enabled)
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                if message.role == .user {
+                    Spacer(minLength: 20)
+                }
+                
+                // Message content with smooth slide-in animation
+                VStack(alignment: .leading, spacing: 0) {
+                    Group {
+                        if message.role == .assistant && message.content.isEmpty && message.id == viewModel.streamingMessageId && viewModel.isLoading {
+                            // Show typing indicator inline
+                            TypingDotsView()
+                        } else if message.role == .assistant {
+                            MarkdownMessageView(content: message.content)
+                                .textSelection(.enabled)
+                        } else {
+                            Text(message.content)
+                                .font(.system(size: 16))
+                                .foregroundStyle(.primary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    
+                    // Extra padding at the bottom INSIDE the bubble while streaming
+                    if isStreaming && !message.content.isEmpty {
+                        Color.clear
+                            .frame(height: 150)
+                    }
+                }
+                .opacity(isVisible ? 1.0 : 0.0)
+                .offset(x: isVisible ? 0 : (message.role == .assistant ? -30 : 30))
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 0.8).delay(0.1)) {
+                        isVisible = true
+                    }
+                }
+                
+                if message.role == .assistant {
+                    Spacer(minLength: 20)
                 }
             }
-            .opacity(isVisible ? 1.0 : 0.0)
-            .offset(x: isVisible ? 0 : (message.role == .assistant ? -30 : 30))
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.8).delay(0.1)) {
-                    isVisible = true
-                }
-            }
+            .padding(.vertical, 16)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
+            .background(message.role == .assistant ? Color(.systemGray6).opacity(0.5) : Color.clear)
             
-            if message.role == .assistant {
-                Spacer(minLength: 20)
+            // Extra padding OUTSIDE the bubble for scrolling breathing room
+            if isStreaming {
+                Color.clear
+                    .frame(height: 100)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
-        .background(message.role == .assistant ? Color(.systemGray6).opacity(0.5) : Color.clear)
     }
 }
 
