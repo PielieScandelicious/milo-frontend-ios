@@ -56,6 +56,7 @@ struct OverviewView: View {
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var showingAllStoresBreakdown = false
     @State private var showingAllTransactions = false
+    @State private var showingHealthScoreTransactions = false
     @State private var showingProfileMenu = false
     @State private var breakdownToDelete: StoreBreakdown?
     @State private var showingDeleteConfirmation = false
@@ -362,6 +363,15 @@ struct OverviewView: View {
                 period: selectedPeriod,
                 category: nil,
                 categoryColor: nil
+            )
+        }
+        .navigationDestination(isPresented: $showingHealthScoreTransactions) {
+            TransactionListView(
+                storeName: "All Stores",
+                period: selectedPeriod,
+                category: nil,
+                categoryColor: nil,
+                sortOrder: .healthScoreDescending
             )
         }
         .sheet(isPresented: $showingFilterSheet) {
@@ -681,73 +691,78 @@ struct OverviewView: View {
         // Use the average health score from the data manager (fetched from backend)
         let averageScore: Double? = dataManager.averageHealthScore
 
-        return VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(averageScore.healthScoreColor)
+        return Button {
+            showingHealthScoreTransactions = true
+        } label: {
+            VStack(spacing: 12) {
+                HStack {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(averageScore.healthScoreColor)
 
-                Text("Health Score")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
-                    .textCase(.uppercase)
-                    .tracking(1)
+                    Text("Health Score")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .textCase(.uppercase)
+                        .tracking(1)
 
-                Spacer()
+                    Spacer()
 
-                if let score = averageScore {
-                    Text(score.healthScoreLabel)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(score.healthScoreColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(score.healthScoreColor.opacity(0.15))
-                        )
-                }
-            }
-
-            HStack(alignment: .center, spacing: 16) {
-                HealthScoreGauge(
-                    score: averageScore,
-                    size: 70,
-                    showTrend: false,
-                    showLabel: false
-                )
-
-                VStack(alignment: .leading, spacing: 6) {
                     if let score = averageScore {
-                        Text("\(score.formattedHealthScore) / 5.0")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-
-                        Text("Average for \(selectedPeriod)")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                    } else {
-                        Text("No Data Yet")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.5))
-
-                        Text("Upload receipts to see your health score")
+                        Text(score.healthScoreLabel)
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(score.healthScoreColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(score.healthScoreColor.opacity(0.15))
+                            )
                     }
                 }
 
-                Spacer()
+                HStack(alignment: .center, spacing: 16) {
+                    HealthScoreGauge(
+                        score: averageScore,
+                        size: 70,
+                        showTrend: false,
+                        showLabel: false
+                    )
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let score = averageScore {
+                            Text("\(score.formattedHealthScore) / 5.0")
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+
+                            Text("Average for \(selectedPeriod)")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                        } else {
+                            Text("No Data Yet")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.5))
+
+                            Text("Upload receipts to see your health score")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                    }
+
+                    Spacer()
+                }
             }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
+        .buttonStyle(TotalSpendingCardButtonStyle())
         .padding(.horizontal)
     }
 
