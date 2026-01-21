@@ -15,7 +15,7 @@ struct ScandaLiciousApp: App {
     @StateObject private var authManager: AuthenticationManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.scenePhase) private var scenePhase
-    @State private var isCheckingSubscription = true
+    @State private var hasCheckedSubscription = false
 
     init() {
         // Configure Firebase FIRST
@@ -29,14 +29,9 @@ struct ScandaLiciousApp: App {
         WindowGroup {
             ZStack {
                 if authManager.isAuthenticated {
-                    // Show loading while checking subscription
-                    if isCheckingSubscription {
-                        ProgressView("Checking subscription...")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Color(.systemBackground))
-                    }
-                    // Show content only if user has active subscription or trial
-                    else if subscriptionManager.subscriptionStatus.isActive {
+                    // Show content immediately - subscription check happens in background
+                    // Only show paywall after check confirms no active subscription
+                    if !hasCheckedSubscription || subscriptionManager.subscriptionStatus.isActive {
                         ContentView()
                     } else {
                         // Show paywall - user must subscribe to access the app
@@ -56,30 +51,31 @@ struct ScandaLiciousApp: App {
                 // Refresh token when app becomes active
                 if newPhase == .active {
                     authManager.refreshTokenInSharedStorage()
-                    // Also refresh subscription status
+                    // Silently refresh subscription status
                     Task {
                         await subscriptionManager.updateSubscriptionStatus()
                     }
                 }
             }
             .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
-                // When auth state changes, refresh subscription status
+                // When auth state changes, refresh subscription status silently
                 if isAuthenticated {
-                    isCheckingSubscription = true
                     Task {
                         await subscriptionManager.loadProducts()
                         await subscriptionManager.updateSubscriptionStatus()
-                        isCheckingSubscription = false
+                        hasCheckedSubscription = true
                     }
+                } else {
+                    hasCheckedSubscription = false
                 }
             }
             .task {
-                // Load products and check subscription status on app launch
+                // Load products and check subscription status silently on app launch
                 if authManager.isAuthenticated {
                     await subscriptionManager.loadProducts()
                     await subscriptionManager.updateSubscriptionStatus()
                 }
-                isCheckingSubscription = false
+                hasCheckedSubscription = true
             }
         }
     }

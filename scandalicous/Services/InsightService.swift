@@ -15,6 +15,20 @@ enum InsightType {
     case healthScore(score: Double?, period: String, totalItems: Int)
     case storeBreakdown(storeName: String, amount: Double, period: String, healthScore: Double?)
 
+    /// Unique cache key for storing daily insights
+    /// The key is based on the insight type and period, so the same insight type + period combination
+    /// will use the same cached value throughout the day
+    var cacheKey: String {
+        switch self {
+        case .totalSpending(_, let period, _, _):
+            return "daily_insight_totalSpending_\(period)"
+        case .healthScore(_, let period, _):
+            return "daily_insight_healthScore_\(period)"
+        case .storeBreakdown(let storeName, _, let period, _):
+            return "daily_insight_store_\(storeName)_\(period)"
+        }
+    }
+
     var prompt: String {
         switch self {
         case .totalSpending(let amount, let period, let storeCount, let topStore):

@@ -21,7 +21,7 @@ struct InsightButton: View {
             HStack(spacing: 4) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .semibold))
-                Text("Insight")
+                Text("Daily Insight")
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundColor(.white.opacity(0.6))
@@ -59,6 +59,40 @@ struct InsightButtonStyle: ButtonStyle {
 
 // MARK: - Insight Sheet View
 
+// MARK: - Daily Insight Cache
+
+private struct CachedInsight: Codable {
+    let text: String
+    let timestamp: Date
+
+    var isValid: Bool {
+        // Check if the insight was generated today (same calendar day)
+        Calendar.current.isDateInToday(timestamp)
+    }
+}
+
+private enum DailyInsightCache {
+    private static let timestampSuffix = "_timestamp"
+
+    static func load(for key: String) -> CachedInsight? {
+        guard let text = UserDefaults.standard.string(forKey: key),
+              let timestamp = UserDefaults.standard.object(forKey: key + timestampSuffix) as? Date else {
+            return nil
+        }
+        return CachedInsight(text: text, timestamp: timestamp)
+    }
+
+    static func save(text: String, for key: String) {
+        UserDefaults.standard.set(text, forKey: key)
+        UserDefaults.standard.set(Date(), forKey: key + timestampSuffix)
+    }
+
+    static func clear(for key: String) {
+        UserDefaults.standard.removeObject(forKey: key)
+        UserDefaults.standard.removeObject(forKey: key + timestampSuffix)
+    }
+}
+
 struct InsightSheetView: View {
     let insightType: InsightType
 
@@ -69,15 +103,16 @@ struct InsightSheetView: View {
     @State private var contentOpacity: Double = 0
     @State private var contentBlur: Double = 8
     @State private var contentScale: Double = 0.96
+    @State private var isCachedInsight = false
 
     private var title: String {
         switch insightType {
         case .totalSpending:
-            return "Spending Insight"
+            return "Daily Spending Insight"
         case .healthScore:
-            return "Health Insight"
+            return "Daily Health Insight"
         case .storeBreakdown(let storeName, _, _, _):
-            return "\(storeName) Insight"
+            return "\(storeName) Daily Insight"
         }
     }
 
@@ -155,6 +190,8 @@ struct InsightSheetView: View {
                                 contentOpacity = 0
                                 contentBlur = 8
                                 contentScale = 0.96
+                                // Clear cache and fetch fresh on retry
+                                DailyInsightCache.clear(for: insightType.cacheKey)
                                 fetchInsight()
                             } label: {
                                 Text("Try Again")
@@ -212,18 +249,40 @@ struct InsightSheetView: View {
                 Divider()
                     .background(Color.white.opacity(0.1))
 
-                Text("Powered by Dobby")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.3))
-                    .padding(.vertical, 12)
+                VStack(spacing: 4) {
+                    if !isLoading && error == nil {
+                        Text("Today's insight • Refreshes daily")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    Text("Powered by Dobby")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.3))
+                }
+                .padding(.vertical, 12)
             }
         }
         .onAppear {
-            fetchInsight()
+            loadOrFetchInsight()
         }
     }
 
+    private func loadOrFetchInsight() {
+        // Check for cached insight first
+        if let cached = DailyInsightCache.load(for: insightType.cacheKey), cached.isValid {
+            // Use cached insight
+            insightText = cached.text
+            isLoading = false
+            isCachedInsight = true
+            return
+        }
+
+        // No valid cache, fetch new insight
+        fetchInsight()
+    }
+
     private func fetchInsight() {
+        isCachedInsight = false
         Task {
             do {
                 var fullText = ""
@@ -235,6 +294,10 @@ struct InsightSheetView: View {
                             isLoading = false
                         }
                     }
+                }
+                // Save to cache after successful completion
+                await MainActor.run {
+                    DailyInsightCache.save(text: fullText, for: insightType.cacheKey)
                 }
             } catch {
                 await MainActor.run {
