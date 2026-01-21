@@ -24,16 +24,16 @@ struct InsightButton: View {
                 Text("Daily Insight")
                     .font(.system(size: 11, weight: .medium))
             }
-            .foregroundColor(.white.opacity(0.6))
+            .foregroundColor(.purple)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
                 Capsule()
-                    .fill(Color.white.opacity(0.08))
+                    .fill(Color.purple.opacity(0.15))
             )
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(Color.purple.opacity(0.3), lineWidth: 1)
             )
         }
         .buttonStyle(InsightButtonStyle())
