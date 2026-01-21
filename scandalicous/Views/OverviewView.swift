@@ -223,20 +223,12 @@ struct OverviewView: View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
             
-            // Subtle overlay in edit mode - catches taps on empty space
+            // Subtle overlay in edit mode - visual dimming effect
             if isEditMode {
                 Color.black.opacity(0.15)
                     .ignoresSafeArea()
                     .transition(.opacity)
-                    .contentShape(Rectangle()) // Make entire overlay tappable
-                    .onTapGesture {
-                        // Exit edit mode when tapping background
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            isEditMode = false
-                        }
-                    }
-                    .allowsHitTesting(true) // Ensure it catches taps
-                    .zIndex(0.5) // Above background but below content
+                    .allowsHitTesting(false) // Don't block touches - tap handled by ScrollView content
             }
             
             // Loading overlay - only show on initial load
@@ -288,7 +280,7 @@ struct OverviewView: View {
                         liquidGlassPeriodFilter
                             .padding(.top, 12)
                             .padding(.bottom, 12)
-                        
+
                         // Content
                         VStack(spacing: 24) {
                             // Total spending card
@@ -303,12 +295,23 @@ struct OverviewView: View {
                         .padding(.top, 8)
                         .padding(.bottom, 32)
                     }
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // Exit edit mode when tapping empty space in ScrollView
+                        if isEditMode {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                isEditMode = false
+                            }
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                        }
+                    }
                 }
                 .scrollIndicators(.hidden)
                 .scrollBounceBehavior(.always)
                 .scrollDismissesKeyboard(.interactively)
                 .background(Color(white: 0.05))
-                .zIndex(1) // Above the overlay
                 .refreshable {
                     // Pull to refresh - smooth animation
                     let startTime = Date()
@@ -918,21 +921,9 @@ struct OverviewView: View {
                 }
             }
             .padding(.horizontal)
-            
-            // Spacer that catches taps in empty space (in edit mode)
-            if isEditMode {
-                Color.clear
-                    .frame(height: 100)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            isEditMode = false
-                        }
-                    }
-            }
         }
     }
-    
+
 // MARK: - Drop Delegate for Drag and Drop Reordering
 struct DropViewDelegate: DropDelegate {
     let destinationItem: StoreBreakdown
