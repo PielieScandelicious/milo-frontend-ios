@@ -18,7 +18,8 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
     let itemsCount: Int  // Required field from backend (not optional)
     let transactions: [ReceiptTransaction]
     let warnings: [String]  // Required field - always returned as array (may be empty)
-    
+    let averageHealthScore: Double?  // Average health score for food items in the receipt
+
     enum CodingKeys: String, CodingKey {
         case receiptId = "receipt_id"
         case status
@@ -28,18 +29,31 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
         case itemsCount = "items_count"
         case transactions  // Backend returns "transactions"
         case warnings
+        case averageHealthScore = "average_health_score"
     }
-    
+
     var parsedDate: Date? {
         guard let receiptDate = receiptDate else { return nil }
         let formatter = ISO8601DateFormatter()
         return formatter.date(from: receiptDate) ?? parseCustomDateFormat(receiptDate)
     }
-    
+
     private func parseCustomDateFormat(_ dateString: String) -> Date? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.date(from: dateString)
+    }
+
+    /// Calculate average health score from transactions (if not provided by backend)
+    var calculatedAverageHealthScore: Double? {
+        // If backend provides it, use that
+        if let avg = averageHealthScore {
+            return avg
+        }
+        // Otherwise calculate from transactions
+        let scores = transactions.compactMap { $0.healthScore }
+        guard !scores.isEmpty else { return nil }
+        return Double(scores.reduce(0, +)) / Double(scores.count)
     }
 }
 
@@ -61,28 +75,31 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     let quantity: Int
     let unitPrice: Double?
     let category: ReceiptCategory
-    
+    let healthScore: Int?  // 0-5 for food items, nil for non-food
+
     // Generate a unique ID using UUID to handle duplicate items
     let id: UUID
-    
+
     enum CodingKeys: String, CodingKey {
         case itemName = "item_name"
         case itemPrice = "item_price"
         case quantity
         case unitPrice = "unit_price"
         case category
+        case healthScore = "health_score"
     }
-    
+
     // Custom initializer to generate UUID
-    init(itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: ReceiptCategory) {
+    init(itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: ReceiptCategory, healthScore: Int? = nil) {
         self.itemName = itemName
         self.itemPrice = itemPrice
         self.quantity = quantity
         self.unitPrice = unitPrice
         self.category = category
+        self.healthScore = healthScore
         self.id = UUID()
     }
-    
+
     // Decode initializer
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -91,10 +108,11 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         quantity = try container.decode(Int.self, forKey: .quantity)
         unitPrice = try container.decodeIfPresent(Double.self, forKey: .unitPrice)
         category = try container.decode(ReceiptCategory.self, forKey: .category)
+        healthScore = try container.decodeIfPresent(Int.self, forKey: .healthScore)
         // Generate a unique ID for each decoded transaction
         id = UUID()
     }
-    
+
     // Encode function (ID is not encoded, will be regenerated on decode)
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -103,6 +121,7 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         try container.encode(quantity, forKey: .quantity)
         try container.encodeIfPresent(unitPrice, forKey: .unitPrice)
         try container.encode(category, forKey: .category)
+        try container.encodeIfPresent(healthScore, forKey: .healthScore)
     }
 }
 

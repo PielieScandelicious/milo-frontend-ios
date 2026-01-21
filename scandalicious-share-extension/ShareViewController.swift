@@ -12,57 +12,8 @@ import FirebaseAuth
 
 class ShareViewController: UIViewController {
     
-    // MARK: - UI Components
-    private let containerView: UIView = {
-        let view = UIView()
-        view.backgroundColor = UIColor(white: 0.15, alpha: 1.0) // Dark gray background
-        view.layer.cornerRadius = 20
-        view.layer.shadowColor = UIColor.black.cgColor
-        view.layer.shadowOpacity = 0.3
-        view.layer.shadowOffset = CGSize(width: 0, height: 10)
-        view.layer.shadowRadius = 20
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-    
-    private let titleLabel: UILabel = {
-        let label = UILabel()
-        label.text = "Processing..."
-        label.font = .systemFont(ofSize: 22, weight: .semibold)
-        label.textAlignment = .center
-        label.textColor = .white
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let activityIndicator: UIActivityIndicatorView = {
-        let indicator = UIActivityIndicatorView(style: .large)
-        indicator.color = .white
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        return indicator
-    }()
-    
-    private let statusLabel: UILabel = {
-        let label = UILabel()
-        label.text = ""
-        label.font = .systemFont(ofSize: 14, weight: .regular)
-        label.textColor = UIColor(white: 0.7, alpha: 1.0) // Light gray
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let checkmarkView: UIImageView = {
-        let imageView = UIImageView()
-        let config = UIImage.SymbolConfiguration(pointSize: 60, weight: .bold)
-        imageView.image = UIImage(systemName: "checkmark.circle.fill", withConfiguration: config)
-        imageView.tintColor = UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0) // Modern green
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.alpha = 0
-        return imageView
-    }()
+    // MARK: - UI Components (Unified Status View)
+    private var statusVC: ReceiptStatusViewController?
     
     
     // MARK: - Lifecycle
@@ -77,8 +28,6 @@ class ShareViewController: UIViewController {
         
         // Debug: Check authentication status
         debugAuthenticationStatus()
-        
-        setupUI()
     }
     
     // MARK: - Debug Authentication
@@ -208,89 +157,22 @@ class ShareViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
-        // Animate in the container
-        animateIn()
+        // Show initial status - just "Processing..."
+        showStatus(.processing(subtitle: ""))
         
-        // Start processing after animation begins
-        Task {
-            // Small delay to ensure animation is visible
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-            processSharedContent()
-        }
-    }
-    
-    // MARK: - UI Setup
-    private func setupUI() {
-        view.backgroundColor = UIColor.black.withAlphaComponent(0)
-        
-        view.addSubview(containerView)
-        containerView.addSubview(titleLabel)
-        containerView.addSubview(activityIndicator)
-        containerView.addSubview(checkmarkView)
-        containerView.addSubview(statusLabel)
-        
-        NSLayoutConstraint.activate([
-            containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            containerView.widthAnchor.constraint(equalToConstant: 300),
-            containerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 150),
-            
-            // Title label now at the top with minimal padding
-            titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 24),
-            titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
-            titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
-            
-            activityIndicator.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
-            activityIndicator.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            
-            checkmarkView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
-            checkmarkView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            checkmarkView.widthAnchor.constraint(equalToConstant: 60),
-            checkmarkView.heightAnchor.constraint(equalToConstant: 60),
-            
-            statusLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 16),
-            statusLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
-            statusLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
-            statusLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -24)
-        ])
-        
-        // Start with container hidden for animation
-        containerView.alpha = 0
-        containerView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
-        
-        activityIndicator.startAnimating()
-    }
-    
-    // MARK: - Animations
-    private func animateIn() {
-        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.75, initialSpringVelocity: 0, options: .curveEaseOut) {
-            self.view.backgroundColor = UIColor.black.withAlphaComponent(0.75) // Darker overlay
-            self.containerView.alpha = 1
-            self.containerView.transform = .identity
-        }
+        // Start processing immediately
+        processSharedContent()
     }
     
     // MARK: - Process Shared Content
     private func processSharedContent() {
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
             updateStatus(error: "No content found")
-            Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                await MainActor.run {
-                    self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 1, userInfo: nil))
-                }
-            }
             return
         }
         
         guard let itemProvider = extensionItem.attachments?.first else {
             updateStatus(error: "No attachment found")
-            Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                await MainActor.run {
-                    self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 1, userInfo: nil))
-                }
-            }
             return
         }
         
@@ -335,12 +217,6 @@ class ShareViewController: UIViewController {
         else {
             let types = itemProvider.registeredTypeIdentifiers.joined(separator: ", ")
             updateStatus(error: "Unsupported content type. Found: \(types)")
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                await MainActor.run {
-                    self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 3, userInfo: nil))
-                }
-            }
         }
     }
     
@@ -350,12 +226,6 @@ class ShareViewController: UIViewController {
             
             if let error = error {
                 self.updateStatus(error: "Failed to load image: \(error.localizedDescription)")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: error)
-                    }
-                }
                 return
             }
             
@@ -377,12 +247,6 @@ class ShareViewController: UIViewController {
             
             guard let receiptImage = image else {
                 self.updateStatus(error: "Could not load image from file")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 2, userInfo: nil))
-                    }
-                }
                 return
             }
             
@@ -399,23 +263,11 @@ class ShareViewController: UIViewController {
             
             if let error = error {
                 self.updateStatus(error: "Failed to load PDF: \(error.localizedDescription)")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: error)
-                    }
-                }
                 return
             }
             
             guard let url = item as? URL else {
                 self.updateStatus(error: "Could not load PDF from file")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 4, userInfo: nil))
-                    }
-                }
                 return
             }
             
@@ -432,23 +284,11 @@ class ShareViewController: UIViewController {
             
             if let error = error {
                 self.updateStatus(error: "Failed to load URL: \(error.localizedDescription)")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: error)
-                    }
-                }
                 return
             }
             
             guard let url = item as? URL else {
                 self.updateStatus(error: "Invalid URL")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 5, userInfo: nil))
-                    }
-                }
                 return
             }
             
@@ -462,12 +302,6 @@ class ShareViewController: UIViewController {
             
             guard let receiptImage = image else {
                 self.updateStatus(error: "Could not load image from URL")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 6, userInfo: nil))
-                    }
-                }
                 return
             }
             
@@ -485,24 +319,12 @@ class ShareViewController: UIViewController {
             if let error = error {
                 print("❌ Failed to load file URL: \(error)")
                 self.updateStatus(error: "Failed to load file: \(error.localizedDescription)")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: error)
-                    }
-                }
                 return
             }
             
             guard let fileURL = item as? URL else {
                 print("❌ Item is not a URL")
                 self.updateStatus(error: "Invalid file URL")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 7, userInfo: nil))
-                    }
-                }
                 return
             }
             
@@ -524,12 +346,6 @@ class ShareViewController: UIViewController {
                 } else {
                     print("❌ Could not create image from file data")
                     self.updateStatus(error: "Could not load image from file")
-                    Task {
-                        try? await Task.sleep(nanoseconds: 2_000_000_000)
-                        await MainActor.run {
-                            self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 8, userInfo: nil))
-                        }
-                    }
                 }
             } else if pathExtension == "pdf" {
                 // Upload PDF directly without conversion
@@ -540,12 +356,6 @@ class ShareViewController: UIViewController {
             } else {
                 print("❌ Unsupported file type: \(pathExtension)")
                 self.updateStatus(error: "Unsupported file type: .\(pathExtension)")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 10, userInfo: nil))
-                    }
-                }
             }
         }
     }
@@ -571,12 +381,6 @@ class ShareViewController: UIViewController {
                     return
                 }
                 self.updateStatus(error: "Failed to load data: \(error.localizedDescription)")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: error)
-                    }
-                }
                 return
             }
             
@@ -633,12 +437,6 @@ class ShareViewController: UIViewController {
                     return
                 }
                 self.updateStatus(error: "Could not extract image data")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 11, userInfo: nil))
-                    }
-                }
                 return
             }
             
@@ -662,12 +460,6 @@ class ShareViewController: UIViewController {
                 }
                 
                 self.updateStatus(error: "Could not create image from data")
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        self.extensionContext?.cancelRequest(withError: NSError(domain: "ShareExtension", code: 12, userInfo: nil))
-                    }
-                }
             }
         }
     }
@@ -740,22 +532,16 @@ class ShareViewController: UIViewController {
         print("📄 uploadPDFReceipt started for: \(pdfURL)")
         
         do {
-            // Add a delay to ensure UI is visible before processing
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-            
             // Upload PDF directly to API
             print("☁️ Uploading PDF receipt to server...")
             let response = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
             print("✅ PDF uploaded successfully - Receipt ID: \(response.receiptId)")
             
-            // Success! Show success state
-            await showSuccess(message: "PDF receipt uploaded successfully!")
+            // Show success
+            updateStatus(.success(message: ""))
             
             // Keep success visible
-            try? await Task.sleep(nanoseconds: 900_000_000) // 0.9 seconds
-            
-            // Animate dismissal
-            await animateDismissal()
+            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
             
             // Complete the request
             await MainActor.run {
@@ -766,28 +552,13 @@ class ShareViewController: UIViewController {
             
         } catch let error as ReceiptUploadError {
             print("❌ ReceiptUploadError: \(error.localizedDescription)")
-            updateStatus(error: error.localizedDescription)
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            await animateDismissal()
-            await MainActor.run {
-                self.extensionContext?.cancelRequest(withError: error)
-            }
+            updateStatus(.failed(message: getUserFriendlyError(from: error), canRetry: false))
         } catch let error as ReceiptError {
             print("❌ ReceiptError: \(error.localizedDescription)")
-            updateStatus(error: error.errorDescription ?? "Unknown error")
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            await animateDismissal()
-            await MainActor.run {
-                self.extensionContext?.cancelRequest(withError: error)
-            }
+            updateStatus(.failed(message: getUserFriendlyError(from: error), canRetry: false))
         } catch {
             print("❌ Error: \(error.localizedDescription)")
-            updateStatus(error: "Failed to upload PDF: \(error.localizedDescription)")
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            await animateDismissal()
-            await MainActor.run {
-                self.extensionContext?.cancelRequest(withError: error)
-            }
+            updateStatus(.failed(message: "Unable to upload PDF. Please try again.", canRetry: false))
         }
     }
     
@@ -796,43 +567,24 @@ class ShareViewController: UIViewController {
         print("💾 uploadReceiptImage started")
         
         do {
-            // Show image preview with animation
-            print("📸 Showing image preview...")
-            await showImagePreview(image)
-            print("📸 Image preview shown")
-            
-            // Add a delay to ensure UI is visible before processing
-            print("⏳ Waiting before upload...")
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-            
             // Validate image
             guard image.size.width > 0 && image.size.height > 0 else {
                 throw ReceiptError.invalidImage
             }
             
-            // ✅ UPLOAD TO API ONLY - No local storage
             print("☁️ Uploading receipt to server...")
             let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
             print("✅ Receipt uploaded successfully - Receipt ID: \(response.receiptId)")
             
-            print("✅ Receipt uploaded, showing success animation...")
+            // Show success
+            updateStatus(.success(message: ""))
             
-            // Success! Show success state with animation and WAIT for it
-            await showSuccess(message: "Receipt uploaded successfully!")
+            print("✅ Success shown, waiting 1.5 seconds...")
             
-            print("✅ Success animation complete, waiting 0.9 seconds...")
+            // Keep success visible
+            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
             
-            // Keep success fully visible - 0.9 seconds for quick but readable feedback
-            try? await Task.sleep(nanoseconds: 900_000_000) // 0.9 seconds
-            
-            print("✅ Starting dismissal animation...")
-            
-            // Animate dismissal and wait for it
-            await animateDismissal()
-            
-            print("✅ Dismissal complete, completing request...")
-            
-            // NOW complete the request after everything is done
+            // Complete the request
             await MainActor.run {
                 self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
             }
@@ -841,105 +593,90 @@ class ShareViewController: UIViewController {
             
         } catch let error as ReceiptError {
             print("❌ ReceiptError: \(error.localizedDescription)")
-            updateStatus(error: error.errorDescription ?? "Unknown error")
-            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
-            await animateDismissal()
-            await MainActor.run {
-                self.extensionContext?.cancelRequest(withError: error)
-            }
+            updateStatus(.failed(message: getUserFriendlyError(from: error), canRetry: false))
+        } catch let error as ReceiptUploadError {
+            print("❌ ReceiptUploadError: \(error.localizedDescription)")
+            updateStatus(.failed(message: getUserFriendlyError(from: error), canRetry: false))
         } catch {
             print("❌ Error: \(error.localizedDescription)")
-            updateStatus(error: "Failed to upload: \(error.localizedDescription)")
-            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
-            await animateDismissal()
-            await MainActor.run {
-                self.extensionContext?.cancelRequest(withError: error)
-            }
-        }
-    }
-    
-    // MARK: - Show Image Preview
-    @MainActor
-    private func showImagePreview(_ image: UIImage) async {
-        // Image preview removed for cleaner UI
-        // Small delay to ensure UI updates
-        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-    }
-    
-    // MARK: - Animate Dismissal
-    @MainActor
-    private func animateDismissal() async {
-        print("👋 Starting dismissal animation")
-        
-        // Smooth fade out animation
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            UIView.animate(withDuration: 0.4) {
-                self.containerView.alpha = 0
-                self.view.backgroundColor = UIColor.black.withAlphaComponent(0)
-            } completion: { finished in
-                print("👋 Dismissal animation finished: \(finished)")
-                continuation.resume()
-            }
+            updateStatus(.failed(message: "Unable to upload receipt. Please try again.", canRetry: false))
         }
     }
 
-
+    // MARK: - Status Management
     
-    // MARK: - Update UI Status
-    private func updateStatus(message: String) {
+    private func showStatus(_ status: ReceiptStatusType) {
         DispatchQueue.main.async {
-            self.statusLabel.text = message
+            if self.statusVC == nil {
+                let vc = ReceiptStatusViewController(
+                    status: status,
+                    onRetry: nil,
+                    onDismiss: { [weak self] in
+                        self?.extensionContext?.cancelRequest(withError: NSError(
+                            domain: "ShareExtension",
+                            code: 1,
+                            userInfo: nil
+                        ))
+                    }
+                )
+                vc.modalPresentationStyle = .overFullScreen
+                vc.modalTransitionStyle = .crossDissolve
+                self.present(vc, animated: true)
+                self.statusVC = vc
+            } else {
+                self.statusVC?.updateStatus(status)
+            }
         }
+    }
+    
+    private func updateStatus(_ newStatus: ReceiptStatusType) {
+        showStatus(newStatus)
+    }
+    
+    // MARK: - User-Friendly Error Messages
+    
+    private func getUserFriendlyError(from error: Error) -> String {
+        if let receiptError = error as? ReceiptError {
+            switch receiptError {
+            case .invalidImage:
+                return "The image appears to be invalid. Please try again."
+            case .uploadFailed:
+                return "Unable to upload receipt. Please try again."
+            }
+        }
+        
+        if let uploadError = error as? ReceiptUploadError {
+            switch uploadError {
+            case .noImage:
+                return "No image provided. Please try again."
+            case .invalidResponse:
+                return "Unable to process receipt. Please try again."
+            case .noAuthToken:
+                return "Please sign in again in the main app."
+            case .serverError:
+                return "Unable to upload receipt. Please try again later."
+            case .networkError:
+                return "Please check your internet connection and try again."
+            }
+        }
+        
+        // Generic user-friendly message
+        return "Unable to upload receipt. Please try again."
+    }
+    
+    // MARK: - Update UI Status (Legacy - kept for error cases)
+    
+    private func updateStatus(message: String) {
+        updateStatus(.uploading(subtitle: message))
     }
     
     private func updateStatus(error: String) {
-        DispatchQueue.main.async {
-            self.titleLabel.text = "Error"
-            self.titleLabel.textColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0) // Modern red
-            self.statusLabel.text = error
-            self.statusLabel.textColor = UIColor(white: 0.8, alpha: 1.0)
-            self.activityIndicator.stopAnimating()
-        }
-    }
-    
-    // MARK: - Show Success
-    @MainActor
-    private func showSuccess(message: String) async {
-        print("🎉 showSuccess called")
+        // Convert to user-friendly message
+        let friendlyMessage = error.contains("Server error:") || error.contains("HTTP") || error.contains("URLSession")
+            ? "Unable to upload receipt. Please try again later."
+            : error
         
-        // Immediate haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.prepare()
-        generator.notificationOccurred(.success)
-        
-        // Update text - keep it simple
-        titleLabel.text = "Success!"
-        statusLabel.text = ""
-        
-        // Hide spinner
-        activityIndicator.stopAnimating()
-        
-        print("🎉 Starting instant checkmark animation")
-        
-        // Start slightly smaller for quick scale animation
-        checkmarkView.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
-        
-        // Very fast, snappy animation - 0.2 seconds
-        return await withCheckedContinuation { continuation in
-            UIView.animate(
-                withDuration: 0.2,
-                delay: 0,
-                usingSpringWithDamping: 0.7,
-                initialSpringVelocity: 1.0,
-                options: [.curveEaseOut, .allowUserInteraction]
-            ) {
-                self.checkmarkView.alpha = 1
-                self.checkmarkView.transform = .identity
-            } completion: { finished in
-                print("🎉 Checkmark animation finished: \(finished)")
-                continuation.resume()
-            }
-        }
+        updateStatus(.failed(message: friendlyMessage, canRetry: false))
     }
 }
 

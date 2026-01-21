@@ -14,22 +14,34 @@ struct StoreBreakdown: Codable, Identifiable, Equatable, Hashable {
     let totalStoreSpend: Double
     let categories: [Category]
     let visitCount: Int
-    
+    let averageHealthScore: Double?  // Average health score for this store
+
     var id: String { "\(storeName)-\(period)" }
-    
+
     enum CodingKeys: String, CodingKey {
         case storeName = "store_name"
         case period
         case totalStoreSpend = "total_store_spend"
         case categories
         case visitCount = "visit_count"
+        case averageHealthScore = "average_health_score"
     }
-    
+
+    // Initializer with default nil for averageHealthScore
+    init(storeName: String, period: String, totalStoreSpend: Double, categories: [Category], visitCount: Int, averageHealthScore: Double? = nil) {
+        self.storeName = storeName
+        self.period = period
+        self.totalStoreSpend = totalStoreSpend
+        self.categories = categories
+        self.visitCount = visitCount
+        self.averageHealthScore = averageHealthScore
+    }
+
     // Equatable conformance
     static func == (lhs: StoreBreakdown, rhs: StoreBreakdown) -> Bool {
         return lhs.id == rhs.id
     }
-    
+
     // Hashable conformance
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -56,7 +68,8 @@ class StoreDataManager: ObservableObject {
     @Published var isRefreshing = false
     @Published var error: String?
     @Published var lastFetchDate: Date?
-    
+    @Published var averageHealthScore: Double?  // Overall average health score for the current period
+
     var transactionManager: TransactionManager?
     private var hasInitiallyFetched = false
     
@@ -111,11 +124,15 @@ class StoreDataManager: ObservableObject {
             
             await MainActor.run {
                 self.storeBreakdowns = breakdowns
+                self.averageHealthScore = summary.averageHealthScore
                 self.isLoading = false
                 self.isRefreshing = false
                 self.lastFetchDate = Date()
                 self.hasInitiallyFetched = true
                 print("✅ Updated storeBreakdowns with \(breakdowns.count) stores")
+                if let healthScore = summary.averageHealthScore {
+                    print("   Average health score: \(healthScore)")
+                }
             }
             
         } catch let apiError as AnalyticsAPIError {

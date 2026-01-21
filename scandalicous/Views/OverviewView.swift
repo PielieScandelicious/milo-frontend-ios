@@ -267,7 +267,10 @@ struct OverviewView: View {
                         VStack(spacing: 24) {
                             // Total spending card
                             totalSpendingCard
-                            
+
+                            // Health score card
+                            healthScoreCard
+
                             // Store breakdowns grid
                             storeBreakdownsGrid
                         }
@@ -614,7 +617,7 @@ struct OverviewView: View {
     // Helper function to format time ago
     private func timeAgo(from date: Date) -> String {
         let seconds = Int(Date().timeIntervalSince(date))
-        
+
         if seconds < 60 {
             return "just now"
         } else if seconds < 3600 {
@@ -628,7 +631,83 @@ struct OverviewView: View {
             return "\(days)d ago"
         }
     }
-    
+
+    // MARK: - Health Score Card
+
+    private var healthScoreCard: some View {
+        // Use the average health score from the data manager (fetched from backend)
+        let averageScore: Double? = dataManager.averageHealthScore
+
+        return VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "heart.text.square.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(averageScore.healthScoreColor)
+
+                Text("Health Score")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+                    .textCase(.uppercase)
+                    .tracking(1)
+
+                Spacer()
+
+                if let score = averageScore {
+                    Text(score.healthScoreLabel)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(score.healthScoreColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(score.healthScoreColor.opacity(0.15))
+                        )
+                }
+            }
+
+            HStack(alignment: .center, spacing: 16) {
+                HealthScoreGauge(
+                    score: averageScore,
+                    size: 70,
+                    showTrend: false,
+                    showLabel: false
+                )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    if let score = averageScore {
+                        Text("\(score.formattedHealthScore) / 5.0")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+
+                        Text("Average for \(selectedPeriod)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                    } else {
+                        Text("No Data Yet")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.5))
+
+                        Text("Upload receipts to see your health score")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                }
+
+                Spacer()
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .padding(.horizontal)
+    }
+
     private var storeBreakdownsGrid: some View {
         VStack(spacing: 0) {
             LazyVGrid(columns: [

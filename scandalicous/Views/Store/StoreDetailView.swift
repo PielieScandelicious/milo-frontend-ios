@@ -29,15 +29,38 @@ struct StoreDetailView: View {
                             Text(storeBreakdown.storeName)
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
-                            
+
                             Text(storeBreakdown.period)
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.white.opacity(0.6))
-                            
+
                             Text(String(format: "€%.0f", storeBreakdown.totalStoreSpend))
                                 .font(.system(size: 48, weight: .heavy, design: .rounded))
                                 .foregroundColor(.white)
                                 .padding(.top, 8)
+
+                            // Health Score indicator (placeholder - will show when backend provides data)
+                            if let healthScore = storeBreakdown.averageHealthScore {
+                                Divider()
+                                    .background(Color.white.opacity(0.2))
+                                    .padding(.horizontal, 40)
+                                    .padding(.top, 8)
+
+                                HStack(spacing: 8) {
+                                    HealthScoreBadge(score: Int(healthScore.rounded()), size: .medium, style: .subtle)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Health Score")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.5))
+
+                                        Text(healthScore.healthScoreLabel)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(healthScore.healthScoreColor)
+                                    }
+                                }
+                                .padding(.top, 4)
+                            }
                         }
                         .padding(.vertical, 32)
                         .frame(maxWidth: .infinity)

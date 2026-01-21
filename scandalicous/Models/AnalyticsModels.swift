@@ -121,23 +121,33 @@ struct TrendPeriod: Codable, Identifiable {
     let periodEnd: String
     let totalSpend: Double
     let transactionCount: Int
-    
+    let averageHealthScore: Double?  // Average health score for this period
+
     var id: String { periodStart }
-    
+
     enum CodingKeys: String, CodingKey {
         case periodStart = "period_start"
         case periodEnd = "period_end"
         case totalSpend = "total_spend"
         case transactionCount = "transaction_count"
+        case averageHealthScore = "average_health_score"
     }
-    
+
+    init(periodStart: String, periodEnd: String, totalSpend: Double, transactionCount: Int, averageHealthScore: Double? = nil) {
+        self.periodStart = periodStart
+        self.periodEnd = periodEnd
+        self.totalSpend = totalSpend
+        self.transactionCount = transactionCount
+        self.averageHealthScore = averageHealthScore
+    }
+
     var startDate: Date? {
-        ISO8601DateFormatter().date(from: periodStart) ?? 
+        ISO8601DateFormatter().date(from: periodStart) ??
         DateFormatter.yyyyMMdd.date(from: periodStart)
     }
-    
+
     var endDate: Date? {
-        ISO8601DateFormatter().date(from: periodEnd) ?? 
+        ISO8601DateFormatter().date(from: periodEnd) ??
         DateFormatter.yyyyMMdd.date(from: periodEnd)
     }
 }
@@ -150,22 +160,33 @@ struct CategoriesResponse: Codable {
     let endDate: String
     let totalSpend: Double
     let categories: [CategoryBreakdown]
-    
+    let averageHealthScore: Double?  // Overall average health score
+
     enum CodingKeys: String, CodingKey {
         case period
         case startDate = "start_date"
         case endDate = "end_date"
         case totalSpend = "total_spend"
         case categories
+        case averageHealthScore = "average_health_score"
     }
-    
+
+    init(period: String, startDate: String, endDate: String, totalSpend: Double, categories: [CategoryBreakdown], averageHealthScore: Double? = nil) {
+        self.period = period
+        self.startDate = startDate
+        self.endDate = endDate
+        self.totalSpend = totalSpend
+        self.categories = categories
+        self.averageHealthScore = averageHealthScore
+    }
+
     var startDateParsed: Date? {
-        ISO8601DateFormatter().date(from: startDate) ?? 
+        ISO8601DateFormatter().date(from: startDate) ??
         DateFormatter.yyyyMMdd.date(from: startDate)
     }
-    
+
     var endDateParsed: Date? {
-        ISO8601DateFormatter().date(from: endDate) ?? 
+        ISO8601DateFormatter().date(from: endDate) ??
         DateFormatter.yyyyMMdd.date(from: endDate)
     }
 }
@@ -175,20 +196,30 @@ struct CategoryBreakdown: Codable, Identifiable {
     let spent: Double
     let percentage: Double
     let transactionCount: Int
-    
+    let averageHealthScore: Double?  // Average health score for this category
+
     var id: String { name }
-    
+
     enum CodingKeys: String, CodingKey {
         case name
         case spent
         case percentage
         case transactionCount = "transaction_count"
+        case averageHealthScore = "average_health_score"
     }
-    
+
+    init(name: String, spent: Double, percentage: Double, transactionCount: Int, averageHealthScore: Double? = nil) {
+        self.name = name
+        self.spent = spent
+        self.percentage = percentage
+        self.transactionCount = transactionCount
+        self.averageHealthScore = averageHealthScore
+    }
+
     var analyticsCategory: AnalyticsCategory? {
         AnalyticsCategory.allCases.first { $0.displayName == name }
     }
-    
+
     var icon: String {
         analyticsCategory?.icon ?? "shippingbox.fill"
     }
@@ -203,7 +234,8 @@ struct SummaryResponse: Codable {
     let totalSpend: Double
     let transactionCount: Int
     let stores: [APIStoreBreakdown]
-    
+    let averageHealthScore: Double?  // Overall average health score for the period
+
     enum CodingKeys: String, CodingKey {
         case period
         case startDate = "start_date"
@@ -211,15 +243,26 @@ struct SummaryResponse: Codable {
         case totalSpend = "total_spend"
         case transactionCount = "transaction_count"
         case stores
+        case averageHealthScore = "average_health_score"
     }
-    
+
+    init(period: String, startDate: String, endDate: String, totalSpend: Double, transactionCount: Int, stores: [APIStoreBreakdown], averageHealthScore: Double? = nil) {
+        self.period = period
+        self.startDate = startDate
+        self.endDate = endDate
+        self.totalSpend = totalSpend
+        self.transactionCount = transactionCount
+        self.stores = stores
+        self.averageHealthScore = averageHealthScore
+    }
+
     var startDateParsed: Date? {
-        ISO8601DateFormatter().date(from: startDate) ?? 
+        ISO8601DateFormatter().date(from: startDate) ??
         DateFormatter.yyyyMMdd.date(from: startDate)
     }
-    
+
     var endDateParsed: Date? {
-        ISO8601DateFormatter().date(from: endDate) ?? 
+        ISO8601DateFormatter().date(from: endDate) ??
         DateFormatter.yyyyMMdd.date(from: endDate)
     }
 }
@@ -229,6 +272,7 @@ struct APIStoreBreakdown: Codable, Identifiable {
     let amountSpent: Double
     let storeVisits: Int
     let percentage: Double
+    let averageHealthScore: Double?  // Average health score for this store
 
     var id: String { storeName }
 
@@ -237,6 +281,15 @@ struct APIStoreBreakdown: Codable, Identifiable {
         case amountSpent = "amount_spent"
         case storeVisits = "store_visits"
         case percentage
+        case averageHealthScore = "average_health_score"
+    }
+
+    init(storeName: String, amountSpent: Double, storeVisits: Int, percentage: Double, averageHealthScore: Double? = nil) {
+        self.storeName = storeName
+        self.amountSpent = amountSpent
+        self.storeVisits = storeVisits
+        self.percentage = percentage
+        self.averageHealthScore = averageHealthScore
     }
 }
 
@@ -250,7 +303,8 @@ struct StoreDetailsResponse: Codable {
     let totalSpend: Double
     let visitCount: Int
     let categories: [CategoryBreakdown]
-    
+    let averageHealthScore: Double?  // Average health score for this store
+
     enum CodingKeys: String, CodingKey {
         case storeName = "store_name"
         case period
@@ -259,15 +313,27 @@ struct StoreDetailsResponse: Codable {
         case totalSpend = "total_store_spend"
         case visitCount = "store_visits"
         case categories
+        case averageHealthScore = "average_health_score"
     }
-    
+
+    init(storeName: String, period: String, startDate: String, endDate: String, totalSpend: Double, visitCount: Int, categories: [CategoryBreakdown], averageHealthScore: Double? = nil) {
+        self.storeName = storeName
+        self.period = period
+        self.startDate = startDate
+        self.endDate = endDate
+        self.totalSpend = totalSpend
+        self.visitCount = visitCount
+        self.categories = categories
+        self.averageHealthScore = averageHealthScore
+    }
+
     var startDateParsed: Date? {
-        ISO8601DateFormatter().date(from: startDate) ?? 
+        ISO8601DateFormatter().date(from: startDate) ??
         DateFormatter.yyyyMMdd.date(from: startDate)
     }
-    
+
     var endDateParsed: Date? {
-        ISO8601DateFormatter().date(from: endDate) ?? 
+        ISO8601DateFormatter().date(from: endDate) ??
         DateFormatter.yyyyMMdd.date(from: endDate)
     }
 }
@@ -298,6 +364,7 @@ struct APITransaction: Codable, Identifiable {
     let quantity: Int
     let category: String
     let date: String
+    let healthScore: Int?  // 0-5 for food items, nil for non-food
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -307,6 +374,18 @@ struct APITransaction: Codable, Identifiable {
         case quantity
         case category
         case date
+        case healthScore = "health_score"
+    }
+
+    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, category: String, date: String, healthScore: Int? = nil) {
+        self.id = id
+        self.storeName = storeName
+        self.itemName = itemName
+        self.itemPrice = itemPrice
+        self.quantity = quantity
+        self.category = category
+        self.date = date
+        self.healthScore = healthScore
     }
 
     var dateParsed: Date? {

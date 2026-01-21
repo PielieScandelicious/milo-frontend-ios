@@ -57,7 +57,7 @@ struct ReceiptDetailsView: View {
     }
     
     // MARK: - Header Section
-    
+
     private var headerSection: some View {
         VStack(spacing: 16) {
             // Store Name
@@ -66,14 +66,14 @@ struct ReceiptDetailsView: View {
                     Image(systemName: "storefront.fill")
                         .font(.title2)
                         .foregroundStyle(.blue)
-                    
+
                     Text(storeName)
                         .font(.title2)
                         .fontWeight(.bold)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
             }
-            
+
             // Date
             if let date = receipt.parsedDate {
                 HStack(spacing: 4) {
@@ -84,23 +84,46 @@ struct ReceiptDetailsView: View {
                 }
                 .foregroundStyle(.secondary)
             }
-            
+
             Divider()
                 .padding(.vertical, 8)
-            
+
             // Total Amount
             if let totalAmount = receipt.totalAmount {
                 VStack(spacing: 4) {
                     Text("Total")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    
+
                     Text(totalAmount, format: .currency(code: "EUR"))
                         .font(.system(size: 40, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
                 }
             }
-            
+
+            // Health Score (if available)
+            if let healthScore = receipt.calculatedAverageHealthScore {
+                Divider()
+                    .padding(.vertical, 4)
+
+                HStack(spacing: 12) {
+                    HealthScoreGauge(score: healthScore, size: 60, showLabel: false)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Health Score")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Text(healthScore.healthScoreLabel)
+                            .font(.headline)
+                            .foregroundStyle(healthScore.healthScoreColor)
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal, 8)
+            }
+
             // Items Count
             HStack(spacing: 4) {
                 Image(systemName: "list.bullet")
@@ -167,7 +190,7 @@ struct ReceiptDetailsView: View {
 
 struct ReceiptItemRow: View {
     let transaction: ReceiptTransaction
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             // Category Icon
@@ -175,19 +198,25 @@ struct ReceiptItemRow: View {
                 Circle()
                     .fill(categoryColor.opacity(0.15))
                     .frame(width: 44, height: 44)
-                
+
                 Image(systemName: transaction.category.icon)
                     .font(.system(size: 20))
                     .foregroundStyle(categoryColor)
             }
-            
+
             // Item Details
             VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.itemName)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.primary)
-                
+                HStack(spacing: 8) {
+                    Text(transaction.itemName)
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    // Health Score Badge
+                    HealthScoreBadge(score: transaction.healthScore, size: .small, style: .subtle)
+                }
+
                 HStack(spacing: 12) {
                     // Quantity
                     if transaction.quantity > 1 {
@@ -199,7 +228,7 @@ struct ReceiptItemRow: View {
                         }
                         .foregroundStyle(.secondary)
                     }
-                    
+
                     // Unit Price
                     if let unitPrice = transaction.unitPrice, transaction.quantity > 1 {
                         HStack(spacing: 4) {
@@ -210,27 +239,37 @@ struct ReceiptItemRow: View {
                         }
                         .foregroundStyle(.secondary)
                     }
-                    
+
                     // Category
                     Text(transaction.category.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             Spacer()
-            
-            // Price
-            Text(transaction.itemPrice, format: .currency(code: "EUR"))
-                .font(.body)
-                .fontWeight(.semibold)
-                .foregroundStyle(.primary)
+
+            // Price and Health Score
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(transaction.itemPrice, format: .currency(code: "EUR"))
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+
+                // Health score label
+                if let score = transaction.healthScore {
+                    Text(score.healthScoreShortLabel)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(score.healthScoreColor)
+                }
+            }
         }
         .padding()
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
-    
+
     private var categoryColor: Color {
         switch transaction.category.color {
         case "red": return .red
@@ -266,38 +305,52 @@ struct ReceiptItemRow: View {
                     itemPrice: 2.99,
                     quantity: 2,
                     unitPrice: 1.50,
-                    category: .dairyAndEggs
+                    category: .dairyAndEggs,
+                    healthScore: 4
                 ),
                 ReceiptTransaction(
                     itemName: "Bread",
                     itemPrice: 3.49,
                     quantity: 1,
                     unitPrice: 3.49,
-                    category: .bakery
+                    category: .bakery,
+                    healthScore: 3
                 ),
                 ReceiptTransaction(
                     itemName: "Apples",
                     itemPrice: 4.99,
                     quantity: 1,
                     unitPrice: 4.99,
-                    category: .freshProduce
+                    category: .freshProduce,
+                    healthScore: 5
                 ),
                 ReceiptTransaction(
                     itemName: "Chicken Breast",
                     itemPrice: 8.99,
                     quantity: 1,
                     unitPrice: 8.99,
-                    category: .meatAndFish
+                    category: .meatAndFish,
+                    healthScore: 4
                 ),
                 ReceiptTransaction(
-                    itemName: "Orange Juice",
+                    itemName: "Cola",
                     itemPrice: 3.99,
                     quantity: 1,
                     unitPrice: 3.99,
-                    category: .drinksSoftSoda
+                    category: .drinksSoftSoda,
+                    healthScore: 1
+                ),
+                ReceiptTransaction(
+                    itemName: "Paper Towels",
+                    itemPrice: 5.99,
+                    quantity: 1,
+                    unitPrice: 5.99,
+                    category: .household,
+                    healthScore: nil  // Non-food item
                 )
             ],
-            warnings: []
+            warnings: [],
+            averageHealthScore: 3.4
         )
     )
 }

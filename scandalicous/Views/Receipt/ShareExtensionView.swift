@@ -34,12 +34,16 @@ struct ShareExtensionView: View {
     @State private var totalCount = 0
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var isComplete = false
+    @State private var lastUploadResponse: ReceiptUploadResponse?
     
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    if isProcessing {
+                    if isComplete, let response = lastUploadResponse {
+                        successView(response: response)
+                    } else if isProcessing {
                         processingView
                     } else if let error = errorMessage {
                         errorView(error)
@@ -53,10 +57,10 @@ struct ShareExtensionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(isComplete ? "Done" : "Cancel") {
                         cancelExtension()
                     }
-                    .disabled(isProcessing)
+                    .disabled(isProcessing && !isComplete)
                 }
             }
         }
@@ -99,17 +103,72 @@ struct ShareExtensionView: View {
     
     private func errorView(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Upload Failed")
+            Text("Receipt Processing Failed!")
                 .font(.headline)
-            
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            
+
             Button("Dismiss") {
                 cancelExtension()
             }
             .buttonStyle(.borderedProminent)
+        }
+    }
+
+    private func successView(response: ReceiptUploadResponse) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title)
+                    .foregroundColor(.green)
+
+                Text("Receipt Uploaded!")
+                    .font(.headline)
+            }
+
+            if let storeName = response.storeName {
+                HStack {
+                    Image(systemName: "storefront.fill")
+                        .foregroundColor(.blue)
+                    Text(storeName)
+                        .font(.subheadline)
+                }
+            }
+
+            if let total = response.totalAmount {
+                HStack {
+                    Image(systemName: "eurosign.circle.fill")
+                        .foregroundColor(.green)
+                    Text(String(format: "€%.2f", total))
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+            }
+
+            HStack {
+                Image(systemName: "list.bullet")
+                    .foregroundColor(.secondary)
+                Text("\(response.itemsCount) item\(response.itemsCount == 1 ? "" : "s")")
+                    .font(.subheadline)
+            }
+
+            // Health Score Section
+            if let healthScore = response.calculatedAverageHealthScore {
+                Divider()
+
+                HStack(spacing: 12) {
+                    HealthScoreBadge(score: Int(healthScore.rounded()), size: .medium, style: .subtle)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Health Score")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Text(healthScore.healthScoreLabel)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(healthScore.healthScoreColor)
+                    }
+                }
+            }
         }
     }
     
@@ -175,9 +234,10 @@ struct ShareExtensionView: View {
             do {
                 let response = try await uploadData(data, filename: filename, contentType: contentType)
                 print("✅ Uploaded: \(response.receiptId)")
-                
+
                 await MainActor.run {
                     uploadedCount += 1
+                    lastUploadResponse = response
                 }
             } catch {
                 print("❌ Upload failed: \(error.localizedDescription)")
@@ -192,13 +252,9 @@ struct ShareExtensionView: View {
         // All uploads complete
         await MainActor.run {
             uploadProgress = 1.0
+            isProcessing = false
+            isComplete = true
         }
-        
-        // Brief delay to show completion
-        try? await Task.sleep(for: .milliseconds(500))
-        
-        // Close extension
-        completeExtension()
     }
     
     // MARK: - Data Loading
@@ -353,9 +409,14 @@ struct ShareExtensionView: View {
     private func completeExtension() {
         extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
     }
-    
+
     private func cancelExtension() {
-        extensionContext?.cancelRequest(withError: NSError(domain: "com.dobby.share", code: 0, userInfo: [NSLocalizedDescriptionKey: "User cancelled"]))
+        if isComplete {
+            // If complete, use completeRequest instead of cancel
+            completeExtension()
+        } else {
+            extensionContext?.cancelRequest(withError: NSError(domain: "com.dobby.share", code: 0, userInfo: [NSLocalizedDescriptionKey: "User cancelled"]))
+        }
     }
 }
 

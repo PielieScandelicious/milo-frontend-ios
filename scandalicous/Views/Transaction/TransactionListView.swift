@@ -372,7 +372,7 @@ struct TransactionListView: View {
 
 struct APITransactionRowView: View {
     let transaction: APITransaction
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Icon
@@ -380,41 +380,55 @@ struct APITransactionRowView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(categoryColor(for: transaction.category).opacity(0.2))
                     .frame(width: 50, height: 50)
-                
+
                 Image(systemName: categoryIcon(for: transaction.category))
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(categoryColor(for: transaction.category))
             }
-            
+
             // Item details
             VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.itemName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                
+                HStack(spacing: 8) {
+                    Text(transaction.itemName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+
+                    // Health Score Badge
+                    HealthScoreBadge(score: transaction.healthScore, size: .small, style: .subtle)
+                }
+
                 HStack(spacing: 8) {
                     Text(transaction.category)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
-                    
+
                     if transaction.quantity > 1 {
                         Text("•")
                             .foregroundColor(.white.opacity(0.3))
-                        
+
                         Text("Qty: \(transaction.quantity)")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.5))
                     }
                 }
             }
-            
+
             Spacer()
-            
-            // Amount
-            Text(String(format: "€%.2f", transaction.totalPrice))
-                .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+
+            // Amount and Health Score
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(String(format: "€%.2f", transaction.totalPrice))
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+
+                // Health score label
+                if let score = transaction.healthScore {
+                    Text(score.healthScoreShortLabel)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(score.healthScoreColor)
+                }
+            }
         }
         .padding(16)
         .background(
@@ -426,7 +440,7 @@ struct APITransactionRowView: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
-    
+
     private func categoryIcon(for category: String) -> String {
         switch category {
         case "Meat & Fish": return "fish.fill"
@@ -443,7 +457,7 @@ struct APITransactionRowView: View {
         default: return "cart.fill"
         }
     }
-    
+
     private func categoryColor(for category: String) -> Color {
         // Use the smart category color extension
         return category.categoryColor

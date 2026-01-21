@@ -31,7 +31,7 @@ struct AllStoresBreakdownView: View {
             Color(red: 1.0, green: 0.6, blue: 0.4),   // Coral
             Color(red: 0.6, green: 0.9, blue: 0.4),   // Lime
         ]
-        
+
         return breakdowns.enumerated().map { index, breakdown in
             let percentage = breakdown.totalStoreSpend / totalSpending
             let angleRange = 360.0 * percentage
@@ -41,7 +41,8 @@ struct AllStoresBreakdownView: View {
                 color: colors[index % colors.count],
                 storeName: breakdown.storeName,
                 amount: breakdown.totalStoreSpend,
-                percentage: Int(percentage * 100)
+                percentage: Int(percentage * 100),
+                healthScore: breakdown.averageHealthScore
             )
             currentAngle += angleRange
             return segment
@@ -141,23 +142,28 @@ struct AllStoresBreakdownView: View {
             Circle()
                 .fill(segment.color)
                 .frame(width: 12, height: 12)
-            
+
             Text(segment.storeName)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white)
-            
+
+            // Health Score Badge (if available)
+            if let healthScore = segment.healthScore {
+                HealthScoreBadge(score: Int(healthScore.rounded()), size: .small, style: .subtle)
+            }
+
             Spacer()
-            
+
             Text("\(segment.percentage)%")
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundColor(.white.opacity(0.6))
                 .frame(width: 45, alignment: .trailing)
-            
+
             Text(String(format: "€%.0f", segment.amount))
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
                 .frame(width: 70, alignment: .trailing)
-            
+
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white.opacity(0.3))
@@ -230,6 +236,7 @@ struct StoreChartSegment: Identifiable {
     let storeName: String
     let amount: Double
     let percentage: Int
+    let healthScore: Double?  // Average health score for this store
 }
 
 // MARK: - Button Styles

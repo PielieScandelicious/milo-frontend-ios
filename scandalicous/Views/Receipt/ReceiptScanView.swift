@@ -20,36 +20,11 @@ struct ReceiptScanView: View {
     @State private var showReceiptDetails = false
     @State private var isCheckingQuality = false
     @State private var qualityCheckProgress: String = ""
+    @State private var canRetryAfterError = false
     
     var body: some View {
         ZStack {
             placeholderView
-            
-            // Quality check overlay
-            if isCheckingQuality {
-                Color.black.opacity(0.4)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 20) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
-                    
-                    Text("Checking Quality")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                    
-                    Text(qualityCheckProgress)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                .padding(32)
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .transition(.scale.combined(with: .opacity))
-            }
             
             // Upload overlay
             if case .uploading = uploadState {
@@ -61,13 +36,9 @@ struct ReceiptScanView: View {
                         .scaleEffect(1.5)
                         .tint(.white)
                     
-                    Text("Uploading receipt...")
+                    Text("Processing receipt...")
                         .font(.headline)
                         .foregroundStyle(.white)
-                    
-                    Text("Sending to Claude Vision API")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.8))
                 }
                 .padding(32)
                 .background(.ultraThinMaterial)
@@ -99,16 +70,19 @@ struct ReceiptScanView: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .alert("Quality Check Failed", isPresented: $showError) {
-            Button("Try Again") {
+        .receiptErrorOverlay(
+            isPresented: $showError,
+            message: errorMessage ?? "Failed to process receipt",
+            onRetry: canRetryAfterError ? {
+                // Reset state and allow retry
                 errorMessage = nil
                 capturedImage = nil
                 uploadState = .idle
                 isCheckingQuality = false
-            }
-        } message: {
-            Text(errorMessage ?? "Failed to process receipt")
-        }
+                canRetryAfterError = false
+                showDocumentScanner = true
+            } : nil
+        )
         .fullScreenCover(isPresented: $showDocumentScanner) {
             DocumentScannerView(capturedImage: $capturedImage)
         }
@@ -244,6 +218,7 @@ struct ReceiptScanView: View {
             await MainActor.run {
                 isCheckingQuality = false
                 capturedImage = nil
+                canRetryAfterError = true // Allow retry for quality issues
                 
                 // Construct detailed error message
                 var message = "Receipt quality too low for accurate processing.\n\n"
@@ -326,12 +301,14 @@ struct ReceiptScanView: View {
                     
                 case .pending, .processing:
                     uploadState = .processing
+                    canRetryAfterError = true
                     errorMessage = "Receipt is still being processed. Please check back later."
                     showError = true
                     uploadState = .idle
                     
                 case .failed:
                     uploadState = .failed("Receipt processing failed")
+                    canRetryAfterError = true
                     errorMessage = "The receipt could not be processed by the server. Please try again."
                     showError = true
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -342,6 +319,7 @@ struct ReceiptScanView: View {
             
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
+                canRetryAfterError = true
                 errorMessage = error.localizedDescription
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -351,6 +329,7 @@ struct ReceiptScanView: View {
             
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
+                canRetryAfterError = true
                 errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)

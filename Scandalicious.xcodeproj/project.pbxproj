@@ -75,6 +75,7 @@
 				Authentication/KeychainHelper.swift,
 				Models/ReceiptModels.swift,
 				Services/ReceiptUploadService.swift,
+				Views/ReceiptErrorView.swift,
 			);
 			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
 		};

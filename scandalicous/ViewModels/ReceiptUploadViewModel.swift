@@ -14,6 +14,7 @@ class ReceiptUploadViewModel: ObservableObject {
     @Published var uploadState: ReceiptUploadState = .idle
     @Published var uploadedReceipt: ReceiptUploadResponse?
     @Published var errorMessage: String?
+    @Published var showError: Bool = false
     
     var isUploading: Bool {
         if case .uploading = uploadState {
@@ -57,6 +58,7 @@ class ReceiptUploadViewModel: ObservableObject {
             case .pending, .processing:
                 uploadState = .processing
                 errorMessage = "Receipt is still being processed. Please check back later."
+                showError = true
                 
                 // You could implement polling here if needed
                 await pollForProcessingCompletion(receiptId: response.receiptId)
@@ -64,6 +66,7 @@ class ReceiptUploadViewModel: ObservableObject {
             case .failed:
                 uploadState = .failed("Receipt processing failed")
                 errorMessage = "The receipt could not be processed. Please try again with a clearer image."
+                showError = true
                 
                 // Trigger error haptic
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -71,12 +74,14 @@ class ReceiptUploadViewModel: ObservableObject {
         } catch let error as ReceiptUploadError {
             uploadState = .failed(error.localizedDescription)
             errorMessage = error.localizedDescription
+            showError = true
             
             // Trigger error haptic
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         } catch {
             uploadState = .failed(error.localizedDescription)
             errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
+            showError = true
             
             // Trigger error haptic
             UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -89,6 +94,7 @@ class ReceiptUploadViewModel: ObservableObject {
         uploadState = .idle
         uploadedReceipt = nil
         errorMessage = nil
+        showError = false
     }
     
     // MARK: - Private Methods
@@ -101,3 +107,34 @@ class ReceiptUploadViewModel: ObservableObject {
         uploadState = .idle
     }
 }
+// MARK: - Example Usage with ReceiptErrorView
+
+/*
+ To use this ViewModel with the consistent error UI:
+ 
+ struct YourReceiptUploadView: View {
+     @StateObject private var viewModel = ReceiptUploadViewModel()
+     
+     var body: some View {
+         VStack {
+             // Your upload UI here
+             Button("Upload Receipt") {
+                 Task {
+                     await viewModel.uploadReceipt(image: yourImage)
+                 }
+             }
+             .disabled(viewModel.isBusy)
+         }
+         .receiptErrorOverlay(
+             isPresented: $viewModel.showError,
+             message: viewModel.errorMessage ?? "Failed to process receipt",
+             onRetry: {
+                 Task {
+                     await viewModel.uploadReceipt(image: yourImage)
+                 }
+             }
+         )
+     }
+ }
+ */
+
