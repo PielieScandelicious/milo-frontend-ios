@@ -16,7 +16,6 @@ struct PaywallView: View {
     @State private var showSuccessAnimation = false
     @State private var showSignOutConfirmation = false
 
-    /// Whether this paywall is dismissible (false when it's the required paywall before app access)
     private var isDismissible: Bool {
         subscriptionManager.subscriptionStatus.isActive
     }
@@ -26,86 +25,63 @@ struct PaywallView: View {
             // Background gradient
             LinearGradient(
                 colors: [
-                    Color.purple.opacity(0.4),
-                    Color.blue.opacity(0.3),
+                    Color(red: 0.15, green: 0.05, blue: 0.3),
+                    Color(red: 0.05, green: 0.05, blue: 0.15),
                     Color.black
                 ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                startPoint: .top,
+                endPoint: .bottom
             )
             .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    headerSection
+            // Main content
+            VStack(spacing: 0) {
+                // Top bar
+                topBar
+                    .padding(.horizontal)
+                    .padding(.top, 8)
 
-                    // Features
-                    featuresSection
-
-                    // Pricing cards
-                    pricingSection
-
-                    // Trial info
-                    trialInfoSection
-
-                    // Subscribe button
-                    subscribeButton
-
-                    // Restore & Terms
-                    footerSection
-                }
-                .padding()
-            }
-
-            // Top bar with close/sign out buttons
-            VStack {
-                HStack {
-                    // Sign out button (only when this is the required paywall)
-                    if !isDismissible {
-                        Button {
-                            showSignOutConfirmation = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
-                                Text("Sign Out")
-                            }
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.7))
-                        }
-                        .padding()
-                    }
-
-                    Spacer()
-
-                    // Close button (only when paywall is dismissible)
-                    if isDismissible {
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.title)
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-                        .padding()
-                    }
-                }
                 Spacer()
+
+                // Header with Dobby icon
+                headerSection
+
+                Spacer()
+
+                // Features row
+                featuresSection
+                    .padding(.horizontal, 20)
+
+                Spacer()
+
+                // Pricing cards
+                pricingSection
+                    .padding(.horizontal, 20)
+
+                Spacer()
+
+                // Subscribe button
+                subscribeButton
+                    .padding(.horizontal, 20)
+
+                // Footer
+                footerSection
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
             }
 
-            // Success animation overlay
+            // Success overlay
             if showSuccessAnimation {
                 successOverlay
             }
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            // Select yearly by default (best value)
             if selectedProduct == nil {
                 selectedProduct = subscriptionManager.yearlyProduct
             }
         }
-        .onChange(of: subscriptionManager.products) { _, products in
+        .onChange(of: subscriptionManager.products) { _, _ in
             if selectedProduct == nil, let yearly = subscriptionManager.yearlyProduct {
                 selectedProduct = yearly
             }
@@ -124,72 +100,106 @@ struct PaywallView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to sign out? You can sign in with a different account.")
+            Text("Are you sure you want to sign out?")
         }
     }
 
-    // MARK: - Header Section
+    // MARK: - Top Bar
+
+    private var topBar: some View {
+        HStack {
+            if !isDismissible {
+                Button {
+                    showSignOutConfirmation = true
+                } label: {
+                    Text("Sign Out")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+
+            Spacer()
+
+            if isDismissible {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+        }
+    }
+
+    // MARK: - Header
 
     private var headerSection: some View {
-        VStack(spacing: 16) {
-            // Icon with glow effect
+        VStack(spacing: 12) {
+            // Dobby icon with glow
             ZStack {
                 Circle()
-                    .fill(.purple.opacity(0.3))
-                    .frame(width: 100, height: 100)
-                    .blur(radius: 20)
+                    .fill(
+                        RadialGradient(
+                            colors: [.purple.opacity(0.6), .clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 60
+                        )
+                    )
+                    .frame(width: 120, height: 120)
 
                 Image(systemName: "sparkles")
-                    .font(.system(size: 50))
+                    .font(.system(size: 56, weight: .medium))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.purple, .blue],
+                            colors: [.purple, .blue, .purple],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
             }
-            .padding(.top, 40)
 
-            Text("Unlock Premium")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+            Text("Meet Dobby")
+                .font(.system(size: 32, weight: .bold))
+                .foregroundStyle(.white)
 
-            Text("Get the most out of Scandalicious")
+            Text("Your AI shopping assistant")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.7))
         }
     }
 
-    // MARK: - Features Section
+    // MARK: - Features
 
     private var featuresSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            FeatureRow(icon: "chart.bar.fill", text: "Unlimited receipt scans")
-            FeatureRow(icon: "brain.head.profile", text: "AI-powered spending insights")
-            FeatureRow(icon: "heart.fill", text: "Detailed health scores")
-            FeatureRow(icon: "chart.pie.fill", text: "Advanced analytics & reports")
-            FeatureRow(icon: "sparkles", text: "Dobby AI assistant - unlimited chats")
+        HStack(spacing: 20) {
+            FeatureItem(icon: "doc.text.viewfinder", label: "Scan")
+            FeatureItem(icon: "chart.bar.fill", label: "Analyze")
+            FeatureItem(icon: "heart.fill", label: "Health")
+            FeatureItem(icon: "bubble.left.fill", label: "Chat")
         }
-        .padding()
+        .padding(.vertical, 16)
+        .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+                .fill(.white.opacity(0.08))
         )
     }
 
-    // MARK: - Pricing Section
+    // MARK: - Pricing
 
     private var pricingSection: some View {
-        VStack(spacing: 12) {
-            // Yearly option (best value)
+        VStack(spacing: 10) {
+            // Yearly
             if let yearly = subscriptionManager.yearlyProduct {
-                PricingCard(
-                    product: yearly,
+                CompactPricingCard(
+                    title: "Yearly",
+                    price: yearly.displayPrice,
+                    period: "year",
                     weeklyPrice: subscriptionManager.weeklyPrice(for: yearly),
-                    isSelected: selectedProduct?.id == yearly.id,
-                    savingsPercentage: subscriptionManager.yearlySavingsPercentage(),
-                    isBestValue: true
+                    badge: "BEST VALUE",
+                    isSelected: selectedProduct?.id == yearly.id
                 ) {
                     withAnimation(.spring(response: 0.3)) {
                         selectedProduct = yearly
@@ -197,14 +207,15 @@ struct PaywallView: View {
                 }
             }
 
-            // Monthly option
+            // Monthly
             if let monthly = subscriptionManager.monthlyProduct {
-                PricingCard(
-                    product: monthly,
+                CompactPricingCard(
+                    title: "Monthly",
+                    price: monthly.displayPrice,
+                    period: "month",
                     weeklyPrice: subscriptionManager.weeklyPrice(for: monthly),
-                    isSelected: selectedProduct?.id == monthly.id,
-                    savingsPercentage: nil,
-                    isBestValue: false
+                    badge: nil,
+                    isSelected: selectedProduct?.id == monthly.id
                 ) {
                     withAnimation(.spring(response: 0.3)) {
                         selectedProduct = monthly
@@ -212,38 +223,12 @@ struct PaywallView: View {
                 }
             }
 
-            // Loading state
+            // Loading
             if subscriptionManager.isLoading && subscriptionManager.products.isEmpty {
                 ProgressView()
-                    .padding(40)
+                    .padding(20)
             }
         }
-    }
-
-    // MARK: - Trial Info Section
-
-    private var trialInfoSection: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "gift.fill")
-                .foregroundStyle(.green)
-
-            Text("Start with a **14-day free trial**")
-                .font(.subheadline)
-
-            Text("Cancel anytime")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.green.opacity(0.15))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(.green.opacity(0.3), lineWidth: 1)
-                )
-        )
     }
 
     // MARK: - Subscribe Button
@@ -257,25 +242,24 @@ struct PaywallView: View {
                     withAnimation(.spring(response: 0.5)) {
                         showSuccessAnimation = true
                     }
-                    // Dismiss after animation
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                         dismiss()
                     }
                 }
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack {
                 if subscriptionManager.isPurchasing {
                     ProgressView()
-                        .progressViewStyle(.circular)
                         .tint(.white)
                 } else {
-                    Text("Start Free Trial")
+                    Image(systemName: "gift.fill")
+                    Text("Start 14-Day Free Trial")
                         .fontWeight(.semibold)
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding()
+            .padding(.vertical, 16)
             .background(
                 LinearGradient(
                     colors: [.purple, .blue],
@@ -290,71 +274,46 @@ struct PaywallView: View {
         .opacity(selectedProduct == nil ? 0.6 : 1)
     }
 
-    // MARK: - Footer Section
+    // MARK: - Footer
 
     private var footerSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 8) {
             Button {
-                Task {
-                    await subscriptionManager.restorePurchases()
-                }
+                Task { await subscriptionManager.restorePurchases() }
             } label: {
                 Text("Restore Purchases")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.5))
             }
 
-            HStack(spacing: 16) {
-                Button {
-                    // Open terms URL
-                    if let url = URL(string: "https://scandalicious.app/terms") {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
-                    Text("Terms of Use")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
+            HStack(spacing: 12) {
+                Link("Terms", destination: URL(string: "https://scandalicious.app/terms")!)
                 Text("•")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary.opacity(0.5))
-
-                Button {
-                    // Open privacy URL
-                    if let url = URL(string: "https://scandalicious.app/privacy") {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
-                    Text("Privacy Policy")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                Link("Privacy", destination: URL(string: "https://scandalicious.app/privacy")!)
             }
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.4))
 
-            Text("Payment will be charged to your Apple ID account at the confirmation of purchase. Subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.")
+            Text("Cancel anytime. Auto-renews until canceled.")
                 .font(.caption2)
-                .foregroundStyle(.secondary.opacity(0.6))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                .foregroundStyle(.white.opacity(0.3))
         }
-        .padding(.bottom, 20)
     }
 
     // MARK: - Success Overlay
 
     private var successOverlay: some View {
         ZStack {
-            Color.black.opacity(0.8)
+            Color.black.opacity(0.9)
                 .ignoresSafeArea()
 
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 80))
+                    .font(.system(size: 70))
                     .foregroundStyle(.green)
                     .symbolEffect(.bounce, value: showSuccessAnimation)
 
-                Text("Welcome to Premium!")
+                Text("Welcome!")
                     .font(.title)
                     .fontWeight(.bold)
             }
@@ -363,155 +322,115 @@ struct PaywallView: View {
     }
 }
 
-// MARK: - Feature Row
+// MARK: - Feature Item
 
-struct FeatureRow: View {
+struct FeatureItem: View {
     let icon: String
-    let text: String
+    let label: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(.system(size: 22))
                 .foregroundStyle(
                     LinearGradient(
                         colors: [.purple, .blue],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
                 )
-                .frame(width: 24)
 
-            Text(text)
-                .font(.subheadline)
-                .foregroundStyle(.primary)
-
-            Spacer()
-
-            Image(systemName: "checkmark")
+            Text(label)
                 .font(.caption)
-                .foregroundStyle(.green)
+                .foregroundStyle(.white.opacity(0.8))
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
-// MARK: - Pricing Card
+// MARK: - Compact Pricing Card
 
-struct PricingCard: View {
-    let product: Product
+struct CompactPricingCard: View {
+    let title: String
+    let price: String
+    let period: String
     let weeklyPrice: String
+    let badge: String?
     let isSelected: Bool
-    let savingsPercentage: Int?
-    let isBestValue: Bool
     let onSelect: () -> Void
 
     var body: some View {
         Button(action: onSelect) {
-            VStack(spacing: 0) {
-                // Best value badge
-                if isBestValue, let savings = savingsPercentage, savings > 0 {
-                    HStack {
-                        Image(systemName: "star.fill")
-                            .font(.caption2)
-                        Text("BEST VALUE • SAVE \(savings)%")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        LinearGradient(
-                            colors: [.orange, .pink],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                    .offset(y: -12)
-                }
+            HStack(spacing: 12) {
+                // Selection indicator
+                ZStack {
+                    Circle()
+                        .strokeBorder(isSelected ? Color.purple : Color.white.opacity(0.3), lineWidth: 2)
+                        .frame(width: 22, height: 22)
 
-                VStack(spacing: 8) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(product.id.contains("yearly") ? "Yearly" : "Monthly")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-
-                            if let trial = product.trialDescription {
-                                Text(trial)
-                                    .font(.caption)
-                                    .foregroundStyle(.green)
-                            }
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(product.displayPrice)
-                                .font(.title2)
-                                .fontWeight(.bold)
-
-                            Text("per \(product.periodDescription)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Divider()
-                        .background(.white.opacity(0.2))
-
-                    // Weekly breakdown
-                    HStack {
-                        Text("That's just")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Text("\(weeklyPrice)/week")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.purple)
-
-                        Spacer()
-
-                        // Selection indicator
-                        ZStack {
-                            Circle()
-                                .strokeBorder(isSelected ? Color.purple : Color.gray.opacity(0.5), lineWidth: 2)
-                                .frame(width: 24, height: 24)
-
-                            if isSelected {
-                                Circle()
-                                    .fill(Color.purple)
-                                    .frame(width: 16, height: 16)
-                            }
-                        }
+                    if isSelected {
+                        Circle()
+                            .fill(Color.purple)
+                            .frame(width: 14, height: 14)
                     }
                 }
-                .padding()
+
+                // Plan info
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(.headline)
+                            .foregroundStyle(.white)
+
+                        if let badge = badge {
+                            Text(badge)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(
+                                    LinearGradient(
+                                        colors: [.orange, .pink],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    Text("\(weeklyPrice)/week")
+                        .font(.caption)
+                        .foregroundStyle(.purple)
+                }
+
+                Spacer()
+
+                // Price
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(price)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+
+                    Text("/\(period)")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.white.opacity(isSelected ? 0.12 : 0.06))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: 14)
                             .strokeBorder(
-                                isSelected ?
-                                LinearGradient(
-                                    colors: [.purple, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ) :
-                                LinearGradient(
-                                    colors: [.white.opacity(0.2), .white.opacity(0.1)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
+                                isSelected ? Color.purple : Color.white.opacity(0.1),
                                 lineWidth: isSelected ? 2 : 1
                             )
                     )
             )
-            .scaleEffect(isSelected ? 1.02 : 1.0)
         }
         .buttonStyle(.plain)
     }
