@@ -11,6 +11,9 @@ struct StoreDetailView: View {
     let storeBreakdown: StoreBreakdown
     @Environment(\.dismiss) private var dismiss
     @State private var selectedCategory: String?
+    @State private var selectedCategoryColor: Color?
+    @State private var showingAllTransactions = false
+    @State private var showingCategoryTransactions = false
     
     var body: some View {
         ZStack {
@@ -19,12 +22,9 @@ struct StoreDetailView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // Header card - clickable to view all store transactions
-                    NavigationLink(destination: TransactionDisplayView(
-                        storeName: storeBreakdown.storeName,
-                        period: storeBreakdown.period,
-                        category: nil,
-                        categoryColor: nil
-                    )) {
+                    Button {
+                        showingAllTransactions = true
+                    } label: {
                         VStack(spacing: 12) {
                             Text(storeBreakdown.storeName)
                                 .font(.system(size: 32, weight: .bold, design: .rounded))
@@ -55,12 +55,9 @@ struct StoreDetailView: View {
                     
                     // Large donut chart - clickable to view all transactions
                     VStack(spacing: 20) {
-                        NavigationLink(destination: TransactionDisplayView(
-                            storeName: storeBreakdown.storeName,
-                            period: storeBreakdown.period,
-                            category: nil,
-                            categoryColor: nil
-                        )) {
+                        Button {
+                            showingAllTransactions = true
+                        } label: {
                             DonutChartView(
                                 title: "",
                                 subtitle: "visits",
@@ -75,12 +72,11 @@ struct StoreDetailView: View {
                         // Legend with tap interaction
                         VStack(spacing: 12) {
                             ForEach(Array(storeBreakdown.categories.toChartSegments().enumerated()), id: \.element.id) { _, segment in
-                                NavigationLink(destination: TransactionDisplayView(
-                                    storeName: storeBreakdown.storeName,
-                                    period: storeBreakdown.period,
-                                    category: segment.label,
-                                    categoryColor: segment.color
-                                )) {
+                                Button {
+                                    selectedCategory = segment.label
+                                    selectedCategoryColor = segment.color
+                                    showingCategoryTransactions = true
+                                } label: {
                                     categoryRow(segment: segment)
                                 }
                                 .buttonStyle(CategoryRowButtonStyle())
@@ -94,6 +90,22 @@ struct StoreDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showingAllTransactions) {
+            TransactionListView(
+                storeName: storeBreakdown.storeName,
+                period: storeBreakdown.period,
+                category: nil,
+                categoryColor: nil
+            )
+        }
+        .navigationDestination(isPresented: $showingCategoryTransactions) {
+            TransactionListView(
+                storeName: storeBreakdown.storeName,
+                period: storeBreakdown.period,
+                category: selectedCategory,
+                categoryColor: selectedCategoryColor
+            )
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {

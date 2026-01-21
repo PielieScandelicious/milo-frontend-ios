@@ -260,7 +260,7 @@ struct OverviewView: View {
             AllStoresBreakdownView(period: selectedPeriod, breakdowns: currentBreakdowns)
         }
         .navigationDestination(isPresented: $showingAllTransactions) {
-            TransactionDisplayView(
+            TransactionListView(
                 storeName: "All Stores",
                 period: selectedPeriod,
                 category: nil,

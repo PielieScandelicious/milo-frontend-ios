@@ -12,6 +12,8 @@ struct AllStoresBreakdownView: View {
     let breakdowns: [StoreBreakdown]
     @Environment(\.dismiss) private var dismiss
     @State private var showingAllTransactions = false
+    @State private var selectedStoreName: String?
+    @State private var showingStoreTransactions = false
     
     private var totalSpending: Double {
         breakdowns.reduce(0) { $0 + $1.totalStoreSpend }
@@ -97,7 +99,13 @@ struct AllStoresBreakdownView: View {
                         // Legend
                         VStack(spacing: 12) {
                             ForEach(storeSegments, id: \.id) { segment in
-                                storeRow(segment: segment)
+                                Button {
+                                    selectedStoreName = segment.storeName
+                                    showingStoreTransactions = true
+                                } label: {
+                                    storeRow(segment: segment)
+                                }
+                                .buttonStyle(StoreRowButtonStyle())
                             }
                         }
                         .padding(.horizontal)
@@ -109,12 +117,22 @@ struct AllStoresBreakdownView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showingAllTransactions) {
-            TransactionDisplayView(
+            TransactionListView(
                 storeName: "All Stores",
                 period: period,
                 category: nil,
                 categoryColor: nil
             )
+        }
+        .navigationDestination(isPresented: $showingStoreTransactions) {
+            if let storeName = selectedStoreName {
+                TransactionListView(
+                    storeName: storeName,
+                    period: period,
+                    category: nil,
+                    categoryColor: nil
+                )
+            }
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -151,6 +169,10 @@ struct AllStoresBreakdownView: View {
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
                 .frame(width: 70, alignment: .trailing)
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.3))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -230,6 +252,15 @@ struct StoresHeaderButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+struct StoreRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
