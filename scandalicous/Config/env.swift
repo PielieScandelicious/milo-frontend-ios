@@ -15,7 +15,6 @@ enum AppConfiguration {
     static var uploadEndpoint: String { "\(backendBaseURL)/upload" }
     static var chatEndpoint: String { "\(backendBaseURL)/api/v1/chat/" }
     static var chatStreamEndpoint: String { "\(backendBaseURL)/api/v1/chat/stream" }
-    static var processReceiptEndpoint: String { "\(backendBaseURL)/process-receipt" }
 }
 
   
