@@ -155,11 +155,26 @@ struct ScandaLiciousAIChatView: View {
 
                     // Usage & Subscription
                     Section {
-                        // Rate limit usage display with smart color
+                        // Message rate limit usage display with smart color
                         Button(action: {}) {
                             Label(rateLimitManager.usageDisplayString, systemImage: usageIconName)
                         }
                         .tint(usageColor)
+
+                        // Receipt upload limit
+                        Button(action: {}) {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) uploads remaining")
+                                    Text(rateLimitManager.resetDaysFormatted)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: receiptLimitIcon)
+                            }
+                        }
+                        .tint(receiptLimitColor)
 
                         // Show subscription status
                         Label(subscriptionManager.subscriptionStatus.displayText, systemImage: "crown.fill")
@@ -258,6 +273,30 @@ struct ScandaLiciousAIChatView: View {
         let green = 0.8 - (used * 0.6)  // 0.8 -> 0.2
         let blue = 0.2
         return Color(red: red, green: green, blue: blue)
+    }
+
+    // Receipt limit status icon
+    private var receiptLimitIcon: String {
+        switch rateLimitManager.receiptLimitState {
+        case .normal:
+            return "checkmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .exhausted:
+            return "xmark.circle.fill"
+        }
+    }
+
+    // Receipt limit status color
+    private var receiptLimitColor: Color {
+        switch rateLimitManager.receiptLimitState {
+        case .normal:
+            return .green
+        case .warning:
+            return .orange
+        case .exhausted:
+            return .red
+        }
     }
     
     private func sendMessage() {

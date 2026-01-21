@@ -9,13 +9,38 @@ import Foundation
 import UIKit
 import FirebaseAuth
 
+// MARK: - Receipt Rate Limit Error
+
+struct ReceiptRateLimitExceededError: Codable, Error {
+    let error: String
+    let message: String
+    let details: ReceiptRateLimitDetails
+
+    struct ReceiptRateLimitDetails: Codable {
+        let receiptsUsed: Int
+        let receiptsLimit: Int
+        let periodEndDate: Date
+        let retryAfterSeconds: Int
+
+        enum CodingKeys: String, CodingKey {
+            case receiptsUsed = "receipts_used"
+            case receiptsLimit = "receipts_limit"
+            case periodEndDate = "period_end_date"
+            case retryAfterSeconds = "retry_after_seconds"
+        }
+    }
+}
+
+// MARK: - Receipt Upload Error
+
 enum ReceiptUploadError: LocalizedError {
     case noImage
     case invalidResponse
     case noAuthToken
     case serverError(String)
     case networkError(Error)
-    
+    case rateLimitExceeded(ReceiptRateLimitExceededError)
+
     var errorDescription: String? {
         switch self {
         case .noImage:
@@ -28,6 +53,19 @@ enum ReceiptUploadError: LocalizedError {
             return "Server error: \(message)"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
+        case .rateLimitExceeded(let error):
+            return error.message
+        }
+    }
+
+    /// User-friendly message for rate limit exceeded
+    var rateLimitUserMessage: String? {
+        guard case .rateLimitExceeded(let error) = self else { return nil }
+        let daysUntilReset = Calendar.current.dateComponents([.day], from: Date(), to: error.details.periodEndDate).day ?? 0
+        if daysUntilReset > 0 {
+            return "You've used all \(error.details.receiptsLimit) receipt uploads this month. Your limit resets in \(daysUntilReset) day\(daysUntilReset == 1 ? "" : "s")."
+        } else {
+            return "You've used all \(error.details.receiptsLimit) receipt uploads this month. Your limit resets soon."
         }
     }
 }
@@ -139,27 +177,43 @@ actor ReceiptUploadService {
                 if let jsonString = String(data: data, encoding: .utf8) {
                     print("📄 Raw server response:\n\(jsonString)")
                 }
-                
+
                 do {
                     let uploadResponse = try await decodeResponse(from: data)
-                    
+
                     print("✅ Successfully parsed response:")
                     print("   Receipt ID: \(uploadResponse.receiptId)")
                     print("   Status: \(uploadResponse.status.rawValue)")
                     print("   Items: \(uploadResponse.transactions.count)")
-                    
+
                     if uploadResponse.status == .failed {
                         throw ReceiptUploadError.serverError("Receipt processing failed")
                     }
-                    
+
                     return uploadResponse
                 } catch let decodingError as DecodingError {
                     print("❌ Decoding error: \(decodingError)")
                     logDecodingError(decodingError)
                     throw ReceiptUploadError.invalidResponse
                 }
-                
-            case 400...499:
+
+            case 429:
+                // Rate limit exceeded
+                print("⚠️ Receipt upload rate limit exceeded")
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    let rateLimitError = try decoder.decode(ReceiptRateLimitExceededError.self, from: data)
+                    print("   Used: \(rateLimitError.details.receiptsUsed)/\(rateLimitError.details.receiptsLimit)")
+                    throw ReceiptUploadError.rateLimitExceeded(rateLimitError)
+                } catch let error as ReceiptUploadError {
+                    throw error
+                } catch {
+                    print("❌ Failed to decode rate limit error: \(error)")
+                    throw ReceiptUploadError.serverError("Upload limit exceeded. Please try again later.")
+                }
+
+            case 400...428, 430...499:
                 if let errorMessage = try? JSONDecoder().decode([String: String].self, from: data),
                    let message = errorMessage["error"] ?? errorMessage["message"] {
                     throw ReceiptUploadError.serverError(message)

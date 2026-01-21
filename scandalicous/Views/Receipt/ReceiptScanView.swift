@@ -249,8 +249,21 @@ struct ReceiptScanView: View {
         } catch let error as ReceiptUploadError {
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
-                canRetryAfterError = true
-                errorMessage = error.localizedDescription
+
+                // Handle rate limit exceeded specially
+                if case .rateLimitExceeded = error {
+                    canRetryAfterError = false // Can't retry - need to wait
+                    errorMessage = error.rateLimitUserMessage ?? "Upload limit reached for this month."
+
+                    // Also sync rate limit manager
+                    Task {
+                        await RateLimitManager.shared.syncFromBackend()
+                    }
+                } else {
+                    canRetryAfterError = true
+                    errorMessage = error.localizedDescription
+                }
+
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }

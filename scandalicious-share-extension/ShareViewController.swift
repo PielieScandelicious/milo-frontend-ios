@@ -687,6 +687,13 @@ class ShareViewController: UIViewController {
                 return "Unable to upload receipt. Please try again later."
             case .networkError:
                 return "Please check your internet connection and try again."
+            case .rateLimitExceeded(let error):
+                let daysUntilReset = Calendar.current.dateComponents([.day], from: Date(), to: error.details.periodEndDate).day ?? 0
+                if daysUntilReset > 0 {
+                    return "Upload limit reached. Resets in \(daysUntilReset) day\(daysUntilReset == 1 ? "" : "s")."
+                } else {
+                    return "Upload limit reached for this month."
+                }
             }
         }
         

@@ -38,6 +38,7 @@ struct OverviewView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject var dataManager: StoreDataManager
+    @ObservedObject var rateLimitManager = RateLimitManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
     // Track the last time we checked for Share Extension uploads
@@ -70,7 +71,31 @@ struct OverviewView: View {
     
     // User defaults key for storing order
     private let orderStorageKey = "StoreBreakdownsOrder"
-    
+
+    // Receipt limit status icon
+    private var receiptLimitIcon: String {
+        switch rateLimitManager.receiptLimitState {
+        case .normal:
+            return "checkmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .exhausted:
+            return "xmark.circle.fill"
+        }
+    }
+
+    // Receipt limit status color
+    private var receiptLimitColor: Color {
+        switch rateLimitManager.receiptLimitState {
+        case .normal:
+            return .green
+        case .warning:
+            return .orange
+        case .exhausted:
+            return .red
+        }
+    }
+
     private var availablePeriods: [String] {
         // Only show periods that have actual data
         let periods = dataManager.breakdownsByPeriod().keys.sorted()
@@ -453,6 +478,11 @@ struct OverviewView: View {
             // Check for Share Extension uploads when view appears
             // This handles the case when user switches tabs
             checkForShareExtensionUploads()
+
+            // Fetch rate limit status when view appears
+            Task {
+                await rateLimitManager.syncFromBackend()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
             print("📬 Received receipt upload notification - refreshing backend data")
@@ -461,6 +491,9 @@ struct OverviewView: View {
                 try? await Task.sleep(for: .seconds(1))
                 await dataManager.refreshData(for: .month, periodString: selectedPeriod)
                 print("✅ Backend data refreshed after receipt upload for period: \(selectedPeriod)")
+
+                // Also refresh rate limit status
+                await rateLimitManager.syncFromBackend()
             }
         }
         .onChange(of: transactionManager.transactions) { oldValue, newValue in
@@ -611,7 +644,22 @@ struct OverviewView: View {
                             .font(.headline)
                     }
                 }
-                
+
+                // Receipt Upload Limit
+                Section {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) uploads remaining")
+                            Text(rateLimitManager.resetDaysFormatted)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: receiptLimitIcon)
+                            .foregroundColor(receiptLimitColor)
+                    }
+                }
+
                 // Sign Out
                 Section {
                     Button(role: .destructive) {

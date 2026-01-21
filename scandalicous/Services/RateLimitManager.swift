@@ -15,6 +15,9 @@ struct RateLimitStatusResponse: Codable {
     let messagesUsed: Int
     let messagesLimit: Int
     let messagesRemaining: Int
+    let receiptsUsed: Int
+    let receiptsLimit: Int
+    let receiptsRemaining: Int
     let periodStartDate: Date
     let periodEndDate: Date
     let daysUntilReset: Int
@@ -23,6 +26,9 @@ struct RateLimitStatusResponse: Codable {
         case messagesUsed = "messages_used"
         case messagesLimit = "messages_limit"
         case messagesRemaining = "messages_remaining"
+        case receiptsUsed = "receipts_used"
+        case receiptsLimit = "receipts_limit"
+        case receiptsRemaining = "receipts_remaining"
         case periodStartDate = "period_start_date"
         case periodEndDate = "period_end_date"
         case daysUntilReset = "days_until_reset"
@@ -51,6 +57,8 @@ struct RateLimitExceededError: Codable, Error {
 enum RateLimitConfig {
     /// Default message limit (backend is source of truth)
     static let defaultMessagesPerMonth: Int = 100
+    /// Default receipt upload limit (backend is source of truth)
+    static let defaultReceiptsPerMonth: Int = 15
 }
 
 // MARK: - Rate Limit Manager
@@ -61,7 +69,7 @@ enum RateLimitConfig {
 class RateLimitManager: ObservableObject {
     static let shared = RateLimitManager()
 
-    // MARK: - Published Properties
+    // MARK: - Published Properties (Messages)
 
     /// Current message count this period
     @Published private(set) var messagesUsed: Int = 0
@@ -71,6 +79,19 @@ class RateLimitManager: ObservableObject {
 
     /// Messages remaining
     @Published private(set) var messagesRemaining: Int = RateLimitConfig.defaultMessagesPerMonth
+
+    // MARK: - Published Properties (Receipts)
+
+    /// Current receipt upload count this period
+    @Published private(set) var receiptsUsed: Int = 0
+
+    /// Receipt upload limit for the period
+    @Published private(set) var receiptsLimit: Int = RateLimitConfig.defaultReceiptsPerMonth
+
+    /// Receipt uploads remaining
+    @Published private(set) var receiptsRemaining: Int = RateLimitConfig.defaultReceiptsPerMonth
+
+    // MARK: - Published Properties (Period)
 
     /// Period end date
     @Published private(set) var periodEndDate: Date?
@@ -89,20 +110,20 @@ class RateLimitManager: ObservableObject {
     private var currentUserId: String?
     private let userDefaults = UserDefaults.standard
 
-    // MARK: - Computed Properties
+    // MARK: - Computed Properties (Messages)
 
-    /// Whether user is rate limited
+    /// Whether user is rate limited for messages
     var isRateLimited: Bool {
         messagesRemaining <= 0
     }
 
-    /// Usage percentage (0.0 to 1.0)
+    /// Message usage percentage (0.0 to 1.0)
     var usagePercentage: Double {
         guard messagesLimit > 0 else { return 1.0 }
         return min(1.0, Double(messagesUsed) / Double(messagesLimit))
     }
 
-    /// Formatted usage string
+    /// Formatted message usage string
     var usageDisplayString: String {
         "\(messagesRemaining)/\(messagesLimit) messages left"
     }
@@ -121,6 +142,62 @@ class RateLimitManager: ObservableObject {
     /// Formatted reset date
     var resetDateFormatted: String {
         periodEndDate?.formatted(date: .abbreviated, time: .omitted) ?? "Unknown"
+    }
+
+    // MARK: - Computed Properties (Receipts)
+
+    /// Whether user has exhausted receipt uploads
+    var isReceiptLimitReached: Bool {
+        receiptsRemaining <= 0
+    }
+
+    /// Receipt usage percentage (0.0 to 1.0)
+    var receiptUsagePercentage: Double {
+        guard receiptsLimit > 0 else { return 1.0 }
+        return min(1.0, Double(receiptsUsed) / Double(receiptsLimit))
+    }
+
+    /// Formatted receipt usage string (e.g., "12/15 uploads remaining")
+    var receiptUsageDisplayString: String {
+        "\(receiptsRemaining)/\(receiptsLimit) uploads remaining"
+    }
+
+    /// Receipt limit state for UI display
+    var receiptLimitState: ReceiptLimitState {
+        if receiptsRemaining <= 0 {
+            return .exhausted
+        } else if receiptsRemaining <= 5 {
+            return .warning
+        } else {
+            return .normal
+        }
+    }
+
+    /// Message to display when receipt limit is reached
+    var receiptLimitMessage: String? {
+        guard isReceiptLimitReached else { return nil }
+        if daysUntilReset > 0 {
+            return "Upload limit reached. Resets in \(daysUntilReset) day\(daysUntilReset == 1 ? "" : "s")"
+        }
+        return "Upload limit reached for this period."
+    }
+
+    /// Reset days formatted string
+    var resetDaysFormatted: String {
+        if daysUntilReset == 0 {
+            return "Resets today"
+        } else if daysUntilReset == 1 {
+            return "Resets in 1 day"
+        } else {
+            return "Resets in \(daysUntilReset) days"
+        }
+    }
+
+    /// Enum for receipt limit states
+    enum ReceiptLimitState {
+        case normal   // >5 remaining
+        case warning  // 1-5 remaining
+        case exhausted // 0 remaining
     }
 
     // MARK: - Initialization
@@ -164,6 +241,9 @@ class RateLimitManager: ObservableObject {
         messagesUsed = 0
         messagesLimit = RateLimitConfig.defaultMessagesPerMonth
         messagesRemaining = RateLimitConfig.defaultMessagesPerMonth
+        receiptsUsed = 0
+        receiptsLimit = RateLimitConfig.defaultReceiptsPerMonth
+        receiptsRemaining = RateLimitConfig.defaultReceiptsPerMonth
         periodEndDate = nil
         daysUntilReset = 30
         lastSyncError = nil
@@ -187,11 +267,27 @@ class RateLimitManager: ObservableObject {
         return !isRateLimited
     }
 
-    /// Optimistically decrement the local counter (call after successful message)
+    /// Optimistically decrement the local message counter (call after successful message)
     func decrementLocal() {
         guard currentUserId != nil else { return }
         messagesUsed += 1
         messagesRemaining = max(0, messagesLimit - messagesUsed)
+        saveLocalState()
+        objectWillChange.send()
+    }
+
+    /// Check if user can upload a receipt
+    func canUploadReceipt() -> Bool {
+        // If we don't have user ID yet, allow upload - backend will enforce
+        if currentUserId == nil { return true }
+        return !isReceiptLimitReached
+    }
+
+    /// Optimistically decrement the local receipt counter (call after successful upload)
+    func decrementReceiptLocal() {
+        guard currentUserId != nil else { return }
+        receiptsUsed += 1
+        receiptsRemaining = max(0, receiptsLimit - receiptsUsed)
         saveLocalState()
         objectWillChange.send()
     }
@@ -224,6 +320,9 @@ class RateLimitManager: ObservableObject {
         messagesUsed = response.messagesUsed
         messagesLimit = response.messagesLimit
         messagesRemaining = response.messagesRemaining
+        receiptsUsed = response.receiptsUsed
+        receiptsLimit = response.receiptsLimit
+        receiptsRemaining = response.receiptsRemaining
         periodEndDate = response.periodEndDate
         daysUntilReset = response.daysUntilReset
         saveLocalState()
@@ -248,12 +347,29 @@ class RateLimitManager: ObservableObject {
         objectWillChange.send()
     }
 
-    /// Handle rate limit exceeded error from backend
+    /// Handle rate limit exceeded error from backend (messages)
     func handleRateLimitExceeded(_ error: RateLimitExceededError) {
         messagesUsed = error.messagesUsed
         messagesLimit = error.messagesLimit
         messagesRemaining = 0
         periodEndDate = error.periodEndDate
+
+        if let endDate = periodEndDate {
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.day], from: Date(), to: endDate)
+            daysUntilReset = max(0, components.day ?? 0)
+        }
+
+        saveLocalState()
+        objectWillChange.send()
+    }
+
+    /// Handle receipt rate limit exceeded error from backend
+    func handleReceiptRateLimitExceeded(_ error: ReceiptRateLimitExceededError) {
+        receiptsUsed = error.details.receiptsUsed
+        receiptsLimit = error.details.receiptsLimit
+        receiptsRemaining = 0
+        periodEndDate = error.details.periodEndDate
 
         if let endDate = periodEndDate {
             let calendar = Calendar.current
@@ -305,11 +421,22 @@ class RateLimitManager: ObservableObject {
 
     private func loadLocalState() {
         let prefix = storageKeyPrefix
+
+        // Messages
         messagesUsed = userDefaults.integer(forKey: "\(prefix)_messagesUsed")
         messagesLimit = userDefaults.integer(forKey: "\(prefix)_messagesLimit")
         if messagesLimit == 0 { messagesLimit = RateLimitConfig.defaultMessagesPerMonth }
         messagesRemaining = userDefaults.integer(forKey: "\(prefix)_messagesRemaining")
         if messagesRemaining == 0 && messagesUsed == 0 { messagesRemaining = messagesLimit }
+
+        // Receipts
+        receiptsUsed = userDefaults.integer(forKey: "\(prefix)_receiptsUsed")
+        receiptsLimit = userDefaults.integer(forKey: "\(prefix)_receiptsLimit")
+        if receiptsLimit == 0 { receiptsLimit = RateLimitConfig.defaultReceiptsPerMonth }
+        receiptsRemaining = userDefaults.integer(forKey: "\(prefix)_receiptsRemaining")
+        if receiptsRemaining == 0 && receiptsUsed == 0 { receiptsRemaining = receiptsLimit }
+
+        // Period
         daysUntilReset = userDefaults.integer(forKey: "\(prefix)_daysUntilReset")
         if daysUntilReset == 0 { daysUntilReset = 30 }
 
@@ -320,9 +447,18 @@ class RateLimitManager: ObservableObject {
 
     private func saveLocalState() {
         let prefix = storageKeyPrefix
+
+        // Messages
         userDefaults.set(messagesUsed, forKey: "\(prefix)_messagesUsed")
         userDefaults.set(messagesLimit, forKey: "\(prefix)_messagesLimit")
         userDefaults.set(messagesRemaining, forKey: "\(prefix)_messagesRemaining")
+
+        // Receipts
+        userDefaults.set(receiptsUsed, forKey: "\(prefix)_receiptsUsed")
+        userDefaults.set(receiptsLimit, forKey: "\(prefix)_receiptsLimit")
+        userDefaults.set(receiptsRemaining, forKey: "\(prefix)_receiptsRemaining")
+
+        // Period
         userDefaults.set(daysUntilReset, forKey: "\(prefix)_daysUntilReset")
         if let endDate = periodEndDate {
             userDefaults.set(endDate.timeIntervalSince1970, forKey: "\(prefix)_periodEndDate")
