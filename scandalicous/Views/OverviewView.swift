@@ -761,15 +761,15 @@ struct OverviewView: View {
                     .foregroundColor(.white.opacity(0.6))
                     .textCase(.uppercase)
                     .tracking(1.2)
-                
+
                 Text(String(format: "€%.0f", totalPeriodSpending))
                     .font(.system(size: 44, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 Text(selectedPeriod)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
-                
+
                 // Last updated indicator
                 if let lastFetch = dataManager.lastFetchDate {
                     Text("Updated \(timeAgo(from: lastFetch))")
@@ -780,16 +780,27 @@ struct OverviewView: View {
             }
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.05))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
         }
         .buttonStyle(TotalSpendingCardButtonStyle())
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .overlay(alignment: .bottomLeading) {
+            if totalPeriodSpending > 0 {
+                InsightButton(insightType: .totalSpending(
+                    amount: totalPeriodSpending,
+                    period: selectedPeriod,
+                    storeCount: currentBreakdowns.count,
+                    topStore: currentBreakdowns.first?.storeName
+                ))
+                .padding(12)
+            }
+        }
         .padding(.horizontal)
     }
     
@@ -817,6 +828,7 @@ struct OverviewView: View {
         // Use the average health score from the data manager (fetched from backend)
         // Only show score if there are breakdowns for the current period
         let averageScore: Double? = currentBreakdowns.isEmpty ? nil : dataManager.averageHealthScore
+        let totalVisits = currentBreakdowns.reduce(0) { $0 + $1.visitCount }
 
         return Button {
             showingHealthScoreTransactions = true
@@ -849,10 +861,9 @@ struct OverviewView: View {
                 }
 
                 HStack(alignment: .center, spacing: 16) {
-                    HealthScoreGauge(
+                    LiquidGaugeView(
                         score: averageScore,
                         size: 70,
-                        showTrend: false,
                         showLabel: false
                     )
 
@@ -880,16 +891,26 @@ struct OverviewView: View {
                 }
             }
             .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.05))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
         }
         .buttonStyle(TotalSpendingCardButtonStyle())
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .overlay(alignment: .bottomTrailing) {
+            if averageScore != nil {
+                InsightButton(insightType: .healthScore(
+                    score: averageScore,
+                    period: selectedPeriod,
+                    totalItems: totalVisits
+                ))
+                .padding(12)
+            }
+        }
         .padding(.horizontal)
     }
 
