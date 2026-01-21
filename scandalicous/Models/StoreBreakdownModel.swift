@@ -88,10 +88,13 @@ class StoreDataManager: ObservableObject {
     // MARK: - Fetch Data from Backend
     
     /// Fetch analytics data from backend API - Initial load
-    func fetchFromBackend(for period: PeriodType = .month) async {
+    /// - Parameters:
+    ///   - period: The period type (week/month/year)
+    ///   - periodString: Optional specific period string like "January 2026" to fetch that exact period
+    func fetchFromBackend(for period: PeriodType = .month, periodString: String? = nil) async {
         // Only show full loading indicator on initial fetch
         let isInitialFetch = !hasInitiallyFetched
-        
+
         await MainActor.run {
             if isInitialFetch {
                 isLoading = true
@@ -100,19 +103,32 @@ class StoreDataManager: ObservableObject {
             }
             error = nil
         }
-        
+
         do {
-            print("📥 Fetching analytics from backend for period: \(period.rawValue)")
-            
+            print("📥 Fetching analytics from backend for period: \(period.rawValue), periodString: \(periodString ?? "nil")")
+
             // Create filters for the selected period
             let filters: AnalyticsFilters
-            switch period {
-            case .week:
-                filters = .thisWeek
-            case .month:
-                filters = .thisMonth
-            case .year:
-                filters = .thisYear
+
+            // If a specific period string is provided (e.g., "December 2025"), use its dates
+            if let periodString = periodString {
+                let (startDateStr, endDateStr) = parsePeriodToDates(periodString, periodType: period)
+                var customFilters = AnalyticsFilters()
+                customFilters.period = period
+                customFilters.startDate = DateFormatter.yyyyMMdd.date(from: startDateStr)
+                customFilters.endDate = DateFormatter.yyyyMMdd.date(from: endDateStr)
+                filters = customFilters
+                print("   Using custom date range: \(startDateStr) to \(endDateStr)")
+            } else {
+                // Default to current period
+                switch period {
+                case .week:
+                    filters = .thisWeek
+                case .month:
+                    filters = .thisMonth
+                case .year:
+                    filters = .thisYear
+                }
             }
             
             // Fetch summary from backend
@@ -189,8 +205,11 @@ class StoreDataManager: ObservableObject {
     }
     
     /// Refresh data from backend - for pull-to-refresh
-    func refreshData(for period: PeriodType = .month) async {
-        await fetchFromBackend(for: period)
+    /// - Parameters:
+    ///   - period: The period type (week/month/year)
+    ///   - periodString: Optional specific period string like "January 2026" to refresh that exact period
+    func refreshData(for period: PeriodType = .month, periodString: String? = nil) async {
+        await fetchFromBackend(for: period, periodString: periodString)
     }
     
     // MARK: - Convert API Response to StoreBreakdown

@@ -257,7 +257,7 @@ struct OverviewView: View {
                     
                     Button {
                         Task {
-                            await dataManager.fetchFromBackend(for: .month)
+                            await dataManager.fetchFromBackend(for: .month, periodString: selectedPeriod)
                         }
                     } label: {
                         Label("Retry", systemImage: "arrow.clockwise")
@@ -302,15 +302,16 @@ struct OverviewView: View {
                 .refreshable {
                     // Pull to refresh - smooth animation
                     let startTime = Date()
-                    
-                    await dataManager.refreshData(for: .month)
-                    
+
+                    // Refresh data for the currently selected period
+                    await dataManager.refreshData(for: .month, periodString: selectedPeriod)
+
                     // Ensure minimum refresh duration for smooth UX (at least 0.8 seconds)
                     let elapsed = Date().timeIntervalSince(startTime)
                     if elapsed < 0.8 {
                         try? await Task.sleep(for: .seconds(0.8 - elapsed))
                     }
-                    
+
                     // Add haptic feedback on completion
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
@@ -442,8 +443,8 @@ struct OverviewView: View {
             Task {
                 // Wait a moment for backend to fully process
                 try? await Task.sleep(for: .seconds(1))
-                await dataManager.refreshData(for: .month)
-                print("✅ Backend data refreshed after receipt upload")
+                await dataManager.refreshData(for: .month, periodString: selectedPeriod)
+                print("✅ Backend data refreshed after receipt upload for period: \(selectedPeriod)")
             }
         }
         .onChange(of: transactionManager.transactions) { oldValue, newValue in
