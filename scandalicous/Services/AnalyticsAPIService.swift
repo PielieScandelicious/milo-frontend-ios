@@ -109,7 +109,28 @@ actor AnalyticsAPIService {
             queryItems: filters.toQueryItems()
         )
     }
-    
+
+    /// Delete transactions for a specific store within a time period
+    /// - Parameters:
+    ///   - storeName: Name of the store
+    ///   - period: Period type (week, month, year)
+    ///   - startDate: Start date for the period
+    ///   - endDate: End date for the period
+    func deleteTransactions(storeName: String, period: String, startDate: String, endDate: String) async throws -> DeleteTransactionsResponse {
+        let requestBody = DeleteTransactionsRequest(
+            storeName: storeName,
+            period: period,
+            startDate: startDate,
+            endDate: endDate
+        )
+
+        return try await performRequestWithBody(
+            endpoint: "/transactions",
+            method: "DELETE",
+            body: requestBody
+        )
+    }
+
     // MARK: - Helper Methods
     
     private func performRequest<T: Decodable>(
@@ -192,7 +213,80 @@ actor AnalyticsAPIService {
             throw AnalyticsAPIError.networkError(error)
         }
     }
-    
+
+    private func performRequestWithBody<T: Decodable, B: Encodable>(
+        endpoint: String,
+        method: String,
+        body: B
+    ) async throws -> T {
+        // Build URL
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            throw AnalyticsAPIError.invalidURL
+        }
+
+        // Log the request
+        print("📡 API Request: \(method) \(url.absoluteString)")
+
+        // Get auth token
+        let token = try await getAuthToken()
+
+        // Create request
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 30
+
+        // Encode body
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        request.httpBody = try encoder.encode(body)
+
+        // Perform request
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AnalyticsAPIError.invalidResponse
+            }
+
+            // Handle status codes
+            switch httpResponse.statusCode {
+            case 200...299:
+                do {
+                    let decodedResponse = try decoder.decode(T.self, from: data)
+                    return decodedResponse
+                } catch let decodingError as DecodingError {
+                    logDecodingError(decodingError, data: data, endpoint: endpoint)
+                    throw AnalyticsAPIError.decodingError(decodingError.localizedDescription)
+                }
+
+            case 401:
+                throw AnalyticsAPIError.unauthorized
+
+            case 404:
+                throw AnalyticsAPIError.notFound
+
+            case 400...499:
+                let errorMessage = parseErrorMessage(from: data) ?? "Client error: \(httpResponse.statusCode)"
+                throw AnalyticsAPIError.serverError(errorMessage)
+
+            case 500...599:
+                let errorMessage = parseErrorMessage(from: data) ?? "Server error: \(httpResponse.statusCode)"
+                throw AnalyticsAPIError.serverError(errorMessage)
+
+            default:
+                throw AnalyticsAPIError.serverError("Unexpected status code: \(httpResponse.statusCode)")
+            }
+
+        } catch let error as AnalyticsAPIError {
+            throw error
+        } catch {
+            throw AnalyticsAPIError.networkError(error)
+        }
+    }
+
     private func getAuthToken() async throws -> String {
         guard let user = Auth.auth().currentUser else {
             throw AnalyticsAPIError.noAuthToken
@@ -275,5 +369,31 @@ extension AnalyticsAPIService {
     /// Nonisolated wrapper for fetchTransactions
     nonisolated func getTransactions(filters: TransactionFilters = TransactionFilters()) async throws -> TransactionsResponse {
         return try await fetchTransactions(filters: filters)
+    }
+
+    /// Nonisolated wrapper for deleteTransactions
+    nonisolated func removeTransactions(storeName: String, period: String, startDate: String, endDate: String) async throws -> DeleteTransactionsResponse {
+        return try await deleteTransactions(storeName: storeName, period: period, startDate: startDate, endDate: endDate)
+    }
+}
+
+// MARK: - Delete Transactions Models
+
+struct DeleteTransactionsRequest: Encodable {
+    let storeName: String
+    let period: String
+    let startDate: String
+    let endDate: String
+}
+
+struct DeleteTransactionsResponse: Decodable {
+    let success: Bool
+    let deletedCount: Int
+    let message: String
+
+    enum CodingKeys: String, CodingKey {
+        case success
+        case deletedCount = "deleted_count"
+        case message
     }
 }

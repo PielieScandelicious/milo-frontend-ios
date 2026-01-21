@@ -180,16 +180,30 @@ struct OverviewView: View {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             for index in offsets {
                 let breakdown = displayedBreakdowns[index]
-                dataManager.deleteBreakdown(breakdown)
+                dataManager.deleteBreakdownLocally(breakdown)
             }
             updateDisplayedBreakdowns()
         }
     }
-    
-    private func deleteBreakdown(_ breakdown: StoreBreakdown) {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            dataManager.deleteBreakdown(breakdown)
-            displayedBreakdowns.removeAll { $0.id == breakdown.id }
+
+    private func deleteBreakdown(_ breakdown: StoreBreakdown) async {
+        // Determine period type from selected period
+        let periodType: PeriodType = {
+            switch selectedPeriod.lowercased() {
+            case let p where p.contains("week"): return .week
+            case let p where p.contains("year"): return .year
+            default: return .month
+            }
+        }()
+
+        let success = await dataManager.deleteBreakdown(breakdown, periodType: periodType)
+
+        if success {
+            await MainActor.run {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    displayedBreakdowns.removeAll { $0.id == breakdown.id }
+                }
+            }
         }
     }
     
@@ -363,10 +377,10 @@ struct OverviewView: View {
                 // Haptic feedback
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.impactOccurred()
-                
+
                 if let breakdown = breakdownToDelete {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        deleteBreakdown(breakdown)
+                    Task {
+                        await deleteBreakdown(breakdown)
                     }
                 }
                 breakdownToDelete = nil
@@ -376,6 +390,34 @@ struct OverviewView: View {
             }
         } message: {
             Text("This will remove all transactions for this store from \(selectedPeriod). This action cannot be undone.")
+        }
+        .alert("Delete Failed", isPresented: .init(
+            get: { dataManager.deleteError != nil },
+            set: { if !$0 { dataManager.deleteError = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                dataManager.deleteError = nil
+            }
+        } message: {
+            Text(dataManager.deleteError ?? "An error occurred while deleting.")
+        }
+        .overlay {
+            if dataManager.isDeleting {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
+                        Text("Deleting...")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    .padding(30)
+                    .background(Color(white: 0.15).cornerRadius(16))
+                }
+            }
         }
         .onAppear {
             // Configure with transaction manager if not already configured
@@ -640,7 +682,7 @@ struct OverviewView: View {
 
         return VStack(spacing: 12) {
             HStack {
-                Image(systemName: "heart.text.square.fill")
+                Image(systemName: "heart.fill")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(averageScore.healthScoreColor)
 
