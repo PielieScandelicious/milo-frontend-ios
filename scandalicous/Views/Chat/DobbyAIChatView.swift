@@ -9,15 +9,18 @@
 import SwiftUI
 import Combine
 import FirebaseAuth
+import StoreKit
 
 struct ScandaLiciousAIChatView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var viewModel = ChatViewModel()
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     @State private var scrollOffset: CGFloat = 0
     @State private var showWelcome = true
+    @State private var showManageSubscription = false
     @Binding var showSignOutConfirmation: Bool
     
     var body: some View {
@@ -147,7 +150,20 @@ struct ScandaLiciousAIChatView: View {
                                 .font(.headline)
                         }
                     }
-                    
+
+                    // Subscription Management
+                    Section {
+                        // Show subscription status
+                        Label(subscriptionManager.subscriptionStatus.displayText, systemImage: "crown.fill")
+
+                        // Manage subscription button
+                        Button {
+                            showManageSubscription = true
+                        } label: {
+                            Label("Manage Subscription", systemImage: "creditcard")
+                        }
+                    }
+
                     // Sign Out
                     Section {
                         Button(role: .destructive) {
@@ -162,7 +178,7 @@ struct ScandaLiciousAIChatView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             // Clear chat button - trailing (right side)
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -180,6 +196,7 @@ struct ScandaLiciousAIChatView: View {
                 }
             }
         }
+        .manageSubscriptionsSheet(isPresented: $showManageSubscription)
         .onAppear {
             viewModel.setTransactions(transactionManager.transactions)
         }
@@ -224,11 +241,11 @@ struct WelcomeView: View {
     @Binding var messageText: String
     @FocusState.Binding var isInputFocused: Bool
     let onSend: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-            
+
             // Hero section
             VStack(spacing: 16) {
                 // Purple AI magic stars logo - transparent background
@@ -240,16 +257,16 @@ struct WelcomeView: View {
                         Color(red: 0.55, green: 0.25, blue: 0.95)   // Slightly lighter purple accent
                     )
                     .padding(.bottom, 8)
-                
+
                 Text("Dobby")
                     .font(.system(size: 34, weight: .bold))
-                
+
                 Text("Your AI shopping assistant")
                     .font(.system(size: 17))
                     .foregroundStyle(.secondary)
             }
             .padding(.bottom, 40)
-            
+
             // Sample prompts
             VStack(spacing: 12) {
                 SamplePromptCard(
@@ -261,7 +278,7 @@ struct WelcomeView: View {
                     messageText = "Do I have enough protein in my diet?"
                     onSend()
                 }
-                
+
                 SamplePromptCard(
                     icon: "chart.pie.fill",
                     iconColor: .orange,
@@ -271,7 +288,7 @@ struct WelcomeView: View {
                     messageText = "What's my biggest expense category?"
                     onSend()
                 }
-                
+
                 SamplePromptCard(
                     icon: "cart.fill",
                     iconColor: .blue,
@@ -281,7 +298,7 @@ struct WelcomeView: View {
                     messageText = "Am I buying enough vegetables?"
                     onSend()
                 }
-                
+
                 SamplePromptCard(
                     icon: "dollarsign.circle.fill",
                     iconColor: .green,
@@ -292,7 +309,7 @@ struct WelcomeView: View {
                     onSend()
                 }
             }
-            
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
