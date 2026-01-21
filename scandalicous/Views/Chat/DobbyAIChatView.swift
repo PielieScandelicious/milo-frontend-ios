@@ -155,13 +155,11 @@ struct ScandaLiciousAIChatView: View {
 
                     // Usage & Subscription
                     Section {
-                        // Rate limit usage display
-                        Label {
-                            Text(rateLimitManager.usageDisplayString)
-                        } icon: {
-                            Image(systemName: usageIconName)
-                                .foregroundStyle(usageColor)
+                        // Rate limit usage display with smart color
+                        Button(action: {}) {
+                            Label(rateLimitManager.usageDisplayString, systemImage: usageIconName)
                         }
+                        .tint(usageColor)
 
                         // Show subscription status
                         Label(subscriptionManager.subscriptionStatus.displayText, systemImage: "crown.fill")
