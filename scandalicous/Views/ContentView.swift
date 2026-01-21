@@ -11,8 +11,15 @@ import FirebaseAuth
 struct ContentView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @StateObject private var transactionManager = TransactionManager()
-    @State private var selectedTab = 0
+    @State private var selectedTab: Tab = .view
     @State private var showSignOutConfirmation = false
+    
+    enum Tab: Int, Hashable {
+        case view = 0
+        case scan = 1
+        case scandaLicious = 2
+        case profile = 3
+    }
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -20,28 +27,31 @@ struct ContentView: View {
                 .tabItem {
                     Label("View", systemImage: "chart.pie.fill")
                 }
-                .tag(0)
+                .tag(Tab.view)
             
             ScanTab()
                 .tabItem {
                     Label("Scan", systemImage: "qrcode.viewfinder")
                 }
-                .tag(1)
+                .tag(Tab.scan)
             
             ScandaLiciousTab()
                 .tabItem {
                     Label("ScandaLicious", systemImage: "sparkles")
                 }
-                .tag(2)
+                .tag(Tab.scandaLicious)
             
             ProfileTab(showSignOutConfirmation: $showSignOutConfirmation)
                 .tabItem {
                     Label("Profile", systemImage: "person.circle.fill")
                 }
-                .tag(3)
+                .tag(Tab.profile)
         }
         .environmentObject(transactionManager)
         .preferredColorScheme(.dark)
+        .onChange(of: selectedTab) { oldValue, newValue in
+            print("🔄 Tab changed: \(oldValue.rawValue) → \(newValue.rawValue)")
+        }
         .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
             Button("Sign Out", role: .destructive) {
                 do {
@@ -67,6 +77,7 @@ struct ViewTab: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar(.hidden, for: .navigationBar)
         }
+        .id("ViewTab") // Prevent recreation
     }
 }
 
@@ -77,6 +88,7 @@ struct ScanTab: View {
             ReceiptScanView()
                 .toolbar(.hidden, for: .navigationBar)
         }
+        .id("ScanTab") // Prevent recreation
     }
 }
 
@@ -87,6 +99,7 @@ struct ScandaLiciousTab: View {
             ScandaLiciousAIChatView()
                 .toolbarBackground(.hidden, for: .navigationBar)
         }
+        .id("ScandaLiciousTab") // Prevent recreation
     }
 }
 

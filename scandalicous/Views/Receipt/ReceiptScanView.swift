@@ -113,6 +113,10 @@ struct ReceiptScanView: View {
             DocumentScannerView(capturedImage: $capturedImage)
         }
         .sheet(isPresented: $showReceiptDetails) {
+            // Clean up state when sheet is dismissed
+            showReceiptDetails = false
+            uploadedReceipt = nil
+        } content: {
             if let receipt = uploadedReceipt {
                 ReceiptDetailsView(receipt: receipt)
             }
@@ -291,10 +295,10 @@ struct ReceiptScanView: View {
                     print("   Total: €\(response.totalAmount ?? 0.0)")
                     print("   Items: \(response.transactions.count)")
                     
-                    // Convert and save transactions
-                    let newTransactions = convertReceiptToTransactions(response)
-                    transactionManager.addTransactions(newTransactions)
-                    print("✅ Added \(newTransactions.count) transactions to manager")
+                    // ✅ Receipt is already uploaded to backend!
+                    // Post notification to refresh View tab data
+                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
+                    print("✅ Posted notification to refresh backend data")
                     
                     // Success haptic
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -341,26 +345,6 @@ struct ReceiptScanView: View {
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
-        }
-    }
-    
-    // MARK: - Convert Receipt to Transactions
-    
-    private func convertReceiptToTransactions(_ receipt: ReceiptUploadResponse) -> [Transaction] {
-        let storeName = receipt.storeName ?? "Unknown Store"
-        let date = receipt.parsedDate ?? Date()
-        
-        return receipt.transactions.map { receiptTransaction in
-            Transaction(
-                id: UUID(),
-                storeName: storeName,
-                category: receiptTransaction.category.displayName,
-                itemName: receiptTransaction.itemName,
-                amount: receiptTransaction.itemPrice,
-                date: date,
-                quantity: receiptTransaction.quantity,
-                paymentMethod: "Unknown" // Receipt doesn't contain payment method info
-            )
         }
     }
 }

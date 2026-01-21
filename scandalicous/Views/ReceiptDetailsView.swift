@@ -52,6 +52,8 @@ struct ReceiptDetailsView: View {
                 }
             }
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
     
     // MARK: - Header Section

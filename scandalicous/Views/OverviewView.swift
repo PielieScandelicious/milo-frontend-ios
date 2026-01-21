@@ -1,4 +1,5 @@
 //
+//
 //  OverviewView.swift
 //  dobby-ios
 //
@@ -7,6 +8,11 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+
+// MARK: - Notification for Receipt Upload Success
+extension Notification.Name {
+    static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")
+}
 
 enum SortOption: String, CaseIterable {
     case highestSpend = "Highest Spend"
@@ -230,6 +236,15 @@ struct OverviewView: View {
             // Fetch data from backend
             Task {
                 await dataManager.fetchFromBackend(for: .month)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
+            print("📬 Received receipt upload notification - refreshing backend data")
+            Task {
+                // Wait a moment for backend to fully process
+                try? await Task.sleep(for: .seconds(1))
+                await dataManager.fetchFromBackend(for: .month)
+                print("✅ Backend data refreshed after receipt upload")
             }
         }
         .onChange(of: transactionManager.transactions) { oldValue, newValue in
