@@ -202,6 +202,7 @@ struct OverviewView: View {
             await MainActor.run {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                     displayedBreakdowns.removeAll { $0.id == breakdown.id }
+                    isEditMode = false
                 }
             }
         }
