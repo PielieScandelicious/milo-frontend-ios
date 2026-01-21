@@ -280,7 +280,7 @@ struct ShareExtensionView: View {
                 
                 // Handle UIImage
                 if let image = item as? UIImage {
-                    if let data = image.jpegData(compressionQuality: 0.9) {
+                    if let data = image.jpegData(compressionQuality: 1.0) {
                         continuation.resume(returning: data)
                     } else {
                         continuation.resume(throwing: ReceiptUploadError.serverError("Failed to convert image to JPEG"))
@@ -330,7 +330,7 @@ struct ShareExtensionView: View {
     // MARK: - Upload
     
     private func uploadData(_ data: Data, filename: String, contentType: String) async throws -> ReceiptUploadResponse {
-        guard let url = URL(string: "\(AppConfiguration.backendBaseURL)/api/v1/receipts/upload") else {
+        guard let url = URL(string: "\(AppConfiguration.backendBaseURL)/api/v3/receipts/upload") else {
             throw ReceiptUploadError.serverError("Invalid upload URL")
         }
         

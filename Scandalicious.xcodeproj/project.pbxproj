@@ -420,7 +420,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Scandalicious-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Scandelicious;
+				INFOPLIST_KEY_CFBundleDisplayName = dobby;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -432,7 +432,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 4.20;
 				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -458,7 +458,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Scandalicious-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Scandelicious;
+				INFOPLIST_KEY_CFBundleDisplayName = dobby;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Dobby needs camera access to scan receipts and automatically categorize your expenses";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -470,7 +470,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 4.20;
 				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

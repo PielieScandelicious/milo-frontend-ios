@@ -35,7 +35,7 @@ enum ReceiptUploadError: LocalizedError {
 actor ReceiptUploadService {
     static let shared = ReceiptUploadService()
     
-    private let baseURL = "https://scandalicious-api-production.up.railway.app/api/v1"
+    private let baseURL = "https://scandalicious-api-production.up.railway.app/api/v3"
     
     private init() {}
     
@@ -43,17 +43,16 @@ actor ReceiptUploadService {
     
     func uploadReceipt(image: UIImage) async throws -> ReceiptUploadResponse {
         print("🚀 Starting receipt upload process")
-        
+
         // Get auth token
         let idToken = try await getAuthToken()
-        
-        // Optimize image for upload while maintaining quality
-        // Use higher compression quality (0.9) since we've already verified quality
-        guard let imageData = optimizeImage(image, targetQuality: 0.9) else {
+
+        // Convert image to JPEG without compression
+        guard let imageData = image.jpegData(compressionQuality: 1.0) else {
             throw ReceiptUploadError.noImage
         }
-        
-        print("📦 Image optimized: \(imageData.count / 1024)KB")
+
+        print("📦 Image size: \(imageData.count / 1024)KB")
         
         // Create multipart form data for SINGLE receipt upload
         let boundary = UUID().uuidString
@@ -81,33 +80,6 @@ actor ReceiptUploadService {
         
         // Use shared upload logic
         return try await performUpload(request: request)
-    }
-    
-    // MARK: - Image Optimization
-    
-    /// Optimizes image for upload while maintaining readability
-    private func optimizeImage(_ image: UIImage, targetQuality: CGFloat) -> Data? {
-        // Ensure image is in a reasonable size range for API processing
-        let maxDimension: CGFloat = 2400 // Optimal for Claude Vision API
-        let size = image.size
-        
-        var optimizedImage = image
-        
-        // Resize if needed while maintaining aspect ratio
-        if size.width > maxDimension || size.height > maxDimension {
-            let scale = min(maxDimension / size.width, maxDimension / size.height)
-            let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-            
-            let renderer = UIGraphicsImageRenderer(size: newSize)
-            optimizedImage = renderer.image { context in
-                image.draw(in: CGRect(origin: .zero, size: newSize))
-            }
-            
-            print("📐 Resized image from \(size) to \(newSize)")
-        }
-        
-        // Convert to JPEG with specified quality
-        return optimizedImage.jpegData(compressionQuality: targetQuality)
     }
     
     // MARK: - Upload PDF Receipt
