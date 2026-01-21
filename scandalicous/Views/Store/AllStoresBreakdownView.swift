@@ -52,26 +52,31 @@ struct AllStoresBreakdownView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 6) {
-                        Text("Stores")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                        
-                        Text(period)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
+                    // Header - clickable to view all transactions
+                    Button {
+                        showingAllTransactions = true
+                    } label: {
+                        VStack(spacing: 6) {
+                            Text("Stores")
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            
+                            Text(period)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.white.opacity(0.05))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
                     }
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.white.opacity(0.05))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
+                    .buttonStyle(StoresHeaderButtonStyle())
                     .padding(.horizontal)
                     
                     // Large combined donut chart
@@ -215,6 +220,18 @@ struct StoreChartSegment: Identifiable {
     let storeName: String
     let amount: Double
     let percentage: Int
+}
+
+// MARK: - Button Styles
+// Note: DonutChartButtonStyle is defined in StoreDetailView.swift
+
+struct StoresHeaderButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
 }
 
 // MARK: - Preview

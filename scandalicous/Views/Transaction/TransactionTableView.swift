@@ -188,7 +188,12 @@ struct TransactionTableView: View {
         
         // Configure filters
         var filters = TransactionFilters()
-        filters.storeName = storeName
+        
+        // Only filter by store name if it's not "All Stores"
+        if storeName != "All Stores" {
+            filters.storeName = storeName
+        }
+        
         filters.startDate = startDate
         filters.endDate = endDate
         
