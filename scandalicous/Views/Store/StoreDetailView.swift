@@ -76,21 +76,16 @@ struct StoreDetailView: View {
                     .buttonStyle(StoreHeaderButtonStyle())
                     .padding(.horizontal)
                     
-                    // Large donut chart - clickable to view all transactions
+                    // Large donut chart - tap to flip to bar chart
                     VStack(spacing: 20) {
-                        Button {
-                            showingAllTransactions = true
-                        } label: {
-                            DonutChartView(
-                                title: "",
-                                subtitle: "visits",
-                                totalAmount: Double(storeBreakdown.visitCount),
-                                segments: storeBreakdown.categories.toChartSegments(),
-                                size: 220
-                            )
-                            .padding(.top, 20)
-                        }
-                        .buttonStyle(DonutChartButtonStyle())
+                        FlippableDonutChartView(
+                            title: "",
+                            subtitle: "visits",
+                            totalAmount: Double(storeBreakdown.visitCount),
+                            segments: storeBreakdown.categories.toChartSegments(),
+                            size: 220
+                        )
+                        .padding(.top, 20)
                         
                         // Legend with tap interaction
                         VStack(spacing: 12) {

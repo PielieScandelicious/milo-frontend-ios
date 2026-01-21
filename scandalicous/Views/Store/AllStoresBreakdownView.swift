@@ -82,20 +82,15 @@ struct AllStoresBreakdownView: View {
                     .buttonStyle(StoresHeaderButtonStyle())
                     .padding(.horizontal)
                     
-                    // Large combined donut chart
+                    // Large combined donut chart - tap to flip to bar chart
                     VStack(spacing: 32) {
-                        Button {
-                            showingAllTransactions = true
-                        } label: {
-                            AllStoresDonutChart(
-                                totalAmount: totalSpending,
-                                segments: storeSegments,
-                                size: 220
-                            )
-                            .padding(.top, 24)
-                            .padding(.bottom, 12)
-                        }
-                        .buttonStyle(DonutChartButtonStyle())
+                        FlippableAllStoresChartView(
+                            totalAmount: totalSpending,
+                            segments: storeSegments,
+                            size: 220
+                        )
+                        .padding(.top, 24)
+                        .padding(.bottom, 12)
                         
                         // Legend
                         VStack(spacing: 12) {
