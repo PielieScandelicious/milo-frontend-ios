@@ -26,13 +26,6 @@ struct ReceiptDetailsView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Receipt Details")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
             .onAppear {
                 print("📋 ReceiptDetailsView appeared")
                 print("   Receipt ID: \(receipt.receiptId)")
