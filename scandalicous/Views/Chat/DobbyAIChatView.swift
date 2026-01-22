@@ -146,8 +146,8 @@ struct ScandaLiciousAIChatView: View {
         .navigationTitle(viewModel.messages.isEmpty ? "" : "Dobby")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Profile button - leading (left side)
-            ToolbarItem(placement: .navigationBarLeading) {
+            // Profile button - trailing (right side)
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     // User Email
                     if let user = authManager.user {
@@ -206,20 +206,22 @@ struct ScandaLiciousAIChatView: View {
                 }
             }
 
-            // Clear chat button - trailing (right side)
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button(role: .destructive) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            viewModel.clearConversation()
-                            showWelcome = true
+            // Clear chat button - leading (left side), only visible when chat is active
+            ToolbarItem(placement: .navigationBarLeading) {
+                if !viewModel.messages.isEmpty {
+                    Menu {
+                        Button(role: .destructive) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                viewModel.clearConversation()
+                                showWelcome = true
+                            }
+                        } label: {
+                            Label("Clear Chat", systemImage: "trash")
                         }
                     } label: {
-                        Label("Clear Chat", systemImage: "trash")
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(.secondary)
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(.secondary)
                 }
             }
         }
