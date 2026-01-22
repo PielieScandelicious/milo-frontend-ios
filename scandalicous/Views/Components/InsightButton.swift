@@ -14,6 +14,9 @@ struct InsightButton: View {
 
     @State private var showingInsight = false
 
+    // Dobby purple - matches the chat icon
+    private let dobbyPurple = Color(red: 0.45, green: 0.15, blue: 0.85)
+
     var body: some View {
         Button {
             showingInsight = true
@@ -24,16 +27,16 @@ struct InsightButton: View {
                 Text("Daily Insight")
                     .font(.system(size: 11, weight: .medium))
             }
-            .foregroundColor(.purple)
+            .foregroundColor(dobbyPurple)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
                 Capsule()
-                    .fill(Color.purple.opacity(0.15))
+                    .fill(dobbyPurple.opacity(0.15))
             )
             .overlay(
                 Capsule()
-                    .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                    .stroke(dobbyPurple.opacity(0.3), lineWidth: 1)
             )
         }
         .buttonStyle(InsightButtonStyle())

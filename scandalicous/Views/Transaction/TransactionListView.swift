@@ -350,7 +350,7 @@ struct TransactionListView: View {
                 .foregroundColor(searchText.isEmpty ? .white.opacity(0.4) : .white.opacity(0.6))
             
             // Text field
-            TextField("Search transactions", text: $searchText)
+            TextField("Search Items", text: $searchText)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white)
                 .accentColor(.blue)

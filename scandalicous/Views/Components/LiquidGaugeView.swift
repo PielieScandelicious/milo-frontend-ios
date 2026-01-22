@@ -22,7 +22,62 @@ struct LiquidGaugeView: View {
 
     private var normalizedScore: CGFloat {
         guard let score = score else { return 0 }
-        return CGFloat(score / 5.0)
+        let linearProgress = CGFloat(score / 5.0)
+        // Convert linear progress to height that fills the correct circular AREA
+        // This makes visual perception match the actual score percentage
+        return circularAreaToHeight(linearProgress)
+    }
+
+    /// Converts a desired fill percentage (0-1) to the height needed in a circle
+    /// so that the filled AREA matches the percentage, not just the height
+    private func circularAreaToHeight(_ targetAreaFraction: CGFloat) -> CGFloat {
+        // For a circle, filling to height h doesn't fill h% of the area
+        // We need to solve for h such that the circular segment area equals the target
+        // Using Newton-Raphson approximation for efficiency
+
+        guard targetAreaFraction > 0 else { return 0 }
+        guard targetAreaFraction < 1 else { return 1 }
+
+        // Binary search for the height that gives us the target area fraction
+        var low: CGFloat = 0
+        var high: CGFloat = 1
+        let tolerance: CGFloat = 0.001
+
+        for _ in 0..<20 { // Max 20 iterations
+            let mid = (low + high) / 2
+            let areaAtMid = circularSegmentAreaFraction(height: mid)
+
+            if abs(areaAtMid - targetAreaFraction) < tolerance {
+                return mid
+            }
+
+            if areaAtMid < targetAreaFraction {
+                low = mid
+            } else {
+                high = mid
+            }
+        }
+
+        return (low + high) / 2
+    }
+
+    /// Calculates what fraction of a circle's area is filled when filled to a given height (0-1)
+    private func circularSegmentAreaFraction(height: CGFloat) -> CGFloat {
+        // For a unit circle centered at (0, 0), water at height h from bottom
+        // means water surface is at y = h - 1 (since circle goes from -1 to 1)
+        // Area below y = circular segment area
+
+        let h = height * 2 - 1 // Convert 0-1 height to -1 to 1 coordinate
+
+        // Area of circular segment below height h for unit circle
+        // A = (1/2) * (arccos(-h) - (-h) * sqrt(1 - h²))
+        // Normalized to total circle area (π)
+
+        let clampedH = max(-1, min(1, h))
+        let theta = acos(-clampedH)
+        let segmentArea = theta - (-clampedH) * sqrt(1 - clampedH * clampedH)
+
+        return segmentArea / .pi
     }
 
     private var liquidColor: Color {
