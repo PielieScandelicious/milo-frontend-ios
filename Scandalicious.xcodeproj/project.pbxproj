@@ -51,52 +51,40 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		29B5D5822F1FE633000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious" target */ = {
+		295CEAD42F22C20E00C17368 /* Exceptions for "Scandalicious" folder in "Scandalicious Share Extension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Resources/Info.plist,
+				Authentication/KeychainHelper.swift,
+				Models/ReceiptModels.swift,
+				Services/ReceiptUploadService.swift,
+				Views/Receipt/ReceiptErrorView.swift,
 			);
-			target = 294D4FBC2F1D695B001B9193 /* Scandalicious */;
+			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
 		};
-		29B5D5832F1FE63D000C48B2 /* Exceptions for "scandalicious-share-extension" folder in "Scandalicious Share Extension" target */ = {
+		29B5D5832F1FE63D000C48B2 /* Exceptions for "ScandaliciousShareExtension" folder in "Scandalicious Share Extension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
 		};
-		29B5D5E12F1FFA89000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Authentication/DOBBY_API_DEBUGGING.md,
-				Authentication/DOBBY_API_EXAMPLES.md,
-				Authentication/DOBBY_API_INTEGRATION_SUMMARY.md,
-				Authentication/DOBBY_API_QUICKREF.md,
-				Authentication/KeychainHelper.swift,
-				Models/ReceiptModels.swift,
-				Services/ReceiptUploadService.swift,
-				Views/ReceiptErrorView.swift,
-			);
-			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		294D4FBF2F1D695B001B9193 /* scandalicous */ = {
+		294D4FBF2F1D695B001B9193 /* Scandalicious */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				29B5D5822F1FE633000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious" target */,
-				29B5D5E12F1FFA89000C48B2 /* Exceptions for "scandalicous" folder in "Scandalicious Share Extension" target */,
+				295CEAD42F22C20E00C17368 /* Exceptions for "Scandalicious" folder in "Scandalicious Share Extension" target */,
 			);
-			path = scandalicous;
+			path = Scandalicious;
 			sourceTree = "<group>";
 		};
-		2999B8BF2F1DA4F9002ACAF3 /* scandalicious-share-extension */ = {
+		2999B8BF2F1DA4F9002ACAF3 /* ScandaliciousShareExtension */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				29B5D5832F1FE63D000C48B2 /* Exceptions for "scandalicious-share-extension" folder in "Scandalicious Share Extension" target */,
+				29B5D5832F1FE63D000C48B2 /* Exceptions for "ScandaliciousShareExtension" folder in "Scandalicious Share Extension" target */,
 			);
-			path = "scandalicious-share-extension";
+			path = ScandaliciousShareExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -129,8 +117,8 @@
 			isa = PBXGroup;
 			children = (
 				29B5D5842F1FEBA2000C48B2 /* Scandalicious-Info.plist */,
-				294D4FBF2F1D695B001B9193 /* scandalicous */,
-				2999B8BF2F1DA4F9002ACAF3 /* scandalicious-share-extension */,
+				294D4FBF2F1D695B001B9193 /* Scandalicious */,
+				2999B8BF2F1DA4F9002ACAF3 /* ScandaliciousShareExtension */,
 				294D4FBE2F1D695B001B9193 /* Products */,
 				2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */,
 				294129312F1FC66500EAB7CE /* GoogleService-Info.plist */,
@@ -164,7 +152,7 @@
 				2999B8C72F1DA4F9002ACAF3 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				294D4FBF2F1D695B001B9193 /* scandalicous */,
+				294D4FBF2F1D695B001B9193 /* Scandalicious */,
 			);
 			name = Scandalicious;
 			packageProductDependencies = (
@@ -190,7 +178,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				2999B8BF2F1DA4F9002ACAF3 /* scandalicious-share-extension */,
+				2999B8BF2F1DA4F9002ACAF3 /* ScandaliciousShareExtension */,
 			);
 			name = "Scandalicious Share Extension";
 			packageProductDependencies = (
@@ -413,7 +401,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = scandalicous/Scandalicious.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Scandalicious/Scandalicious.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
@@ -450,7 +438,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = scandalicous/Scandalicious.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Scandalicious/Scandalicious.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
@@ -484,12 +472,12 @@
 		2999B8CB2F1DA4F9002ACAF3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "scandalicious-share-extension/ShareExtension.entitlements";
+				CODE_SIGN_ENTITLEMENTS = ScandaliciousShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "scandalicious-share-extension/Info.plist";
+				INFOPLIST_FILE = ScandaliciousShareExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Scandalicious Share Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -515,12 +503,12 @@
 		2999B8CC2F1DA4F9002ACAF3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "scandalicious-share-extension/ShareExtension.entitlements";
+				CODE_SIGN_ENTITLEMENTS = ScandaliciousShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "scandalicious-share-extension/Info.plist";
+				INFOPLIST_FILE = ScandaliciousShareExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Scandalicious Share Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (

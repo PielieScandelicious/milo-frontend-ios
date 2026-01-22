@@ -12,16 +12,6 @@ import UniformTypeIdentifiers
 import FirebaseAuth
 import Combine
 
-// MARK: - View Extension for Hiding Drag Preview
-extension View {
-    func hideDragPreview() -> some View {
-        self.overlay(
-            Color.clear
-                .contentShape(Rectangle())
-        )
-    }
-}
-
 // MARK: - Notification for Receipt Upload
 extension Notification.Name {
     static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")

@@ -78,7 +78,7 @@
          </BuildableReference>
       </BuildableProductRunnable>
       <StoreKitConfigurationFileReference
-         identifier = "../../scandalicous/Resources/Subscriptions.storekit">
+         identifier = "../../Scandalicious/Resources/Subscriptions.storekit">
       </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction

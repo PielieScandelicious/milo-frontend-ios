@@ -292,12 +292,6 @@ class StoreDataManager: ObservableObject {
         return dateFormatter.string(from: startDate)
     }
     
-    func loadData() {
-        // Deprecated - now fetching from backend
-        // Keeping for backward compatibility but does nothing
-        print("⚠️ loadData() called - this is deprecated, use fetchFromBackend() instead")
-    }
-    
     // Regenerate breakdowns from transactions (for local data)
     func regenerateBreakdowns() {
         guard let transactionManager = transactionManager else { return }

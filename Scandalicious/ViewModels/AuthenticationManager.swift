@@ -8,8 +8,6 @@
 import Foundation
 import FirebaseAuth
 import Combine
-import CryptoKit
-import AuthenticationServices
 
 class AuthenticationManager: ObservableObject {
     @Published var user: User?

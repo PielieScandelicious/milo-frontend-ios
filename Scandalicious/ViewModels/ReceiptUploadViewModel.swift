@@ -107,34 +107,4 @@ class ReceiptUploadViewModel: ObservableObject {
         uploadState = .idle
     }
 }
-// MARK: - Example Usage with ReceiptErrorView
-
-/*
- To use this ViewModel with the consistent error UI:
- 
- struct YourReceiptUploadView: View {
-     @StateObject private var viewModel = ReceiptUploadViewModel()
-     
-     var body: some View {
-         VStack {
-             // Your upload UI here
-             Button("Upload Receipt") {
-                 Task {
-                     await viewModel.uploadReceipt(image: yourImage)
-                 }
-             }
-             .disabled(viewModel.isBusy)
-         }
-         .receiptErrorOverlay(
-             isPresented: $viewModel.showError,
-             message: viewModel.errorMessage ?? "Failed to process receipt",
-             onRetry: {
-                 Task {
-                     await viewModel.uploadReceipt(image: yourImage)
-                 }
-             }
-         )
-     }
- }
- */
 

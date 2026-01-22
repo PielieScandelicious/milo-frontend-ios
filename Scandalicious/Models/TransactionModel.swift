@@ -39,25 +39,13 @@ class TransactionManager: ObservableObject {
     init() {
         // Start with empty transactions - data will come from Railway API
     }
-    
-    // Add new transactions
-    func addTransactions(_ newTransactions: [Transaction]) {
-        transactions.append(contentsOf: newTransactions)
-        // Sort by date
-        transactions.sort { $0.date > $1.date }
-    }
-    
+
     // Add a single transaction
     func addTransaction(_ transaction: Transaction) {
         transactions.append(transaction)
         transactions.sort { $0.date > $1.date }
     }
-    
-    // Delete a transaction
-    func deleteTransaction(_ transaction: Transaction) {
-        transactions.removeAll { $0.id == transaction.id }
-    }
-    
+
     // Get transactions for a specific store and period
     func transactions(for storeName: String, period: String) -> [Transaction] {
         let calendar = Calendar.current

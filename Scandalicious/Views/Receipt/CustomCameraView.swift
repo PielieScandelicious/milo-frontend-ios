@@ -292,9 +292,17 @@ struct CustomCameraView: View {
 
     private func photoPreviewOverlay(image: UIImage) -> some View {
         GeometryReader { geometry in
-            ZStack {
-                // Background
-                Color.black.ignoresSafeArea()
+            VStack(spacing: 0) {
+                // Top header
+                Text("Review your photo")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial.opacity(0.8))
+                    .clipShape(Capsule())
+                    .padding(.top, 16)
+                    .padding(.bottom, 12)
 
                 // Photo preview - scrollable for long receipts
                 ScrollView(.vertical, showsIndicators: true) {
@@ -303,109 +311,84 @@ struct CustomCameraView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: geometry.size.width)
                 }
-                .ignoresSafeArea(edges: .top)
-
-                // Top instruction text
-                VStack {
-                    Text("Review your photo")
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(.ultraThinMaterial.opacity(0.8))
-                        .clipShape(Capsule())
-                        .padding(.top, geometry.safeAreaInsets.top + 16)
-
-                    Spacer()
-                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // Bottom action buttons
-                VStack {
-                    Spacer()
+                VStack(spacing: 12) {
+                    Text("Is all the receipt text clear and readable?")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
 
-                    VStack(spacing: 12) {
-                        Text("Is all the receipt text clear and readable?")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .multilineTextAlignment(.center)
-
-                        HStack(spacing: 16) {
-                            // Retake button
-                            Button {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    showPhotoPreview = false
-                                    previewImage = nil
-                                    // Reset scroll capture state for fresh retake
-                                    scrollCaptureImages = []
-                                    if cameraMode == .scrollCapture {
-                                        showScrollCaptureHint = true
-                                    }
+                    HStack(spacing: 16) {
+                        // Retake button
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                showPhotoPreview = false
+                                previewImage = nil
+                                // Reset scroll capture state for fresh retake
+                                scrollCaptureImages = []
+                                if cameraMode == .scrollCapture {
+                                    showScrollCaptureHint = true
                                 }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "arrow.counterclockwise")
-                                        .font(.system(size: 16, weight: .semibold))
-                                    Text("Retake")
-                                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                }
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(Color.white.opacity(0.2))
-                                )
                             }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 16, weight: .semibold))
+                                Text("Retake")
+                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color.white.opacity(0.2))
+                            )
+                        }
 
-                            // Use Photo button
-                            Button {
-                                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                                let imageToUse = image
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    showPhotoPreview = false
-                                    previewImage = nil
-                                }
-                                dismiss()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                    self.capturedImage = imageToUse
-                                }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 16, weight: .semibold))
-                                    Text("Use Photo")
-                                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                }
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.blue, .cyan],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
+                        // Use Photo button
+                        Button {
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            let imageToUse = image
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                showPhotoPreview = false
+                                previewImage = nil
+                            }
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                self.capturedImage = imageToUse
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                Text("Use Photo")
+                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.blue, .cyan],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
                                         )
-                                )
-                            }
+                                    )
+                            )
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 20)
-                    .padding(.bottom, geometry.safeAreaInsets.bottom)
-                    .background(
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.8), .black],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .ignoresSafeArea(edges: .bottom)
-                    )
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .padding(.bottom, geometry.safeAreaInsets.bottom)
             }
+            .background(Color.black.ignoresSafeArea())
         }
     }
 
