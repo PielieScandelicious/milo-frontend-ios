@@ -10,6 +10,7 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 import FirebaseAuth
+import Combine
 
 // MARK: - View Extension for Hiding Drag Preview
 extension View {
@@ -67,6 +68,8 @@ struct OverviewView: View {
     @State private var showingProfileMenu = false
     @State private var breakdownToDelete: StoreBreakdown?
     @State private var showingDeleteConfirmation = false
+    @State private var lastRefreshTime: Date?
+    @State private var timerTick = false
     @Binding var showSignOutConfirmation: Bool
     
     // User defaults key for storing order
@@ -338,7 +341,6 @@ struct OverviewView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .background(Color(white: 0.05))
                 .refreshable {
-                    // Pull to refresh - smooth animation
                     let startTime = Date()
 
                     // Refresh data for the currently selected period
@@ -353,6 +355,9 @@ struct OverviewView: View {
                     // Add haptic feedback on completion
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
+
+                    // Update refresh time for "Updated X ago" display
+                    lastRefreshTime = Date()
                 }
             }
             
@@ -497,6 +502,16 @@ struct OverviewView: View {
 
                 // Also refresh rate limit status
                 await rateLimitManager.syncFromBackend()
+            }
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            // Trigger re-render to update time display and green highlight
+            timerTick.toggle()
+        }
+        .onChange(of: dataManager.lastFetchDate) { _, newValue in
+            // Set green highlight whenever data is fetched (initial load, refresh, etc.)
+            if newValue != nil {
+                lastRefreshTime = Date()
             }
         }
         .onChange(of: transactionManager.transactions) { oldValue, newValue in
@@ -806,12 +821,20 @@ struct OverviewView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
 
-                // Last updated indicator
+                // Last updated indicator (timerTick triggers re-render for time updates)
                 if let lastFetch = dataManager.lastFetchDate {
-                    Text("Updated \(timeAgo(from: lastFetch))")
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundColor(.white.opacity(0.4))
-                        .padding(.top, 4)
+                    let _ = timerTick // Reference to trigger re-renders
+                    let isRecentlyRefreshed = lastRefreshTime != nil && Date().timeIntervalSince(lastRefreshTime!) < 60
+                    let displayDate = lastRefreshTime ?? lastFetch
+                    let timeAgoText = timeAgo(from: displayDate)
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.icloud.fill")
+                            .font(.system(size: 10))
+                        Text(timeAgoText.isEmpty ? "Synced" : "Synced \(timeAgoText)")
+                            .font(.system(size: 11, weight: isRecentlyRefreshed ? .medium : .regular))
+                    }
+                    .foregroundColor(isRecentlyRefreshed ? .green : .white.opacity(0.4))
+                    .padding(.top, 4)
                 }
             }
             .padding(.vertical, 28)
@@ -845,7 +868,7 @@ struct OverviewView: View {
         let seconds = Int(Date().timeIntervalSince(date))
 
         if seconds < 60 {
-            return "just now"
+            return ""
         } else if seconds < 3600 {
             let minutes = seconds / 60
             return "\(minutes)m ago"
