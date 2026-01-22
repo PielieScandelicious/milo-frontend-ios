@@ -585,7 +585,10 @@ struct OverviewView: View {
 
                 print("📥 Refreshing data for current month: '\(currentMonthPeriod)'")
                 await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
-                print("✅ Data refreshed after Share Extension upload")
+
+                // Sync rate limit status (Share Extension upload decrements the count on backend)
+                await rateLimitManager.syncFromBackend()
+                print("✅ Data and rate limit refreshed after Share Extension upload")
 
                 // If user is viewing current month, update displayed breakdowns
                 await MainActor.run {

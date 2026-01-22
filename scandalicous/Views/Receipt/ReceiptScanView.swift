@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ReceiptScanView: View {
     @EnvironmentObject var transactionManager: TransactionManager
+    @ObservedObject private var rateLimitManager = RateLimitManager.shared
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
     @State private var errorMessage: String?
@@ -17,6 +18,7 @@ struct ReceiptScanView: View {
     @State private var uploadedReceipt: ReceiptUploadResponse?
     @State private var showReceiptDetails = false
     @State private var canRetryAfterError = false
+    @State private var showRateLimitAlert = false
 
     var body: some View {
         ZStack {
@@ -55,9 +57,27 @@ struct ReceiptScanView: View {
         }
         .onChange(of: capturedImage) { _, newImage in
             if let image = newImage {
-                Task {
-                    await processReceipt(image: image)
+                // Double-check rate limit before processing (could have changed while camera was open)
+                if rateLimitManager.canUploadReceipt() {
+                    Task {
+                        await processReceipt(image: image)
+                    }
+                } else {
+                    capturedImage = nil
+                    showRateLimitAlert = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
                 }
+            }
+        }
+        .alert("Upload Limit Reached", isPresented: $showRateLimitAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(rateLimitManager.receiptLimitMessage ?? "You've used all your receipt uploads for this month. Your limit will reset soon.")
+        }
+        .onAppear {
+            // Sync rate limit when view appears to ensure we have latest count
+            Task {
+                await rateLimitManager.syncFromBackend()
             }
         }
         .animation(.easeInOut, value: uploadState)
@@ -94,7 +114,13 @@ struct ReceiptScanView: View {
 
     private var scanPlaceholderView: some View {
         Button {
-            showCamera = true
+            // Check rate limit before showing camera
+            if rateLimitManager.canUploadReceipt() {
+                showCamera = true
+            } else {
+                showRateLimitAlert = true
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            }
         } label: {
             VStack(spacing: 0) {
                 Spacer()
@@ -136,6 +162,11 @@ struct ReceiptScanView: View {
 
                 Spacer()
 
+                // Upload limit indicator
+                uploadLimitIndicator
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+
                 // Bottom tip
                 HStack(spacing: 12) {
                     Image(systemName: "square.and.arrow.up.fill")
@@ -164,6 +195,56 @@ struct ReceiptScanView: View {
             .background(Color(white: 0.05))
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Upload Limit Indicator
+
+    private var uploadLimitIndicator: some View {
+        let state = rateLimitManager.receiptLimitState
+        let color: Color = {
+            switch state {
+            case .normal: return .green
+            case .warning: return .orange
+            case .exhausted: return .red
+            }
+        }()
+
+        return HStack(spacing: 10) {
+            Image(systemName: state == .exhausted ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(color)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(rateLimitManager.receiptUsageDisplayString)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+
+                Text(rateLimitManager.resetDaysFormatted)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+
+            Spacer()
+
+            if state == .exhausted {
+                Text("Limit Reached")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(color.opacity(0.3))
+                    .clipShape(Capsule())
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(color.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+        )
     }
 
     // MARK: - Process Receipt
@@ -216,6 +297,9 @@ struct ReceiptScanView: View {
                 case .success, .completed:
                     uploadState = .success(response)
                     uploadedReceipt = response
+
+                    // Optimistically update rate limit counter
+                    rateLimitManager.decrementReceiptLocal()
 
                     NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
