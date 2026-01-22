@@ -438,10 +438,12 @@ struct APITransactionRowView: View {
             // Item details
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(transaction.itemName)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        Text(transaction.itemName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
 
                     // Health Score Badge
                     HealthScoreBadge(score: transaction.healthScore, size: .small, style: .subtle)
