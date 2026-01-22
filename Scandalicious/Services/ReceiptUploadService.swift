@@ -40,6 +40,7 @@ enum ReceiptUploadError: LocalizedError {
     case serverError(String)
     case networkError(Error)
     case rateLimitExceeded(ReceiptRateLimitExceededError)
+    case deleteFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -55,6 +56,8 @@ enum ReceiptUploadError: LocalizedError {
             return "Network error: \(error.localizedDescription)"
         case .rateLimitExceeded(let error):
             return error.message
+        case .deleteFailed(let message):
+            return "Failed to delete receipt: \(message)"
         }
     }
 
@@ -160,8 +163,83 @@ actor ReceiptUploadService {
         return try await performUpload(request: request)
     }
     
+    // MARK: - Delete Receipt
+
+    func deleteReceipt(receiptId: String) async throws {
+        print("🗑️ Starting receipt deletion for ID: \(receiptId)")
+
+        // Get auth token
+        let idToken = try await getAuthToken()
+        print("✅ Got auth token for deletion (length: \(idToken.count))")
+
+        // Create request
+        guard let url = URL(string: "\(baseURL)/receipts/\(receiptId)") else {
+            print("❌ Failed to create URL for receipt deletion")
+            throw ReceiptUploadError.invalidResponse
+        }
+
+        print("📡 DELETE URL: \(url.absoluteString)")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 30
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ Invalid HTTP response")
+                throw ReceiptUploadError.invalidResponse
+            }
+
+            print("📥 Delete response: HTTP \(httpResponse.statusCode)")
+
+            // Log response data for debugging
+            if let responseString = String(data: data, encoding: .utf8), !responseString.isEmpty {
+                print("📄 Delete response body: \(responseString)")
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                print("✅ Receipt deleted successfully")
+                return
+
+            case 401:
+                print("❌ Authentication failed (401)")
+                throw ReceiptUploadError.noAuthToken
+
+            case 404:
+                print("❌ Receipt not found (404)")
+                throw ReceiptUploadError.deleteFailed("Receipt not found")
+
+            case 400...499:
+                if let errorMessage = try? JSONDecoder().decode([String: String].self, from: data),
+                   let message = errorMessage["error"] ?? errorMessage["message"] {
+                    print("❌ Client error: \(message)")
+                    throw ReceiptUploadError.deleteFailed(message)
+                }
+                print("❌ Client error: \(httpResponse.statusCode)")
+                throw ReceiptUploadError.deleteFailed("Client error: \(httpResponse.statusCode)")
+
+            case 500...599:
+                print("❌ Server error: \(httpResponse.statusCode)")
+                throw ReceiptUploadError.deleteFailed("Server error: \(httpResponse.statusCode)")
+
+            default:
+                print("❌ Unexpected status code: \(httpResponse.statusCode)")
+                throw ReceiptUploadError.deleteFailed("Unexpected status code: \(httpResponse.statusCode)")
+            }
+        } catch let error as ReceiptUploadError {
+            throw error
+        } catch {
+            print("❌ Network error during deletion: \(error.localizedDescription)")
+            throw ReceiptUploadError.networkError(error)
+        }
+    }
+
     // MARK: - Shared Upload Logic
-    
+
     private func performUpload(request: URLRequest) async throws -> ReceiptUploadResponse {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

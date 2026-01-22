@@ -9,23 +9,36 @@ import SwiftUI
 
 struct ReceiptDetailsView: View {
     let receipt: ReceiptUploadResponse
+    var onDelete: (() -> Void)?
+
     @Environment(\.dismiss) private var dismiss
-    
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+    @State private var showDeleteError = false
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
                     // Header Section - Store and Totals
                     headerSection
-                    
+
                     // Items List
                     itemsSection
+
+                    // Delete Button
+                    deleteButton
                 }
                 .padding()
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Receipt Details")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Delete Failed", isPresented: $showDeleteError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteError ?? "An unknown error occurred")
+            }
             .onAppear {
                 print("📋 ReceiptDetailsView appeared")
                 print("   Receipt ID: \(receipt.receiptId)")
@@ -172,6 +185,62 @@ struct ReceiptDetailsView: View {
         VStack(spacing: 8) {
             ForEach(receipt.transactions) { transaction in
                 ReceiptItemRow(transaction: transaction)
+            }
+        }
+    }
+
+    // MARK: - Delete Button
+
+    private var deleteButton: some View {
+        Button(role: .destructive) {
+            Task {
+                await deleteReceipt()
+            }
+        } label: {
+            HStack {
+                if isDeleting {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Image(systemName: "trash")
+                }
+                Text(isDeleting ? "Deleting..." : "Delete Receipt")
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.red.opacity(isDeleting ? 0.5 : 1.0))
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .disabled(isDeleting)
+        .padding(.top, 16)
+    }
+
+    // MARK: - Delete Receipt
+
+    private func deleteReceipt() async {
+        isDeleting = true
+
+        do {
+            print("🗑️ Attempting to delete receipt ID: \(receipt.receiptId)")
+            print("   Store: \(receipt.storeName ?? "N/A")")
+            print("   Status: \(receipt.status.rawValue)")
+
+            try await ReceiptUploadService.shared.deleteReceipt(receiptId: receipt.receiptId)
+            print("✅ Receipt \(receipt.receiptId) deleted successfully")
+            print("ℹ️ Rate limit counter NOT changed - you already paid for the upload processing")
+
+            await MainActor.run {
+                onDelete?()
+                dismiss()
+            }
+        } catch {
+            print("❌ Failed to delete receipt: \(error.localizedDescription)")
+            print("   Receipt ID that failed: \(receipt.receiptId)")
+            await MainActor.run {
+                deleteError = error.localizedDescription
+                showDeleteError = true
+                isDeleting = false
             }
         }
     }

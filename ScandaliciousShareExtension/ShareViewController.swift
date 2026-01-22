@@ -694,6 +694,8 @@ class ShareViewController: UIViewController {
                 } else {
                     return "Upload limit reached for this month."
                 }
+            case .deleteFailed:
+                return "Unable to delete receipt. Please try again."
             }
         }
         

@@ -16,6 +16,7 @@ import Combine
 extension Notification.Name {
     static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")
     static let receiptUploadStarted = Notification.Name("receiptUploadStarted")
+    static let receiptDeleted = Notification.Name("receiptDeleted")
 }
 
 enum SortOption: String, CaseIterable {
@@ -491,6 +492,17 @@ struct OverviewView: View {
 
                 // Also refresh rate limit status
                 await rateLimitManager.syncFromBackend()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptDeleted)) { _ in
+            print("🗑️ Received receipt deleted notification - refreshing backend data")
+            Task {
+                // Wait a moment for backend to process deletion
+                try? await Task.sleep(for: .seconds(0.5))
+                await dataManager.refreshData(for: .month, periodString: selectedPeriod)
+                print("✅ Backend data refreshed after receipt deletion for period: \(selectedPeriod)")
+
+                // Rate limit sync is already handled in ReceiptDetailsView, no need to sync again here
             }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in

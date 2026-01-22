@@ -292,6 +292,15 @@ class RateLimitManager: ObservableObject {
         objectWillChange.send()
     }
 
+    /// Optimistically increment the local receipt counter (call after successful delete)
+    func incrementReceiptLocal() {
+        guard currentUserId != nil else { return }
+        receiptsUsed = max(0, receiptsUsed - 1)
+        receiptsRemaining = min(receiptsLimit, receiptsRemaining + 1)
+        saveLocalState()
+        objectWillChange.send()
+    }
+
     // MARK: - Backend Sync
 
     /// Sync rate limit state from backend

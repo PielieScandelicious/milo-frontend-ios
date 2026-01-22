@@ -52,7 +52,10 @@ struct ReceiptScanView: View {
             uploadedReceipt = nil
         } content: {
             if let receipt = uploadedReceipt {
-                ReceiptDetailsView(receipt: receipt)
+                ReceiptDetailsView(receipt: receipt) {
+                    // Receipt was deleted - notify to refresh data
+                    NotificationCenter.default.post(name: .receiptDeleted, object: nil)
+                }
             }
         }
         .onChange(of: capturedImage) { _, newImage in
