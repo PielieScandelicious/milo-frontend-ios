@@ -126,6 +126,10 @@ struct CustomCameraView: View {
     @State private var scrollSpeed: ScrollSpeedIndicator = .perfect
     @State private var captureQuality: CaptureQuality = .good
 
+    // Photo preview confirmation state
+    @State private var showPhotoPreview = false
+    @State private var previewImage: UIImage?
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -162,6 +166,12 @@ struct CustomCameraView: View {
                 // Flash picker overlay
                 if showFlashPicker {
                     flashPickerOverlay
+                }
+
+                // Photo preview overlay
+                if showPhotoPreview, let image = previewImage {
+                    photoPreviewOverlay(image: image)
+                        .transition(.opacity)
                 }
             }
         }
@@ -276,6 +286,127 @@ struct CustomCameraView: View {
                     }
                 }
         )
+    }
+
+    // MARK: - Photo Preview Overlay
+
+    private func photoPreviewOverlay(image: UIImage) -> some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Background
+                Color.black.ignoresSafeArea()
+
+                // Photo preview - scrollable for long receipts
+                ScrollView(.vertical, showsIndicators: true) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: geometry.size.width)
+                }
+                .ignoresSafeArea(edges: .top)
+
+                // Top instruction text
+                VStack {
+                    Text("Review your photo")
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(.ultraThinMaterial.opacity(0.8))
+                        .clipShape(Capsule())
+                        .padding(.top, geometry.safeAreaInsets.top + 16)
+
+                    Spacer()
+                }
+
+                // Bottom action buttons
+                VStack {
+                    Spacer()
+
+                    VStack(spacing: 12) {
+                        Text("Is all the receipt text clear and readable?")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+
+                        HStack(spacing: 16) {
+                            // Retake button
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    showPhotoPreview = false
+                                    previewImage = nil
+                                    // Reset scroll capture state for fresh retake
+                                    scrollCaptureImages = []
+                                    if cameraMode == .scrollCapture {
+                                        showScrollCaptureHint = true
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text("Retake")
+                                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                }
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(Color.white.opacity(0.2))
+                                )
+                            }
+
+                            // Use Photo button
+                            Button {
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                let imageToUse = image
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    showPhotoPreview = false
+                                    previewImage = nil
+                                }
+                                dismiss()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    self.capturedImage = imageToUse
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text("Use Photo")
+                                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                }
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.blue, .cyan],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 20)
+                    .padding(.bottom, geometry.safeAreaInsets.bottom)
+                    .background(
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.8), .black],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .ignoresSafeArea(edges: .bottom)
+                    )
+                }
+            }
+        }
     }
 
     // MARK: - Scroll Capture Overlay
@@ -644,10 +775,10 @@ struct CustomCameraView: View {
 
                 if let image = image {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    // Dismiss first, then set image after delay (same pattern as UIImagePickerController)
-                    self.dismiss()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        self.capturedImage = image
+                    // Show preview for user confirmation
+                    withAnimation(.easeIn(duration: 0.2)) {
+                        self.previewImage = image
+                        self.showPhotoPreview = true
                     }
                 }
             }
@@ -729,30 +860,32 @@ struct CustomCameraView: View {
                 if let stitchedImage = await stitchImages(imagesToStitch) {
                     await MainActor.run {
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        // Dismiss first, then set image after delay (same pattern as UIImagePickerController)
-                        self.dismiss()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            self.capturedImage = stitchedImage
+                        // Show preview for user confirmation
+                        withAnimation(.easeIn(duration: 0.2)) {
+                            self.previewImage = stitchedImage
+                            self.showPhotoPreview = true
                         }
                     }
                 } else {
                     // Stitching failed, use first image as fallback
                     await MainActor.run {
-                        let fallbackImage = imagesToStitch.first
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        self.dismiss()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            self.capturedImage = fallbackImage
+                        if let fallbackImage = imagesToStitch.first {
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            // Show preview for user confirmation
+                            withAnimation(.easeIn(duration: 0.2)) {
+                                self.previewImage = fallbackImage
+                                self.showPhotoPreview = true
+                            }
                         }
                     }
                 }
             }
         } else if let singleImage = scrollCaptureImages.first {
-            // Only one image captured, use it directly
+            // Only one image captured, show preview for confirmation
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            dismiss()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                self.capturedImage = singleImage
+            withAnimation(.easeIn(duration: 0.2)) {
+                self.previewImage = singleImage
+                self.showPhotoPreview = true
             }
         } else {
             // No images captured, just reset state
