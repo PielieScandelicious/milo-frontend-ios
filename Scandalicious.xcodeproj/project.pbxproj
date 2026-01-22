@@ -54,8 +54,8 @@
 		295CEAD42F22C20E00C17368 /* Exceptions for "Scandalicious" folder in "Scandalicious Share Extension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Authentication/KeychainHelper.swift,
 				Models/ReceiptModels.swift,
+				Services/KeychainHelper.swift,
 				Services/ReceiptUploadService.swift,
 				Views/Receipt/ReceiptErrorView.swift,
 			);
