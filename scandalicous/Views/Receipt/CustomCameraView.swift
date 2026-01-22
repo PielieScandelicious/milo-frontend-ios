@@ -312,47 +312,52 @@ struct CustomCameraView: View {
 
             VStack(spacing: 16) {
                 if showScrollCaptureHint && !isScrollCapturing {
-                    // Instructions card
-                    VStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.blue.opacity(0.3), .cyan.opacity(0.3)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                    // Instructions card - scrollable for smaller screens
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.blue.opacity(0.3), .cyan.opacity(0.3)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
                                     )
-                                )
-                                .frame(width: 70, height: 70)
+                                    .frame(width: 56, height: 56)
 
-                            Image(systemName: "arrow.down")
-                                .font(.system(size: 32, weight: .bold))
-                                .foregroundStyle(.white)
-                                .symbolEffect(.bounce.up.byLayer, options: .repeating.speed(0.5))
+                                Image(systemName: "arrow.down")
+                                    .font(.system(size: 26, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .symbolEffect(.bounce.up.byLayer, options: .repeating.speed(0.5))
+                            }
+
+                            VStack(spacing: 6) {
+                                Text("Long Receipt Mode")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
+
+                                Text("Position at the top of receipt, then move phone slowly downward")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .multilineTextAlignment(.center)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            // Tips - compact layout
+                            HStack(spacing: 16) {
+                                tipItem(icon: "hand.raised.fill", text: "Steady")
+                                tipItem(icon: "light.max", text: "Good light")
+                                tipItem(icon: "arrow.down", text: "Slow")
+                            }
                         }
-
-                        VStack(spacing: 8) {
-                            Text("Long Receipt Mode")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-
-                            Text("Position at the top of receipt,\nthen move phone slowly downward")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .multilineTextAlignment(.center)
-                        }
-
-                        // Tips
-                        HStack(spacing: 20) {
-                            tipItem(icon: "hand.raised.fill", text: "Steady")
-                            tipItem(icon: "light.max", text: "Good light")
-                            tipItem(icon: "arrow.down", text: "Slow")
-                        }
+                        .padding(20)
                     }
-                    .padding(24)
+                    .frame(maxHeight: min(geometry.size.height * 0.35, 280))
                     .background(.ultraThinMaterial.opacity(0.9))
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
                     .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+                    .padding(.horizontal, 24)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 1.1).combined(with: .opacity)
@@ -634,13 +639,16 @@ struct CustomCameraView: View {
         cameraManager.capturePhoto(flashMode: flashMode.avFlashMode) { image in
             DispatchQueue.main.async {
                 withAnimation(.easeInOut(duration: 0.1)) {
-                    isCapturing = false
+                    self.isCapturing = false
                 }
 
                 if let image = image {
-                    self.capturedImage = image
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    // Dismiss first, then set image after delay (same pattern as UIImagePickerController)
                     self.dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        self.capturedImage = image
+                    }
                 }
             }
         }
@@ -714,29 +722,38 @@ struct CustomCameraView: View {
             // Show processing feedback
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
 
+            // Capture images locally before async task
+            let imagesToStitch = scrollCaptureImages
+
             Task {
-                if let stitchedImage = await stitchImages(scrollCaptureImages) {
+                if let stitchedImage = await stitchImages(imagesToStitch) {
                     await MainActor.run {
-                        self.capturedImage = stitchedImage
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        // Dismiss first, then set image after delay (same pattern as UIImagePickerController)
                         self.dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            self.capturedImage = stitchedImage
+                        }
                     }
                 } else {
                     // Stitching failed, use first image as fallback
                     await MainActor.run {
-                        if let firstImage = scrollCaptureImages.first {
-                            self.capturedImage = firstImage
-                        }
+                        let fallbackImage = imagesToStitch.first
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                         self.dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            self.capturedImage = fallbackImage
+                        }
                     }
                 }
             }
         } else if let singleImage = scrollCaptureImages.first {
             // Only one image captured, use it directly
-            capturedImage = singleImage
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                self.capturedImage = singleImage
+            }
         } else {
             // No images captured, just reset state
             UINotificationFeedbackGenerator().notificationOccurred(.error)

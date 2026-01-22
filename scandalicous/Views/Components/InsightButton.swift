@@ -42,9 +42,10 @@ struct InsightButton: View {
         .buttonStyle(InsightButtonStyle())
         .sheet(isPresented: $showingInsight) {
             InsightSheetView(insightType: insightType)
-                .presentationDetents([.fraction(0.7)])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(white: 0.08))
+                .presentationSizing(.fitted)
         }
     }
 }
@@ -180,96 +181,94 @@ struct InsightSheetView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.top, 20)
+            .padding(.top, 48)
             .padding(.bottom, 16)
 
             Divider()
                 .background(Color.white.opacity(0.1))
 
             // Content
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if isLoading {
-                        HStack(spacing: 12) {
-                            ProgressView()
-                                .tint(accentColor)
+            VStack(alignment: .leading, spacing: 16) {
+                if isLoading {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .tint(accentColor)
 
-                            Text("Generating insight...")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                        Text("Generating insight...")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+                } else if let error = error {
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.orange)
+
+                        Text(error)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                            .multilineTextAlignment(.center)
+
+                        Button {
+                            self.error = nil
+                            isLoading = true
+                            contentOpacity = 0
+                            contentBlur = 8
+                            contentScale = 0.96
+                            // Clear cache and fetch fresh on retry
+                            DailyInsightCache.clear(for: insightType.cacheKey)
+                            fetchInsight()
+                        } label: {
+                            Text("Try Again")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(accentColor)
+                                .cornerRadius(20)
                         }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 40)
-                    } else if let error = error {
-                        VStack(spacing: 12) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 32))
-                                .foregroundColor(.orange)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                } else {
+                    // Insight text with nice formatting and premium fade-in
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(accentColor)
+                            .padding(.top, 2)
 
-                            Text(error)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
-                                .multilineTextAlignment(.center)
-
-                            Button {
-                                self.error = nil
-                                isLoading = true
-                                contentOpacity = 0
-                                contentBlur = 8
-                                contentScale = 0.96
-                                // Clear cache and fetch fresh on retry
-                                DailyInsightCache.clear(for: insightType.cacheKey)
-                                fetchInsight()
-                            } label: {
-                                Text("Try Again")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 10)
-                                    .background(accentColor)
-                                    .cornerRadius(20)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 30)
-                    } else {
-                        // Insight text with nice formatting and premium fade-in
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(accentColor)
-                                .padding(.top, 2)
-
-                            Text(insightText)
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundColor(.white.opacity(0.9))
-                                .lineSpacing(6)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(accentColor.opacity(0.1))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                        Text(insightText)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundColor(.white.opacity(0.9))
+                            .lineSpacing(6)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(accentColor.opacity(0.1))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
                                 .stroke(accentColor.opacity(0.2), lineWidth: 1)
-                        )
-                        .opacity(contentOpacity)
-                        .blur(radius: contentBlur)
-                        .scaleEffect(contentScale)
-                        .onAppear {
-                            withAnimation(.easeOut(duration: 0.5)) {
-                                contentOpacity = 1.0
-                                contentBlur = 0
-                                contentScale = 1.0
-                            }
+                    )
+                    .opacity(contentOpacity)
+                    .blur(radius: contentBlur)
+                    .scaleEffect(contentScale)
+                    .onAppear {
+                        withAnimation(.easeOut(duration: 0.5)) {
+                            contentOpacity = 1.0
+                            contentBlur = 0
+                            contentScale = 1.0
                         }
                     }
                 }
-                .padding(20)
             }
+            .padding(20)
 
             // Footer
             VStack(spacing: 8) {

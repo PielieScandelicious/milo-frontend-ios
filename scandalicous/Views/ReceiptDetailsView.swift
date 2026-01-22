@@ -38,7 +38,7 @@ struct ReceiptDetailsView: View {
                 if !receipt.transactions.isEmpty {
                     print("   First few transactions:")
                     for (index, transaction) in receipt.transactions.prefix(3).enumerated() {
-                        print("      [\(index)] \(transaction.itemName) - €\(transaction.itemPrice)")
+                        print("      [\(index)] \(transaction.itemName) - €\(transaction.itemPrice) - qty: \(transaction.quantity) - unitPrice: \(transaction.unitPrice ?? 0)")
                     }
                 } else {
                     print("   ⚠️ Transactions array is empty!")
@@ -111,10 +111,8 @@ struct ReceiptDetailsView: View {
                             .font(.headline)
                             .foregroundStyle(healthScore.healthScoreColor)
                     }
-
-                    Spacer()
                 }
-                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
 
             // Items Count
@@ -185,64 +183,78 @@ struct ReceiptItemRow: View {
     let transaction: ReceiptTransaction
 
     var body: some View {
+        let _ = print("🛒 ReceiptItemRow: \(transaction.itemName) - qty: \(transaction.quantity), unitPrice: \(transaction.unitPrice ?? 0)")
         HStack(alignment: .top, spacing: 12) {
-            // Category Icon
-            ZStack {
-                Circle()
-                    .fill(categoryColor.opacity(0.15))
-                    .frame(width: 44, height: 44)
+            // Category Icon with Quantity Badge
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    Circle()
+                        .fill(categoryColor.opacity(0.15))
+                        .frame(width: 44, height: 44)
 
-                Image(systemName: transaction.category.icon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(categoryColor)
+                    Image(systemName: transaction.category.icon)
+                        .font(.system(size: 20))
+                        .foregroundStyle(categoryColor)
+                }
+
+                // Quantity badge (show if > 1)
+                if transaction.quantity > 1 {
+                    Text("×\(transaction.quantity)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(categoryColor)
+                        )
+                        .offset(x: 6, y: -4)
+                }
             }
+            .frame(width: 50, height: 44)  // Slightly wider to accommodate badge
 
             // Item Details
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(transaction.itemName)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                HStack(alignment: .top, spacing: 8) {
+                    // Horizontally scrollable item name (2 lines max)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        Text(transaction.itemName)
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.primary)
+                    }
+                    .frame(maxHeight: 44) // Roughly 2 lines of text
 
                     // Health Score Badge
                     HealthScoreBadge(score: transaction.healthScore, size: .small, style: .subtle)
+                        .layoutPriority(1)
                 }
 
-                HStack(spacing: 12) {
-                    // Quantity
+                HStack(spacing: 8) {
+                    // Quantity (show if > 1)
                     if transaction.quantity > 1 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "number")
-                                .font(.caption2)
-                            Text("×\(transaction.quantity)")
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.secondary)
+                        Text("Qty: \(transaction.quantity)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
-                    // Unit Price
+                    // Unit Price (show if quantity > 1)
                     if let unitPrice = transaction.unitPrice, transaction.quantity > 1 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "tag")
-                                .font(.caption2)
-                            Text(unitPrice, format: .currency(code: "EUR"))
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.secondary)
+                        Text(unitPrice, format: .currency(code: "EUR"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     // Category
                     Text(transaction.category.displayName)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            // Price and Health Score
+            // Price
             VStack(alignment: .trailing, spacing: 4) {
                 Text(transaction.itemPrice, format: .currency(code: "EUR"))
                     .font(.body)
@@ -257,6 +269,7 @@ struct ReceiptItemRow: View {
                         .foregroundStyle(score.healthScoreColor)
                 }
             }
+            .layoutPriority(1)  // Ensure price doesn't get compressed
         }
         .padding()
         .background(.ultraThinMaterial)
