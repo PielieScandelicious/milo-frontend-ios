@@ -19,6 +19,7 @@ struct ReceiptScanView: View {
     @State private var showReceiptDetails = false
     @State private var canRetryAfterError = false
     @State private var showRateLimitAlert = false
+    @State private var showCaptureSuccess = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastCheckedUploadTimestamp: TimeInterval = 0
 
@@ -26,13 +27,10 @@ struct ReceiptScanView: View {
         ZStack {
             scanPlaceholderView
 
-            // Processing overlay
-            if case .uploading = uploadState {
-                processingOverlay
-            }
-
-            if case .processing = uploadState {
-                processingOverlay
+            // Capture success overlay
+            if showCaptureSuccess {
+                CaptureSuccessOverlay()
+                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
         }
         .receiptErrorOverlay(
@@ -61,7 +59,19 @@ struct ReceiptScanView: View {
             if let image = newImage {
                 // Double-check rate limit before processing (could have changed while camera was open)
                 if rateLimitManager.canUploadReceipt() {
+                    // Show success overlay first
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        showCaptureSuccess = true
+                    }
+
+                    // Hide after delay and start processing
                     Task {
+                        try? await Task.sleep(for: .seconds(0.8))
+                        await MainActor.run {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                showCaptureSuccess = false
+                            }
+                        }
                         await processReceipt(image: image)
                     }
                 } else {
@@ -105,33 +115,6 @@ struct ReceiptScanView: View {
             checkForShareExtensionUploads()
         }
         .animation(.easeInOut, value: uploadState)
-    }
-
-    // MARK: - Processing Overlay
-
-    private var processingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                ProgressView()
-                    .scaleEffect(1.5)
-                    .tint(.white)
-
-                Text("Processing receipt...")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-
-                Text("Extracting items and prices")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .padding(32)
-            .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .transition(.scale.combined(with: .opacity))
-        }
     }
 
     // MARK: - Scan Placeholder View
@@ -309,6 +292,8 @@ struct ReceiptScanView: View {
         // Upload receipt
         await MainActor.run {
             uploadState = .uploading
+            // Notify View tab to show syncing indicator
+            NotificationCenter.default.post(name: .receiptUploadStarted, object: nil)
         }
 
         do {
@@ -343,6 +328,8 @@ struct ReceiptScanView: View {
                     errorMessage = "Receipt is still being processed. Please check back later."
                     showError = true
                     uploadState = .idle
+                    // Clear syncing indicator in View tab
+                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
 
                 case .failed:
                     uploadState = .failed("Receipt processing failed")
@@ -350,6 +337,8 @@ struct ReceiptScanView: View {
                     errorMessage = "The receipt could not be processed. Please try again."
                     showError = true
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    // Clear syncing indicator in View tab
+                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
                 }
             }
         } catch let error as ReceiptUploadError {
@@ -372,6 +361,8 @@ struct ReceiptScanView: View {
 
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
+                // Clear syncing indicator in View tab
+                NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
             }
         } catch {
             await MainActor.run {
@@ -380,6 +371,8 @@ struct ReceiptScanView: View {
                 errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
+                // Clear syncing indicator in View tab
+                NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
             }
         }
     }
@@ -431,6 +424,81 @@ struct ReceiptScanView: View {
             print("✅ [ScanTab] Rate limit updated. Receipts: \(rateLimitManager.receiptsUsed)/\(rateLimitManager.receiptsLimit) used, \(rateLimitManager.receiptsRemaining) remaining")
         } else {
             print("ℹ️ [ScanTab] No new Share Extension upload detected")
+        }
+    }
+}
+
+// MARK: - Capture Success Overlay
+
+struct CaptureSuccessOverlay: View {
+    @State private var checkmarkScale: CGFloat = 0
+    @State private var checkmarkOpacity: Double = 0
+    @State private var ringScale: CGFloat = 0.8
+    @State private var ringOpacity: Double = 0
+
+    var body: some View {
+        ZStack {
+            // Semi-transparent background
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+
+            // Success card
+            VStack(spacing: 20) {
+                // Animated checkmark circle
+                ZStack {
+                    // Outer ring
+                    Circle()
+                        .stroke(Color.green.opacity(0.3), lineWidth: 4)
+                        .frame(width: 80, height: 80)
+                        .scaleEffect(ringScale)
+                        .opacity(ringOpacity)
+
+                    // Inner filled circle
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 70, height: 70)
+                        .scaleEffect(checkmarkScale)
+                        .opacity(checkmarkOpacity)
+
+                    // Checkmark
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(.white)
+                        .scaleEffect(checkmarkScale)
+                        .opacity(checkmarkOpacity)
+                }
+
+                // Done text
+                Text("Done!")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .opacity(checkmarkOpacity)
+            }
+            .padding(40)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+            )
+            .scaleEffect(checkmarkScale > 0 ? 1 : 0.8)
+        }
+        .onAppear {
+            // Animate in sequence
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                checkmarkScale = 1.0
+                checkmarkOpacity = 1.0
+            }
+
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+                ringScale = 1.2
+                ringOpacity = 1.0
+            }
+
+            // Ring pulse out
+            withAnimation(.easeOut(duration: 0.3).delay(0.3)) {
+                ringScale = 1.4
+                ringOpacity = 0
+            }
         }
     }
 }

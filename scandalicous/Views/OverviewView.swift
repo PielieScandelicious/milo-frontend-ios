@@ -22,9 +22,10 @@ extension View {
     }
 }
 
-// MARK: - Notification for Receipt Upload Success
+// MARK: - Notification for Receipt Upload
 extension Notification.Name {
     static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")
+    static let receiptUploadStarted = Notification.Name("receiptUploadStarted")
 }
 
 enum SortOption: String, CaseIterable {
@@ -44,6 +45,9 @@ struct OverviewView: View {
 
     // Track the last time we checked for Share Extension uploads
     @State private var lastCheckedUploadTimestamp: TimeInterval = 0
+
+    // Track when a receipt is being uploaded from Scan tab
+    @State private var isReceiptUploading = false
 
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
@@ -259,17 +263,7 @@ struct OverviewView: View {
                     .allowsHitTesting(false) // Don't block touches - tap handled by ScrollView content
             }
             
-            // Loading overlay - only show on initial load
-            if dataManager.isLoading {
-                VStack(spacing: 20) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.opacity(0.3))
-                .transition(.opacity)
-            } else if let error = dataManager.error {
+            if let error = dataManager.error {
                 // Error state
                 VStack(spacing: 20) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -492,8 +486,13 @@ struct OverviewView: View {
             // Prefetch daily insights in background
             prefetchInsights()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadStarted)) { _ in
+            print("📤 Received receipt upload started notification")
+            isReceiptUploading = true
+        }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
             print("📬 Received receipt upload notification - refreshing backend data")
+            isReceiptUploading = false
             Task {
                 // Wait a moment for backend to fully process
                 try? await Task.sleep(for: .seconds(1))
@@ -821,20 +820,30 @@ struct OverviewView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
 
-                // Last updated indicator (timerTick triggers re-render for time updates)
-                if let lastFetch = dataManager.lastFetchDate {
-                    let _ = timerTick // Reference to trigger re-renders
-                    let isRecentlyRefreshed = lastRefreshTime != nil && Date().timeIntervalSince(lastRefreshTime!) < 60
-                    let displayDate = lastRefreshTime ?? lastFetch
-                    let timeAgoText = timeAgo(from: displayDate)
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.icloud.fill")
-                            .font(.system(size: 10))
-                        Text(timeAgoText.isEmpty ? "Synced" : "Synced \(timeAgoText)")
-                            .font(.system(size: 11, weight: isRecentlyRefreshed ? .medium : .regular))
+                // Syncing/Synced indicator
+                Group {
+                    if dataManager.isLoading || dataManager.isRefreshing || isReceiptUploading {
+                        HStack(spacing: 6) {
+                            SyncingArrowsView()
+                            Text("Syncing...")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(.blue)
+                        .padding(.top, 4)
+                    } else if let lastFetch = dataManager.lastFetchDate {
+                        let _ = timerTick // Reference to trigger re-renders
+                        let isRecentlyRefreshed = lastRefreshTime != nil && Date().timeIntervalSince(lastRefreshTime!) < 60
+                        let displayDate = lastRefreshTime ?? lastFetch
+                        let timeAgoText = timeAgo(from: displayDate)
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.icloud.fill")
+                                .font(.system(size: 10))
+                            Text(timeAgoText.isEmpty ? "Synced" : "Synced \(timeAgoText)")
+                                .font(.system(size: 11, weight: isRecentlyRefreshed ? .medium : .regular))
+                        }
+                        .foregroundColor(isRecentlyRefreshed ? .green : .white.opacity(0.4))
+                        .padding(.top, 4)
                     }
-                    .foregroundColor(isRecentlyRefreshed ? .green : .white.opacity(0.4))
-                    .padding(.top, 4)
                 }
             }
             .padding(.vertical, 28)
@@ -1253,7 +1262,7 @@ struct TotalSpendingCardButtonStyle: ButtonStyle {
 // MARK: - Delete Button Style
 struct DeleteButtonStyle: ButtonStyle {
     @State private var isPulsing = false
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.85 : (isPulsing ? 1.1 : 1.0))
@@ -1265,6 +1274,20 @@ struct DeleteButtonStyle: ButtonStyle {
                     isPulsing = true
                 }
             }
+    }
+}
+
+// MARK: - Syncing Arrows View
+struct SyncingArrowsView: View {
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let seconds = timeline.date.timeIntervalSinceReferenceDate
+            let rotation = seconds.truncatingRemainder(dividingBy: 1.0) * 360
+
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 11, weight: .semibold))
+                .rotationEffect(.degrees(rotation))
+        }
     }
 }
 
