@@ -169,7 +169,7 @@ struct ScandaLiciousAIChatView: View {
                         Button(action: {}) {
                             Label {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) uploads remaining")
+                                    Text("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts remaining")
                                     Text(rateLimitManager.resetDaysFormatted)
                                         .font(.caption2)
                                         .foregroundColor(.secondary)

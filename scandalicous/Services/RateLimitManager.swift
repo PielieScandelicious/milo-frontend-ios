@@ -88,7 +88,7 @@ class RateLimitManager: ObservableObject {
     /// Receipt upload limit for the period
     @Published private(set) var receiptsLimit: Int = RateLimitConfig.defaultReceiptsPerMonth
 
-    /// Receipt uploads remaining
+    /// Receipts remaining
     @Published private(set) var receiptsRemaining: Int = RateLimitConfig.defaultReceiptsPerMonth
 
     // MARK: - Published Properties (Period)
@@ -157,9 +157,9 @@ class RateLimitManager: ObservableObject {
         return min(1.0, Double(receiptsUsed) / Double(receiptsLimit))
     }
 
-    /// Formatted receipt usage string (e.g., "12/15 uploads remaining")
+    /// Formatted receipt usage string (e.g., "12/15 receipts remaining")
     var receiptUsageDisplayString: String {
-        "\(receiptsRemaining)/\(receiptsLimit) uploads remaining"
+        "\(receiptsRemaining)/\(receiptsLimit) receipts remaining"
     }
 
     /// Receipt limit state for UI display
