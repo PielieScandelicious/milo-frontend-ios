@@ -47,7 +47,7 @@ struct ReceiptScanView: View {
             } : nil
         )
         .fullScreenCover(isPresented: $showCamera) {
-            CameraPickerView(capturedImage: $capturedImage)
+            CustomCameraView(capturedImage: $capturedImage)
         }
         .sheet(isPresented: $showReceiptDetails) {
             showReceiptDetails = false
