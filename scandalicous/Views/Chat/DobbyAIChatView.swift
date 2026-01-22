@@ -100,7 +100,7 @@ struct ScandaLiciousAIChatView: View {
                 HStack(alignment: .bottom, spacing: 8) {
                     // Message input field
                     HStack(alignment: .bottom, spacing: 8) {
-                        TextField("Message", text: $messageText, axis: .vertical)
+                        TextField("Ask Dobby", text: $messageText, axis: .vertical)
                             .textFieldStyle(.plain)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
