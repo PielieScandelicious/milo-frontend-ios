@@ -167,21 +167,9 @@ struct ScandaLiciousAIChatView: View {
 
                         // Receipt upload limit
                         Button(action: {}) {
-                            Label {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts remaining")
-                                    Text(rateLimitManager.resetDaysFormatted)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: receiptLimitIcon)
-                            }
+                            Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts", systemImage: receiptLimitIcon)
                         }
                         .tint(receiptLimitColor)
-
-                        // Show subscription status
-                        Label(subscriptionManager.subscriptionStatus.displayText, systemImage: "crown.fill")
 
                         // Manage subscription button
                         Button {

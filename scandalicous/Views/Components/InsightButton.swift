@@ -64,17 +64,33 @@ struct InsightButtonStyle: ButtonStyle {
 
 // MARK: - Daily Insight Cache
 
-private struct CachedInsight: Codable {
+struct CachedInsight: Codable {
     let text: String
     let timestamp: Date
 
     var isValid: Bool {
-        // Check if the insight was generated today (same calendar day)
-        Calendar.current.isDateInToday(timestamp)
+        // Insights refresh at 6 AM daily
+        let calendar = Calendar.current
+        let now = Date()
+
+        // Get today at 6 AM
+        var todaySixAM = calendar.startOfDay(for: now)
+        todaySixAM = calendar.date(byAdding: .hour, value: 6, to: todaySixAM) ?? todaySixAM
+
+        // If we're before 6 AM today, the refresh point was yesterday at 6 AM
+        let refreshPoint: Date
+        if now < todaySixAM {
+            refreshPoint = calendar.date(byAdding: .day, value: -1, to: todaySixAM) ?? todaySixAM
+        } else {
+            refreshPoint = todaySixAM
+        }
+
+        // Cache is valid if it was created after the most recent 6 AM refresh point
+        return timestamp >= refreshPoint
     }
 }
 
-private enum DailyInsightCache {
+enum DailyInsightCache {
     private static let timestampSuffix = "_timestamp"
 
     static func load(for key: String) -> CachedInsight? {
@@ -93,6 +109,14 @@ private enum DailyInsightCache {
     static func clear(for key: String) {
         UserDefaults.standard.removeObject(forKey: key)
         UserDefaults.standard.removeObject(forKey: key + timestampSuffix)
+    }
+
+    /// Check if a valid cached insight exists for the given type
+    static func hasValidCache(for type: InsightType) -> Bool {
+        if let cached = load(for: type.cacheKey), cached.isValid {
+            return true
+        }
+        return false
     }
 }
 

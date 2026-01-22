@@ -483,6 +483,9 @@ struct OverviewView: View {
             Task {
                 await rateLimitManager.syncFromBackend()
             }
+
+            // Prefetch daily insights in background
+            prefetchInsights()
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
             print("📬 Received receipt upload notification - refreshing backend data")
@@ -524,6 +527,8 @@ struct OverviewView: View {
                 isEditMode = false
             }
             updateDisplayedBreakdowns()
+            // Prefetch insights for the new period
+            prefetchInsights()
         }
         .onChange(of: selectedSort) { oldValue, newValue in
             // Exit edit mode when changing sort to avoid inconsistency
@@ -536,6 +541,8 @@ struct OverviewView: View {
             if !isEditMode {
                 updateDisplayedBreakdowns()
             }
+            // Prefetch insights when data changes
+            prefetchInsights()
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             // Check for Share Extension uploads when app becomes active
@@ -548,6 +555,32 @@ struct OverviewView: View {
             // Backup: Also check when app becomes active via notification (more reliable)
             print("🔄 App became active (UIApplication notification)")
             checkForShareExtensionUploads()
+        }
+    }
+
+    // MARK: - Insight Prefetching
+
+    /// Prefetches daily insights in the background so they're ready when the user taps
+    private func prefetchInsights() {
+        // Only prefetch if we have data
+        guard totalPeriodSpending > 0 else { return }
+
+        // Prefetch spending insight
+        InsightService.shared.prefetchInsight(for: .totalSpending(
+            amount: totalPeriodSpending,
+            period: selectedPeriod,
+            storeCount: currentBreakdowns.count,
+            topStore: currentBreakdowns.first?.storeName
+        ))
+
+        // Prefetch health score insight if available
+        if let score = dataManager.averageHealthScore {
+            let totalVisits = currentBreakdowns.reduce(0) { $0 + $1.visitCount }
+            InsightService.shared.prefetchInsight(for: .healthScore(
+                score: score,
+                period: selectedPeriod,
+                totalItems: totalVisits
+            ))
         }
     }
 

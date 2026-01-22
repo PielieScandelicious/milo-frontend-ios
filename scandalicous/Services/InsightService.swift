@@ -97,6 +97,34 @@ actor InsightService {
 
     // MARK: - Generate Insight (Streaming)
 
+    // MARK: - Prefetch Insight (Background)
+
+    /// Prefetches an insight in the background if not already cached
+    /// This runs silently and doesn't block the UI
+    nonisolated func prefetchInsight(for type: InsightType) {
+        // Check if we already have a valid cached insight
+        if DailyInsightCache.hasValidCache(for: type) {
+            return
+        }
+
+        // Fetch in background
+        Task(priority: .background) {
+            do {
+                var fullText = ""
+                for try await chunk in generateInsight(for: type) {
+                    fullText += chunk
+                }
+                // Save to cache
+                await MainActor.run {
+                    DailyInsightCache.save(text: fullText, for: type.cacheKey)
+                }
+            } catch {
+                // Silently fail - user can still generate on demand
+                print("Insight prefetch failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
     nonisolated func generateInsight(for type: InsightType) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
