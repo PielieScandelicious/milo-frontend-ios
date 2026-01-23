@@ -159,7 +159,13 @@ class RateLimitManager: ObservableObject {
 
     /// Formatted receipt usage string (e.g., "12/15 receipts remaining")
     var receiptUsageDisplayString: String {
-        "\(receiptsRemaining)/\(receiptsLimit) receipts remaining"
+        if receiptsRemaining == 0 {
+            return "No receipts remaining"
+        } else if receiptsRemaining == 1 {
+            return "1 receipt remaining"
+        } else {
+            return "\(receiptsRemaining) receipts remaining"
+        }
     }
 
     /// Receipt limit state for UI display
