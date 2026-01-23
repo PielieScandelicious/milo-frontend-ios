@@ -34,36 +34,40 @@ struct OnboardingView: View {
                     .padding(.top, 60)
 
                     // Form
-                    VStack(spacing: 20) {
+                    VStack(spacing: 24) {
                         // First Name
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 10) {
                             Text("First Name")
-                                .font(.subheadline.bold())
-                                .foregroundStyle(.secondary)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
 
                             TextField("Enter your first name", text: $firstName)
-                                .textFieldStyle(.roundedBorder)
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(14)
                                 .textContentType(.givenName)
                                 .autocorrectionDisabled()
                         }
 
                         // Last Name
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 10) {
                             Text("Last Name")
-                                .font(.subheadline.bold())
-                                .foregroundStyle(.secondary)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
 
                             TextField("Enter your last name", text: $lastName)
-                                .textFieldStyle(.roundedBorder)
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(14)
                                 .textContentType(.familyName)
                                 .autocorrectionDisabled()
                         }
 
                         // Gender
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 10) {
                             Text("Gender")
-                                .font(.subheadline.bold())
-                                .foregroundStyle(.secondary)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
 
                             Picker("Gender", selection: $selectedGender) {
                                 ForEach(ProfileGender.allCases, id: \.self) { gender in
@@ -71,6 +75,7 @@ struct OnboardingView: View {
                                 }
                             }
                             .pickerStyle(.segmented)
+                            .padding(.vertical, 4)
                         }
                     }
                     .padding(.horizontal, 24)
@@ -90,16 +95,28 @@ struct OnboardingView: View {
                                 .frame(maxWidth: .infinity)
                         }
                     }
-                    .frame(height: 50)
-                    .background(canContinue ? Color.purple : Color.gray)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(height: 56)
+                    .background(
+                        canContinue ?
+                        LinearGradient(
+                            colors: [Color.purple, Color.purple.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ) :
+                        LinearGradient(
+                            colors: [Color.gray, Color.gray],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: canContinue ? Color.purple.opacity(0.3) : Color.clear, radius: 10, x: 0, y: 5)
                     .disabled(!canContinue || isLoading)
                     .padding(.horizontal, 24)
-                    .padding(.top, 12)
+                    .padding(.top, 16)
                 }
                 .padding(.bottom, 40)
             }
-            .background(Color(.systemBackground))
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled()
             .alert("Error", isPresented: $showError) {
@@ -108,6 +125,7 @@ struct OnboardingView: View {
                 Text(errorMessage ?? "An unknown error occurred")
             }
         }
+        .preferredColorScheme(.dark)
     }
 
     private var canContinue: Bool {
