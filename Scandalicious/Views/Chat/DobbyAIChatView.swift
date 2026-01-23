@@ -178,9 +178,9 @@ struct ScandaLiciousAIChatView: View {
                             .font(.system(size: 22))
                             .foregroundStyle(.secondary)
 
-                        // Usage indicator dot
+                        // Usage indicator dot - shows reddest state
                         Circle()
-                            .fill(usageColor)
+                            .fill(profileBadgeColor)
                             .frame(width: 10, height: 10)
                             .overlay(
                                 Circle()
@@ -283,6 +283,38 @@ struct ScandaLiciousAIChatView: View {
         case .exhausted:
             return .red
         }
+    }
+
+    // Profile badge color - shows the reddest state between messages and receipts
+    private var profileBadgeColor: Color {
+        // Check receipts first - discrete states
+        let receiptState = rateLimitManager.receiptLimitState
+
+        // Check message usage percentage
+        let messageUsage = rateLimitManager.usagePercentage
+
+        // Priority: exhausted receipts or critical message usage (>95%) = red
+        if receiptState == .exhausted || messageUsage >= 0.95 {
+            return .red
+        }
+
+        // Warning receipts (1-5 left) or high message usage (80-95%) = orange/red
+        if receiptState == .warning {
+            // If messages are also high usage, return the redder color
+            if messageUsage >= 0.8 {
+                // Return whichever is redder - compare the colors
+                return messageUsage >= 0.9 ? usageColor : .orange
+            }
+            return .orange
+        }
+
+        // If messages are at warning level or higher, use message color
+        if messageUsage >= 0.8 {
+            return usageColor
+        }
+
+        // Otherwise use the interpolated message usage color (green to yellow)
+        return usageColor
     }
     
     private func sendMessage() {
