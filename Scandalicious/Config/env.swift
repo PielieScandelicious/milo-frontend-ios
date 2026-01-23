@@ -19,8 +19,8 @@ enum AppConfiguration {
 
     // API Endpoints (computed properties to avoid actor isolation issues)
     static var uploadEndpoint: String { "\(backendBaseURL)/upload" }
-    static var chatEndpoint: String { "\(backendBaseURL)/api/v1/chat/" }
-    static var chatStreamEndpoint: String { "\(backendBaseURL)/api/v1/chat/stream" }
+    static var chatEndpoint: String { "\(backendBaseURL)/api/v2/chat/" }
+    static var chatStreamEndpoint: String { "\(backendBaseURL)/api/v2/chat/stream" }
 
     // Receipt API endpoint
     static var receiptUploadEndpoint: String { "\(backendBaseURL)/api/v3/receipts/upload" }
