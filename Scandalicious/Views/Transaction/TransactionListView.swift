@@ -424,16 +424,33 @@ struct APITransactionRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Icon
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(categoryColor(for: transaction.category).opacity(0.2))
-                    .frame(width: 50, height: 50)
+            // Icon with quantity badge
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(categoryColor(for: transaction.category).opacity(0.2))
+                        .frame(width: 50, height: 50)
 
-                Image(systemName: categoryIcon(for: transaction.category))
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(categoryColor(for: transaction.category))
+                    Image(systemName: categoryIcon(for: transaction.category))
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(categoryColor(for: transaction.category))
+                }
+
+                // Quantity badge (only show if quantity > 1)
+                if transaction.quantity > 1 {
+                    Text("×\(transaction.quantity)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(categoryColor(for: transaction.category))
+                        )
+                        .offset(x: 6, y: -4)
+                }
             }
+            .frame(width: 50, height: 50)
 
             // Item details
             VStack(alignment: .leading, spacing: 4) {
@@ -462,6 +479,13 @@ struct APITransactionRowView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.5))
                     }
+                }
+
+                // Unit price (only show if quantity > 1 and unitPrice is available)
+                if let unitPrice = transaction.unitPrice, transaction.quantity > 1 {
+                    Text(unitPrice, format: .currency(code: "EUR"))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
                 }
             }
 

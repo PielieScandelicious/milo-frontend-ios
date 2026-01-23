@@ -362,6 +362,7 @@ struct APITransaction: Codable, Identifiable {
     let itemName: String
     let itemPrice: Double
     let quantity: Int
+    let unitPrice: Double?  // Price per unit when quantity > 1
     let category: String
     let date: String
     let healthScore: Int?  // 0-5 for food items, nil for non-food
@@ -372,17 +373,19 @@ struct APITransaction: Codable, Identifiable {
         case itemName = "item_name"
         case itemPrice = "item_price"
         case quantity
+        case unitPrice = "unit_price"
         case category
         case date
         case healthScore = "health_score"
     }
 
-    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, category: String, date: String, healthScore: Int? = nil) {
+    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, healthScore: Int? = nil) {
         self.id = id
         self.storeName = storeName
         self.itemName = itemName
         self.itemPrice = itemPrice
         self.quantity = quantity
+        self.unitPrice = unitPrice
         self.category = category
         self.date = date
         self.healthScore = healthScore
@@ -398,7 +401,7 @@ struct APITransaction: Codable, Identifiable {
     }
 
     var totalPrice: Double {
-        itemPrice * Double(quantity)
+        itemPrice  // Total price from backend (already accounts for quantity)
     }
 }
 
