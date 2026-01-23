@@ -23,7 +23,7 @@ struct ScandaLiciousAIChatView: View {
     @State private var showWelcome = true
     @State private var showManageSubscription = false
     @State private var showRateLimitAlert = false
-    @Binding var showSignOutConfirmation: Bool
+    @State private var showProfile = false
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -149,14 +149,6 @@ struct ScandaLiciousAIChatView: View {
             // Profile button - trailing (right side)
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    // User Email
-                    if let user = authManager.user {
-                        Section {
-                            Text(user.email ?? "No email")
-                                .font(.headline)
-                        }
-                    }
-
                     // Usage & Subscription
                     Section {
                         // Message rate limit usage display with smart color
@@ -170,21 +162,14 @@ struct ScandaLiciousAIChatView: View {
                             Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts", systemImage: receiptLimitIcon)
                         }
                         .tint(receiptLimitColor)
-
-                        // Manage subscription button
-                        Button {
-                            showManageSubscription = true
-                        } label: {
-                            Label("Manage Subscription", systemImage: "creditcard")
-                        }
                     }
 
-                    // Sign Out
+                    // Profile
                     Section {
-                        Button(role: .destructive) {
-                            showSignOutConfirmation = true
+                        Button {
+                            showProfile = true
                         } label: {
-                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                            Label("Profile", systemImage: "person.fill")
                         }
                     }
                 } label: {
@@ -226,6 +211,13 @@ struct ScandaLiciousAIChatView: View {
             }
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
+        .sheet(isPresented: $showProfile) {
+            NavigationStack {
+                ProfileView()
+                    .environmentObject(authManager)
+                    .environmentObject(subscriptionManager)
+            }
+        }
         .alert("Message Limit Reached", isPresented: $showRateLimitAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -948,7 +940,7 @@ class ChatViewModel: ObservableObject {
 // MARK: - Preview
 #Preview {
     NavigationStack {
-        ScandaLiciousAIChatView(showSignOutConfirmation: .constant(false))
+        ScandaLiciousAIChatView()
             .environmentObject(TransactionManager())
             .environmentObject(AuthenticationManager())
     }

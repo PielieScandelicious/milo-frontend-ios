@@ -36,7 +36,7 @@ struct ContentView: View {
                 }
                 .tag(Tab.scan)
             
-            ScandaLiciousTab(showSignOutConfirmation: $showSignOutConfirmation)
+            ScandaLiciousTab()
                 .tabItem {
                     Label("Dobby", systemImage: "sparkles")
                 }
@@ -104,11 +104,9 @@ struct ScanTab: View {
 
 // MARK: - ScandaLicious Tab
 struct ScandaLiciousTab: View {
-    @Binding var showSignOutConfirmation: Bool
-    
     var body: some View {
         NavigationStack {
-            ScandaLiciousAIChatView(showSignOutConfirmation: $showSignOutConfirmation)
+            ScandaLiciousAIChatView()
                 .toolbarBackground(.hidden, for: .navigationBar)
         }
         .id("ScandaLiciousTab") // Prevent recreation

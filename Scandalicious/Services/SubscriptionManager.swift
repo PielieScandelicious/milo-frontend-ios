@@ -185,71 +185,99 @@ class SubscriptionManager: ObservableObject {
     func updateSubscriptionStatus() async {
         var foundActiveSubscription = false
 
-        // Check subscription status using Product's subscription status API
-        for product in products {
-            guard let subscription = product.subscription else { continue }
+        // First, check current entitlements directly (more reliable for StoreKit testing)
+        for await verificationResult in StoreKitTransaction.currentEntitlements {
+            guard case .verified(let transaction) = verificationResult else { continue }
 
-            do {
-                // Get the subscription status for this product
-                let statuses = try await subscription.status
-
-                for status in statuses {
-                    guard case .verified(let renewalInfo) = status.renewalInfo,
-                          case .verified(let transaction) = status.transaction else {
-                        continue
+            // Check if this is one of our subscription products
+            if SubscriptionProduct.allCases.map({ $0.rawValue }).contains(transaction.productID) {
+                if let expirationDate = transaction.expirationDate, expirationDate > Date() {
+                    // Check if in trial period
+                    if transaction.offerType == .introductory {
+                        subscriptionStatus = .inTrial(
+                            expirationDate: expirationDate,
+                            productId: transaction.productID
+                        )
+                    } else {
+                        subscriptionStatus = .subscribed(
+                            expirationDate: expirationDate,
+                            productId: transaction.productID
+                        )
                     }
+                    foundActiveSubscription = true
+                    print("✅ Active subscription found (currentEntitlements): \(transaction.productID), expires: \(expirationDate)")
+                    break
+                }
+            }
+        }
 
-                    // Check if subscription is active
-                    switch status.state {
-                    case .subscribed:
-                        if let expirationDate = transaction.expirationDate {
-                            // Check if in trial period
-                            if transaction.offerType == .introductory {
-                                subscriptionStatus = .inTrial(
-                                    expirationDate: expirationDate,
-                                    productId: transaction.productID
-                                )
-                            } else {
+        // If no entitlement found, also check via Product subscription status API
+        if !foundActiveSubscription {
+            for product in products {
+                guard let subscription = product.subscription else { continue }
+
+                do {
+                    // Get the subscription status for this product
+                    let statuses = try await subscription.status
+
+                    for status in statuses {
+                        guard case .verified(let renewalInfo) = status.renewalInfo,
+                              case .verified(let transaction) = status.transaction else {
+                            continue
+                        }
+
+                        // Check if subscription is active
+                        switch status.state {
+                        case .subscribed:
+                            if let expirationDate = transaction.expirationDate {
+                                // Check if in trial period
+                                if transaction.offerType == .introductory {
+                                    subscriptionStatus = .inTrial(
+                                        expirationDate: expirationDate,
+                                        productId: transaction.productID
+                                    )
+                                } else {
+                                    subscriptionStatus = .subscribed(
+                                        expirationDate: expirationDate,
+                                        productId: transaction.productID
+                                    )
+                                }
+                                foundActiveSubscription = true
+                                print("✅ Active subscription found (product status): \(transaction.productID), expires: \(expirationDate)")
+                            }
+
+                        case .inGracePeriod:
+                            if let expirationDate = transaction.expirationDate {
                                 subscriptionStatus = .subscribed(
                                     expirationDate: expirationDate,
                                     productId: transaction.productID
                                 )
+                                foundActiveSubscription = true
+                                print("⚠️ Subscription in grace period: \(transaction.productID)")
                             }
-                            foundActiveSubscription = true
-                            print("✅ Active subscription found: \(transaction.productID), expires: \(expirationDate)")
+
+                        case .inBillingRetryPeriod:
+                            // Still consider active during billing retry
+                            if let expirationDate = transaction.expirationDate {
+                                subscriptionStatus = .subscribed(
+                                    expirationDate: expirationDate,
+                                    productId: transaction.productID
+                                )
+                                foundActiveSubscription = true
+                                print("⚠️ Subscription in billing retry: \(transaction.productID)")
+                            }
+
+                        case .expired, .revoked:
+                            // Not active
+                            break
+
+                        default:
+                            break
                         }
-
-                    case .inGracePeriod:
-                        if let expirationDate = transaction.expirationDate {
-                            subscriptionStatus = .subscribed(
-                                expirationDate: expirationDate,
-                                productId: transaction.productID
-                            )
-                            foundActiveSubscription = true
-                            print("⚠️ Subscription in grace period: \(transaction.productID)")
-                        }
-
-                    case .inBillingRetryPeriod:
-                        // Still consider active during billing retry
-                        if let expirationDate = transaction.expirationDate {
-                            subscriptionStatus = .subscribed(
-                                expirationDate: expirationDate,
-                                productId: transaction.productID
-                            )
-                            foundActiveSubscription = true
-                            print("⚠️ Subscription in billing retry: \(transaction.productID)")
-                        }
-
-                    case .expired, .revoked:
-                        // Not active
-                        break
-
-                    default:
-                        break
                     }
+                } catch {
+                    print("⚠️ Failed to check subscription status: \(error)")
                 }
-            } catch {
-                print("⚠️ Failed to check subscription status: \(error)")
             }
         }
 
