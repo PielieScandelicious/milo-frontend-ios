@@ -33,7 +33,7 @@ struct ProfileView: View {
     enum Gender: String, CaseIterable {
         case male = "Male"
         case female = "Female"
-        case notSpecified = "Prefer not to say"
+        case notSpecified = "X"
 
         var apiValue: String {
             switch self {

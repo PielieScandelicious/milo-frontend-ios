@@ -22,19 +22,16 @@ struct OnboardingView: View {
                 VStack(spacing: 32) {
                     // Welcome Header
                     VStack(spacing: 12) {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 80))
+                        Text("Welcome to Dobby")
+                            .font(.system(size: 42, weight: .bold, design: .rounded))
                             .foregroundStyle(.purple.gradient)
-
-                        Text("Welcome to Scandalicious!")
-                            .font(.title.bold())
 
                         Text("Let's personalize your experience")
                             .font(.body)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
-                    .padding(.top, 40)
+                    .padding(.top, 60)
 
                     // Form
                     VStack(spacing: 20) {
@@ -99,16 +96,6 @@ struct OnboardingView: View {
                     .disabled(!canContinue || isLoading)
                     .padding(.horizontal, 24)
                     .padding(.top, 12)
-
-                    // Skip Button
-                    Button {
-                        skipOnboarding()
-                    } label: {
-                        Text("Skip for now")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .disabled(isLoading)
                 }
                 .padding(.bottom, 40)
             }
@@ -160,11 +147,6 @@ struct OnboardingView: View {
                 print("❌ Error creating profile: \(error)")
             }
         }
-    }
-
-    private func skipOnboarding() {
-        // Mark profile as completed even if skipped
-        authManager.markProfileAsCompleted()
     }
 }
 

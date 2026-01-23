@@ -48,7 +48,7 @@ enum ProfileGender: String, CaseIterable {
         switch self {
         case .male: return "Male"
         case .female: return "Female"
-        case .preferNotToSay: return "Prefer not to say"
+        case .preferNotToSay: return "X"
         }
     }
 }
