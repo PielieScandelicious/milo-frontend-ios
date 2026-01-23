@@ -267,10 +267,8 @@ class RateLimitManager: ObservableObject {
 
     /// Check if user can send a message
     func canSendMessage(for subscriptionStatus: SubscriptionStatus) -> Bool {
-        guard subscriptionStatus.isActive else { return false }
-        // If we don't have user ID yet, allow message - backend will enforce
-        if currentUserId == nil { return true }
-        return !isRateLimited
+        // PAYWALL DISABLED: Always allow messages
+        return true
     }
 
     /// Optimistically decrement the local message counter (call after successful message)
@@ -284,9 +282,8 @@ class RateLimitManager: ObservableObject {
 
     /// Check if user can upload a receipt
     func canUploadReceipt() -> Bool {
-        // If we don't have user ID yet, allow upload - backend will enforce
-        if currentUserId == nil { return true }
-        return !isReceiptLimitReached
+        // PAYWALL DISABLED: Always allow receipt uploads
+        return true
     }
 
     /// Optimistically decrement the local receipt counter (call after successful upload)

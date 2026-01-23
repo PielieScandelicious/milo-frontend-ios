@@ -41,14 +41,9 @@ struct ScandaLiciousApp: App {
                     } else if !authManager.profileCompleted {
                         // Show onboarding for first-time users
                         OnboardingView()
-                    } else if !hasCheckedSubscription || subscriptionManager.subscriptionStatus.isActive {
-                        // Show content immediately - subscription check happens in background
-                        // Only show paywall after check confirms no active subscription
-                        ContentView()
                     } else {
-                        // Show paywall - user must subscribe to access the app
-                        PaywallView()
-                            .interactiveDismissDisabled(true)
+                        // PAYWALL DISABLED: Always show content view
+                        ContentView()
                     }
                 } else {
                     LoginView()
