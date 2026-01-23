@@ -75,9 +75,10 @@ enum ReceiptUploadError: LocalizedError {
 
 actor ReceiptUploadService {
     static let shared = ReceiptUploadService()
-    
-    private let baseURL = "https://scandalicious-api-production.up.railway.app/api/v3"
-    
+
+    private let baseURL = "\(AppConfiguration.backendBaseURL)/api/v3"
+    private var uploadURL: String { "\(baseURL)/receipts/upload" }
+
     private init() {}
     
     // MARK: - Upload Receipt
@@ -108,37 +109,37 @@ actor ReceiptUploadService {
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
         // Create request
-        guard let url = URL(string: "\(baseURL)/receipts/upload") else {
+        guard let url = URL(string: uploadURL) else {
             throw ReceiptUploadError.invalidResponse
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = body
         request.timeoutInterval = 90 // Increased timeout for Claude Vision API processing
-        
+
         // Use shared upload logic
         return try await performUpload(request: request)
     }
-    
+
     // MARK: - Upload PDF Receipt
-    
+
     func uploadPDFReceipt(from pdfURL: URL) async throws -> ReceiptUploadResponse {
         print("🚀 Starting PDF receipt upload process")
-        
+
         // Get auth token
         let idToken = try await getAuthToken()
-        
+
         // Read PDF data
         let pdfData = try Data(contentsOf: pdfURL)
         print("📦 PDF size: \(pdfData.count / 1024)KB")
-        
+
         // Create multipart form data for SINGLE PDF receipt upload
         let boundary = UUID().uuidString
         var body = Data()
-        
+
         // Add PDF data
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"receipt.pdf\"\r\n".data(using: .utf8)!)
@@ -146,9 +147,9 @@ actor ReceiptUploadService {
         body.append(pdfData)
         body.append("\r\n".data(using: .utf8)!)
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        
+
         // Create request
-        guard let url = URL(string: "\(baseURL)/receipts/upload") else {
+        guard let url = URL(string: uploadURL) else {
             throw ReceiptUploadError.invalidResponse
         }
         

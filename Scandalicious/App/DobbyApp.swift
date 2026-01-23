@@ -21,6 +21,9 @@ struct ScandaLiciousApp: App {
         // Configure Firebase FIRST
         FirebaseApp.configure()
 
+        // Log environment configuration
+        AppConfiguration.logConfiguration()
+
         // Now create the auth manager
         _authManager = StateObject(wrappedValue: AuthenticationManager())
     }

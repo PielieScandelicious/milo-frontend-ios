@@ -46,8 +46,8 @@ enum AnalyticsAPIError: LocalizedError {
 
 actor AnalyticsAPIService {
     static let shared = AnalyticsAPIService()
-    
-    private let baseURL = "https://scandalicious-api-production.up.railway.app/api/v1"
+
+    private var baseURL: String { "\(AppConfiguration.backendBaseURL)/api/v1" }
     private let decoder: JSONDecoder
     
     private init() {
