@@ -11,36 +11,48 @@ import Combine
 
 class AuthenticationManager: ObservableObject {
     @Published var user: User?
+    @Published var profileCompleted: Bool = false
+    @Published var isCheckingProfile: Bool = true
+
     var isAuthenticated: Bool {
         user != nil
     }
-    
+
     private var authStateHandle: AuthStateDidChangeListenerHandle?
     private let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+    private let profileCompletedKey = "user_profile_completed"
     
     init() {
         // Set the current user immediately
         self.user = Auth.auth().currentUser
-        
+
+        // Load profile completed status from UserDefaults
+        self.profileCompleted = UserDefaults.standard.bool(forKey: profileCompletedKey)
+
         // Save token to shared storage if user is already authenticated
         if let user = self.user {
             Task {
                 await self.saveTokenToSharedStorage(for: user)
+                await self.checkProfileStatus()
             }
+        } else {
+            self.isCheckingProfile = false
         }
-        
+
         // Listen for authentication state changes
         authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             self?.user = user
-            
+
             // Save token when user state changes
             if let user = user {
                 Task {
                     await self?.saveTokenToSharedStorage(for: user)
+                    await self?.checkProfileStatus()
                 }
             } else {
                 // Clear token from shared storage on logout
                 self?.clearTokenFromSharedStorage()
+                self?.clearProfileStatus()
             }
         }
     }
@@ -166,8 +178,60 @@ class AuthenticationManager: ObservableObject {
     }
     
     // MARK: - Password Reset
-    
+
     func resetPassword(email: String) async throws {
         try await Auth.auth().sendPasswordReset(withEmail: email)
+    }
+
+    // MARK: - Profile Status Management
+
+    func checkProfileStatus() async {
+        await MainActor.run {
+            self.isCheckingProfile = true
+        }
+
+        // First check local storage
+        let localProfileCompleted = UserDefaults.standard.bool(forKey: profileCompletedKey)
+
+        if localProfileCompleted {
+            // If we already know profile is completed, no need to check backend
+            await MainActor.run {
+                self.profileCompleted = true
+                self.isCheckingProfile = false
+            }
+            return
+        }
+
+        // Check backend for profile completion status
+        do {
+            let profile = try await ProfileAPIService().getProfile()
+            await MainActor.run {
+                self.profileCompleted = profile.profileCompleted
+                self.isCheckingProfile = false
+
+                // Save to local storage
+                if profile.profileCompleted {
+                    UserDefaults.standard.set(true, forKey: self.profileCompletedKey)
+                }
+            }
+        } catch {
+            // If profile not found or error, treat as incomplete
+            print("⚠️ Profile check failed: \(error.localizedDescription)")
+            await MainActor.run {
+                self.profileCompleted = false
+                self.isCheckingProfile = false
+            }
+        }
+    }
+
+    func markProfileAsCompleted() {
+        self.profileCompleted = true
+        UserDefaults.standard.set(true, forKey: profileCompletedKey)
+    }
+
+    private func clearProfileStatus() {
+        self.profileCompleted = false
+        self.isCheckingProfile = false
+        UserDefaults.standard.removeObject(forKey: profileCompletedKey)
     }
 }

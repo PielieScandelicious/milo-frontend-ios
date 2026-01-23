@@ -18,11 +18,39 @@ struct ProfileView: View {
     @State private var lastName = ""
     @State private var selectedGender: Gender = .notSpecified
     @State private var showManageSubscription = false
+    @State private var isLoading = false
+    @State private var isSaving = false
+    @State private var showSaveSuccess = false
+    @State private var errorMessage: String?
+    @State private var showError = false
+    @State private var hasUnsavedChanges = false
+
+    // Store original values to detect changes
+    @State private var originalFirstName = ""
+    @State private var originalLastName = ""
+    @State private var originalGender: Gender = .notSpecified
 
     enum Gender: String, CaseIterable {
         case male = "Male"
         case female = "Female"
         case notSpecified = "Prefer not to say"
+
+        var apiValue: String {
+            switch self {
+            case .male: return "male"
+            case .female: return "female"
+            case .notSpecified: return "prefer_not_to_say"
+            }
+        }
+
+        static func from(apiValue: String?) -> Gender {
+            guard let apiValue = apiValue else { return .notSpecified }
+            switch apiValue {
+            case "male": return .male
+            case "female": return .female
+            default: return .notSpecified
+            }
+        }
     }
 
     var body: some View {
@@ -36,6 +64,10 @@ struct ProfileView: View {
                     TextField("First Name", text: $firstName)
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
+                        .disabled(isLoading || isSaving)
+                        .onChange(of: firstName) { _, _ in
+                            checkForChanges()
+                        }
                 }
 
                 HStack {
@@ -45,6 +77,10 @@ struct ProfileView: View {
                     TextField("Last Name", text: $lastName)
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
+                        .disabled(isLoading || isSaving)
+                        .onChange(of: lastName) { _, _ in
+                            checkForChanges()
+                        }
                 }
 
                 Picker("Gender", selection: $selectedGender) {
@@ -52,8 +88,34 @@ struct ProfileView: View {
                         Text(gender.rawValue).tag(gender)
                     }
                 }
+                .disabled(isLoading || isSaving)
+                .onChange(of: selectedGender) { _, _ in
+                    checkForChanges()
+                }
             } header: {
                 Text("Personal Information")
+            } footer: {
+                if hasUnsavedChanges {
+                    Button {
+                        saveProfile()
+                    } label: {
+                        if isSaving {
+                            HStack {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                                Text("Saving...")
+                            }
+                        } else {
+                            Text("Save Changes")
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                    .disabled(isSaving)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                }
             }
 
             // Account
@@ -140,12 +202,36 @@ struct ProfileView: View {
                 }
             }
         }
+        .overlay {
+            if isLoading {
+                ZStack {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                }
+            }
+        }
+        .alert("Success", isPresented: $showSaveSuccess) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your profile has been updated successfully")
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred")
+        }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
         .onAppear {
             Task {
                 // Load products first, then check status
                 await subscriptionManager.loadProducts()
                 await subscriptionManager.updateSubscriptionStatus()
+
+                // Load profile data
+                await loadProfile()
             }
         }
         .onChange(of: showManageSubscription) { oldValue, newValue in
@@ -222,6 +308,89 @@ struct ProfileView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: date)
+    }
+
+    // MARK: - Profile Data Management
+
+    private func loadProfile() async {
+        await MainActor.run {
+            isLoading = true
+        }
+
+        do {
+            let profile = try await ProfileAPIService().getProfile()
+            await MainActor.run {
+                firstName = profile.firstName ?? ""
+                lastName = profile.lastName ?? ""
+                selectedGender = Gender.from(apiValue: profile.gender)
+
+                // Store original values
+                originalFirstName = firstName
+                originalLastName = lastName
+                originalGender = selectedGender
+
+                hasUnsavedChanges = false
+                isLoading = false
+            }
+            print("✅ Profile loaded successfully")
+        } catch {
+            // If profile not found, that's okay - user hasn't filled it out yet
+            await MainActor.run {
+                isLoading = false
+            }
+            print("⚠️ Could not load profile: \(error.localizedDescription)")
+        }
+    }
+
+    private func saveProfile() {
+        guard hasUnsavedChanges else { return }
+
+        isSaving = true
+        errorMessage = nil
+
+        Task {
+            do {
+                let trimmedFirstName = firstName.trimmingCharacters(in: .whitespaces)
+                let trimmedLastName = lastName.trimmingCharacters(in: .whitespaces)
+
+                let profile = try await ProfileAPIService().updateProfile(
+                    firstName: trimmedFirstName.isEmpty ? nil : trimmedFirstName,
+                    lastName: trimmedLastName.isEmpty ? nil : trimmedLastName,
+                    gender: selectedGender.apiValue
+                )
+
+                await MainActor.run {
+                    // Update original values
+                    originalFirstName = firstName
+                    originalLastName = lastName
+                    originalGender = selectedGender
+
+                    hasUnsavedChanges = false
+                    isSaving = false
+                    showSaveSuccess = true
+
+                    // Update profile completion status
+                    if profile.profileCompleted {
+                        authManager.markProfileAsCompleted()
+                    }
+                }
+
+                print("✅ Profile saved successfully")
+            } catch {
+                await MainActor.run {
+                    isSaving = false
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+                print("❌ Error saving profile: \(error)")
+            }
+        }
+    }
+
+    private func checkForChanges() {
+        hasUnsavedChanges = firstName != originalFirstName ||
+                           lastName != originalLastName ||
+                           selectedGender != originalGender
     }
 }
 

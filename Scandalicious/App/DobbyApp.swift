@@ -29,9 +29,18 @@ struct ScandaLiciousApp: App {
         WindowGroup {
             ZStack {
                 if authManager.isAuthenticated {
-                    // Show content immediately - subscription check happens in background
-                    // Only show paywall after check confirms no active subscription
-                    if !hasCheckedSubscription || subscriptionManager.subscriptionStatus.isActive {
+                    // Show onboarding if profile is not completed
+                    if authManager.isCheckingProfile {
+                        // Show loading while checking profile status
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(1.5)
+                    } else if !authManager.profileCompleted {
+                        // Show onboarding for first-time users
+                        OnboardingView()
+                    } else if !hasCheckedSubscription || subscriptionManager.subscriptionStatus.isActive {
+                        // Show content immediately - subscription check happens in background
+                        // Only show paywall after check confirms no active subscription
                         ContentView()
                     } else {
                         // Show paywall - user must subscribe to access the app
