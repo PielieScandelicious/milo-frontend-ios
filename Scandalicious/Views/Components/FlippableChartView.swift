@@ -165,6 +165,22 @@ struct FlippableDonutChartView: View {
     @State private var isFlipped = false
     @State private var flipDegrees: Double = 0
 
+    /// Convert ChartSegments to ChartData for IconDonutChartView
+    private var chartData: [ChartData] {
+        segments.map { segment in
+            // Get icon from AnalyticsCategory if available
+            let icon = AnalyticsCategory.allCases
+                .first { $0.displayName == segment.label }?.icon ?? "shippingbox.fill"
+
+            return ChartData(
+                value: segment.value,
+                color: segment.color,
+                iconName: icon,
+                label: segment.label
+            )
+        }
+    }
+
     var body: some View {
         ZStack {
             // Back side - Mini Bar Chart
@@ -180,13 +196,12 @@ struct FlippableDonutChartView: View {
                 axis: (x: 0, y: 1, z: 0)
             )
 
-            // Front side - Donut Chart
-            DonutChartView(
-                title: title,
-                subtitle: subtitle,
+            // Front side - Icon Donut Chart
+            IconDonutChartView(
+                data: chartData,
                 totalAmount: totalAmount,
-                segments: segments,
-                size: size
+                size: size,
+                currencySymbol: subtitle == "visits" ? "" : "€"
             )
             .opacity(isFlipped ? 0 : 1)
         }
@@ -213,6 +228,11 @@ struct FlippableAllStoresChartView: View {
     @State private var isFlipped = false
     @State private var flipDegrees: Double = 0
 
+    /// Convert StoreChartSegments to ChartData for IconDonutChartView
+    private var chartData: [ChartData] {
+        segments.toIconChartData()
+    }
+
     var body: some View {
         ZStack {
             // Back side - Mini Bar Chart
@@ -227,11 +247,12 @@ struct FlippableAllStoresChartView: View {
                 axis: (x: 0, y: 1, z: 0)
             )
 
-            // Front side - Donut Chart
-            AllStoresDonutChart(
+            // Front side - Icon Donut Chart
+            IconDonutChartView(
+                data: chartData,
                 totalAmount: totalAmount,
-                segments: segments,
-                size: size
+                size: size,
+                currencySymbol: "€"
             )
             .opacity(isFlipped ? 0 : 1)
         }

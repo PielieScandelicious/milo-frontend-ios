@@ -47,7 +47,7 @@ enum AnalyticsAPIError: LocalizedError {
 actor AnalyticsAPIService {
     static let shared = AnalyticsAPIService()
 
-    private var baseURL: String { "\(AppConfiguration.backendBaseURL)/api/v2" }
+    private var baseURL: String { "\(AppConfiguration.backendBaseURL)/api/v1" }
     private let decoder: JSONDecoder
     
     private init() {

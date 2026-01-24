@@ -1127,18 +1127,22 @@ struct DropViewDelegate: DropDelegate {
 }
     
     private func storeChartCard(_ breakdown: StoreBreakdown) -> some View {
-        VStack(spacing: 0) {
-            DonutChartView(
-                title: breakdown.storeName,
-                subtitle: "",
+        VStack(spacing: 8) {
+            IconDonutChartView(
+                data: breakdown.categories.toIconChartData(),
                 totalAmount: breakdown.totalStoreSpend,
-                segments: breakdown.categories.toChartSegments(),
-                size: 90
+                size: 80,
+                currencySymbol: "€"
             )
-            .padding(.top, 16)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+
+            Text(breakdown.storeName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 16)
