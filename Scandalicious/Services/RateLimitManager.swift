@@ -282,8 +282,7 @@ class RateLimitManager: ObservableObject {
 
     /// Check if user can upload a receipt
     func canUploadReceipt() -> Bool {
-        // PAYWALL DISABLED: Always allow receipt uploads
-        return true
+        return receiptsRemaining > 0
     }
 
     /// Optimistically decrement the local receipt counter (call after successful upload)
@@ -573,6 +572,14 @@ class RateLimitManager: ObservableObject {
         userDefaults.set(daysUntilReset, forKey: "\(prefix)_daysUntilReset")
         if let endDate = periodEndDate {
             userDefaults.set(endDate.timeIntervalSince1970, forKey: "\(prefix)_periodEndDate")
+        }
+
+        // Also save to shared App Group UserDefaults for Share Extension access
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+        if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
+            sharedDefaults.set(receiptsRemaining, forKey: "\(prefix)_receiptsRemaining")
+            sharedDefaults.set(daysUntilReset, forKey: "\(prefix)_daysUntilReset")
+            sharedDefaults.synchronize()
         }
     }
 }

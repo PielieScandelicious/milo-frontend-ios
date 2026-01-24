@@ -161,18 +161,72 @@ class ShareViewController: UIViewController {
         processSharedContent()
     }
     
+    // MARK: - Rate Limit Check
+
+    /// Checks if the user has remaining receipt uploads by reading from shared UserDefaults
+    private func checkRateLimitFromSharedStorage() -> (canUpload: Bool, message: String?) {
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
+            print("⚠️ Could not access shared UserDefaults for rate limit check")
+            // If we can't check, allow the upload (backend will reject if needed)
+            return (true, nil)
+        }
+
+        // Read rate limit data saved by main app's RateLimitManager
+        // Keys are prefixed with user ID, but we also check for a global key
+        let allKeys = sharedDefaults.dictionaryRepresentation().keys
+
+        // Find the receiptsRemaining key (format: rateLimit_{userId}_receiptsRemaining)
+        var receiptsRemaining: Int?
+        var daysUntilReset: Int = 0
+
+        for key in allKeys {
+            if key.contains("_receiptsRemaining") {
+                receiptsRemaining = sharedDefaults.integer(forKey: key)
+                // Also get days until reset
+                let resetKey = key.replacingOccurrences(of: "_receiptsRemaining", with: "_daysUntilReset")
+                daysUntilReset = sharedDefaults.integer(forKey: resetKey)
+                break
+            }
+        }
+
+        print("🔍 Rate limit check: receiptsRemaining = \(receiptsRemaining ?? -1), daysUntilReset = \(daysUntilReset)")
+
+        // If we found a receiptsRemaining value and it's 0, block the upload
+        if let remaining = receiptsRemaining, remaining <= 0 {
+            let message: String
+            if daysUntilReset > 0 {
+                message = "You've reached your monthly upload limit.\n\nYour limit resets in \(daysUntilReset) day\(daysUntilReset == 1 ? "" : "s")."
+            } else {
+                message = "You've reached your monthly upload limit.\n\nYour limit resets soon."
+            }
+            return (false, message)
+        }
+
+        return (true, nil)
+    }
+
     // MARK: - Process Shared Content
     private func processSharedContent() {
+        // Check rate limit before processing
+        let rateLimitCheck = checkRateLimitFromSharedStorage()
+        if !rateLimitCheck.canUpload {
+            print("🚫 Rate limit reached - blocking upload")
+            updateStatus(.failed(message: rateLimitCheck.message ?? "Upload limit reached for this month.", canRetry: false))
+            return
+        }
+
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
             updateStatus(error: "No content found")
             return
         }
-        
+
         guard let itemProvider = extensionItem.attachments?.first else {
             updateStatus(error: "No attachment found")
             return
         }
-        
+
         print("📋 Available type identifiers:")
         for identifier in itemProvider.registeredTypeIdentifiers {
             print("  - \(identifier)")

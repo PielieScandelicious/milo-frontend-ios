@@ -898,18 +898,14 @@ struct OverviewView: View {
                         }
                         .foregroundColor(.blue)
                         .padding(.top, 4)
-                    } else if let lastFetch = dataManager.lastFetchDate {
-                        let _ = timerTick // Reference to trigger re-renders
-                        let isRecentlyRefreshed = lastRefreshTime != nil && Date().timeIntervalSince(lastRefreshTime!) < 60
-                        let displayDate = lastRefreshTime ?? lastFetch
-                        let timeAgoText = timeAgo(from: displayDate)
+                    } else {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.icloud.fill")
                                 .font(.system(size: 10))
-                            Text(timeAgoText.isEmpty ? "Synced" : "Synced \(timeAgoText)")
-                                .font(.system(size: 11, weight: isRecentlyRefreshed ? .medium : .regular))
+                            Text("Synced")
+                                .font(.system(size: 11, weight: .medium))
                         }
-                        .foregroundColor(isRecentlyRefreshed ? .green : .white.opacity(0.4))
+                        .foregroundColor(.green)
                         .padding(.top, 4)
                     }
                 }
