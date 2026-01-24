@@ -17,6 +17,7 @@ extension Notification.Name {
     static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")
     static let receiptUploadStarted = Notification.Name("receiptUploadStarted")
     static let receiptDeleted = Notification.Name("receiptDeleted")
+    static let shareExtensionUploadDetected = Notification.Name("shareExtensionUploadDetected")
 }
 
 enum SortOption: String, CaseIterable {
@@ -574,6 +575,14 @@ struct OverviewView: View {
             print("🔄 App became active (UIApplication notification)")
             checkForShareExtensionUploads()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .shareExtensionUploadDetected)) { _ in
+            // Share extension upload detected (possibly from another view)
+            print("📬 Received share extension upload notification - showing syncing indicator")
+            if !isReceiptUploading {
+                isReceiptUploading = true
+                // The actual refresh will be handled by checkForShareExtensionUploads
+            }
+        }
     }
 
     // MARK: - Insight Prefetching
@@ -623,35 +632,89 @@ struct OverviewView: View {
             // Update last checked timestamp
             lastCheckedUploadTimestamp = uploadTimestamp
 
-            // Trigger refresh
+            // Show syncing indicator immediately
+            isReceiptUploading = true
+
+            // Post notification so other views can react
+            NotificationCenter.default.post(name: .shareExtensionUploadDetected, object: nil)
+
+            // Trigger refresh with retry mechanism
             Task {
-                // Wait for backend to process the receipt (backend needs time to extract items and update analytics)
-                print("⏳ Waiting 2 seconds for backend to process receipt...")
-                try? await Task.sleep(for: .seconds(2.0))
-
-                // Get current month period string (where new receipts appear)
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "MMMM yyyy"
-                dateFormatter.locale = Locale(identifier: "en_US")
-                let currentMonthPeriod = dateFormatter.string(from: Date())
-
-                print("📥 Refreshing data for current month: '\(currentMonthPeriod)'")
-                await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
-
-                // Sync rate limit status (Share Extension upload decrements the count on backend)
-                await rateLimitManager.syncFromBackend()
-                print("✅ Data and rate limit refreshed after Share Extension upload")
-
-                // If user is viewing current month, update displayed breakdowns
-                await MainActor.run {
-                    if selectedPeriod == currentMonthPeriod {
-                        print("📊 User is viewing current month - updating display")
-                        updateDisplayedBreakdowns()
-                    } else {
-                        print("ℹ️ User is viewing '\(selectedPeriod)', not '\(currentMonthPeriod)' - may need to switch periods to see new data")
-                    }
-                }
+                await refreshWithRetry()
             }
+        }
+    }
+
+    /// Refreshes data with retry mechanism for share extension uploads
+    /// The share extension signals immediately but the upload + backend processing can take 5-15 seconds
+    private func refreshWithRetry() async {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        let currentMonthPeriod = dateFormatter.string(from: Date())
+
+        // Capture current state to detect changes (not just count - also total spending for existing stores)
+        let initialBreakdowns = dataManager.storeBreakdowns.filter { $0.period == currentMonthPeriod }
+        let initialBreakdownCount = initialBreakdowns.count
+        let initialTotalSpending = initialBreakdowns.reduce(0.0) { $0 + $1.totalStoreSpend }
+        let initialTransactionCount = transactionManager.transactions.count
+
+        // Retry configuration: 3 seconds each, up to 4 attempts
+        let retryDelays: [Double] = [3.0, 3.0, 3.0, 3.0] // Total: up to 12 seconds of waiting
+        var dataChanged = false
+
+        for (attempt, delay) in retryDelays.enumerated() {
+            print("⏳ Share Extension sync - attempt \(attempt + 1)/\(retryDelays.count), waiting \(delay)s...")
+            try? await Task.sleep(for: .seconds(delay))
+
+            print("📥 Refreshing data for current month: '\(currentMonthPeriod)' (attempt \(attempt + 1))")
+            await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
+
+            // Check if data changed (count OR total spending - handles uploads to existing stores)
+            let newBreakdowns = dataManager.storeBreakdowns.filter { $0.period == currentMonthPeriod }
+            let newBreakdownCount = newBreakdowns.count
+            let newTotalSpending = newBreakdowns.reduce(0.0) { $0 + $1.totalStoreSpend }
+            let newTransactionCount = transactionManager.transactions.count
+
+            // Detect change: new stores, more transactions, OR increased spending (same store, new receipt)
+            let countChanged = newBreakdownCount > initialBreakdownCount || newTransactionCount > initialTransactionCount
+            let spendingChanged = abs(newTotalSpending - initialTotalSpending) > 0.01
+
+            if countChanged || spendingChanged {
+                print("✅ Data changed! Breakdowns: \(initialBreakdownCount) -> \(newBreakdownCount), Transactions: \(initialTransactionCount) -> \(newTransactionCount), Spending: €\(String(format: "%.2f", initialTotalSpending)) -> €\(String(format: "%.2f", newTotalSpending))")
+                dataChanged = true
+                break
+            } else {
+                print("ℹ️ No changes yet (breakdowns: \(newBreakdownCount), transactions: \(newTransactionCount), spending: €\(String(format: "%.2f", newTotalSpending)))")
+            }
+        }
+
+        if !dataChanged {
+            print("⚠️ No data changes after all retries - upload may have failed or still processing")
+        }
+
+        // Sync rate limit status
+        await rateLimitManager.syncFromBackend()
+        print("✅ Data and rate limit refreshed after Share Extension upload")
+
+        // Update UI on main thread
+        await MainActor.run {
+            // Clear syncing indicator
+            isReceiptUploading = false
+
+            if selectedPeriod == currentMonthPeriod {
+                print("📊 User is viewing current month - updating display")
+                updateDisplayedBreakdowns()
+            } else {
+                print("ℹ️ User is viewing '\(selectedPeriod)', not '\(currentMonthPeriod)' - may need to switch periods to see new data")
+            }
+
+            // Update refresh time for "Updated X ago" display
+            lastRefreshTime = Date()
+
+            // Add haptic feedback
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(dataChanged ? .success : .warning)
         }
     }
     

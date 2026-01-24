@@ -20,14 +20,21 @@ struct ReceiptDetailsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    // Duplicate Warning Banner
+                    if receipt.isDuplicate {
+                        duplicateWarningBanner
+                    }
+
                     // Header Section - Store and Totals
                     headerSection
 
-                    // Items List
-                    itemsSection
+                    // Items List (hide for duplicates since they weren't saved)
+                    if !receipt.isDuplicate {
+                        itemsSection
 
-                    // Delete Button
-                    deleteButton
+                        // Delete Button
+                        deleteButton
+                    }
                 }
                 .padding()
             }
@@ -45,6 +52,10 @@ struct ReceiptDetailsView: View {
                 print("   Store: \(receipt.storeName ?? "N/A")")
                 print("   Total: \(receipt.totalAmount ?? 0.0)")
                 print("   Items Count: \(receipt.itemsCount)")
+                print("   Is Duplicate: \(receipt.isDuplicate)")
+                if let score = receipt.duplicateScore {
+                    print("   Duplicate Score: \(String(format: "%.1f%%", score * 100))")
+                }
                 print("   Transactions array count: \(receipt.transactions.count)")
                 print("   Transactions isEmpty: \(receipt.transactions.isEmpty)")
                 
@@ -62,6 +73,37 @@ struct ReceiptDetailsView: View {
         .presentationDragIndicator(.visible)
     }
     
+    // MARK: - Duplicate Warning Banner
+
+    private var duplicateWarningBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title2)
+                .foregroundStyle(.orange)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Duplicate Receipt")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Text("This receipt was already uploaded before. The items have not been added again.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.orange.opacity(0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+
     // MARK: - Header Section
 
     private var headerSection: some View {
@@ -426,6 +468,40 @@ struct ReceiptItemRow: View {
             ],
             warnings: [],
             averageHealthScore: 3.4
+        )
+    )
+}
+
+#Preview("Duplicate Receipt") {
+    ReceiptDetailsView(
+        receipt: ReceiptUploadResponse(
+            receiptId: "456",
+            status: .success,
+            storeName: "Lidl",
+            receiptDate: "2026-01-22",
+            totalAmount: 28.50,
+            itemsCount: 3,
+            transactions: [
+                ReceiptTransaction(
+                    itemName: "Bananas",
+                    itemPrice: 1.99,
+                    quantity: 1,
+                    unitPrice: 1.99,
+                    category: .freshProduce,
+                    healthScore: 5
+                ),
+                ReceiptTransaction(
+                    itemName: "Yogurt",
+                    itemPrice: 3.49,
+                    quantity: 1,
+                    unitPrice: 3.49,
+                    category: .dairyAndEggs,
+                    healthScore: 4
+                )
+            ],
+            warnings: [],
+            averageHealthScore: 4.5,
+            isDuplicate: true
         )
     )
 }

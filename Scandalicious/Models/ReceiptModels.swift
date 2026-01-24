@@ -19,6 +19,8 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
     let transactions: [ReceiptTransaction]
     let warnings: [String]  // Required field - always returned as array (may be empty)
     let averageHealthScore: Double?  // Average health score for food items in the receipt
+    let isDuplicate: Bool  // Whether this receipt was already uploaded before
+    let duplicateScore: Double?  // Confidence score for duplicate detection (0.0 - 1.0)
 
     enum CodingKeys: String, CodingKey {
         case receiptId = "receipt_id"
@@ -30,6 +32,39 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
         case transactions  // Backend returns "transactions"
         case warnings
         case averageHealthScore = "average_health_score"
+        case isDuplicate = "is_duplicate"
+        case duplicateScore = "duplicate_score"
+    }
+
+    // Custom init for manual construction (e.g., previews)
+    init(receiptId: String, status: ReceiptStatus, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, transactions: [ReceiptTransaction], warnings: [String], averageHealthScore: Double?, isDuplicate: Bool = false, duplicateScore: Double? = nil) {
+        self.receiptId = receiptId
+        self.status = status
+        self.storeName = storeName
+        self.receiptDate = receiptDate
+        self.totalAmount = totalAmount
+        self.itemsCount = itemsCount
+        self.transactions = transactions
+        self.warnings = warnings
+        self.averageHealthScore = averageHealthScore
+        self.isDuplicate = isDuplicate
+        self.duplicateScore = duplicateScore
+    }
+
+    // Custom decoder for backward compatibility (handles missing is_duplicate)
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        receiptId = try container.decode(String.self, forKey: .receiptId)
+        status = try container.decode(ReceiptStatus.self, forKey: .status)
+        storeName = try container.decodeIfPresent(String.self, forKey: .storeName)
+        receiptDate = try container.decodeIfPresent(String.self, forKey: .receiptDate)
+        totalAmount = try container.decodeIfPresent(Double.self, forKey: .totalAmount)
+        itemsCount = try container.decode(Int.self, forKey: .itemsCount)
+        transactions = try container.decode([ReceiptTransaction].self, forKey: .transactions)
+        warnings = try container.decode([String].self, forKey: .warnings)
+        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
+        isDuplicate = try container.decodeIfPresent(Bool.self, forKey: .isDuplicate) ?? false
+        duplicateScore = try container.decodeIfPresent(Double.self, forKey: .duplicateScore)
     }
 
     var parsedDate: Date? {

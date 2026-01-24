@@ -264,6 +264,13 @@ actor ReceiptUploadService {
                     print("   Receipt ID: \(uploadResponse.receiptId)")
                     print("   Status: \(uploadResponse.status.rawValue)")
                     print("   Items: \(uploadResponse.transactions.count)")
+                    print("   Is Duplicate: \(uploadResponse.isDuplicate)")
+                    if let score = uploadResponse.duplicateScore {
+                        print("   Duplicate Score: \(String(format: "%.1f%%", score * 100))")
+                    }
+                    if uploadResponse.isDuplicate {
+                        print("   ⚠️ DUPLICATE DETECTED by backend")
+                    }
 
                     if uploadResponse.status == .failed {
                         throw ReceiptUploadError.serverError("Receipt processing failed")
@@ -306,12 +313,15 @@ actor ReceiptUploadService {
                 throw ReceiptUploadError.serverError("Unexpected status code: \(httpResponse.statusCode)")
             }
         } catch let error as ReceiptUploadError {
+            print("❌ Receipt upload error: \(error.localizedDescription ?? "unknown")")
             throw error
         } catch {
+            print("❌ Network error during upload: \(error.localizedDescription)")
+            print("   Error type: \(type(of: error))")
             throw ReceiptUploadError.networkError(error)
         }
     }
-    
+
     // MARK: - Get Auth Token
     
     private func getAuthToken() async throws -> String {

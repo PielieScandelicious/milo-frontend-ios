@@ -140,7 +140,7 @@ struct ReceiptStatusView: View {
         case .processing:
             return "Processing..."
         case .success:
-            return "Success!"
+            return "Done!"
         case .failed:
             return "Upload Failed"
         }
@@ -507,7 +507,7 @@ class ReceiptStatusViewController: UIViewController {
             }
 
         case .success(let message):
-            titleLabel.text = "Success!"
+            titleLabel.text = "Done!"
             messageLabel.text = message
             messageLabel.isHidden = message.isEmpty
             messageLabelHeightConstraint?.isActive = message.isEmpty
@@ -551,21 +551,23 @@ class ReceiptStatusViewController: UIViewController {
     }
     
     private func setupSuccessIcon() {
-        let config = UIImage.SymbolConfiguration(pointSize: 60, weight: .bold)
-        let image = UIImage(systemName: "checkmark.circle.fill", withConfiguration: config)
-        let imageView = UIImageView(image: image)
-        imageView.tintColor = UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0)
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        
-        iconContainerView.addSubview(imageView)
-        
+        // Create animated checkmark
+        let checkmarkView = AnimatedCheckmarkView(frame: CGRect(x: 0, y: 0, width: 60, height: 60))
+        checkmarkView.translatesAutoresizingMaskIntoConstraints = false
+
+        iconContainerView.addSubview(checkmarkView)
+
         NSLayoutConstraint.activate([
-            imageView.centerXAnchor.constraint(equalTo: iconContainerView.centerXAnchor),
-            imageView.centerYAnchor.constraint(equalTo: iconContainerView.centerYAnchor),
-            imageView.widthAnchor.constraint(equalToConstant: 60),
-            imageView.heightAnchor.constraint(equalToConstant: 60)
+            checkmarkView.centerXAnchor.constraint(equalTo: iconContainerView.centerXAnchor),
+            checkmarkView.centerYAnchor.constraint(equalTo: iconContainerView.centerYAnchor),
+            checkmarkView.widthAnchor.constraint(equalToConstant: 60),
+            checkmarkView.heightAnchor.constraint(equalToConstant: 60)
         ])
+
+        // Start animation after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            checkmarkView.animate()
+        }
     }
     
     private func setupErrorIcon() {
@@ -616,6 +618,126 @@ class ReceiptStatusViewController: UIViewController {
 
 /// Legacy error view controller - kept for backward compatibility
 typealias ReceiptErrorViewController = ReceiptStatusViewController
+
+// MARK: - Animated Checkmark View
+
+/// A custom view that draws an animated green checkmark with a circle
+class AnimatedCheckmarkView: UIView {
+
+    private let circleLayer = CAShapeLayer()
+    private let checkmarkLayer = CAShapeLayer()
+
+    private let successGreen = UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0)
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupLayers()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupLayers()
+    }
+
+    private func setupLayers() {
+        backgroundColor = .clear
+
+        // Circle layer
+        let circlePath = UIBezierPath(
+            arcCenter: CGPoint(x: bounds.width / 2, y: bounds.height / 2),
+            radius: bounds.width / 2 - 2,
+            startAngle: -CGFloat.pi / 2,
+            endAngle: 3 * CGFloat.pi / 2,
+            clockwise: true
+        )
+
+        circleLayer.path = circlePath.cgPath
+        circleLayer.fillColor = UIColor.clear.cgColor
+        circleLayer.strokeColor = successGreen.cgColor
+        circleLayer.lineWidth = 3
+        circleLayer.lineCap = .round
+        circleLayer.strokeEnd = 0
+        layer.addSublayer(circleLayer)
+
+        // Checkmark layer
+        let checkmarkPath = UIBezierPath()
+        let centerX = bounds.width / 2
+        let centerY = bounds.height / 2
+
+        // Draw checkmark path
+        checkmarkPath.move(to: CGPoint(x: centerX - 12, y: centerY + 2))
+        checkmarkPath.addLine(to: CGPoint(x: centerX - 3, y: centerY + 11))
+        checkmarkPath.addLine(to: CGPoint(x: centerX + 14, y: centerY - 10))
+
+        checkmarkLayer.path = checkmarkPath.cgPath
+        checkmarkLayer.fillColor = UIColor.clear.cgColor
+        checkmarkLayer.strokeColor = successGreen.cgColor
+        checkmarkLayer.lineWidth = 4
+        checkmarkLayer.lineCap = .round
+        checkmarkLayer.lineJoin = .round
+        checkmarkLayer.strokeEnd = 0
+        layer.addSublayer(checkmarkLayer)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        // Update circle path for new bounds
+        let circlePath = UIBezierPath(
+            arcCenter: CGPoint(x: bounds.width / 2, y: bounds.height / 2),
+            radius: bounds.width / 2 - 2,
+            startAngle: -CGFloat.pi / 2,
+            endAngle: 3 * CGFloat.pi / 2,
+            clockwise: true
+        )
+        circleLayer.path = circlePath.cgPath
+
+        // Update checkmark path for new bounds
+        let checkmarkPath = UIBezierPath()
+        let centerX = bounds.width / 2
+        let centerY = bounds.height / 2
+
+        checkmarkPath.move(to: CGPoint(x: centerX - 12, y: centerY + 2))
+        checkmarkPath.addLine(to: CGPoint(x: centerX - 3, y: centerY + 11))
+        checkmarkPath.addLine(to: CGPoint(x: centerX + 14, y: centerY - 10))
+
+        checkmarkLayer.path = checkmarkPath.cgPath
+    }
+
+    func animate() {
+        // Animate circle
+        let circleAnimation = CABasicAnimation(keyPath: "strokeEnd")
+        circleAnimation.fromValue = 0
+        circleAnimation.toValue = 1
+        circleAnimation.duration = 0.4
+        circleAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        circleAnimation.fillMode = .forwards
+        circleAnimation.isRemovedOnCompletion = false
+        circleLayer.add(circleAnimation, forKey: "circleAnimation")
+
+        // Animate checkmark with delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self = self else { return }
+
+            let checkmarkAnimation = CABasicAnimation(keyPath: "strokeEnd")
+            checkmarkAnimation.fromValue = 0
+            checkmarkAnimation.toValue = 1
+            checkmarkAnimation.duration = 0.3
+            checkmarkAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            checkmarkAnimation.fillMode = .forwards
+            checkmarkAnimation.isRemovedOnCompletion = false
+            self.checkmarkLayer.add(checkmarkAnimation, forKey: "checkmarkAnimation")
+
+            // Add a subtle scale bounce
+            let scaleAnimation = CAKeyframeAnimation(keyPath: "transform.scale")
+            scaleAnimation.values = [1.0, 1.15, 1.0]
+            scaleAnimation.keyTimes = [0, 0.5, 1.0]
+            scaleAnimation.duration = 0.3
+            scaleAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            self.layer.add(scaleAnimation, forKey: "scaleAnimation")
+        }
+    }
+}
 
 // MARK: - Preview
 

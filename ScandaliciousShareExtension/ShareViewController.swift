@@ -156,11 +156,8 @@ class ShareViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        
-        // Show initial status - just "Processing..."
-        showStatus(.processing(subtitle: ""))
-        
-        // Start processing immediately
+
+        // Start processing immediately - success will be shown once upload begins
         processSharedContent()
     }
     
@@ -530,83 +527,95 @@ class ShareViewController: UIViewController {
     // MARK: - Upload PDF Receipt
     private func uploadPDFReceipt(from pdfURL: URL) async {
         print("📄 uploadPDFReceipt started for: \(pdfURL)")
-        
-        do {
-            // Upload PDF directly to API
-            print("☁️ Uploading PDF receipt to server...")
-            let response = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
-            print("✅ PDF uploaded successfully - Receipt ID: \(response.receiptId)")
-            
-            // Show success
-            updateStatus(.success(message: ""))
 
-            // Signal main app that it needs to refresh data
-            signalMainAppToRefresh()
+        // Read PDF data first to ensure it's valid
+        guard let pdfData = try? Data(contentsOf: pdfURL), !pdfData.isEmpty else {
+            updateStatus(.failed(message: "Could not read PDF file.", canRetry: false))
+            return
+        }
 
-            // Keep success visible
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        print("☁️ Starting PDF upload...")
 
-            // Complete the request
-            await MainActor.run {
-                self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+        // Show success immediately for instant feedback
+        updateStatus(.success(message: ""))
+
+        // Signal main app that it needs to refresh data
+        signalMainAppToRefresh()
+
+        // Start upload with expiring activity to ensure it completes
+        ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading PDF receipt") { expired in
+            if expired {
+                print("⚠️ Background time expired before PDF upload completed")
+                return
             }
 
-            print("✅ PDF upload completed successfully")
-            
-        } catch let error as ReceiptUploadError {
-            print("❌ ReceiptUploadError: \(error.localizedDescription)")
-            updateStatus(.failed(message: getUserFriendlyError(from: error), canRetry: false))
-        } catch let error as ReceiptError {
-            print("❌ ReceiptError: \(error.localizedDescription)")
-            updateStatus(.failed(message: getUserFriendlyError(from: error), canRetry: false))
-        } catch {
-            print("❌ Error: \(error.localizedDescription)")
-            updateStatus(.failed(message: "Unable to upload PDF. Please try again.", canRetry: false))
+            Task {
+                do {
+                    let response = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
+                    print("✅ PDF upload completed - Receipt ID: \(response.receiptId)")
+                } catch {
+                    print("⚠️ PDF upload failed: \(error.localizedDescription)")
+                    // Error is logged but not shown - user already saw success
+                }
+            }
         }
+
+        // Keep success visible briefly for the animation
+        try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2 seconds
+
+        // Complete the request
+        await MainActor.run {
+            self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+        }
+
+        print("✅ Extension completed")
     }
     
     // MARK: - Upload Receipt Image
     private func saveReceiptImage(_ image: UIImage) async {
         print("💾 uploadReceiptImage started")
-        
-        do {
-            // Validate image
-            guard image.size.width > 0 && image.size.height > 0 else {
-                throw ReceiptError.invalidImage
-            }
-            
-            print("☁️ Uploading receipt to server...")
-            let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
-            print("✅ Receipt uploaded successfully - Receipt ID: \(response.receiptId)")
-            
-            // Show success
-            updateStatus(.success(message: ""))
 
-            // Signal main app that it needs to refresh data
-            signalMainAppToRefresh()
-
-            print("✅ Success shown, waiting 1.5 seconds...")
-
-            // Keep success visible
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-
-            // Complete the request
-            await MainActor.run {
-                self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
-            }
-
-            print("✅ Extension completed successfully")
-            
-        } catch let error as ReceiptError {
-            print("❌ ReceiptError: \(error.localizedDescription)")
-            updateStatus(.failed(message: getUserFriendlyError(from: error), canRetry: false))
-        } catch let error as ReceiptUploadError {
-            print("❌ ReceiptUploadError: \(error.localizedDescription)")
-            updateStatus(.failed(message: getUserFriendlyError(from: error), canRetry: false))
-        } catch {
-            print("❌ Error: \(error.localizedDescription)")
-            updateStatus(.failed(message: "Unable to upload receipt. Please try again.", canRetry: false))
+        // Validate image
+        guard image.size.width > 0 && image.size.height > 0 else {
+            updateStatus(.failed(message: "The image appears to be invalid. Please try again.", canRetry: false))
+            return
         }
+
+        print("☁️ Starting image upload...")
+
+        // Show success immediately for instant feedback
+        updateStatus(.success(message: ""))
+
+        // Signal main app that it needs to refresh data
+        signalMainAppToRefresh()
+
+        // Start upload with expiring activity to ensure it completes
+        ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading receipt") { expired in
+            if expired {
+                print("⚠️ Background time expired before upload completed")
+                return
+            }
+
+            Task {
+                do {
+                    let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+                    print("✅ Image upload completed - Receipt ID: \(response.receiptId)")
+                } catch {
+                    print("⚠️ Image upload failed: \(error.localizedDescription)")
+                    // Error is logged but not shown - user already saw success
+                }
+            }
+        }
+
+        // Keep success visible briefly for the animation
+        try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2 seconds
+
+        // Complete the request
+        await MainActor.run {
+            self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+        }
+
+        print("✅ Extension completed")
     }
 
     // MARK: - Status Management

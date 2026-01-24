@@ -302,6 +302,19 @@ struct ReceiptScanView: View {
         do {
             let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
 
+            // Debug logging for duplicate detection
+            print("📬 Receipt upload response:")
+            print("   Status: \(response.status.rawValue)")
+            print("   Store: \(response.storeName ?? "N/A")")
+            print("   Items: \(response.itemsCount)")
+            print("   Is Duplicate: \(response.isDuplicate)")
+            if let score = response.duplicateScore {
+                print("   Duplicate Score: \(String(format: "%.1f%%", score * 100))")
+            }
+            if response.isDuplicate {
+                print("   ⚠️ DUPLICATE RECEIPT DETECTED - items not saved")
+            }
+
             await MainActor.run {
                 capturedImage = nil
 
@@ -419,6 +432,9 @@ struct ReceiptScanView: View {
 
             // Update last checked timestamp
             lastCheckedUploadTimestamp = uploadTimestamp
+
+            // Post notification so Overview tab shows syncing indicator
+            NotificationCenter.default.post(name: .shareExtensionUploadDetected, object: nil)
 
             // Optimistically decrement the local rate limit counter
             // This is a workaround for the backend rate-limit API returning 403
