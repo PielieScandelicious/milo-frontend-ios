@@ -615,6 +615,12 @@ struct OverviewView: View {
 
     /// Checks if the Share Extension uploaded a receipt while the app was in the background
     private func checkForShareExtensionUploads() {
+        // Skip if already processing an upload
+        guard !isReceiptUploading else {
+            print("ℹ️ Already processing upload, skipping share extension check")
+            return
+        }
+
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
             print("❌ Could not access shared UserDefaults with App Group: \(appGroupIdentifier)")
@@ -648,6 +654,13 @@ struct OverviewView: View {
     /// Refreshes data with retry mechanism for share extension uploads
     /// The share extension signals immediately but the upload + backend processing can take 5-15 seconds
     private func refreshWithRetry() async {
+        // Ensure isReceiptUploading is always reset when this method exits
+        defer {
+            Task { @MainActor in
+                isReceiptUploading = false
+            }
+        }
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US")
@@ -699,9 +712,6 @@ struct OverviewView: View {
 
         // Update UI on main thread
         await MainActor.run {
-            // Clear syncing indicator
-            isReceiptUploading = false
-
             if selectedPeriod == currentMonthPeriod {
                 print("📊 User is viewing current month - updating display")
                 updateDisplayedBreakdowns()
@@ -890,7 +900,7 @@ struct OverviewView: View {
 
                 // Syncing/Synced indicator
                 Group {
-                    if dataManager.isLoading || dataManager.isRefreshing || isReceiptUploading {
+                    if dataManager.isLoading || isReceiptUploading {
                         HStack(spacing: 6) {
                             SyncingArrowsView()
                             Text("Syncing...")
