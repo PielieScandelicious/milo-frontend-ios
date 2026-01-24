@@ -88,6 +88,7 @@ struct LiquidGaugeView: View {
         VStack(spacing: size * 0.08) {
             TimelineView(.animation) { timeline in
                 let time = timeline.date.timeIntervalSinceReferenceDate
+                let liquidProgress = fillProgress * normalizedScore
 
                 ZStack {
                     // Background circle
@@ -103,8 +104,8 @@ struct LiquidGaugeView: View {
 
                     // Liquid fill with wave
                     LiquidWave(
-                        progress: fillProgress * normalizedScore,
-                        waveHeight: size * 0.04,
+                        progress: liquidProgress,
+                        waveHeight: size * 0.035,
                         phase: time,
                         tiltX: motionManager.tiltX
                     )
@@ -124,8 +125,8 @@ struct LiquidGaugeView: View {
 
                     // Secondary wave highlight
                     LiquidWave(
-                        progress: fillProgress * normalizedScore,
-                        waveHeight: size * 0.025,
+                        progress: liquidProgress,
+                        waveHeight: size * 0.02,
                         phase: time * 0.8 + 1.5,
                         tiltX: motionManager.tiltX * 0.6
                     )
@@ -139,6 +140,16 @@ struct LiquidGaugeView: View {
                             startPoint: .top,
                             endPoint: .center
                         )
+                    )
+                    .frame(width: size - 6, height: size - 6)
+                    .clipShape(Circle())
+
+                    // Bubbles effect
+                    BubblesView(
+                        time: time,
+                        liquidProgress: liquidProgress,
+                        color: liquidColor,
+                        size: size
                     )
                     .frame(width: size - 6, height: size - 6)
                     .clipShape(Circle())
@@ -190,6 +201,77 @@ struct LiquidGaugeView: View {
         }
         .onDisappear {
             motionManager.stop()
+        }
+    }
+}
+
+// MARK: - Bubbles View
+
+struct BubblesView: View {
+    let time: Double
+    let liquidProgress: CGFloat
+    let color: Color
+    let size: CGFloat
+
+    private let bubbleCount = 8
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            guard liquidProgress > 0.05 else { return }
+
+            let liquidTop = canvasSize.height * (1.0 - liquidProgress)
+
+            for i in 0..<bubbleCount {
+                let seed = Double(i * 137 + 42)
+                let cycleSpeed = 0.3 + fmod(seed * 0.1, 0.4)
+                let cyclePosition = fmod(time * cycleSpeed + seed, 1.0)
+
+                // Bubble rises from bottom to liquid surface
+                let startY = canvasSize.height
+                let endY = liquidTop + canvasSize.height * 0.05
+                let y = startY - cyclePosition * (startY - endY)
+
+                // Horizontal wobble
+                let baseX = fmod(seed * 0.618, 1.0) * canvasSize.width * 0.7 + canvasSize.width * 0.15
+                let wobble = sin(time * 3 + seed) * canvasSize.width * 0.03
+                let x = baseX + wobble
+
+                // Bubble size varies
+                let bubbleSize = (2.0 + fmod(seed * 0.3, 3.0)) * (size / 120.0)
+
+                // Fade in at bottom, fade out near surface
+                let fadeIn = min(1.0, cyclePosition * 4)
+                let fadeOut = min(1.0, (1.0 - cyclePosition) * 3)
+                let opacity = fadeIn * fadeOut * 0.6
+
+                let rect = CGRect(
+                    x: x - bubbleSize / 2,
+                    y: y - bubbleSize / 2,
+                    width: bubbleSize,
+                    height: bubbleSize
+                )
+
+                // Draw bubble with highlight
+                context.opacity = opacity
+                context.fill(
+                    Path(ellipseIn: rect),
+                    with: .color(Color.white.opacity(0.7))
+                )
+
+                // Small highlight on bubble
+                let highlightSize = bubbleSize * 0.3
+                let highlightRect = CGRect(
+                    x: x - bubbleSize * 0.2,
+                    y: y - bubbleSize * 0.2,
+                    width: highlightSize,
+                    height: highlightSize
+                )
+                context.opacity = opacity * 0.8
+                context.fill(
+                    Path(ellipseIn: highlightRect),
+                    with: .color(Color.white)
+                )
+            }
         }
     }
 }
