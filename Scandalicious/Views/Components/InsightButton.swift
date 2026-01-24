@@ -42,10 +42,8 @@ struct InsightButton: View {
         .buttonStyle(InsightButtonStyle())
         .sheet(isPresented: $showingInsight) {
             InsightSheetView(insightType: insightType)
-                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(white: 0.08))
-                .presentationSizing(.fitted)
         }
     }
 }
@@ -121,6 +119,15 @@ enum DailyInsightCache {
     }
 }
 
+// MARK: - Height Preference Key for Dynamic Sizing
+
+private struct HeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct InsightSheetView: View {
     let insightType: InsightType
 
@@ -132,6 +139,7 @@ struct InsightSheetView: View {
     @State private var contentBlur: Double = 8
     @State private var contentScale: Double = 0.96
     @State private var isCachedInsight = false
+    @State private var contentHeight: CGFloat = 200
 
     private var title: String {
         switch insightType {
@@ -166,6 +174,13 @@ struct InsightSheetView: View {
         }
     }
 
+    // Calculate dynamic detent based on content
+    private var dynamicDetent: PresentationDetent {
+        // Add padding for drag indicator (20) + safe area buffer (34)
+        let totalHeight = contentHeight + 54
+        return .height(totalHeight)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -181,14 +196,14 @@ struct InsightSheetView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.top, 48)
-            .padding(.bottom, 16)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
 
             Divider()
                 .background(Color.white.opacity(0.1))
 
-            // Content
-            VStack(alignment: .leading, spacing: 16) {
+            // Content - sizes to fit
+            VStack(alignment: .leading, spacing: 0) {
                 if isLoading {
                     HStack(spacing: 12) {
                         ProgressView()
@@ -217,7 +232,6 @@ struct InsightSheetView: View {
                             contentOpacity = 0
                             contentBlur = 8
                             contentScale = 0.96
-                            // Clear cache and fetch fresh on retry
                             DailyInsightCache.clear(for: insightType.cacheKey)
                             fetchInsight()
                         } label: {
@@ -231,9 +245,9 @@ struct InsightSheetView: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, 20)
                 } else {
-                    // Insight text with nice formatting and premium fade-in
+                    // Insight text - naturally sized
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 16, weight: .semibold))
@@ -244,7 +258,6 @@ struct InsightSheetView: View {
                             .font(.system(size: 16, weight: .regular))
                             .foregroundColor(.white.opacity(0.9))
                             .lineSpacing(6)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -254,7 +267,7 @@ struct InsightSheetView: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                                .stroke(accentColor.opacity(0.2), lineWidth: 1)
+                            .stroke(accentColor.opacity(0.2), lineWidth: 1)
                     )
                     .opacity(contentOpacity)
                     .blur(radius: contentBlur)
@@ -268,26 +281,33 @@ struct InsightSheetView: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
 
             // Footer
-            VStack(spacing: 8) {
+            VStack(spacing: 0) {
                 Divider()
                     .background(Color.white.opacity(0.1))
 
-                VStack(spacing: 4) {
-                    if !isLoading && error == nil {
-                        Text("Today's insight • Refreshes daily")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                    Text("Powered by Dobby")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.3))
-                }
-                .padding(.vertical, 12)
+                Text("Insight by Dobby")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+                    .padding(.vertical, 10)
             }
         }
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(key: HeightPreferenceKey.self, value: geo.size.height)
+            }
+        )
+        .onPreferenceChange(HeightPreferenceKey.self) { height in
+            if height > contentHeight {
+                contentHeight = height
+            }
+        }
+        .presentationDetents([dynamicDetent, .large])
         .onAppear {
             loadOrFetchInsight()
         }
