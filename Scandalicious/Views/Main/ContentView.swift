@@ -23,25 +23,34 @@ struct ContentView: View {
     }
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
-                .tabItem {
-                    Label("View", systemImage: "chart.pie.fill")
-                }
-                .tag(Tab.view)
-            
-            ScanTab()
-                .tabItem {
-                    Label("Scan", systemImage: "qrcode.viewfinder")
-                }
-                .tag(Tab.scan)
-            
-            ScandaLiciousTab()
-                .tabItem {
-                    Label("Dobby", systemImage: "sparkles")
-                }
-                .tag(Tab.dobby)
+        ZStack {
+            TabView(selection: $selectedTab) {
+                ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
+                    .tabItem {
+                        Label("View", systemImage: "chart.pie.fill")
+                    }
+                    .tag(Tab.view)
+
+                ScanTab()
+                    .tabItem {
+                        Label("Scan", systemImage: "qrcode.viewfinder")
+                    }
+                    .tag(Tab.scan)
+
+                ScandaLiciousTab()
+                    .tabItem {
+                        Label("Dobby", systemImage: "sparkles")
+                    }
+                    .tag(Tab.dobby)
+            }
+
+            // Loading screen overlay
+            if !hasLoadedInitialData {
+                SyncLoadingView()
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.4), value: hasLoadedInitialData)
         .environmentObject(transactionManager)
         .environmentObject(dataManager)
         .preferredColorScheme(.dark)
@@ -49,12 +58,14 @@ struct ContentView: View {
             // Configure data manager on first appear
             if !hasLoadedInitialData {
                 dataManager.configure(with: transactionManager)
-                
+
                 // Fetch data in a persistent task
                 Task {
                     print("🚀 App launched - fetching initial data")
                     await dataManager.fetchFromBackend(for: .month)
-                    hasLoadedInitialData = true
+                    await MainActor.run {
+                        hasLoadedInitialData = true
+                    }
                     print("✅ Initial data loaded successfully")
                 }
             }
