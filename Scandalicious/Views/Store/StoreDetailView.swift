@@ -14,6 +14,7 @@ struct StoreDetailView: View {
     @State private var selectedCategoryColor: Color?
     @State private var showingAllTransactions = false
     @State private var showingCategoryTransactions = false
+    @State private var showingReceipts = false
     
     var body: some View {
         ZStack {
@@ -101,6 +102,36 @@ struct StoreDetailView: View {
                             }
                         }
                         .padding(.horizontal)
+
+                        // View Receipts button
+                        Button {
+                            showingReceipts = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text("View Receipts")
+                                    .font(.system(size: 16, weight: .semibold))
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color.blue.opacity(0.15))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(CategoryRowButtonStyle())
+                        .padding(.horizontal)
+                        .padding(.top, 8)
                     }
                     .padding(.bottom, 32)
                 }
@@ -122,6 +153,12 @@ struct StoreDetailView: View {
                 period: storeBreakdown.period,
                 category: selectedCategory,
                 categoryColor: selectedCategoryColor
+            )
+        }
+        .navigationDestination(isPresented: $showingReceipts) {
+            ReceiptsListView(
+                period: storeBreakdown.period,
+                storeName: storeBreakdown.storeName
             )
         }
     }

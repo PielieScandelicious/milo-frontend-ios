@@ -454,29 +454,147 @@ struct TransactionFilters {
     var category: AnalyticsCategory?
     var page: Int = 1
     var pageSize: Int = 50
-    
+
     func toQueryItems() -> [URLQueryItem] {
         var items: [URLQueryItem] = []
-        
+
         if let startDate = startDate {
             items.append(URLQueryItem(name: "start_date", value: DateFormatter.yyyyMMdd.string(from: startDate)))
         }
-        
+
         if let endDate = endDate {
             items.append(URLQueryItem(name: "end_date", value: DateFormatter.yyyyMMdd.string(from: endDate)))
         }
-        
+
         if let storeName = storeName {
             items.append(URLQueryItem(name: "store_name", value: storeName))
         }
-        
+
         if let category = category {
             items.append(URLQueryItem(name: "category", value: category.displayName))
         }
-        
+
         items.append(URLQueryItem(name: "page", value: String(page)))
         items.append(URLQueryItem(name: "page_size", value: String(pageSize)))
-        
+
+        return items
+    }
+}
+
+// MARK: - Receipts List Response
+
+struct ReceiptsListResponse: Codable {
+    let receipts: [APIReceipt]
+    let total: Int
+    let page: Int
+    let pageSize: Int
+    let totalPages: Int
+
+    enum CodingKeys: String, CodingKey {
+        case receipts
+        case total
+        case page
+        case pageSize = "page_size"
+        case totalPages = "total_pages"
+    }
+}
+
+struct APIReceipt: Codable, Identifiable {
+    let receiptId: String
+    let storeName: String?
+    let receiptDate: String?
+    let totalAmount: Double?
+    let itemsCount: Int
+    let averageHealthScore: Double?
+    let transactions: [APIReceiptItem]
+
+    var id: String { receiptId }
+
+    enum CodingKeys: String, CodingKey {
+        case receiptId = "receipt_id"
+        case storeName = "store_name"
+        case receiptDate = "receipt_date"
+        case totalAmount = "total_amount"
+        case itemsCount = "items_count"
+        case averageHealthScore = "average_health_score"
+        case transactions
+    }
+
+    var dateParsed: Date? {
+        guard let receiptDate = receiptDate else { return nil }
+        return DateFormatter.yyyyMMdd.date(from: receiptDate)
+    }
+
+    var formattedDate: String {
+        guard let date = dateParsed else { return receiptDate ?? "Unknown Date" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: date)
+    }
+
+    var displayStoreName: String {
+        storeName ?? "Unknown Store"
+    }
+
+    var displayTotalAmount: Double {
+        totalAmount ?? 0
+    }
+}
+
+struct APIReceiptItem: Codable, Identifiable {
+    let itemName: String
+    let itemPrice: Double
+    let quantity: Int
+    let unitPrice: Double?
+    let category: String
+    let healthScore: Int?
+
+    var id: String { "\(itemName)-\(itemPrice)-\(quantity)" }
+
+    enum CodingKeys: String, CodingKey {
+        case itemName = "item_name"
+        case itemPrice = "item_price"
+        case quantity
+        case unitPrice = "unit_price"
+        case category
+        case healthScore = "health_score"
+    }
+
+    var totalPrice: Double {
+        itemPrice
+    }
+
+    var categoryDisplayName: String {
+        // Category comes as display name from backend (e.g., "Dairy & Eggs")
+        category
+    }
+}
+
+struct ReceiptFilters {
+    var startDate: Date?
+    var endDate: Date?
+    var storeName: String?
+    var page: Int = 1
+    var pageSize: Int = 20
+
+    func toQueryItems() -> [URLQueryItem] {
+        var items: [URLQueryItem] = []
+
+        if let startDate = startDate {
+            items.append(URLQueryItem(name: "start_date", value: DateFormatter.yyyyMMdd.string(from: startDate)))
+        }
+
+        if let endDate = endDate {
+            items.append(URLQueryItem(name: "end_date", value: DateFormatter.yyyyMMdd.string(from: endDate)))
+        }
+
+        if let storeName = storeName {
+            items.append(URLQueryItem(name: "store_name", value: storeName))
+        }
+
+        items.append(URLQueryItem(name: "page", value: String(page)))
+        items.append(URLQueryItem(name: "page_size", value: String(pageSize)))
+
         return items
     }
 }

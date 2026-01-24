@@ -9,7 +9,7 @@ import Foundation
 import FirebaseAuth
 
 actor ProfileAPIService {
-    private let baseURL = "\(AppConfiguration.backendBaseURL)/api/v1"
+    private var baseURL: String { AppConfiguration.apiBase }
 
     enum ProfileError: LocalizedError {
         case unauthorized

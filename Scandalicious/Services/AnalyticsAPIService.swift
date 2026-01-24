@@ -47,7 +47,7 @@ enum AnalyticsAPIError: LocalizedError {
 actor AnalyticsAPIService {
     static let shared = AnalyticsAPIService()
 
-    private var baseURL: String { "\(AppConfiguration.backendBaseURL)/api/v1" }
+    private var baseURL: String { AppConfiguration.apiBase }
     private let decoder: JSONDecoder
     
     private init() {
@@ -106,6 +106,15 @@ actor AnalyticsAPIService {
     func fetchTransactions(filters: TransactionFilters = TransactionFilters()) async throws -> TransactionsResponse {
         return try await performRequest(
             endpoint: "/transactions",
+            queryItems: filters.toQueryItems()
+        )
+    }
+
+    /// Fetch list of scanned receipts
+    /// - Parameter filters: Receipt filters including pagination
+    func fetchReceipts(filters: ReceiptFilters = ReceiptFilters()) async throws -> ReceiptsListResponse {
+        return try await performRequest(
+            endpoint: "/receipts",
             queryItems: filters.toQueryItems()
         )
     }
