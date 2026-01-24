@@ -15,6 +15,8 @@ struct ReceiptsListView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedReceipt: APIReceipt?
     @State private var showingReceiptDetail = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
     var body: some View {
         ZStack {
@@ -29,13 +31,22 @@ struct ReceiptsListView: View {
                     VStack(spacing: 0) {
                         LazyVStack(spacing: 12) {
                             ForEach(viewModel.receipts) { receipt in
-                                Button {
-                                    selectedReceipt = receipt
-                                    showingReceiptDetail = true
-                                } label: {
-                                    receiptRow(receipt)
-                                }
-                                .buttonStyle(ReceiptRowButtonStyle())
+                                SwipeableReceiptRow(
+                                    receipt: receipt,
+                                    onTap: {
+                                        selectedReceipt = receipt
+                                        showingReceiptDetail = true
+                                    },
+                                    onDelete: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            deleteReceipt(receipt)
+                                        }
+                                    }
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .opacity,
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
                             }
 
                             // Load more indicator
@@ -50,6 +61,7 @@ struct ReceiptsListView: View {
                                     }
                             }
                         }
+                        .animation(.easeInOut(duration: 0.3), value: viewModel.receipts.count)
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
                         .padding(.bottom, 32)
@@ -89,6 +101,62 @@ struct ReceiptsListView: View {
                 Text(error)
             }
         }
+        .alert("Delete Failed", isPresented: .constant(deleteError != nil)) {
+            Button("OK") {
+                deleteError = nil
+            }
+        } message: {
+            if let error = deleteError {
+                Text(error)
+            }
+        }
+        .overlay {
+            if isDeleting {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.2)
+
+                        Text("Deleting...")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(white: 0.15))
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Delete Receipt
+
+    private func deleteReceipt(_ receipt: APIReceipt) {
+        isDeleting = true
+
+        Task {
+            do {
+                try await viewModel.deleteReceipt(receipt, period: period, storeName: storeName)
+
+                // Haptic feedback for successful deletion
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+            } catch {
+                deleteError = error.localizedDescription
+
+                // Haptic feedback for failure
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+            }
+
+            isDeleting = false
+        }
     }
 
     // MARK: - Components
@@ -125,8 +193,105 @@ struct ReceiptsListView: View {
         }
         .frame(maxHeight: .infinity)
     }
+}
 
-    private func receiptRow(_ receipt: APIReceipt) -> some View {
+// MARK: - Swipeable Receipt Row
+
+struct SwipeableReceiptRow: View {
+    let receipt: APIReceipt
+    let onTap: () -> Void
+    let onDelete: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @State private var startOffset: CGFloat = 0
+    @State private var showingDeleteConfirmation = false
+
+    private let deleteButtonWidth: CGFloat = 80
+    private let swipeThreshold: CGFloat = 40
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            // Delete button (behind content)
+            Button {
+                showingDeleteConfirmation = true
+            } label: {
+                HStack {
+                    Spacer()
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: deleteButtonWidth)
+                        .frame(maxHeight: .infinity)
+                }
+                .background(Color.red)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+
+            // Main content
+            receiptRowContent
+                .offset(x: offset)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 8)
+                        .onChanged { value in
+                            // Calculate new offset based on starting position
+                            let newOffset = startOffset + value.translation.width
+
+                            // Clamp between -deleteButtonWidth and 0, with rubber band effect
+                            if newOffset > 0 {
+                                offset = newOffset * 0.2 // Rubber band right
+                            } else if newOffset < -deleteButtonWidth {
+                                let overshoot = newOffset + deleteButtonWidth
+                                offset = -deleteButtonWidth + overshoot * 0.2 // Rubber band left
+                            } else {
+                                offset = newOffset
+                            }
+                        }
+                        .onEnded { value in
+                            let velocity = value.velocity.width
+                            let predictedEndOffset = offset + velocity * 0.15
+
+                            withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                                // Decide final position based on predicted end and velocity
+                                if predictedEndOffset < -swipeThreshold {
+                                    offset = -deleteButtonWidth
+                                    startOffset = -deleteButtonWidth
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                } else {
+                                    offset = 0
+                                    startOffset = 0
+                                }
+                            }
+                        }
+                )
+                .onTapGesture {
+                    if abs(offset) < 5 {
+                        onTap()
+                    } else {
+                        withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                            offset = 0
+                            startOffset = 0
+                        }
+                    }
+                }
+        }
+        .confirmationDialog("Delete Receipt", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
+            Button("Cancel", role: .cancel) {
+                withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
+                    offset = 0
+                    startOffset = 0
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete this receipt? This action cannot be undone.")
+        }
+    }
+
+    private var receiptRowContent: some View {
         HStack(spacing: 16) {
             // Receipt icon
             ZStack {
@@ -141,7 +306,6 @@ struct ReceiptsListView: View {
 
             // Receipt details
             VStack(alignment: .leading, spacing: 4) {
-                // Date as main title
                 Text(receipt.formattedDate)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
@@ -159,7 +323,6 @@ struct ReceiptsListView: View {
                         .foregroundColor(.white.opacity(0.5))
                 }
 
-                // Health score if available
                 if let healthScore = receipt.averageHealthScore {
                     HStack(spacing: 4) {
                         HealthScoreBadge(score: Int(healthScore.rounded()), size: .small, style: .subtle)
@@ -187,23 +350,12 @@ struct ReceiptsListView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
+                .fill(Color(white: 0.08))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
-    }
-}
-
-// MARK: - Button Style
-
-struct ReceiptRowButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.8 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 

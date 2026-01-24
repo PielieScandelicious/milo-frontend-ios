@@ -209,9 +209,29 @@ class TransactionsViewModel: ObservableObject {
     @Published var filters: TransactionFilters = TransactionFilters()
     @Published var transactions: [APITransaction] = []
     @Published var hasMorePages = false
-    
+
     private let apiService = AnalyticsAPIService.shared
-    
+    private var notificationObserver: NSObjectProtocol?
+
+    init() {
+        // Listen for data change notifications
+        notificationObserver = NotificationCenter.default.addObserver(
+            forName: .receiptsDataDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.refresh()
+            }
+        }
+    }
+
+    deinit {
+        if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
     func loadTransactions(reset: Bool = false) async {
         if reset {
             filters.page = 1
@@ -287,6 +307,12 @@ class TransactionsViewModel: ObservableObject {
     }
 }
 
+// MARK: - Data Refresh Notification
+
+extension Notification.Name {
+    static let receiptsDataDidChange = Notification.Name("receiptsDataDidChange")
+}
+
 // MARK: - Combined Analytics ViewModel
 
 @MainActor
@@ -295,7 +321,9 @@ class AnalyticsViewModel: ObservableObject {
     let trends = TrendsViewModel()
     let categories = CategoriesViewModel()
     let summary = SummaryViewModel()
-    
+
+    private var notificationObserver: NSObjectProtocol?
+
     @Published var selectedPeriod: PeriodType = .month {
         didSet {
             Task {
@@ -303,7 +331,7 @@ class AnalyticsViewModel: ObservableObject {
             }
         }
     }
-    
+
     @Published var dateRange: (start: Date?, end: Date?) = (nil, nil) {
         didSet {
             Task {
@@ -311,7 +339,26 @@ class AnalyticsViewModel: ObservableObject {
             }
         }
     }
-    
+
+    init() {
+        // Listen for data change notifications
+        notificationObserver = NotificationCenter.default.addObserver(
+            forName: .receiptsDataDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.refresh()
+            }
+        }
+    }
+
+    deinit {
+        if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
     func loadAll() async {
         async let trendsTask = trends.loadTrends()
         async let categoriesTask = categories.loadCategories()

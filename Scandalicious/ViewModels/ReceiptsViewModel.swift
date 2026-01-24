@@ -74,6 +74,20 @@ class ReceiptsViewModel: ObservableObject {
         await loadReceipts(period: period, storeName: storeName, reset: true)
     }
 
+    /// Delete a receipt by ID and update the list
+    func deleteReceipt(_ receipt: APIReceipt, period: String, storeName: String?) async throws {
+        // Delete from server
+        try await apiService.removeReceipt(receiptId: receipt.receiptId)
+
+        // Remove from local array - notify observers explicitly
+        objectWillChange.send()
+        receipts.removeAll { $0.receiptId == receipt.receiptId }
+        state = .success(receipts)
+
+        // Notify other views to refresh their data
+        NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
+    }
+
     // MARK: - Private Helpers
 
     private func parsePeriod(_ period: String) -> (Date?, Date?) {

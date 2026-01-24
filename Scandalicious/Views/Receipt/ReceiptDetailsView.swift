@@ -268,7 +268,7 @@ struct ReceiptDetailsView: View {
             print("   Store: \(receipt.storeName ?? "N/A")")
             print("   Status: \(receipt.status.rawValue)")
 
-            try await ReceiptUploadService.shared.deleteReceipt(receiptId: receipt.receiptId)
+            try await AnalyticsAPIService.shared.removeReceipt(receiptId: receipt.receiptId)
             print("✅ Receipt \(receipt.receiptId) deleted successfully")
             print("ℹ️ Rate limit counter NOT changed - you already paid for the upload processing")
 

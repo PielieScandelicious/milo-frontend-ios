@@ -497,6 +497,16 @@ struct OverviewView: View {
                 // Rate limit sync is already handled in ReceiptDetailsView, no need to sync again here
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
+            print("🗑️ Received receiptsDataDidChange notification - refreshing backend data")
+            Task {
+                // Wait a moment for backend to process changes
+                try? await Task.sleep(for: .seconds(0.5))
+                await dataManager.refreshData(for: .month, periodString: selectedPeriod)
+                updateDisplayedBreakdowns()
+                print("✅ Backend data refreshed after receipts data change for period: \(selectedPeriod)")
+            }
+        }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             // Trigger re-render to update time display and green highlight
             timerTick.toggle()
