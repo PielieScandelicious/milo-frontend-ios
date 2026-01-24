@@ -285,7 +285,7 @@ struct ReceiptScanView: View {
             Capsule()
                 .fill(Color.blue.opacity(0.15))
         )
-        .padding(.top, 60)
+        .padding(.top, 12)
     }
 
     // MARK: - Process Receipt

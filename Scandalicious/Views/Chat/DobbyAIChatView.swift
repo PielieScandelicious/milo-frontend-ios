@@ -25,6 +25,7 @@ struct ScandaLiciousAIChatView: View {
     @State private var showRateLimitAlert = false
     @State private var showProfile = false
     @State private var showClearButton = false
+
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -89,7 +90,7 @@ struct ScandaLiciousAIChatView: View {
                     }
                 }
             }
-            
+
             // Floating input area
             VStack(spacing: 0) {
                 // Gradient fade effect above input
@@ -322,7 +323,7 @@ struct ScandaLiciousAIChatView: View {
         // Otherwise use the interpolated message usage color (green to yellow)
         return usageColor
     }
-    
+
     private func sendMessage() {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }

@@ -115,12 +115,60 @@ struct ScanTab: View {
 
 // MARK: - ScandaLicious Tab
 struct ScandaLiciousTab: View {
+    @ObservedObject private var rateLimitManager = RateLimitManager.shared
+
     var body: some View {
         NavigationStack {
             ScandaLiciousAIChatView()
                 .toolbarBackground(.hidden, for: .navigationBar)
         }
+        .overlay(alignment: .top) {
+            VStack {
+                if rateLimitManager.isReceiptUploading {
+                    syncingStatusBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                } else if rateLimitManager.showReceiptSynced {
+                    syncedStatusBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
+        }
         .id("ScandaLiciousTab") // Prevent recreation
+    }
+
+    private var syncingStatusBanner: some View {
+        HStack(spacing: 6) {
+            SyncingArrowsView()
+            Text("Syncing...")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.blue)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(Color.blue.opacity(0.15))
+        )
+        .padding(.top, 12)
+    }
+
+    private var syncedStatusBanner: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "checkmark.icloud.fill")
+                .font(.system(size: 11))
+            Text("Synced")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.green)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(Color.green.opacity(0.15))
+        )
+        .padding(.top, 12)
     }
 }
 
