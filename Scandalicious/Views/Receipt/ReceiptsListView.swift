@@ -276,15 +276,15 @@ struct SwipeableReceiptRow: View {
                     }
                 }
         }
-        .confirmationDialog("Delete Receipt", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
-                onDelete()
-            }
+        .alert("Delete Receipt", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) {
                 withAnimation(.interpolatingSpring(stiffness: 300, damping: 30)) {
                     offset = 0
                     startOffset = 0
                 }
+            }
+            Button("Delete", role: .destructive) {
+                onDelete()
             }
         } message: {
             Text("Are you sure you want to delete this receipt? This action cannot be undone.")
