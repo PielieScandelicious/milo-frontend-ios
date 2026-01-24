@@ -17,13 +17,16 @@ enum AppConfiguration {
     static let environment = "DEBUG/NON-PROD"
     #endif
 
-    // API Endpoints (computed properties to avoid actor isolation issues)
-    static var uploadEndpoint: String { "\(backendBaseURL)/upload" }
-    static var chatEndpoint: String { "\(backendBaseURL)/api/v1/chat/" }
-    static var chatStreamEndpoint: String { "\(backendBaseURL)/api/v1/chat/stream" }
+    // API Version - change this to update all endpoints
+    private static let apiVersion = "v2"
+    private static var apiBase: String { "\(backendBaseURL)/api/\(apiVersion)" }
 
-    // Receipt API endpoint
-    static var receiptUploadEndpoint: String { "\(backendBaseURL)/api/v1/receipts/upload" }
+    // API Endpoints
+    static var uploadEndpoint: String { "\(backendBaseURL)/upload" }
+    static var chatEndpoint: String { "\(apiBase)/chat/" }
+    static var chatStreamEndpoint: String { "\(apiBase)/chat/stream" }
+    static var receiptUploadEndpoint: String { "\(apiBase)/receipts/upload" }
+    static var rateLimitEndpoint: String { "\(apiBase)/rate-limit" }
     
     // Helper to log current configuration
     static func logConfiguration() {

@@ -346,7 +346,7 @@ class RateLimitManager: ObservableObject {
         isSyncing = false
     }
 
-    /// Sync from GET /api/v1/rate-limit response
+    /// Sync from rate-limit API response
     func syncFromResponse(_ response: RateLimitStatusResponse) {
         messagesUsed = response.messagesUsed
         messagesLimit = response.messagesLimit
@@ -418,7 +418,7 @@ class RateLimitManager: ObservableObject {
         // Get auth token using multiple fallback methods
         let token = try await getAuthToken()
 
-        guard let url = URL(string: "\(AppConfiguration.backendBaseURL)/api/v1/rate-limit") else {
+        guard let url = URL(string: AppConfiguration.rateLimitEndpoint) else {
             throw ChatServiceError.invalidURL
         }
 
