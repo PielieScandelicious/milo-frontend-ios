@@ -444,6 +444,19 @@ struct OverviewView: View {
             }
             updateDisplayedBreakdowns()
 
+            // Initialize lastCheckedUploadTimestamp from UserDefaults on first appear
+            // This prevents re-detecting old uploads as "new" on app launch
+            if lastCheckedUploadTimestamp == 0 {
+                let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+                if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
+                    let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
+                    if existingTimestamp > 0 {
+                        lastCheckedUploadTimestamp = existingTimestamp
+                        print("📋 Initialized lastCheckedUploadTimestamp to \(existingTimestamp) from UserDefaults")
+                    }
+                }
+            }
+
             // Check for Share Extension uploads when view appears
             // This handles the case when user switches tabs
             checkForShareExtensionUploads()
