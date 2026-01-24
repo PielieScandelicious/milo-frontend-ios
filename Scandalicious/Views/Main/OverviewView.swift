@@ -291,22 +291,6 @@ struct OverviewView: View {
                 // Content
                 ScrollView {
                     VStack(spacing: 0) {
-                        // DEBUG: Manual refresh button for testing
-                        Button {
-                            print("🔘 MANUAL REFRESH BUTTON PRESSED")
-                            Task {
-                                await dataManager.refreshData(for: .month, periodString: selectedPeriod)
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Manual Refresh (Debug)")
-                            }
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                            .padding(.vertical, 8)
-                        }
-
                         // Liquid Glass Period Filter at the top
                         liquidGlassPeriodFilter
                             .padding(.top, 12)
