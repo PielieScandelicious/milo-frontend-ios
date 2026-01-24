@@ -699,12 +699,10 @@ struct OverviewView: View {
             isReceiptUploading = false
             isRefreshWithRetryRunning = false
 
-            if selectedPeriod == currentMonthPeriod {
-                print("📊 User is viewing current month - updating display")
-                updateDisplayedBreakdowns()
-            } else {
-                print("ℹ️ User is viewing '\(selectedPeriod)', not '\(currentMonthPeriod)' - may need to switch periods to see new data")
-            }
+            // Always update displayed breakdowns to ensure UI reflects latest data
+            // The filter inside updateDisplayedBreakdowns will handle period matching
+            print("📊 Updating display after sync (selectedPeriod: '\(selectedPeriod)', currentMonthPeriod: '\(currentMonthPeriod)')")
+            updateDisplayedBreakdowns()
 
             // Update refresh time for "Updated X ago" display
             lastRefreshTime = Date()
