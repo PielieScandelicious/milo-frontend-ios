@@ -23,6 +23,10 @@ struct ReceiptScanView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastCheckedUploadTimestamp: TimeInterval = 0
 
+    // Syncing status for top banner
+    @State private var isSyncing = false
+    @State private var showSyncedBanner = false
+
     var body: some View {
         ZStack {
             scanPlaceholderView
@@ -32,6 +36,17 @@ struct ReceiptScanView: View {
                 CaptureSuccessOverlay()
                     .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
+
+            // Syncing status banner at top
+            VStack {
+                if isSyncing || showSyncedBanner {
+                    syncingStatusBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                Spacer()
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSyncing)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showSyncedBanner)
         }
         .receiptErrorOverlay(
             isPresented: $showError,
@@ -116,6 +131,27 @@ struct ReceiptScanView: View {
             // Backup: Also check when app becomes active via notification (more reliable)
             print("🔄 [ScanTab] App became active (UIApplication notification)")
             checkForShareExtensionUploads()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadStarted)) { _ in
+            isSyncing = true
+            showSyncedBanner = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
+            isSyncing = false
+            showSyncedBanner = true
+            // Hide synced banner after brief display
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                await MainActor.run {
+                    withAnimation {
+                        showSyncedBanner = false
+                    }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .shareExtensionUploadDetected)) { _ in
+            isSyncing = true
+            showSyncedBanner = false
         }
         .animation(.easeInOut, value: uploadState)
     }
@@ -255,6 +291,31 @@ struct ReceiptScanView: View {
                         .stroke(color.opacity(0.3), lineWidth: 1)
                 )
         )
+    }
+
+    // MARK: - Syncing Status Banner
+
+    private var syncingStatusBanner: some View {
+        HStack(spacing: 6) {
+            if isSyncing {
+                SyncingArrowsView()
+                Text("Syncing...")
+                    .font(.system(size: 12, weight: .medium))
+            } else {
+                Image(systemName: "checkmark.icloud.fill")
+                    .font(.system(size: 11))
+                Text("Synced")
+                    .font(.system(size: 12, weight: .medium))
+            }
+        }
+        .foregroundColor(isSyncing ? .blue : .green)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill((isSyncing ? Color.blue : Color.green).opacity(0.15))
+        )
+        .padding(.top, 60)
     }
 
     // MARK: - Process Receipt
