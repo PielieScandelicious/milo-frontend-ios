@@ -39,14 +39,19 @@ struct ReceiptScanView: View {
 
             // Syncing status banner at top
             VStack {
-                if isTabVisible && isSyncing {
+                if isTabVisible && (isSyncing || rateLimitManager.isReceiptUploading) {
                     syncingStatusBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                } else if isTabVisible && rateLimitManager.showReceiptSynced {
+                    syncedStatusBanner
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 Spacer()
             }
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSyncing)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
         }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -282,7 +287,7 @@ struct ReceiptScanView: View {
         )
     }
 
-    // MARK: - Syncing Status Banner
+    // MARK: - Syncing Status Banners
 
     private var syncingStatusBanner: some View {
         HStack(spacing: 6) {
@@ -291,6 +296,17 @@ struct ReceiptScanView: View {
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.blue)
+        .padding(.top, 12)
+    }
+
+    private var syncedStatusBanner: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "checkmark.icloud.fill")
+                .font(.system(size: 11))
+            Text("Synced")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.green)
         .padding(.top, 12)
     }
 

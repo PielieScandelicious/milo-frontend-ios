@@ -171,16 +171,26 @@ class ShareViewController: UIViewController {
             return
         }
 
-        for key in sharedDefaults.dictionaryRepresentation().keys {
-            if key.contains("_receiptsRemaining") {
-                let currentValue = sharedDefaults.integer(forKey: key)
-                let newValue = max(0, currentValue - 1)
-                sharedDefaults.set(newValue, forKey: key)
-                sharedDefaults.synchronize()
-                print("📉 Decremented rate limit: \(currentValue) -> \(newValue)")
-                break
-            }
+        // Get the current user ID from Firebase Auth to build the correct key
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("⚠️ No Firebase user to decrement rate limit")
+            return
         }
+
+        // Build the specific key for this user (matching RateLimitManager's key format)
+        let receiptsRemainingKey = "rateLimit_\(userId)_receiptsRemaining"
+
+        // Check if the key exists
+        guard sharedDefaults.object(forKey: receiptsRemainingKey) != nil else {
+            print("⚠️ No rate limit data found for user \(userId) to decrement")
+            return
+        }
+
+        let currentValue = sharedDefaults.integer(forKey: receiptsRemainingKey)
+        let newValue = max(0, currentValue - 1)
+        sharedDefaults.set(newValue, forKey: receiptsRemainingKey)
+        sharedDefaults.synchronize()
+        print("📉 Decremented rate limit for user \(userId): \(currentValue) -> \(newValue)")
     }
 
     /// Checks if the user has remaining receipt uploads by reading from shared UserDefaults
@@ -193,28 +203,31 @@ class ShareViewController: UIViewController {
             return (true, nil)
         }
 
-        // Read rate limit data saved by main app's RateLimitManager
-        // Keys are prefixed with user ID, but we also check for a global key
-        let allKeys = sharedDefaults.dictionaryRepresentation().keys
-
-        // Find the receiptsRemaining key (format: rateLimit_{userId}_receiptsRemaining)
-        var receiptsRemaining: Int?
-        var daysUntilReset: Int = 0
-
-        for key in allKeys {
-            if key.contains("_receiptsRemaining") {
-                receiptsRemaining = sharedDefaults.integer(forKey: key)
-                // Also get days until reset
-                let resetKey = key.replacingOccurrences(of: "_receiptsRemaining", with: "_daysUntilReset")
-                daysUntilReset = sharedDefaults.integer(forKey: resetKey)
-                break
-            }
+        // Get the current user ID from Firebase Auth to build the correct key
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("⚠️ No Firebase user for rate limit check, allowing upload")
+            // If we can't identify the user, allow the upload (backend will reject if needed)
+            return (true, nil)
         }
 
-        print("🔍 Rate limit check: receiptsRemaining = \(receiptsRemaining ?? -1), daysUntilReset = \(daysUntilReset)")
+        // Build the specific key for this user (matching RateLimitManager's key format)
+        let receiptsRemainingKey = "rateLimit_\(userId)_receiptsRemaining"
+        let daysUntilResetKey = "rateLimit_\(userId)_daysUntilReset"
 
-        // If we found a receiptsRemaining value and it's 0, block the upload
-        if let remaining = receiptsRemaining, remaining <= 0 {
+        // Check if the key exists - UserDefaults.integer(forKey:) returns 0 for non-existent keys
+        guard sharedDefaults.object(forKey: receiptsRemainingKey) != nil else {
+            print("⚠️ No rate limit data found for user \(userId), allowing upload")
+            // If no rate limit data is saved, allow the upload (backend will reject if needed)
+            return (true, nil)
+        }
+
+        let receiptsRemaining = sharedDefaults.integer(forKey: receiptsRemainingKey)
+        let daysUntilReset = sharedDefaults.integer(forKey: daysUntilResetKey)
+
+        print("🔍 Rate limit check for user \(userId): receiptsRemaining = \(receiptsRemaining), daysUntilReset = \(daysUntilReset)")
+
+        // If receiptsRemaining is 0, block the upload
+        if receiptsRemaining <= 0 {
             let message: String
             if daysUntilReset > 0 {
                 message = "You've reached your monthly upload limit.\n\nYour limit resets in \(daysUntilReset) day\(daysUntilReset == 1 ? "" : "s")."

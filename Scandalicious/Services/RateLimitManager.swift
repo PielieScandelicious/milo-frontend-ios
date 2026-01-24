@@ -254,6 +254,19 @@ class RateLimitManager: ObservableObject {
                 self?.showReceiptSynced = false
             }
         }
+
+        // Listen for share extension upload detection
+        // Just set syncing state - the completion will be handled by .receiptUploadedSuccessfully
+        NotificationCenter.default.addObserver(
+            forName: .shareExtensionUploadDetected,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.showReceiptSynced = false
+                self?.isReceiptUploading = true
+            }
+        }
     }
 
     // MARK: - User Management

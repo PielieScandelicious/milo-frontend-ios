@@ -709,6 +709,9 @@ struct OverviewView: View {
             isReceiptUploading = false
             isRefreshWithRetryRunning = false
 
+            // Notify other views that share extension sync is complete
+            NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
+
             // Always update displayed breakdowns to ensure UI reflects latest data
             // The filter inside updateDisplayedBreakdowns will handle period matching
             print("📊 Updating display after sync (selectedPeriod: '\(selectedPeriod)', currentMonthPeriod: '\(currentMonthPeriod)')")
