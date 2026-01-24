@@ -163,6 +163,26 @@ class ShareViewController: UIViewController {
     
     // MARK: - Rate Limit Check
 
+    /// Decrements the rate limit locally after showing success to prevent stale data issues
+    private func decrementRateLimitLocally() {
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
+            print("⚠️ Could not access shared UserDefaults to decrement rate limit")
+            return
+        }
+
+        for key in sharedDefaults.dictionaryRepresentation().keys {
+            if key.contains("_receiptsRemaining") {
+                let currentValue = sharedDefaults.integer(forKey: key)
+                let newValue = max(0, currentValue - 1)
+                sharedDefaults.set(newValue, forKey: key)
+                sharedDefaults.synchronize()
+                print("📉 Decremented rate limit: \(currentValue) -> \(newValue)")
+                break
+            }
+        }
+    }
+
     /// Checks if the user has remaining receipt uploads by reading from shared UserDefaults
     private func checkRateLimitFromSharedStorage() -> (canUpload: Bool, message: String?) {
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
@@ -596,6 +616,9 @@ class ShareViewController: UIViewController {
         // Signal main app that it needs to refresh data
         signalMainAppToRefresh()
 
+        // Decrement rate limit locally to prevent stale data allowing duplicate uploads
+        decrementRateLimitLocally()
+
         // Start upload with expiring activity to ensure it completes
         ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading PDF receipt") { expired in
             if expired {
@@ -642,6 +665,9 @@ class ShareViewController: UIViewController {
 
         // Signal main app that it needs to refresh data
         signalMainAppToRefresh()
+
+        // Decrement rate limit locally to prevent stale data allowing duplicate uploads
+        decrementRateLimitLocally()
 
         // Start upload with expiring activity to ensure it completes
         ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading receipt") { expired in
