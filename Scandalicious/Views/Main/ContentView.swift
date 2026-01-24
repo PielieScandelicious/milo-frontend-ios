@@ -158,12 +158,6 @@ struct ScandaLiciousTab: View {
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.blue)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(
-            Capsule()
-                .fill(Color.blue.opacity(0.15))
-        )
         .padding(.top, 12)
     }
 
@@ -175,12 +169,6 @@ struct ScandaLiciousTab: View {
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.green)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(
-            Capsule()
-                .fill(Color.green.opacity(0.15))
-        )
         .padding(.top, 12)
     }
 }
