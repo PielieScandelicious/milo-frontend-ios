@@ -18,6 +18,10 @@ struct AllStoresBreakdownView: View {
     private var totalSpending: Double {
         breakdowns.reduce(0) { $0 + $1.totalStoreSpend }
     }
+
+    private var totalTransactions: Int {
+        breakdowns.reduce(0) { $0 + $1.visitCount }
+    }
     
     private var storeSegments: [StoreChartSegment] {
         var currentAngle: Double = 0
@@ -59,27 +63,33 @@ struct AllStoresBreakdownView: View {
                     Button {
                         showingAllTransactions = true
                     } label: {
-                        VStack(spacing: 6) {
-                            Text("Stores")
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            
-                            Text(period)
-                                .font(.system(size: 15, weight: .medium))
+                        VStack(spacing: 8) {
+                            Text("Total Transactions")
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.6))
+                                .textCase(.uppercase)
+                                .tracking(1.2)
+
+                            Text("\(totalTransactions)")
+                                .font(.system(size: 44, weight: .heavy, design: .rounded))
+                                .foregroundColor(.white)
+
+                            Text(period)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
                         }
-                        .padding(.vertical, 16)
+                        .padding(.vertical, 28)
                         .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.white.opacity(0.05))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                        )
                     }
                     .buttonStyle(StoresHeaderButtonStyle())
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.white.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    )
                     .padding(.horizontal)
                     
                     // Large combined donut chart - tap to flip to bar chart
