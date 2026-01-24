@@ -76,7 +76,7 @@ enum ReceiptUploadError: LocalizedError {
 actor ReceiptUploadService {
     static let shared = ReceiptUploadService()
 
-    private let baseURL = "\(AppConfiguration.backendBaseURL)/api/v3"
+    private let baseURL = "\(AppConfiguration.backendBaseURL)/api/v1"
     private var uploadURL: String { "\(baseURL)/receipts/upload" }
 
     private init() {}

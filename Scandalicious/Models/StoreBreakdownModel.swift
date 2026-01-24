@@ -91,7 +91,8 @@ class StoreDataManager: ObservableObject {
     /// - Parameters:
     ///   - period: The period type (week/month/year)
     ///   - periodString: Optional specific period string like "January 2026" to fetch that exact period
-    func fetchFromBackend(for period: PeriodType = .month, periodString: String? = nil) async {
+    ///   - retryCount: Number of retries attempted (internal use)
+    func fetchFromBackend(for period: PeriodType = .month, periodString: String? = nil, retryCount: Int = 0) async {
         // Only show full loading indicator on initial fetch
         let isInitialFetch = !hasInitiallyFetched
 
@@ -168,10 +169,21 @@ class StoreDataManager: ObservableObject {
             // Check if it's a cancellation error
             if case .networkError(let underlyingError) = apiError,
                (underlyingError as NSError).code == NSURLErrorCancelled {
-                print("⚠️ Request was cancelled - ignoring error")
-                await MainActor.run {
-                    self.isLoading = false
-                    self.isRefreshing = false
+                if retryCount < 3 {
+                    print("⚠️ Request was cancelled - will retry after delay (attempt \(retryCount + 1)/3)")
+                    await MainActor.run {
+                        self.isLoading = false
+                        self.isRefreshing = false
+                    }
+                    // Retry after a short delay to let the view settle
+                    try? await Task.sleep(for: .seconds(0.5))
+                    await fetchFromBackend(for: period, periodString: periodString, retryCount: retryCount + 1)
+                } else {
+                    print("⚠️ Request was cancelled after 3 retries - giving up")
+                    await MainActor.run {
+                        self.isLoading = false
+                        self.isRefreshing = false
+                    }
                 }
                 return
             }
@@ -209,7 +221,9 @@ class StoreDataManager: ObservableObject {
     ///   - period: The period type (week/month/year)
     ///   - periodString: Optional specific period string like "January 2026" to refresh that exact period
     func refreshData(for period: PeriodType = .month, periodString: String? = nil) async {
+        print("🔄 refreshData called - period: \(period.rawValue), periodString: \(periodString ?? "nil")")
         await fetchFromBackend(for: period, periodString: periodString)
+        print("✅ refreshData completed")
     }
     
     // MARK: - Convert API Response to StoreBreakdown
@@ -280,26 +294,28 @@ class StoreDataManager: ObservableObject {
     private func formatPeriod(from startDateStr: String, to endDateStr: String, period: PeriodType) -> String {
         guard let startDate = ISO8601DateFormatter().date(from: startDateStr) ??
                 DateFormatter.yyyyMMdd.date(from: startDateStr) else {
+            print("❌ formatPeriod: Could not parse date from '\(startDateStr)'")
             return "Unknown Period"
         }
-        
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.month, .year], from: startDate)
-        
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
-        
-        return dateFormatter.string(from: startDate)
+        dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
+
+        let result = dateFormatter.string(from: startDate)
+        print("📅 formatPeriod: '\(startDateStr)' -> '\(result)'")
+        return result
     }
     
     // Regenerate breakdowns from transactions (for local data)
     func regenerateBreakdowns() {
         guard let transactionManager = transactionManager else { return }
-        
+
         let transactions = transactionManager.transactions
         let calendar = Calendar.current
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
         
         print("🔄 Regenerating breakdowns from \(transactions.count) transactions")
         
@@ -440,6 +456,7 @@ class StoreDataManager: ObservableObject {
     private func parsePeriodToDates(_ period: String, periodType: PeriodType) -> (startDate: String, endDate: String) {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
 
         let outputFormatter = DateFormatter()
         outputFormatter.dateFormat = "yyyy-MM-dd"

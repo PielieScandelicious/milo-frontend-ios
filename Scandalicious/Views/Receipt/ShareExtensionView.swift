@@ -330,7 +330,7 @@ struct ShareExtensionView: View {
     // MARK: - Upload
     
     private func uploadData(_ data: Data, filename: String, contentType: String) async throws -> ReceiptUploadResponse {
-        guard let url = URL(string: "\(AppConfiguration.backendBaseURL)/api/v3/receipts/upload") else {
+        guard let url = URL(string: "\(AppConfiguration.backendBaseURL)/api/v1/receipts/upload") else {
             throw ReceiptUploadError.serverError("Invalid upload URL")
         }
         

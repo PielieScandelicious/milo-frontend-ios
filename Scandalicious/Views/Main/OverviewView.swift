@@ -43,6 +43,7 @@ struct OverviewView: View {
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
         return dateFormatter.string(from: Date())
     }()
     @State private var selectedSort: SortOption = .highestSpend
@@ -102,6 +103,7 @@ struct OverviewView: View {
         if periods.isEmpty {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
             return [dateFormatter.string(from: Date())]
         }
 
@@ -289,6 +291,22 @@ struct OverviewView: View {
                 // Content
                 ScrollView {
                     VStack(spacing: 0) {
+                        // DEBUG: Manual refresh button for testing
+                        Button {
+                            print("🔘 MANUAL REFRESH BUTTON PRESSED")
+                            Task {
+                                await dataManager.refreshData(for: .month, periodString: selectedPeriod)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Manual Refresh (Debug)")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                            .padding(.vertical, 8)
+                        }
+
                         // Liquid Glass Period Filter at the top
                         liquidGlassPeriodFilter
                             .padding(.top, 12)
@@ -309,27 +327,26 @@ struct OverviewView: View {
                         .padding(.bottom, 32)
                     }
                     .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        // Exit edit mode when tapping empty space in ScrollView
-                        if isEditMode {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                isEditMode = false
-                            }
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                        }
-                    }
+                    // NOTE: Removed .contentShape and gesture to debug pull-to-refresh
+                    // .contentShape(Rectangle())
+                    // .simultaneousGesture(TapGesture().onEnded { ... })
                 }
                 .scrollIndicators(.hidden)
                 .scrollBounceBehavior(.always)
                 .scrollDismissesKeyboard(.interactively)
                 .background(Color(white: 0.05))
+                .onAppear {
+                    print("📱 ScrollView with .refreshable appeared - pull down to refresh!")
+                }
                 .refreshable {
+                    print("⬇️⬇️⬇️ PULL-TO-REFRESH TRIGGERED ⬇️⬇️⬇️")
+                    print("🔄 Period: '\(selectedPeriod)'")
+                    fflush(stdout) // Force flush to ensure logs appear immediately
                     let startTime = Date()
 
                     // Refresh data for the currently selected period
                     await dataManager.refreshData(for: .month, periodString: selectedPeriod)
+                    print("✅ Pull-to-refresh completed")
 
                     // Ensure minimum refresh duration for smooth UX (at least 0.8 seconds)
                     let elapsed = Date().timeIntervalSince(startTime)
@@ -526,6 +543,7 @@ struct OverviewView: View {
             if newValue.count > oldValue.count, let latestTransaction = newValue.first {
                 let dateFormatter = DateFormatter()
                 dateFormatter.dateFormat = "MMMM yyyy"
+                dateFormatter.locale = Locale(identifier: "en_US")
                 let newPeriod = dateFormatter.string(from: latestTransaction.date)
                 selectedPeriod = newPeriod
                 print("   📅 Switched to period: \(newPeriod)")
@@ -630,6 +648,7 @@ struct OverviewView: View {
                 // Get current month period string (where new receipts appear)
                 let dateFormatter = DateFormatter()
                 dateFormatter.dateFormat = "MMMM yyyy"
+                dateFormatter.locale = Locale(identifier: "en_US")
                 let currentMonthPeriod = dateFormatter.string(from: Date())
 
                 print("📥 Refreshing data for current month: '\(currentMonthPeriod)'")

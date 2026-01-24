@@ -23,7 +23,7 @@ enum AppConfiguration {
     static var chatStreamEndpoint: String { "\(backendBaseURL)/api/v1/chat/stream" }
 
     // Receipt API endpoint
-    static var receiptUploadEndpoint: String { "\(backendBaseURL)/api/v3/receipts/upload" }
+    static var receiptUploadEndpoint: String { "\(backendBaseURL)/api/v1/receipts/upload" }
     
     // Helper to log current configuration
     static func logConfiguration() {
