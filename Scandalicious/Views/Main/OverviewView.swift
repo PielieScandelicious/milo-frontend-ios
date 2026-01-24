@@ -38,8 +38,11 @@ struct OverviewView: View {
     // Track the last time we checked for Share Extension uploads
     @State private var lastCheckedUploadTimestamp: TimeInterval = 0
 
-    // Track when a receipt is being uploaded from Scan tab
+    // Track when a receipt is being uploaded from Scan tab or Share Extension
     @State private var isReceiptUploading = false
+
+    // Track if refreshWithRetry is currently running to prevent duplicate calls
+    @State private var isRefreshWithRetryRunning = false
 
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
@@ -577,11 +580,8 @@ struct OverviewView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .shareExtensionUploadDetected)) { _ in
             // Share extension upload detected (possibly from another view)
-            print("📬 Received share extension upload notification - showing syncing indicator")
-            if !isReceiptUploading {
-                isReceiptUploading = true
-                // The actual refresh will be handled by checkForShareExtensionUploads
-            }
+            // Note: isReceiptUploading is managed by checkForShareExtensionUploads, don't set it here
+            print("📬 Received share extension upload notification")
         }
     }
 
@@ -615,12 +615,6 @@ struct OverviewView: View {
 
     /// Checks if the Share Extension uploaded a receipt while the app was in the background
     private func checkForShareExtensionUploads() {
-        // Skip if already processing an upload
-        guard !isReceiptUploading else {
-            print("ℹ️ Already processing upload, skipping share extension check")
-            return
-        }
-
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
             print("❌ Could not access shared UserDefaults with App Group: \(appGroupIdentifier)")
@@ -644,9 +638,13 @@ struct OverviewView: View {
             // Post notification so other views can react
             NotificationCenter.default.post(name: .shareExtensionUploadDetected, object: nil)
 
-            // Trigger refresh with retry mechanism
-            Task {
-                await refreshWithRetry()
+            // Only start refresh if not already running (prevent duplicate concurrent refreshes)
+            if !isRefreshWithRetryRunning {
+                Task {
+                    await refreshWithRetry()
+                }
+            } else {
+                print("ℹ️ refreshWithRetry already running, skipping duplicate call")
             }
         }
     }
@@ -654,11 +652,9 @@ struct OverviewView: View {
     /// Refreshes data with retry mechanism for share extension uploads
     /// The share extension signals immediately but the upload + backend processing can take 5-15 seconds
     private func refreshWithRetry() async {
-        // Ensure isReceiptUploading is always reset when this method exits
-        defer {
-            Task { @MainActor in
-                isReceiptUploading = false
-            }
+        // Mark as running
+        await MainActor.run {
+            isRefreshWithRetryRunning = true
         }
 
         let dateFormatter = DateFormatter()
@@ -710,8 +706,12 @@ struct OverviewView: View {
         await rateLimitManager.syncFromBackend()
         print("✅ Data and rate limit refreshed after Share Extension upload")
 
-        // Update UI on main thread
+        // Update UI on main thread and always reset isReceiptUploading
         await MainActor.run {
+            // Always clear syncing indicator and running flag
+            isReceiptUploading = false
+            isRefreshWithRetryRunning = false
+
             if selectedPeriod == currentMonthPeriod {
                 print("📊 User is viewing current month - updating display")
                 updateDisplayedBreakdowns()
