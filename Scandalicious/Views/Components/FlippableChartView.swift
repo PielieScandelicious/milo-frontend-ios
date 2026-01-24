@@ -7,150 +7,440 @@
 
 import SwiftUI
 
-// MARK: - iOS-Style Mini Line Chart
-struct MiniLineChart: View {
-    let segments: [ChartSegment]
+// MARK: - Spending Trend Line Chart
+struct SpendingTrendLineChart: View {
+    let trends: [TrendPeriod]
     let size: CGFloat
     let subtitle: String
     let totalAmount: Double
+    let accentColor: Color
 
     @State private var animationProgress: CGFloat = 0
+    @State private var selectedIndex: Int? = nil
 
-    private var sortedSegments: [ChartSegment] {
-        segments.sorted { $0.value > $1.value }
+    private let yAxisWidth: CGFloat = 32
+    private let gridLineCount = 4
+
+    private var sortedTrends: [TrendPeriod] {
+        // Sort by date, oldest first
+        trends.sorted { $0.periodStart < $1.periodStart }
     }
 
-    private var maxValue: Double {
-        segments.map { $0.value }.max() ?? 1
+    private var visibleTrends: [TrendPeriod] {
+        Array(sortedTrends.suffix(5))
+    }
+
+    private var maxSpend: Double {
+        let max = visibleTrends.map { $0.totalSpend }.max() ?? 1
+        // Round up to a nice number
+        return ceil(max / 50) * 50
+    }
+
+    private var minSpend: Double {
+        let min = visibleTrends.map { $0.totalSpend }.min() ?? 0
+        // Round down to a nice number
+        return max(0, floor(min / 50) * 50)
+    }
+
+    private var spendRange: Double {
+        max(maxSpend - minSpend, 1)
+    }
+
+    private var yAxisValues: [Double] {
+        let step = spendRange / Double(gridLineCount)
+        return (0...gridLineCount).map { minSpend + step * Double($0) }
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                // Background circle matching donut style
-                Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: size * 0.15)
-                    .frame(width: size, height: size)
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 4) {
+                // Y-axis labels
+                VStack(alignment: .trailing, spacing: 0) {
+                    ForEach(yAxisValues.reversed(), id: \.self) { value in
+                        Text(formatYAxisLabel(value))
+                            .font(.system(size: size * 0.035, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.4))
+                            .frame(height: size * 0.55 / CGFloat(gridLineCount), alignment: .top)
+                    }
+                }
+                .frame(width: yAxisWidth)
 
-                // Inner chart area
-                VStack(spacing: 8) {
-                    // Mini bar chart visualization
-                    HStack(alignment: .bottom, spacing: 4) {
-                        ForEach(Array(sortedSegments.prefix(5).enumerated()), id: \.element.id) { index, segment in
-                            VStack(spacing: 4) {
-                                // Animated bar
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [segment.color, segment.color.opacity(0.6)],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
+                // Chart area
+                GeometryReader { geometry in
+                    let chartWidth = geometry.size.width
+                    let chartHeight = geometry.size.height
+
+                    ZStack {
+                        // Horizontal grid lines
+                        ForEach(0...gridLineCount, id: \.self) { index in
+                            let y = chartHeight * CGFloat(index) / CGFloat(gridLineCount)
+                            Path { path in
+                                path.move(to: CGPoint(x: 0, y: y))
+                                path.addLine(to: CGPoint(x: chartWidth, y: y))
+                            }
+                            .stroke(Color.white.opacity(0.1), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        }
+
+                        // Gradient fill under the line
+                        if visibleTrends.count > 1 {
+                            Path { path in
+                                let points = calculatePoints(width: chartWidth, height: chartHeight)
+                                guard !points.isEmpty else { return }
+
+                                path.move(to: CGPoint(x: points[0].x, y: chartHeight))
+                                path.addLine(to: CGPoint(x: points[0].x, y: points[0].y))
+
+                                for i in 1..<points.count {
+                                    let current = points[i]
+                                    let previous = points[i - 1]
+                                    let control1 = CGPoint(
+                                        x: previous.x + (current.x - previous.x) * 0.5,
+                                        y: previous.y
                                     )
-                                    .frame(
-                                        width: max(8, (size * 0.5) / CGFloat(min(5, sortedSegments.count)) - 6),
-                                        height: max(4, CGFloat(segment.value / maxValue) * (size * 0.35) * animationProgress)
+                                    let control2 = CGPoint(
+                                        x: previous.x + (current.x - previous.x) * 0.5,
+                                        y: current.y
                                     )
+                                    path.addCurve(to: current, control1: control1, control2: control2)
+                                }
+
+                                path.addLine(to: CGPoint(x: points[points.count - 1].x, y: chartHeight))
+                                path.closeSubpath()
+                            }
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        accentColor.opacity(0.3 * animationProgress),
+                                        accentColor.opacity(0.05 * animationProgress)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                        }
+
+                        // Line
+                        if visibleTrends.count > 1 {
+                            Path { path in
+                                let points = calculatePoints(width: chartWidth, height: chartHeight)
+                                guard !points.isEmpty else { return }
+
+                                path.move(to: points[0])
+
+                                for i in 1..<points.count {
+                                    let current = points[i]
+                                    let previous = points[i - 1]
+                                    let control1 = CGPoint(
+                                        x: previous.x + (current.x - previous.x) * 0.5,
+                                        y: previous.y
+                                    )
+                                    let control2 = CGPoint(
+                                        x: previous.x + (current.x - previous.x) * 0.5,
+                                        y: current.y
+                                    )
+                                    path.addCurve(to: current, control1: control1, control2: control2)
+                                }
+                            }
+                            .trim(from: 0, to: animationProgress)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [accentColor, accentColor.opacity(0.7)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+                            )
+                        }
+
+                        // Data points
+                        let points = calculatePoints(width: chartWidth, height: chartHeight)
+                        ForEach(Array(visibleTrends.enumerated()), id: \.element.id) { index, trend in
+                            if index < points.count {
+                                Circle()
+                                    .fill(accentColor)
+                                    .frame(width: 6, height: 6)
+                                    .scaleEffect(animationProgress)
+                                    .position(points[index])
                             }
                         }
                     }
-                    .frame(height: size * 0.4)
+                }
+                .frame(height: size * 0.55)
+            }
 
-                    // Center amount
-                    if subtitle == "visits" {
-                        Text(String(format: "%.0f", totalAmount))
-                            .font(.system(size: size * 0.12, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    } else {
-                        Text(String(format: "€%.0f", totalAmount))
-                            .font(.system(size: size * 0.12, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
-
-                    if !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.system(size: size * 0.07, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
+            // Period labels
+            if visibleTrends.count > 0 {
+                HStack(spacing: 0) {
+                    Spacer().frame(width: yAxisWidth + 4)
+                    ForEach(Array(visibleTrends.enumerated()), id: \.element.id) { index, trend in
+                        Text(formatPeriodLabel(trend.periodStart))
+                            .font(.system(size: size * 0.045, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                            .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(size * 0.12)
             }
-            .frame(width: size, height: size)
         }
+        .frame(width: size * 1.33, height: size * 1.09)
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.1)) {
+            withAnimation(.spring(response: 1.0, dampingFraction: 0.8).delay(0.1)) {
                 animationProgress = 1.0
             }
         }
+    }
+
+    private func calculatePoints(width: CGFloat, height: CGFloat) -> [CGPoint] {
+        guard !visibleTrends.isEmpty else { return [] }
+
+        let padding: CGFloat = 8
+        let effectiveWidth = width - padding * 2
+        let stepX = visibleTrends.count > 1 ? effectiveWidth / CGFloat(visibleTrends.count - 1) : effectiveWidth / 2
+
+        return visibleTrends.enumerated().map { index, trend in
+            let x = padding + (visibleTrends.count > 1 ? CGFloat(index) * stepX : effectiveWidth / 2)
+            let normalizedY = (trend.totalSpend - minSpend) / spendRange
+            let y = height - (CGFloat(normalizedY) * height)
+            return CGPoint(x: x, y: y)
+        }
+    }
+
+    private func formatYAxisLabel(_ value: Double) -> String {
+        if value >= 1000 {
+            return String(format: "€%.0fK", value / 1000)
+        }
+        return String(format: "€%.0f", value)
+    }
+
+    private func formatPeriodLabel(_ dateString: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        if let date = formatter.date(from: dateString) {
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMM"
+            return monthFormatter.string(from: date)
+        }
+        if let date = ISO8601DateFormatter().date(from: dateString) {
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMM"
+            return monthFormatter.string(from: date)
+        }
+        return ""
     }
 }
 
-// MARK: - Store Mini Bar Chart (for AllStoresBreakdownView)
-struct StoreMiniBarChart: View {
-    let segments: [StoreChartSegment]
+// MARK: - Store Spending Trend Line Chart (for individual stores)
+struct StoreTrendLineChart: View {
+    let trends: [TrendPeriod]
     let size: CGFloat
     let totalAmount: Double
+    let accentColor: Color
 
     @State private var animationProgress: CGFloat = 0
 
-    private var sortedSegments: [StoreChartSegment] {
-        segments.sorted { $0.amount > $1.amount }
+    private let yAxisWidth: CGFloat = 32
+    private let gridLineCount = 4
+
+    private var sortedTrends: [TrendPeriod] {
+        trends.sorted { $0.periodStart < $1.periodStart }
     }
 
-    private var maxValue: Double {
-        segments.map { $0.amount }.max() ?? 1
+    private var visibleTrends: [TrendPeriod] {
+        Array(sortedTrends.suffix(5))
+    }
+
+    private var maxSpend: Double {
+        let max = visibleTrends.map { $0.totalSpend }.max() ?? 1
+        return ceil(max / 50) * 50
+    }
+
+    private var minSpend: Double {
+        let min = visibleTrends.map { $0.totalSpend }.min() ?? 0
+        return max(0, floor(min / 50) * 50)
+    }
+
+    private var spendRange: Double {
+        max(maxSpend - minSpend, 1)
+    }
+
+    private var yAxisValues: [Double] {
+        let step = spendRange / Double(gridLineCount)
+        return (0...gridLineCount).map { minSpend + step * Double($0) }
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                // Background circle matching donut style
-                Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: size * 0.15)
-                    .frame(width: size, height: size)
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 4) {
+                // Y-axis labels
+                VStack(alignment: .trailing, spacing: 0) {
+                    ForEach(yAxisValues.reversed(), id: \.self) { value in
+                        Text(formatYAxisLabel(value))
+                            .font(.system(size: size * 0.04, weight: .medium, design: .rounded))
+                            .foregroundColor(.white.opacity(0.4))
+                            .frame(height: size * 0.7 / CGFloat(gridLineCount), alignment: .top)
+                    }
+                }
+                .frame(width: yAxisWidth)
 
-                // Inner chart area
-                VStack(spacing: 8) {
-                    // Mini bar chart visualization
-                    HStack(alignment: .bottom, spacing: 4) {
-                        ForEach(Array(sortedSegments.prefix(5).enumerated()), id: \.element.id) { index, segment in
-                            VStack(spacing: 4) {
-                                // Animated bar
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [segment.color, segment.color.opacity(0.6)],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
+                // Chart area
+                GeometryReader { geometry in
+                    let chartWidth = geometry.size.width
+                    let chartHeight = geometry.size.height
+
+                    ZStack {
+                        // Horizontal grid lines
+                        ForEach(0...gridLineCount, id: \.self) { index in
+                            let y = chartHeight * CGFloat(index) / CGFloat(gridLineCount)
+                            Path { path in
+                                path.move(to: CGPoint(x: 0, y: y))
+                                path.addLine(to: CGPoint(x: chartWidth, y: y))
+                            }
+                            .stroke(Color.white.opacity(0.1), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        }
+
+                        // Gradient fill under the line
+                        if visibleTrends.count > 1 {
+                            Path { path in
+                                let points = calculatePoints(width: chartWidth, height: chartHeight)
+                                guard !points.isEmpty else { return }
+
+                                path.move(to: CGPoint(x: points[0].x, y: chartHeight))
+                                path.addLine(to: CGPoint(x: points[0].x, y: points[0].y))
+
+                                for i in 1..<points.count {
+                                    let current = points[i]
+                                    let previous = points[i - 1]
+                                    let control1 = CGPoint(
+                                        x: previous.x + (current.x - previous.x) * 0.5,
+                                        y: previous.y
                                     )
-                                    .frame(
-                                        width: max(8, (size * 0.5) / CGFloat(min(5, sortedSegments.count)) - 6),
-                                        height: max(4, CGFloat(segment.amount / maxValue) * (size * 0.35) * animationProgress)
+                                    let control2 = CGPoint(
+                                        x: previous.x + (current.x - previous.x) * 0.5,
+                                        y: current.y
                                     )
+                                    path.addCurve(to: current, control1: control1, control2: control2)
+                                }
+
+                                path.addLine(to: CGPoint(x: points[points.count - 1].x, y: chartHeight))
+                                path.closeSubpath()
+                            }
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        accentColor.opacity(0.3 * animationProgress),
+                                        accentColor.opacity(0.05 * animationProgress)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                        }
+
+                        // Line
+                        if visibleTrends.count > 1 {
+                            Path { path in
+                                let points = calculatePoints(width: chartWidth, height: chartHeight)
+                                guard !points.isEmpty else { return }
+
+                                path.move(to: points[0])
+
+                                for i in 1..<points.count {
+                                    let current = points[i]
+                                    let previous = points[i - 1]
+                                    let control1 = CGPoint(
+                                        x: previous.x + (current.x - previous.x) * 0.5,
+                                        y: previous.y
+                                    )
+                                    let control2 = CGPoint(
+                                        x: previous.x + (current.x - previous.x) * 0.5,
+                                        y: current.y
+                                    )
+                                    path.addCurve(to: current, control1: control1, control2: control2)
+                                }
+                            }
+                            .trim(from: 0, to: animationProgress)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [accentColor, accentColor.opacity(0.7)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+                            )
+                        }
+
+                        // Data points
+                        let points = calculatePoints(width: chartWidth, height: chartHeight)
+                        ForEach(Array(visibleTrends.enumerated()), id: \.element.id) { index, trend in
+                            if index < points.count {
+                                Circle()
+                                    .fill(accentColor)
+                                    .frame(width: 6, height: 6)
+                                    .scaleEffect(animationProgress)
+                                    .position(points[index])
                             }
                         }
                     }
-                    .frame(height: size * 0.4)
-
-                    // Center amount
-                    Text(String(format: "€%.0f", totalAmount))
-                        .font(.system(size: size * 0.12, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-
-                    Text("Total")
-                        .font(.system(size: size * 0.07, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
                 }
-                .padding(size * 0.12)
+                .frame(height: size * 0.7)
             }
-            .frame(width: size, height: size)
+
+            // Period labels
+            if visibleTrends.count > 0 {
+                HStack(spacing: 0) {
+                    Spacer().frame(width: yAxisWidth + 4)
+                    ForEach(Array(visibleTrends.enumerated()), id: \.element.id) { index, trend in
+                        Text(formatPeriodLabel(trend.periodStart))
+                            .font(.system(size: size * 0.045, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
         }
+        .frame(width: size * 1.33, height: size * 1.09)
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.1)) {
+            withAnimation(.spring(response: 1.0, dampingFraction: 0.8).delay(0.1)) {
                 animationProgress = 1.0
             }
         }
+    }
+
+    private func calculatePoints(width: CGFloat, height: CGFloat) -> [CGPoint] {
+        guard !visibleTrends.isEmpty else { return [] }
+
+        let padding: CGFloat = 8
+        let effectiveWidth = width - padding * 2
+        let stepX = visibleTrends.count > 1 ? effectiveWidth / CGFloat(visibleTrends.count - 1) : effectiveWidth / 2
+
+        return visibleTrends.enumerated().map { index, trend in
+            let x = padding + (visibleTrends.count > 1 ? CGFloat(index) * stepX : effectiveWidth / 2)
+            let normalizedY = (trend.totalSpend - minSpend) / spendRange
+            let y = height - (CGFloat(normalizedY) * height)
+            return CGPoint(x: x, y: y)
+        }
+    }
+
+    private func formatYAxisLabel(_ value: Double) -> String {
+        if value >= 1000 {
+            return String(format: "€%.0fK", value / 1000)
+        }
+        return String(format: "€%.0f", value)
+    }
+
+    private func formatPeriodLabel(_ dateString: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        if let date = formatter.date(from: dateString) {
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMM"
+            return monthFormatter.string(from: date)
+        }
+        if let date = ISO8601DateFormatter().date(from: dateString) {
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMM"
+            return monthFormatter.string(from: date)
+        }
+        return ""
     }
 }
 
@@ -161,6 +451,8 @@ struct FlippableDonutChartView: View {
     let totalAmount: Double
     let segments: [ChartSegment]
     let size: CGFloat
+    var trends: [TrendPeriod] = []
+    var accentColor: Color = Color(red: 0.95, green: 0.25, blue: 0.3) // Modern red
 
     @State private var isFlipped = false
     @State private var flipDegrees: Double = 0
@@ -183,12 +475,13 @@ struct FlippableDonutChartView: View {
 
     var body: some View {
         ZStack {
-            // Back side - Mini Bar Chart
-            MiniLineChart(
-                segments: segments,
+            // Back side - Spending Trend Line Chart
+            SpendingTrendLineChart(
+                trends: trends,
                 size: size,
                 subtitle: subtitle,
-                totalAmount: totalAmount
+                totalAmount: totalAmount,
+                accentColor: accentColor
             )
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(
@@ -201,10 +494,13 @@ struct FlippableDonutChartView: View {
                 data: chartData,
                 totalAmount: totalAmount,
                 size: size,
-                currencySymbol: subtitle == "visits" ? "" : "€"
+                currencySymbol: subtitle == "visits" ? "" : "€",
+                subtitle: subtitle == "visits" ? "visits" : nil
             )
             .opacity(isFlipped ? 0 : 1)
         }
+        .frame(width: size * 1.33, height: size * 1.09)
+        .contentShape(Rectangle())
         .rotation3DEffect(
             .degrees(flipDegrees),
             axis: (x: 0, y: 1, z: 0),
@@ -224,6 +520,8 @@ struct FlippableAllStoresChartView: View {
     let totalAmount: Double
     let segments: [StoreChartSegment]
     let size: CGFloat
+    var trends: [TrendPeriod] = []
+    var accentColor: Color = Color(red: 0.95, green: 0.25, blue: 0.3) // Modern red
 
     @State private var isFlipped = false
     @State private var flipDegrees: Double = 0
@@ -235,11 +533,12 @@ struct FlippableAllStoresChartView: View {
 
     var body: some View {
         ZStack {
-            // Back side - Mini Bar Chart
-            StoreMiniBarChart(
-                segments: segments,
+            // Back side - Spending Trend Line Chart
+            StoreTrendLineChart(
+                trends: trends,
                 size: size,
-                totalAmount: totalAmount
+                totalAmount: totalAmount,
+                accentColor: accentColor
             )
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(
@@ -256,6 +555,8 @@ struct FlippableAllStoresChartView: View {
             )
             .opacity(isFlipped ? 0 : 1)
         }
+        .frame(width: size * 1.33, height: size * 1.09)
+        .contentShape(Rectangle())
         .rotation3DEffect(
             .degrees(flipDegrees),
             axis: (x: 0, y: 1, z: 0),

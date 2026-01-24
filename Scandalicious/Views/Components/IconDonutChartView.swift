@@ -31,6 +31,7 @@ struct IconDonutChartView: View {
     let totalAmount: Double
     let size: CGFloat
     let currencySymbol: String
+    let subtitle: String?
 
     /// Visual gap between segments in degrees (the actual empty space you see)
     private let visualGapDegrees: Double = 4.0
@@ -39,11 +40,12 @@ struct IconDonutChartView: View {
 
     @State private var animationProgress: CGFloat = 0
 
-    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$") {
+    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
         self.size = size
         self.currencySymbol = currencySymbol
+        self.subtitle = subtitle
     }
 
     private var strokeWidth: CGFloat {
@@ -138,12 +140,29 @@ struct IconDonutChartView: View {
     // MARK: - Center Content
 
     private var centerContent: some View {
-        Text("\(currencySymbol)\(formattedTotal)")
-            .font(.system(size: size * 0.20, weight: .bold, design: .rounded))
-            .foregroundColor(.white)
-            .minimumScaleFactor(0.7)
-            .lineLimit(1)
-            .frame(maxWidth: size * 0.55) // Keep text within inner circle
+        VStack(spacing: 2) {
+            Text("\(currencySymbol)\(formattedTotal)")
+                .font(.system(size: size * 0.20, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+
+            if let subtitle = subtitle, !subtitle.isEmpty {
+                Text(subtitleText)
+                    .font(.system(size: size * 0.07, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
+        .frame(maxWidth: size * 0.55) // Keep text within inner circle
+    }
+
+    private var subtitleText: String {
+        guard let subtitle = subtitle else { return "" }
+        // Handle singular/plural for "visits"
+        if subtitle == "visits" && Int(totalAmount) == 1 {
+            return "visit"
+        }
+        return subtitle
     }
 
     private var formattedTotal: String {

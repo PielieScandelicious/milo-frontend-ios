@@ -108,17 +108,21 @@ enum AnalyticsCategory: String, Codable, CaseIterable {
 
 struct TrendsResponse: Codable {
     let periodType: PeriodType
-    let periods: [TrendPeriod]
-    
+    let trends: [TrendPeriod]
+
     enum CodingKeys: String, CodingKey {
         case periodType = "period_type"
-        case periods
+        case trends
     }
+
+    /// Alias for backwards compatibility
+    var periods: [TrendPeriod] { trends }
 }
 
 struct TrendPeriod: Codable, Identifiable {
-    let periodStart: String
-    let periodEnd: String
+    let period: String           // e.g., "January 2026"
+    let periodStart: String      // e.g., "2026-01-01"
+    let periodEnd: String        // e.g., "2026-01-31"
     let totalSpend: Double
     let transactionCount: Int
     let averageHealthScore: Double?  // Average health score for this period
@@ -126,14 +130,16 @@ struct TrendPeriod: Codable, Identifiable {
     var id: String { periodStart }
 
     enum CodingKeys: String, CodingKey {
-        case periodStart = "period_start"
-        case periodEnd = "period_end"
+        case period
+        case periodStart = "start_date"
+        case periodEnd = "end_date"
         case totalSpend = "total_spend"
         case transactionCount = "transaction_count"
         case averageHealthScore = "average_health_score"
     }
 
-    init(periodStart: String, periodEnd: String, totalSpend: Double, transactionCount: Int, averageHealthScore: Double? = nil) {
+    init(period: String = "", periodStart: String, periodEnd: String, totalSpend: Double, transactionCount: Int, averageHealthScore: Double? = nil) {
+        self.period = period
         self.periodStart = periodStart
         self.periodEnd = periodEnd
         self.totalSpend = totalSpend

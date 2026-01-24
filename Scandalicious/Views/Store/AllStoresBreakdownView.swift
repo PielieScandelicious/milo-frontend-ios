@@ -14,7 +14,9 @@ struct AllStoresBreakdownView: View {
     @State private var showingAllTransactions = false
     @State private var selectedStoreName: String?
     @State private var showingStoreTransactions = false
-    
+    @State private var trends: [TrendPeriod] = []
+    @State private var isLoadingTrends = false
+
     private var totalSpending: Double {
         breakdowns.reduce(0) { $0 + $1.totalStoreSpend }
     }
@@ -92,12 +94,14 @@ struct AllStoresBreakdownView: View {
                     )
                     .padding(.horizontal)
                     
-                    // Large combined donut chart - tap to flip to bar chart
+                    // Large combined donut chart - tap to flip to line chart
                     VStack(spacing: 32) {
                         FlippableAllStoresChartView(
                             totalAmount: totalSpending,
                             segments: storeSegments,
-                            size: 220
+                            size: 220,
+                            trends: trends,
+                            accentColor: Color(red: 0.95, green: 0.25, blue: 0.3)
                         )
                         .padding(.top, 24)
                         .padding(.bottom, 12)
@@ -140,8 +144,26 @@ struct AllStoresBreakdownView: View {
                 )
             }
         }
+        .task {
+            await fetchTrends()
+        }
     }
-    
+
+    private func fetchTrends() async {
+        guard !isLoadingTrends else { return }
+        isLoadingTrends = true
+        defer { isLoadingTrends = false }
+
+        do {
+            let response = try await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 6)
+            await MainActor.run {
+                self.trends = response.periods
+            }
+        } catch {
+            print("Failed to fetch trends: \(error)")
+        }
+    }
+
     private func storeRow(segment: StoreChartSegment) -> some View {
         HStack {
             Circle()

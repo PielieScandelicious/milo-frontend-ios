@@ -417,11 +417,11 @@ extension TrendsResponse {
     static var preview: TrendsResponse {
         TrendsResponse(
             periodType: .month,
-            periods: [
-                TrendPeriod(periodStart: "2024-01-01", periodEnd: "2024-01-31", totalSpend: 450.00, transactionCount: 42),
-                TrendPeriod(periodStart: "2024-02-01", periodEnd: "2024-02-29", totalSpend: 520.00, transactionCount: 48),
-                TrendPeriod(periodStart: "2024-03-01", periodEnd: "2024-03-31", totalSpend: 480.00, transactionCount: 45),
-                TrendPeriod(periodStart: "2024-04-01", periodEnd: "2024-04-30", totalSpend: 510.00, transactionCount: 50)
+            trends: [
+                TrendPeriod(period: "January 2024", periodStart: "2024-01-01", periodEnd: "2024-01-31", totalSpend: 450.00, transactionCount: 42),
+                TrendPeriod(period: "February 2024", periodStart: "2024-02-01", periodEnd: "2024-02-29", totalSpend: 520.00, transactionCount: 48),
+                TrendPeriod(period: "March 2024", periodStart: "2024-03-01", periodEnd: "2024-03-31", totalSpend: 480.00, transactionCount: 45),
+                TrendPeriod(period: "April 2024", periodStart: "2024-04-01", periodEnd: "2024-04-30", totalSpend: 510.00, transactionCount: 50)
             ]
         )
     }

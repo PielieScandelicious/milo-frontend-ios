@@ -15,7 +15,14 @@ struct StoreDetailView: View {
     @State private var showingAllTransactions = false
     @State private var showingCategoryTransactions = false
     @State private var showingReceipts = false
-    
+    @State private var trends: [TrendPeriod] = []
+    @State private var isLoadingTrends = false
+
+    // Accent color for the line chart - modern red
+    private var chartAccentColor: Color {
+        Color(red: 0.95, green: 0.25, blue: 0.3)
+    }
+
     var body: some View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
@@ -77,14 +84,16 @@ struct StoreDetailView: View {
                     .buttonStyle(StoreHeaderButtonStyle())
                     .padding(.horizontal)
                     
-                    // Large donut chart - tap to flip to bar chart
+                    // Large donut chart - tap to flip to line chart
                     VStack(spacing: 20) {
                         FlippableDonutChartView(
                             title: "",
                             subtitle: "visits",
                             totalAmount: Double(storeBreakdown.visitCount),
                             segments: storeBreakdown.categories.toChartSegments(),
-                            size: 220
+                            size: 220,
+                            trends: trends,
+                            accentColor: chartAccentColor
                         )
                         .padding(.top, 20)
                         
@@ -161,8 +170,27 @@ struct StoreDetailView: View {
                 storeName: storeBreakdown.storeName
             )
         }
+        .task {
+            await fetchTrends()
+        }
     }
-    
+
+    private func fetchTrends() async {
+        guard !isLoadingTrends else { return }
+        isLoadingTrends = true
+        defer { isLoadingTrends = false }
+
+        do {
+            // Use the store-specific trends endpoint
+            let response = try await AnalyticsAPIService.shared.getStoreTrends(storeName: storeBreakdown.storeName, periodType: .month, numPeriods: 6)
+            await MainActor.run {
+                self.trends = response.periods
+            }
+        } catch {
+            print("Failed to fetch trends for \(storeBreakdown.storeName): \(error)")
+        }
+    }
+
     private func categoryRow(segment: ChartSegment) -> some View {
         HStack {
             Circle()

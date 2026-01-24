@@ -60,12 +60,17 @@ actor AnalyticsAPIService {
     /// - Parameters:
     ///   - periodType: Type of period (week, month, year)
     ///   - numPeriods: Number of periods to fetch (1-52, default 12)
-    func fetchTrends(periodType: PeriodType = .month, numPeriods: Int = 12) async throws -> TrendsResponse {
-        let queryItems = [
+    ///   - storeName: Optional store name to filter trends for a specific store
+    func fetchTrends(periodType: PeriodType = .month, numPeriods: Int = 12, storeName: String? = nil) async throws -> TrendsResponse {
+        var queryItems = [
             URLQueryItem(name: "period_type", value: periodType.rawValue),
             URLQueryItem(name: "num_periods", value: String(min(max(numPeriods, 1), 52)))
         ]
-        
+
+        if let storeName = storeName {
+            queryItems.append(URLQueryItem(name: "store_name", value: storeName))
+        }
+
         return try await performRequest(
             endpoint: "/analytics/trends",
             queryItems: queryItems
@@ -100,7 +105,29 @@ actor AnalyticsAPIService {
             queryItems: filters.toQueryItems()
         )
     }
-    
+
+    /// Fetch spending trends for a specific store
+    /// - Parameters:
+    ///   - storeName: Name of the store
+    ///   - periodType: Type of period (week, month, year)
+    ///   - numPeriods: Number of periods to fetch (1-52, default 6)
+    func fetchStoreTrends(storeName: String, periodType: PeriodType = .month, numPeriods: Int = 6) async throws -> TrendsResponse {
+        // URL encode the store name to handle special characters (spaces, &, etc.)
+        guard let encodedStoreName = storeName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            throw AnalyticsAPIError.invalidURL
+        }
+
+        let queryItems = [
+            URLQueryItem(name: "period_type", value: periodType.rawValue),
+            URLQueryItem(name: "num_periods", value: String(min(max(numPeriods, 1), 52)))
+        ]
+
+        return try await performRequest(
+            endpoint: "/analytics/stores/\(encodedStoreName)/trends",
+            queryItems: queryItems
+        )
+    }
+
     /// Fetch paginated list of transactions
     /// - Parameter filters: Transaction filters including pagination
     func fetchTransactions(filters: TransactionFilters = TransactionFilters()) async throws -> TransactionsResponse {
@@ -404,8 +431,8 @@ actor AnalyticsAPIService {
 
 extension AnalyticsAPIService {
     /// Nonisolated wrapper for fetchTrends
-    nonisolated func getTrends(periodType: PeriodType = .month, numPeriods: Int = 12) async throws -> TrendsResponse {
-        return try await fetchTrends(periodType: periodType, numPeriods: numPeriods)
+    nonisolated func getTrends(periodType: PeriodType = .month, numPeriods: Int = 12, storeName: String? = nil) async throws -> TrendsResponse {
+        return try await fetchTrends(periodType: periodType, numPeriods: numPeriods, storeName: storeName)
     }
     
     /// Nonisolated wrapper for fetchCategories
@@ -422,7 +449,12 @@ extension AnalyticsAPIService {
     nonisolated func getStoreDetails(storeName: String, filters: AnalyticsFilters = AnalyticsFilters()) async throws -> StoreDetailsResponse {
         return try await fetchStoreDetails(storeName: storeName, filters: filters)
     }
-    
+
+    /// Nonisolated wrapper for fetchStoreTrends
+    nonisolated func getStoreTrends(storeName: String, periodType: PeriodType = .month, numPeriods: Int = 6) async throws -> TrendsResponse {
+        return try await fetchStoreTrends(storeName: storeName, periodType: periodType, numPeriods: numPeriods)
+    }
+
     /// Nonisolated wrapper for fetchTransactions
     nonisolated func getTransactions(filters: TransactionFilters = TransactionFilters()) async throws -> TransactionsResponse {
         return try await fetchTransactions(filters: filters)
