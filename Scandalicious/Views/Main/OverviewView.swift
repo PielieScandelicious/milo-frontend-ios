@@ -444,15 +444,25 @@ struct OverviewView: View {
             }
             updateDisplayedBreakdowns()
 
-            // Initialize lastCheckedUploadTimestamp from UserDefaults on first appear
+            // Initialize lastCheckedUploadTimestamp from persistent storage on first appear
             // This prevents re-detecting old uploads as "new" on app launch
             if lastCheckedUploadTimestamp == 0 {
                 let appGroupIdentifier = "group.com.deepmaind.scandalicious"
                 if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
-                    let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-                    if existingTimestamp > 0 {
-                        lastCheckedUploadTimestamp = existingTimestamp
-                        print("📋 Initialized lastCheckedUploadTimestamp to \(existingTimestamp) from UserDefaults")
+                    // First try to load from persisted lastCheckedUploadTimestamp
+                    let persistedLastChecked = sharedDefaults.double(forKey: "lastCheckedUploadTimestamp")
+                    if persistedLastChecked > 0 {
+                        lastCheckedUploadTimestamp = persistedLastChecked
+                        print("📋 Restored lastCheckedUploadTimestamp from storage: \(persistedLastChecked)")
+                    } else {
+                        // Fall back to current upload timestamp to prevent detecting old uploads as new
+                        let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
+                        if existingTimestamp > 0 {
+                            lastCheckedUploadTimestamp = existingTimestamp
+                            // Also persist it so future checks use this value
+                            sharedDefaults.set(existingTimestamp, forKey: "lastCheckedUploadTimestamp")
+                            print("📋 Initialized lastCheckedUploadTimestamp to current upload timestamp: \(existingTimestamp)")
+                        }
                     }
                 }
             }
@@ -626,8 +636,9 @@ struct OverviewView: View {
         if uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0 {
             print("📬 Detected Share Extension upload (timestamp: \(uploadTimestamp)) - refreshing data")
 
-            // Update last checked timestamp
+            // Update last checked timestamp and persist it
             lastCheckedUploadTimestamp = uploadTimestamp
+            sharedDefaults.set(uploadTimestamp, forKey: "lastCheckedUploadTimestamp")
 
             // Show syncing indicator immediately
             isReceiptUploading = true

@@ -626,6 +626,11 @@ class RateLimitManager: ObservableObject {
         if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
             sharedDefaults.set(receiptsRemaining, forKey: "\(prefix)_receiptsRemaining")
             sharedDefaults.set(daysUntilReset, forKey: "\(prefix)_daysUntilReset")
+            // Save the user ID so the share extension can look up rate limit data
+            // without needing Firebase Auth
+            if let userId = currentUserId {
+                sharedDefaults.set(userId, forKey: "rateLimit_currentUserId")
+            }
             sharedDefaults.synchronize()
         }
     }

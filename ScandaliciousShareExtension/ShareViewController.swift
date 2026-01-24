@@ -171,9 +171,14 @@ class ShareViewController: UIViewController {
             return
         }
 
-        // Get the current user ID from Firebase Auth to build the correct key
-        guard let userId = Auth.auth().currentUser?.uid else {
-            print("⚠️ No Firebase user to decrement rate limit")
+        // Get the current user ID - try Firebase Auth first, then fall back to shared storage
+        let userId: String
+        if let firebaseUserId = Auth.auth().currentUser?.uid {
+            userId = firebaseUserId
+        } else if let storedUserId = sharedDefaults.string(forKey: "rateLimit_currentUserId") {
+            userId = storedUserId
+        } else {
+            print("⚠️ No user ID available to decrement rate limit")
             return
         }
 
@@ -203,9 +208,16 @@ class ShareViewController: UIViewController {
             return (true, nil)
         }
 
-        // Get the current user ID from Firebase Auth to build the correct key
-        guard let userId = Auth.auth().currentUser?.uid else {
-            print("⚠️ No Firebase user for rate limit check, allowing upload")
+        // Get the current user ID - try Firebase Auth first, then fall back to shared storage
+        let userId: String
+        if let firebaseUserId = Auth.auth().currentUser?.uid {
+            userId = firebaseUserId
+            print("🔐 Using Firebase Auth user ID for rate limit check")
+        } else if let storedUserId = sharedDefaults.string(forKey: "rateLimit_currentUserId") {
+            userId = storedUserId
+            print("🔐 Using stored user ID for rate limit check (Firebase Auth not available)")
+        } else {
+            print("⚠️ No user ID available for rate limit check, allowing upload")
             // If we can't identify the user, allow the upload (backend will reject if needed)
             return (true, nil)
         }
@@ -716,25 +728,44 @@ class ShareViewController: UIViewController {
     private func showStatus(_ status: ReceiptStatusType) {
         DispatchQueue.main.async {
             if self.statusVC == nil {
-                let vc = ReceiptStatusViewController(
-                    status: status,
-                    onRetry: nil,
-                    onDismiss: { [weak self] in
-                        self?.extensionContext?.cancelRequest(withError: NSError(
-                            domain: "ShareExtension",
-                            code: 1,
-                            userInfo: nil
-                        ))
-                    }
-                )
-                vc.modalPresentationStyle = .overFullScreen
-                vc.modalTransitionStyle = .crossDissolve
-                self.present(vc, animated: true)
-                self.statusVC = vc
+                self.presentStatusViewController(with: status)
             } else {
                 self.statusVC?.updateStatus(status)
             }
         }
+    }
+
+    private func presentStatusViewController(with status: ReceiptStatusType, retryCount: Int = 0) {
+        let vc = ReceiptStatusViewController(
+            status: status,
+            onRetry: nil,
+            onDismiss: { [weak self] in
+                self?.extensionContext?.cancelRequest(withError: NSError(
+                    domain: "ShareExtension",
+                    code: 1,
+                    userInfo: nil
+                ))
+            }
+        )
+        vc.modalPresentationStyle = .overFullScreen
+        vc.modalTransitionStyle = .crossDissolve
+
+        // Ensure view is in window hierarchy before presenting
+        // This fixes the issue where the dialogue doesn't show when rate limit is 0
+        guard self.view.window != nil else {
+            // View not ready yet, retry after a short delay (max 5 retries = 0.5 seconds)
+            if retryCount < 5 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    self?.presentStatusViewController(with: status, retryCount: retryCount + 1)
+                }
+            } else {
+                print("⚠️ Failed to present status VC after \(retryCount) retries - view not in window")
+            }
+            return
+        }
+
+        self.present(vc, animated: true)
+        self.statusVC = vc
     }
     
     private func updateStatus(_ newStatus: ReceiptStatusType) {

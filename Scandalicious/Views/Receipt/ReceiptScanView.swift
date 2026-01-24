@@ -452,15 +452,24 @@ struct ReceiptScanView: View {
 
     // MARK: - Share Extension Upload Detection
 
-    /// Initialize the last checked timestamp to the current value in shared defaults
+    /// Initialize the last checked timestamp from persisted storage
     private func initializeLastCheckedTimestamp() {
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
         if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
-            let currentTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-            if lastCheckedUploadTimestamp == 0 && currentTimestamp > 0 {
-                // Don't initialize to current value - we WANT to detect uploads that happened
-                // while the app wasn't running. Only set to 0 to ensure we check.
-                print("📋 [ScanTab] Found existing upload timestamp: \(currentTimestamp), will check for new uploads")
+            // First try to load from persisted lastCheckedUploadTimestamp
+            let persistedLastChecked = sharedDefaults.double(forKey: "lastCheckedUploadTimestamp")
+            if persistedLastChecked > 0 {
+                lastCheckedUploadTimestamp = persistedLastChecked
+                print("📋 [ScanTab] Restored lastCheckedUploadTimestamp from storage: \(persistedLastChecked)")
+            } else {
+                // Fall back to current upload timestamp to prevent detecting old uploads as new
+                let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
+                if existingTimestamp > 0 {
+                    lastCheckedUploadTimestamp = existingTimestamp
+                    // Also persist it so future checks use this value
+                    sharedDefaults.set(existingTimestamp, forKey: "lastCheckedUploadTimestamp")
+                    print("📋 [ScanTab] Initialized lastCheckedUploadTimestamp to current upload timestamp: \(existingTimestamp)")
+                }
             }
         }
     }
@@ -487,8 +496,9 @@ struct ReceiptScanView: View {
         if uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0 {
             print("📬 [ScanTab] NEW Share Extension upload detected!")
 
-            // Update last checked timestamp
+            // Update last checked timestamp and persist it
             lastCheckedUploadTimestamp = uploadTimestamp
+            sharedDefaults.set(uploadTimestamp, forKey: "lastCheckedUploadTimestamp")
 
             // Post notification so Overview tab shows syncing indicator
             NotificationCenter.default.post(name: .shareExtensionUploadDetected, object: nil)
