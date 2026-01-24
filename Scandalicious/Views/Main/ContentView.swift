@@ -116,6 +116,7 @@ struct ScanTab: View {
 // MARK: - ScandaLicious Tab
 struct ScandaLiciousTab: View {
     @ObservedObject private var rateLimitManager = RateLimitManager.shared
+    @State private var isTabVisible = false
 
     var body: some View {
         NavigationStack {
@@ -124,16 +125,28 @@ struct ScandaLiciousTab: View {
         }
         .overlay(alignment: .top) {
             VStack {
-                if rateLimitManager.isReceiptUploading {
+                if isTabVisible && rateLimitManager.isReceiptUploading {
                     syncingStatusBanner
                         .transition(.move(edge: .top).combined(with: .opacity))
-                } else if rateLimitManager.showReceiptSynced {
+                } else if isTabVisible && rateLimitManager.showReceiptSynced {
                     syncedStatusBanner
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
+        }
+        .onAppear {
+            // Delay slightly to trigger slide-in animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    isTabVisible = true
+                }
+            }
+        }
+        .onDisappear {
+            isTabVisible = false
         }
         .id("ScandaLiciousTab") // Prevent recreation
     }

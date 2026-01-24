@@ -25,6 +25,7 @@ struct ReceiptScanView: View {
 
     // Syncing status for top banner
     @State private var isSyncing = false
+    @State private var isTabVisible = false
 
     var body: some View {
         ZStack {
@@ -38,13 +39,24 @@ struct ReceiptScanView: View {
 
             // Syncing status banner at top
             VStack {
-                if isSyncing {
+                if isTabVisible && isSyncing {
                     syncingStatusBanner
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 Spacer()
             }
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSyncing)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    isTabVisible = true
+                }
+            }
+        }
+        .onDisappear {
+            isTabVisible = false
         }
         .receiptErrorOverlay(
             isPresented: $showError,
