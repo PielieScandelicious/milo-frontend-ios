@@ -196,8 +196,8 @@ struct InsightSheetView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 12)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
 
             Divider()
                 .background(Color.white.opacity(0.1))
@@ -282,8 +282,8 @@ struct InsightSheetView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
 
             // Footer
             VStack(spacing: 0) {
@@ -293,7 +293,8 @@ struct InsightSheetView: View {
                 Text("Insight by Dobby")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
-                    .padding(.vertical, 10)
+                    .padding(.top, 16)
+                    .padding(.bottom, 4)
             }
         }
         .background(
