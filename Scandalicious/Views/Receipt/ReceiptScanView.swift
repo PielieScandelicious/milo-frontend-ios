@@ -130,15 +130,6 @@ struct ReceiptScanView: View {
             print("🔄 [ScanTab] App became active (UIApplication notification)")
             checkForShareExtensionUploads()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadStarted)) { _ in
-            isSyncing = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
-            isSyncing = false
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .shareExtensionUploadDetected)) { _ in
-            isSyncing = true
-        }
         .animation(.easeInOut, value: uploadState)
     }
 
@@ -335,6 +326,7 @@ struct ReceiptScanView: View {
         // Upload receipt
         await MainActor.run {
             uploadState = .uploading
+            isSyncing = true
             // Notify View tab to show syncing indicator
             NotificationCenter.default.post(name: .receiptUploadStarted, object: nil)
         }
@@ -357,6 +349,7 @@ struct ReceiptScanView: View {
 
             await MainActor.run {
                 capturedImage = nil
+                isSyncing = false
 
                 switch response.status {
                 case .success, .completed:
@@ -400,6 +393,7 @@ struct ReceiptScanView: View {
         } catch let error as ReceiptUploadError {
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
+                isSyncing = false
 
                 // Handle rate limit exceeded specially
                 if case .rateLimitExceeded = error {
@@ -423,6 +417,7 @@ struct ReceiptScanView: View {
         } catch {
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
+                isSyncing = false
                 canRetryAfterError = true
                 errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
                 showError = true

@@ -323,32 +323,6 @@ struct OverviewView: View {
                 .scrollBounceBehavior(.always)
                 .scrollDismissesKeyboard(.interactively)
                 .background(Color(white: 0.05))
-                .onAppear {
-                    print("📱 ScrollView with .refreshable appeared - pull down to refresh!")
-                }
-                .refreshable {
-                    print("⬇️⬇️⬇️ PULL-TO-REFRESH TRIGGERED ⬇️⬇️⬇️")
-                    print("🔄 Period: '\(selectedPeriod)'")
-                    fflush(stdout) // Force flush to ensure logs appear immediately
-                    let startTime = Date()
-
-                    // Refresh data for the currently selected period
-                    await dataManager.refreshData(for: .month, periodString: selectedPeriod)
-                    print("✅ Pull-to-refresh completed")
-
-                    // Ensure minimum refresh duration for smooth UX (at least 0.8 seconds)
-                    let elapsed = Date().timeIntervalSince(startTime)
-                    if elapsed < 0.8 {
-                        try? await Task.sleep(for: .seconds(0.8 - elapsed))
-                    }
-
-                    // Add haptic feedback on completion
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
-
-                    // Update refresh time for "Updated X ago" display
-                    lastRefreshTime = Date()
-                }
             }
             
             // Edit mode exit button overlay

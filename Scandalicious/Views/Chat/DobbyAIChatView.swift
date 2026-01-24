@@ -24,6 +24,7 @@ struct ScandaLiciousAIChatView: View {
     @State private var showManageSubscription = false
     @State private var showRateLimitAlert = false
     @State private var showProfile = false
+    @State private var showClearButton = false
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -66,6 +67,12 @@ struct ScandaLiciousAIChatView: View {
                     withAnimation(.easeOut(duration: 0.3)) {
                         if let lastMessage = viewModel.messages.last {
                             proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                    // Show clear button when messages appear
+                    if !viewModel.messages.isEmpty && !showClearButton {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            showClearButton = true
                         }
                     }
                 }
@@ -192,21 +199,20 @@ struct ScandaLiciousAIChatView: View {
             }
 
             // Clear chat button - leading (left side), only visible when chat is active
-            ToolbarItem(placement: .navigationBarLeading) {
-                if !viewModel.messages.isEmpty {
-                    Menu {
-                        Button(role: .destructive) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                viewModel.clearConversation()
-                                showWelcome = true
-                            }
-                        } label: {
-                            Label("Clear Chat", systemImage: "trash")
+            if showClearButton {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            viewModel.clearConversation()
+                            showWelcome = true
+                            showClearButton = false
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(.secondary)
+                        Image(systemName: "trash")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.red.opacity(0.8))
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
