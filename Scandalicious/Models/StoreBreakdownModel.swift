@@ -72,6 +72,8 @@ class StoreDataManager: ObservableObject {
     @Published var isDeleting = false
     @Published var deleteError: String?
     @Published var deleteSuccessMessage: String?
+    @Published var periodTotalSpends: [String: Double] = [:]  // Total spend per period from backend (sum of item_price)
+    @Published var periodReceiptCounts: [String: Int] = [:]  // Total receipt count per period
 
     var transactionManager: TransactionManager?
     private var hasInitiallyFetched = false
@@ -154,15 +156,46 @@ class StoreDataManager: ObservableObject {
             
             // Convert API response to StoreBreakdown format
             let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: period)
-            
+
+            // Determine the period key for storing aggregations
+            let periodKey = breakdowns.first?.period ?? periodString ?? {
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "MMMM yyyy"
+                dateFormatter.locale = Locale(identifier: "en_US")
+                return dateFormatter.string(from: Date())
+            }()
+
+            // Fetch receipt count from /receipts endpoint (now supports date filtering)
+            var receiptCount = 0
+            if let startDate = filters.startDate, let endDate = filters.endDate {
+                var receiptFilters = ReceiptFilters()
+                receiptFilters.startDate = startDate
+                receiptFilters.endDate = endDate
+                receiptFilters.pageSize = 1  // We only need the total count
+                if let receiptsResponse = try? await AnalyticsAPIService.shared.getReceipts(filters: receiptFilters) {
+                    receiptCount = receiptsResponse.total
+                    print("   📊 Receipt count from /receipts endpoint: \(receiptCount)")
+                }
+            }
+
             await MainActor.run {
-                self.storeBreakdowns = breakdowns
+                // Update breakdowns for this specific period (don't replace all)
+                // First remove existing breakdowns for this period
+                self.storeBreakdowns.removeAll { $0.period == periodKey }
+                // Then add the new breakdowns
+                self.storeBreakdowns.append(contentsOf: breakdowns)
+
+                // Update period aggregations
+                self.periodTotalSpends[periodKey] = summary.totalSpend
+                self.periodReceiptCounts[periodKey] = receiptCount
+
                 self.averageHealthScore = summary.averageHealthScore
                 self.isLoading = false
                 self.isRefreshing = false
                 self.lastFetchDate = Date()
                 self.hasInitiallyFetched = true
-                print("✅ Updated storeBreakdowns with \(breakdowns.count) stores")
+                print("✅ Updated storeBreakdowns for period '\(periodKey)' with \(breakdowns.count) stores")
+                print("   Total spend: €\(summary.totalSpend), Receipts: \(receiptCount)")
                 if let healthScore = summary.averageHealthScore {
                     print("   Average health score: \(healthScore)")
                 }
@@ -267,10 +300,14 @@ class StoreDataManager: ObservableObject {
 
             // Fetch summary for each period to get store breakdowns
             var allBreakdowns: [StoreBreakdown] = []
+            var allPeriodTotalSpends: [String: Double] = [:]
+            var allPeriodReceiptCounts: [String: Int] = [:]
             var latestHealthScore: Double?
 
             for trendPeriod in periodsWithData {
                 print("   📊 Fetching summary for \(trendPeriod.period)...")
+                print("      🔍 Trends API returned: periodStart='\(trendPeriod.periodStart)', periodEnd='\(trendPeriod.periodEnd)'")
+                print("      🔍 Trends API totalSpend: €\(trendPeriod.totalSpend)")
 
                 // Parse start and end dates from the trend period
                 guard let startDate = DateFormatter.yyyyMMdd.date(from: trendPeriod.periodStart),
@@ -286,19 +323,40 @@ class StoreDataManager: ObservableObject {
                 filters.startDate = startDate
                 filters.endDate = endDate
 
+                // Log the actual dates being sent to the API
+                let startDateStr = DateFormatter.yyyyMMdd.string(from: startDate)
+                let endDateStr = DateFormatter.yyyyMMdd.string(from: endDate)
+                print("      📤 Sending to summary API: start_date='\(startDateStr)', end_date='\(endDateStr)'")
+
                 do {
                     let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+                    print("      📥 Summary API returned: totalSpend=€\(summary.totalSpend), transactionCount=\(summary.transactionCount)")
 
                     // Convert to StoreBreakdowns
                     let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: .month)
                     allBreakdowns.append(contentsOf: breakdowns)
+
+                    // Use the breakdown's period as key (ensures consistency with selectedPeriod in UI)
+                    let periodKey = breakdowns.first?.period ?? trendPeriod.period
+
+                    // Store the total spend for this period (from backend = sum of item_price)
+                    allPeriodTotalSpends[periodKey] = summary.totalSpend
+
+                    // Fetch receipt count from /receipts endpoint (now supports date filtering)
+                    var receiptFilters = ReceiptFilters()
+                    receiptFilters.startDate = startDate
+                    receiptFilters.endDate = endDate
+                    receiptFilters.pageSize = 1  // We only need the total count
+                    let receiptsResponse = try await AnalyticsAPIService.shared.getReceipts(filters: receiptFilters)
+                    print("      📊 Receipt count from /receipts endpoint: \(receiptsResponse.total)")
+                    allPeriodReceiptCounts[periodKey] = receiptsResponse.total
 
                     // Store the health score from the most recent period (first one with data)
                     if latestHealthScore == nil {
                         latestHealthScore = summary.averageHealthScore
                     }
 
-                    print("   ✅ Added \(breakdowns.count) stores for \(trendPeriod.period)")
+                    print("   ✅ Added \(breakdowns.count) stores for \(periodKey), total: €\(summary.totalSpend), receipts: \(receiptsResponse.total)")
 
                 } catch {
                     print("   ⚠️ Failed to fetch summary for \(trendPeriod.period): \(error.localizedDescription)")
@@ -318,6 +376,8 @@ class StoreDataManager: ObservableObject {
 
             await MainActor.run {
                 self.storeBreakdowns = allBreakdowns
+                self.periodTotalSpends = allPeriodTotalSpends
+                self.periodReceiptCounts = allPeriodReceiptCounts
                 self.averageHealthScore = latestHealthScore
                 self.isLoading = false
                 self.hasInitiallyFetched = true
@@ -571,22 +631,24 @@ class StoreDataManager: ObservableObject {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
+        dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
 
         let outputFormatter = DateFormatter()
         outputFormatter.dateFormat = "yyyy-MM-dd"
         outputFormatter.timeZone = TimeZone(identifier: "UTC")
 
+        // Use UTC calendar to avoid timezone issues
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
         guard let parsedDate = dateFormatter.date(from: period) else {
             // Fallback to current month if parsing fails
             let now = Date()
-            let calendar = Calendar.current
             let components = calendar.dateComponents([.year, .month], from: now)
             let startOfMonth = calendar.date(from: components)!
             let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
             return (outputFormatter.string(from: startOfMonth), outputFormatter.string(from: endOfMonth))
         }
-
-        let calendar = Calendar.current
 
         switch periodType {
         case .week:

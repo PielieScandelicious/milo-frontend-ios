@@ -10,20 +10,14 @@ import SwiftUI
 struct AllStoresBreakdownView: View {
     let period: String
     let breakdowns: [StoreBreakdown]
+    let totalSpend: Double  // Total spend from backend (sum of item_price)
+    let totalReceipts: Int  // Total receipt count from backend
     @Environment(\.dismiss) private var dismiss
     @State private var showingAllTransactions = false
     @State private var selectedStoreName: String?
     @State private var showingStoreTransactions = false
     @State private var trends: [TrendPeriod] = []
     @State private var isLoadingTrends = false
-
-    private var totalSpending: Double {
-        breakdowns.reduce(0) { $0 + $1.totalStoreSpend }
-    }
-
-    private var totalTransactions: Int {
-        breakdowns.reduce(0) { $0 + $1.visitCount }
-    }
     
     private var storeSegments: [StoreChartSegment] {
         var currentAngle: Double = 0
@@ -39,7 +33,7 @@ struct AllStoresBreakdownView: View {
         ]
 
         return breakdowns.enumerated().map { index, breakdown in
-            let percentage = breakdown.totalStoreSpend / totalSpending
+            let percentage = breakdown.totalStoreSpend / totalSpend
             let angleRange = 360.0 * percentage
             let segment = StoreChartSegment(
                 startAngle: .degrees(currentAngle),
@@ -66,13 +60,13 @@ struct AllStoresBreakdownView: View {
                         showingAllTransactions = true
                     } label: {
                         VStack(spacing: 8) {
-                            Text("Total Transactions")
+                            Text("Total Spend")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.6))
                                 .textCase(.uppercase)
                                 .tracking(1.2)
 
-                            Text("\(totalTransactions)")
+                            Text(String(format: "€%.0f", totalSpend))
                                 .font(.system(size: 44, weight: .heavy, design: .rounded))
                                 .foregroundColor(.white)
 
@@ -97,9 +91,10 @@ struct AllStoresBreakdownView: View {
                     // Large combined donut chart - tap to flip to line chart
                     VStack(spacing: 32) {
                         FlippableAllStoresChartView(
-                            totalAmount: totalSpending,
+                            totalAmount: totalSpend,
                             segments: storeSegments,
                             size: 220,
+                            totalReceipts: totalReceipts,
                             trends: trends,
                             accentColor: Color(red: 0.95, green: 0.25, blue: 0.3),
                             selectedPeriod: period
@@ -128,20 +123,16 @@ struct AllStoresBreakdownView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showingAllTransactions) {
-            TransactionListView(
-                storeName: "All Stores",
+            ReceiptsListView(
                 period: period,
-                category: nil,
-                categoryColor: nil
+                storeName: nil
             )
         }
         .navigationDestination(isPresented: $showingStoreTransactions) {
             if let storeName = selectedStoreName {
-                TransactionListView(
-                    storeName: storeName,
+                ReceiptsListView(
                     period: period,
-                    category: nil,
-                    categoryColor: nil
+                    storeName: storeName
                 )
             }
         }
@@ -313,7 +304,9 @@ struct StoreRowButtonStyle: ButtonStyle {
                     ],
                     visitCount: 10
                 )
-            ]
+            ],
+            totalSpend: 284.40,
+            totalReceipts: 25
         )
     }
     .preferredColorScheme(.dark)

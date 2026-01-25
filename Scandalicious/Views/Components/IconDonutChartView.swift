@@ -158,9 +158,10 @@ struct IconDonutChartView: View {
 
     private var subtitleText: String {
         guard let subtitle = subtitle else { return "" }
-        // Handle singular/plural for "visits"
-        if subtitle == "visits" && Int(totalAmount) == 1 {
-            return "visit"
+        // Handle singular/plural for "visits" and "receipts"
+        if Int(totalAmount) == 1 {
+            if subtitle == "visits" { return "visit" }
+            if subtitle == "receipts" { return "receipt" }
         }
         return subtitle
     }

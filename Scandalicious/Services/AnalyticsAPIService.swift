@@ -469,6 +469,11 @@ extension AnalyticsAPIService {
     nonisolated func removeReceipt(receiptId: String) async throws {
         return try await deleteReceipt(receiptId: receiptId)
     }
+
+    /// Nonisolated wrapper for fetchReceipts
+    nonisolated func getReceipts(filters: ReceiptFilters = ReceiptFilters()) async throws -> ReceiptsListResponse {
+        return try await fetchReceipts(filters: filters)
+    }
 }
 
 // MARK: - Delete Transactions Models

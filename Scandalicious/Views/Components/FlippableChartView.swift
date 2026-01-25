@@ -624,6 +624,7 @@ struct FlippableAllStoresChartView: View {
     let totalAmount: Double
     let segments: [StoreChartSegment]
     let size: CGFloat
+    var totalReceipts: Int = 0  // Total receipts to show in chart center
     var trends: [TrendPeriod] = []
     var accentColor: Color = Color(red: 0.95, green: 0.25, blue: 0.3) // Modern red
     var selectedPeriod: String? = nil  // e.g., "January 2026"
@@ -652,12 +653,13 @@ struct FlippableAllStoresChartView: View {
                 axis: (x: 0, y: 1, z: 0)
             )
 
-            // Front side - Icon Donut Chart
+            // Front side - Icon Donut Chart (shows receipts in center)
             IconDonutChartView(
                 data: chartData,
-                totalAmount: totalAmount,
+                totalAmount: Double(totalReceipts),
                 size: size,
-                currencySymbol: "€"
+                currencySymbol: "",
+                subtitle: "receipts"
             )
             .opacity(isFlipped ? 0 : 1)
         }

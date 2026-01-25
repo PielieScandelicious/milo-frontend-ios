@@ -94,12 +94,16 @@ class ReceiptsViewModel: ObservableObject {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
 
         guard let date = dateFormatter.date(from: period) else {
             return (nil, nil)
         }
 
-        let calendar = Calendar.current
+        // Use UTC calendar to avoid timezone issues
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
         let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: date))
 
         var endComponents = DateComponents()

@@ -221,9 +221,15 @@ struct OverviewView: View {
     }
     
     private var totalPeriodSpending: Double {
-        currentBreakdowns.reduce(0) { $0 + $1.totalStoreSpend }
+        // Use the total spend from backend (sum of item_price) instead of summing store amounts
+        dataManager.periodTotalSpends[selectedPeriod] ?? currentBreakdowns.reduce(0) { $0 + $1.totalStoreSpend }
     }
-    
+
+    private var totalPeriodReceipts: Int {
+        // Use the receipt count from backend instead of summing visit counts
+        dataManager.periodReceiptCounts[selectedPeriod] ?? currentBreakdowns.reduce(0) { $0 + $1.visitCount }
+    }
+
     // MARK: - Delete Functions
     private func deleteBreakdowns(at offsets: IndexSet) {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -372,7 +378,7 @@ struct OverviewView: View {
             StoreDetailView(storeBreakdown: breakdown)
         }
         .navigationDestination(isPresented: $showingAllStoresBreakdown) {
-            AllStoresBreakdownView(period: selectedPeriod, breakdowns: currentBreakdowns)
+            AllStoresBreakdownView(period: selectedPeriod, breakdowns: currentBreakdowns, totalSpend: totalPeriodSpending, totalReceipts: totalPeriodReceipts)
         }
         .navigationDestination(isPresented: $showingAllTransactions) {
             TransactionListView(

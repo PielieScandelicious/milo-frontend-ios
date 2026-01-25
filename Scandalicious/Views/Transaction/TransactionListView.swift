@@ -241,25 +241,28 @@ struct TransactionListView: View {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        
+        dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
+
         guard let date = dateFormatter.date(from: period) else {
             print("⚠️ Failed to parse period: \(period)")
             return (nil, nil)
         }
-        
-        let calendar = Calendar.current
-        
+
+        // Use UTC calendar to avoid timezone issues
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
         // Get start of month
         let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: date))
-        
+
         // Get end of month (last second of the last day)
         var endComponents = DateComponents()
         endComponents.month = 1
         endComponents.second = -1
         let endOfMonth = calendar.date(byAdding: endComponents, to: startOfMonth ?? date)
-        
+
         print("   Parsed dates: \(startOfMonth?.description ?? "nil") to \(endOfMonth?.description ?? "nil")")
-        
+
         return (startOfMonth, endOfMonth)
     }
     
