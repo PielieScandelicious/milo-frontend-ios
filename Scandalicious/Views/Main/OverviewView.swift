@@ -946,7 +946,7 @@ struct OverviewView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 4)
 
-            // Pageable content area - simplified without GeometryReader for better performance
+            // Pageable content area
             TabView(selection: $selectedPeriod) {
                 ForEach(availablePeriods, id: \.self) { period in
                     periodContentView(for: period)
@@ -967,8 +967,8 @@ struct OverviewView: View {
 
     private func periodContentView(for period: String) -> some View {
         ScrollView {
-            // Use LazyVStack for better performance with many items
-            LazyVStack(spacing: 12) {
+            // Use regular VStack since we only have 3 items
+            VStack(spacing: 12) {
                 totalSpendingCardForPeriod(period)
                 healthScoreCardForPeriod(period)
                 storeBreakdownsGridForPeriod(period)
@@ -1116,8 +1116,7 @@ struct OverviewView: View {
                     size: 85,
                     showLabel: false
                 )
-                // Pre-rasterize the gauge as a bitmap for smoother swiping
-                .drawingGroup()
+                .drawingGroup() // Pre-rasterize gauge for smoother rendering
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Health Score")
@@ -1392,7 +1391,6 @@ struct DropViewDelegate: DropDelegate {
                 size: 96,
                 currencySymbol: "€"
             )
-            // Pre-rasterize the chart as a bitmap for smoother scrolling/swiping
             .drawingGroup()
 
             Text(breakdown.storeName)
