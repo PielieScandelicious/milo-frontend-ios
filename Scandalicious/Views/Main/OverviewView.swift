@@ -181,18 +181,8 @@ struct OverviewView: View {
         for (period, periodBreakdowns) in groupedByPeriod {
             var sorted = periodBreakdowns
 
-            // Apply sorting
-            switch selectedSort {
-            case .highestSpend:
-                sorted.sort { $0.totalStoreSpend > $1.totalStoreSpend }
-            case .lowestSpend:
-                sorted.sort { $0.totalStoreSpend < $1.totalStoreSpend }
-            case .storeName:
-                sorted.sort { $0.storeName < $1.storeName }
-            }
-
-            // Apply saved custom order if available
-            sorted = applyCustomOrder(to: sorted, for: period)
+            // Always sort by highest spending for clear visual hierarchy
+            sorted.sort { $0.totalStoreSpend > $1.totalStoreSpend }
 
             newCache[period] = sorted
         }
@@ -208,18 +198,8 @@ struct OverviewView: View {
     private func updateCacheForPeriod(_ period: String) {
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == period }
 
-        // Apply sorting
-        switch selectedSort {
-        case .highestSpend:
-            breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
-        case .lowestSpend:
-            breakdowns.sort { $0.totalStoreSpend < $1.totalStoreSpend }
-        case .storeName:
-            breakdowns.sort { $0.storeName < $1.storeName }
-        }
-
-        // Apply saved custom order if available
-        breakdowns = applyCustomOrder(to: breakdowns, for: period)
+        // Always sort by highest spending for clear visual hierarchy
+        breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
 
         cachedBreakdownsByPeriod[period] = breakdowns
 
@@ -951,9 +931,9 @@ struct OverviewView: View {
 
     // Grid columns - defined once to avoid recreating on every render
     private let storeGridColumns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
 
     private var swipeableContentView: some View {
@@ -970,6 +950,7 @@ struct OverviewView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 4)
                 .background(Color(white: 0.05))
+                .zIndex(100) // Ensure period bar stays above scroll content
         }
         .background {
             // Pre-warm adjacent page views to eliminate first-swipe lag
@@ -979,7 +960,8 @@ struct OverviewView: View {
                 AdjacentPagesWarmer(
                     periods: adjacentPeriodsToWarm,
                     getCachedBreakdowns: getCachedBreakdowns,
-                    healthScoreForPeriod: healthScoreForPeriod
+                    healthScoreForPeriod: healthScoreForPeriod,
+                    totalSpendForPeriod: totalSpendForPeriod
                 )
                 .task {
                     // Allow time for views to render and Metal shaders to compile
@@ -992,7 +974,10 @@ struct OverviewView: View {
     }
 
     private func periodContentView(for period: String) -> some View {
-        ScrollView {
+        let breakdowns = getCachedBreakdowns(for: period)
+        let hasMoreThanSixStores = breakdowns.count > 6
+
+        return ScrollView {
             VStack(spacing: 12) {
                 // Sequential fade-in: creates visual hierarchy and guides the eye
                 // Using subtle, fast animations for a premium feel
@@ -1004,15 +989,15 @@ struct OverviewView: View {
 
                 storeBreakdownsGridForPeriod(period)
             }
-            .padding(.top, 4)
-            .padding(.bottom, 32)
+            .padding(.top, 8) // Small gap from period bar
+            .padding(.bottom, hasMoreThanSixStores ? 24 : 8)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.basedOnSize)
+        .scrollBounceBehavior(.always) // Always bounce against period bar
         .scrollDismissesKeyboard(.interactively)
-        .scrollClipDisabled(false)
-        .contentMargins(.vertical, 0, for: .scrollContent)
+        .clipped() // Clip content at scroll view bounds - prevents content going under period bar
+        .contentMargins(.top, 0, for: .scrollContent) // No top margin - bounce against period bar
     }
 
     // Period-specific versions of the cards to ensure proper data display
@@ -1023,21 +1008,10 @@ struct OverviewView: View {
             return cached
         }
 
-        // Fallback: calculate and cache if not yet available
+        // Fallback: calculate if not yet available (always sorted by highest spending)
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == period }
-
-        // Apply sorting
-        switch selectedSort {
-        case .highestSpend:
-            breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
-        case .lowestSpend:
-            breakdowns.sort { $0.totalStoreSpend < $1.totalStoreSpend }
-        case .storeName:
-            breakdowns.sort { $0.storeName < $1.storeName }
-        }
-
-        // Apply saved custom order if available
-        return applyCustomOrder(to: breakdowns, for: period)
+        breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
+        return breakdowns
     }
 
     private func totalSpendForPeriod(_ period: String) -> Double {
@@ -1083,35 +1057,35 @@ struct OverviewView: View {
         return Button {
             showingAllStoresBreakdown = true
         } label: {
-            VStack(spacing: 10) {
+            VStack(spacing: 6) {
                 Text("Total Spending")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
                     .textCase(.uppercase)
                     .tracking(1.2)
 
                 Text(String(format: "€%.0f", spending))
-                    .font(.system(size: 48, weight: .heavy, design: .rounded))
+                    .font(.system(size: 40, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
 
                 // Syncing/Synced indicator inline
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     if dataManager.isLoading || isReceiptUploading {
                         SyncingArrowsView()
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                         Text("Syncing...")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.blue)
                     } else {
                         Image(systemName: "checkmark.icloud.fill")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                         Text("Synced")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                     }
                 }
                 .foregroundColor(dataManager.isLoading || isReceiptUploading ? .blue : .green)
             }
-            .padding(.vertical, 28)
+            .padding(.vertical, 20)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(TotalSpendingCardButtonStyle())
@@ -1134,7 +1108,7 @@ struct OverviewView: View {
                 .padding(12)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 16)
     }
 
     private func healthScoreCardForPeriod(_ period: String) -> some View {
@@ -1144,53 +1118,53 @@ struct OverviewView: View {
         return Button {
             showingHealthScoreTransactions = true
         } label: {
-            HStack(spacing: 20) {
+            HStack(spacing: 16) {
                 LiquidGaugeView(
                     score: averageScore,
-                    size: 85,
+                    size: 70,
                     showLabel: false
                 )
                 .drawingGroup() // Pre-rasterize gauge for smoother rendering
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Health Score")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
                         .textCase(.uppercase)
                         .tracking(1.0)
 
                     if let score = averageScore {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Text(score.formattedHealthScore)
-                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
 
                             Text("/ 5.0")
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         }
 
                         Text(score.healthScoreLabel)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(score.healthScoreColor)
                             .lineLimit(1)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
                             .background(
                                 Capsule()
                                     .fill(score.healthScoreColor.opacity(0.15))
                             )
                     } else {
                         Text("No Data")
-                            .font(.system(size: 24, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(.white.opacity(0.4))
                     }
                 }
 
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
         .buttonStyle(TotalSpendingCardButtonStyle())
         .background(
@@ -1211,7 +1185,7 @@ struct OverviewView: View {
                 .padding(10)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 16)
     }
 
     private func storeBreakdownsGridForPeriod(_ period: String) -> some View {
@@ -1219,24 +1193,25 @@ struct OverviewView: View {
         let breakdowns = getCachedBreakdowns(for: period)
         let isLoadingPeriod = !dataManager.periodMetadata.isEmpty && !dataManager.isPeriodLoaded(period) && breakdowns.isEmpty
         let storeCount = storeCountForPeriod(period)
+        let totalPeriodSpend = totalSpendForPeriod(period)
 
         return VStack(spacing: 0) {
             if isLoadingPeriod && storeCount > 0 {
                 // Show skeleton loading cards with staggered appearance
-                LazyVGrid(columns: storeGridColumns, spacing: 20) {
+                LazyVGrid(columns: storeGridColumns, spacing: 12) {
                     ForEach(0..<storeCount, id: \.self) { index in
                         SkeletonStoreCard(index: index)
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 12)
                 .transition(.opacity)
             } else {
-                LazyVGrid(columns: storeGridColumns, spacing: 20) {
+                LazyVGrid(columns: storeGridColumns, spacing: 12) {
                     ForEach(Array(breakdowns.enumerated()), id: \.element.id) { index, breakdown in
                         ZStack(alignment: .topTrailing) {
                             // The card itself with staggered appearance
                             if isEditMode && period == selectedPeriod {
-                                storeChartCard(breakdown)
+                                storeChartCard(breakdown, totalPeriodSpend: totalPeriodSpend, rank: index, totalStores: breakdowns.count)
                                     .modifier(JiggleModifier(isJiggling: isEditMode && draggingItem?.id != breakdown.id))
                                     .scaleEffect(draggingItem?.id == breakdown.id ? 1.05 : 1.0)
                                     .opacity(draggingItem?.id == breakdown.id ? 0.5 : 1.0)
@@ -1255,7 +1230,7 @@ struct OverviewView: View {
                                         onReorder: saveCustomOrder
                                     ))
                             } else {
-                                storeChartCard(breakdown)
+                                storeChartCard(breakdown, totalPeriodSpend: totalPeriodSpend, rank: index, totalStores: breakdowns.count)
                                     .staggeredAppearance(index: index, totalCount: breakdowns.count)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
@@ -1294,60 +1269,80 @@ struct OverviewView: View {
                         }
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 12)
                 .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.2), value: isLoadingPeriod)
     }
 
+    /// Formats the period into month and year components
+    private var periodComponents: (month: String, year: String) {
+        let parts = selectedPeriod.split(separator: " ")
+        if parts.count == 2 {
+            return (String(parts[0]).uppercased(), String(parts[1]))
+        }
+        return (selectedPeriod.uppercased(), "")
+    }
+
     private var liquidGlassPeriodFilter: some View {
-        HStack(spacing: 12) {
-            // Previous period button (older)
+        HStack(spacing: 0) {
+            // Previous period button
             Button {
                 goToPreviousPeriod()
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(canGoToPreviousPeriod ? .white : .white.opacity(0.3))
-                    .frame(width: 28, height: 28)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(canGoToPreviousPeriod ? 0.1 : 0.05))
-                    )
+                    .foregroundColor(canGoToPreviousPeriod ? .white : .white.opacity(0.25))
+                    .frame(width: 36, height: 36)
             }
             .buttonStyle(PeriodNavButtonStyle())
             .disabled(!canGoToPreviousPeriod)
 
             Spacer()
 
-            // Current period display with smooth text transition
-            Text(selectedPeriod)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
-                .contentTransition(.interpolate)
-                .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
+            // Modern period display with month and year
+            HStack(spacing: 6) {
+                Text(periodComponents.month)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .tracking(1.0)
+                    .contentTransition(.interpolate)
+
+                if !periodComponents.year.isEmpty {
+                    Text(periodComponents.year)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                        .contentTransition(.numericText())
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
 
             Spacer()
 
-            // Next period button (newer)
+            // Next period button
             Button {
                 goToNextPeriod()
             } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(canGoToNextPeriod ? .white : .white.opacity(0.3))
-                    .frame(width: 28, height: 28)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(canGoToNextPeriod ? 0.1 : 0.05))
-                    )
+                    .foregroundColor(canGoToNextPeriod ? .white : .white.opacity(0.25))
+                    .frame(width: 36, height: 36)
             }
             .buttonStyle(PeriodNavButtonStyle())
             .disabled(!canGoToNextPeriod)
         }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
         .padding(.horizontal, 16)
-        .padding(.vertical, 2)
     }
 
     private var currentPeriodIndex: Int {
@@ -1424,24 +1419,37 @@ struct DropViewDelegate: DropDelegate {
     }
 }
     
-    private func storeChartCard(_ breakdown: StoreBreakdown) -> some View {
-        VStack(spacing: 10) {
+    private func storeChartCard(_ breakdown: StoreBreakdown, totalPeriodSpend: Double, rank: Int, totalStores: Int) -> some View {
+        // Calculate this store's percentage of total period spending
+        let otherSpend = max(0, totalPeriodSpend - breakdown.totalStoreSpend)
+
+        // Modern red color for all charts
+        let storeColor = Color(red: 0.95, green: 0.25, blue: 0.30)
+
+        // Create chart data: this store vs. other stores
+        let chartData: [ChartData] = [
+            ChartData(value: breakdown.totalStoreSpend, color: storeColor, label: breakdown.storeName),
+            ChartData(value: otherSpend, color: Color.white.opacity(0.1), label: "Other")
+        ]
+
+        return VStack(spacing: 6) {
             IconDonutChartView(
-                data: breakdown.categories.toIconChartData(),
+                data: chartData,
                 totalAmount: breakdown.totalStoreSpend,
-                size: 96,
+                size: 84,
                 currencySymbol: "€"
             )
             .drawingGroup()
 
-            Text(breakdown.storeName)
-                .font(.system(size: 16, weight: .semibold))
+            Text(breakdown.storeName.uppercased())
+                .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.white)
+                .tracking(0.5)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 20)
@@ -1750,6 +1758,7 @@ struct AdjacentPagesWarmer: View {
     let periods: [String]
     let getCachedBreakdowns: (String) -> [StoreBreakdown]
     let healthScoreForPeriod: (String) -> Double?
+    let totalSpendForPeriod: (String) -> Double
 
     var body: some View {
         // Render chart components at full size but positioned far offscreen
@@ -1758,21 +1767,29 @@ struct AdjacentPagesWarmer: View {
             ForEach(periods, id: \.self) { period in
                 let breakdowns = getCachedBreakdowns(period)
                 let healthScore = healthScoreForPeriod(period)
+                let totalSpend = totalSpendForPeriod(period)
 
                 // Pre-render the LiquidGaugeView (health score card)
                 LiquidGaugeView(
                     score: healthScore,
-                    size: 85,
+                    size: 70,
                     showLabel: false
                 )
                 .drawingGroup()
 
                 // Pre-render IconDonutChartViews for store cards (limit to first 6 for performance)
                 ForEach(breakdowns.prefix(6)) { breakdown in
+                    let storeColor = Color(red: 0.95, green: 0.25, blue: 0.30) // Modern red
+                    let otherSpend = max(0, totalSpend - breakdown.totalStoreSpend)
+                    let chartData: [ChartData] = [
+                        ChartData(value: breakdown.totalStoreSpend, color: storeColor, label: breakdown.storeName),
+                        ChartData(value: otherSpend, color: Color.white.opacity(0.1), label: "Other")
+                    ]
+
                     IconDonutChartView(
-                        data: breakdown.categories.toIconChartData(),
+                        data: chartData,
                         totalAmount: breakdown.totalStoreSpend,
-                        size: 96,
+                        size: 84,
                         currencySymbol: "€"
                     )
                     .drawingGroup()
@@ -1789,9 +1806,13 @@ struct AdjacentPagesWarmer: View {
 struct PeriodNavButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.85 : 1.0)
-            .opacity(configuration.isPressed ? 0.6 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
+            .background(
+                Circle()
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.15 : 0))
+                    .scaleEffect(configuration.isPressed ? 1.0 : 0.8)
+            )
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
