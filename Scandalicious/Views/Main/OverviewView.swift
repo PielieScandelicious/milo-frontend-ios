@@ -554,10 +554,16 @@ struct OverviewView: View {
             // Lazy load store breakdowns for this period if not already loaded
             // Only applies when using new /analytics/periods endpoint (periodMetadata is populated)
             // When using fallback, all data is already loaded via fetchAllHistoricalData()
-            if !dataManager.periodMetadata.isEmpty && !dataManager.isPeriodLoaded(newValue) {
+            if !dataManager.periodMetadata.isEmpty {
                 Task {
-                    await dataManager.fetchPeriodDetails(newValue)
-                    updateDisplayedBreakdowns()
+                    // Load current period if needed
+                    if !dataManager.isPeriodLoaded(newValue) {
+                        await dataManager.fetchPeriodDetails(newValue)
+                        updateDisplayedBreakdowns()
+                    }
+
+                    // Prefetch adjacent periods for smooth swiping (2 in each direction)
+                    await prefetchAdjacentPeriods(around: newValue)
                 }
             }
         }
@@ -617,6 +623,54 @@ struct OverviewView: View {
                 period: selectedPeriod,
                 totalItems: totalVisits
             ))
+        }
+    }
+
+    // MARK: - Period Prefetching
+
+    /// Prefetches adjacent periods for smooth swiping experience
+    /// Loads 2 periods before and 2 periods after the current period
+    private func prefetchAdjacentPeriods(around period: String) async {
+        guard !dataManager.periodMetadata.isEmpty else { return }
+
+        // Find the index of the current period in availablePeriods
+        guard let currentIndex = availablePeriods.firstIndex(of: period) else { return }
+
+        // Collect periods to prefetch (2 before, 2 after)
+        var periodsToPrefetch: [String] = []
+
+        // Add 2 periods before (older - lower indices since oldest is first)
+        for offset in 1...2 {
+            let index = currentIndex - offset
+            if index >= 0 {
+                let periodString = availablePeriods[index]
+                if !dataManager.isPeriodLoaded(periodString) {
+                    periodsToPrefetch.append(periodString)
+                }
+            }
+        }
+
+        // Add 2 periods after (newer - higher indices)
+        for offset in 1...2 {
+            let index = currentIndex + offset
+            if index < availablePeriods.count {
+                let periodString = availablePeriods[index]
+                if !dataManager.isPeriodLoaded(periodString) {
+                    periodsToPrefetch.append(periodString)
+                }
+            }
+        }
+
+        // Prefetch in parallel
+        if !periodsToPrefetch.isEmpty {
+            print("📊 Prefetching \(periodsToPrefetch.count) adjacent periods: \(periodsToPrefetch)")
+            await withTaskGroup(of: Void.self) { group in
+                for periodString in periodsToPrefetch {
+                    group.addTask {
+                        await dataManager.fetchPeriodDetails(periodString)
+                    }
+                }
+            }
         }
     }
 
@@ -991,30 +1045,41 @@ struct OverviewView: View {
             HStack(spacing: 20) {
                 LiquidGaugeView(
                     score: averageScore,
-                    size: 80,
+                    size: 85,
                     showLabel: false
                 )
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("Health Score")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
                         .textCase(.uppercase)
-                        .tracking(1.2)
+                        .tracking(1.0)
 
                     if let score = averageScore {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Text(score.formattedHealthScore)
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
 
                             Text("/ 5.0")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         }
+
+                        Text(score.healthScoreLabel)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(score.healthScoreColor)
+                            .lineLimit(1)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule()
+                                    .fill(score.healthScoreColor.opacity(0.15))
+                            )
                     } else {
                         Text("No Data")
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(size: 24, weight: .semibold))
                             .foregroundColor(.white.opacity(0.4))
                     }
                 }
@@ -1022,7 +1087,7 @@ struct OverviewView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 22)
+            .padding(.vertical, 18)
         }
         .buttonStyle(TotalSpendingCardButtonStyle())
         .background(
@@ -1033,22 +1098,6 @@ struct OverviewView: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
-        .overlay(alignment: .topTrailing) {
-            if let score = averageScore {
-                Text(score.healthScoreLabel)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(score.healthScoreColor)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(
-                        Capsule()
-                            .fill(score.healthScoreColor.opacity(0.15))
-                    )
-                    .padding(12)
-            }
-        }
         .overlay(alignment: .bottomTrailing) {
             if averageScore != nil {
                 InsightButton(insightType: .healthScore(

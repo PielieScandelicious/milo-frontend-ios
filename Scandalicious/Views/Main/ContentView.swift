@@ -67,19 +67,42 @@ struct ContentView: View {
                     // Step 1: Fetch lightweight period metadata (falls back if endpoint unavailable)
                     await dataManager.fetchPeriodMetadata()
 
-                    // Step 2: Load current period's detailed store breakdowns (only if using new endpoint)
-                    // If fallback was used, storeBreakdowns are already loaded
+                    // Step 2: Load current period + 5 previous periods for smooth swiping
+                    // If fallback was used, all data is already loaded via fetchAllHistoricalData()
                     if !dataManager.periodMetadata.isEmpty {
-                        if let currentPeriod = dataManager.periodMetadata.first?.period {
-                            print("📊 Loading details for current period: \(currentPeriod)")
+                        // Get the first 6 periods (current + 5 previous) to preload
+                        let periodsToPreload = Array(dataManager.periodMetadata.prefix(6))
+                        print("📊 Preloading \(periodsToPreload.count) periods for smooth swiping")
+
+                        // Load current period first (blocking)
+                        if let currentPeriod = periodsToPreload.first?.period {
+                            print("📊 Loading current period: \(currentPeriod)")
                             await dataManager.fetchPeriodDetails(currentPeriod)
+                        }
+
+                        // Show UI immediately after current period loads
+                        await MainActor.run {
+                            hasLoadedInitialData = true
+                        }
+
+                        // Then load the next 5 periods in parallel (background)
+                        if periodsToPreload.count > 1 {
+                            let remainingPeriods = Array(periodsToPreload.dropFirst())
+                            print("📊 Background loading \(remainingPeriods.count) previous periods...")
+                            await withTaskGroup(of: Void.self) { group in
+                                for periodMeta in remainingPeriods {
+                                    group.addTask {
+                                        await dataManager.fetchPeriodDetails(periodMeta.period)
+                                    }
+                                }
+                            }
+                            print("✅ All \(periodsToPreload.count) periods preloaded")
                         }
                     } else {
                         print("📊 Using fallback: all historical data already loaded")
-                    }
-
-                    await MainActor.run {
-                        hasLoadedInitialData = true
+                        await MainActor.run {
+                            hasLoadedInitialData = true
+                        }
                     }
                     print("✅ Initial data loaded successfully")
                 }
