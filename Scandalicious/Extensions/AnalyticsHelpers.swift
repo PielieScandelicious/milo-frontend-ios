@@ -82,6 +82,13 @@ struct DateRange {
             let adjustedStart = calendar.date(byAdding: .year, value: offset, to: startOfYear) ?? startOfYear
             let end = calendar.date(byAdding: .year, value: 1, to: adjustedStart)?.addingTimeInterval(-1) ?? adjustedStart
             return DateRange(start: adjustedStart, end: end)
+
+        case .custom:
+            // Custom periods don't have a predefined range, fall back to month behavior
+            let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
+            let adjustedStart = calendar.date(byAdding: .month, value: offset, to: startOfMonth) ?? startOfMonth
+            let end = calendar.date(byAdding: .month, value: 1, to: adjustedStart)?.addingTimeInterval(-1) ?? adjustedStart
+            return DateRange(start: adjustedStart, end: end)
         }
     }
     

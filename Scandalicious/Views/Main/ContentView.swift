@@ -59,14 +59,14 @@ struct ContentView: View {
             if !hasLoadedInitialData {
                 dataManager.configure(with: transactionManager)
 
-                // Fetch data in a persistent task
+                // Fetch all historical data in a persistent task
                 Task {
-                    print("🚀 App launched - fetching initial data")
-                    await dataManager.fetchFromBackend(for: .month)
+                    print("🚀 App launched - fetching all historical data")
+                    await dataManager.fetchAllHistoricalData()
                     await MainActor.run {
                         hasLoadedInitialData = true
                     }
-                    print("✅ Initial data loaded successfully")
+                    print("✅ All historical data loaded successfully")
                 }
             }
         }

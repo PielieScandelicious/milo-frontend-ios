@@ -129,6 +129,9 @@ class StoreDataManager: ObservableObject {
                     filters = .thisMonth
                 case .year:
                     filters = .thisYear
+                case .custom:
+                    // Custom requires explicit dates, fall back to current month
+                    filters = .thisMonth
                 }
             }
             
@@ -224,6 +227,117 @@ class StoreDataManager: ObservableObject {
         print("🔄 refreshData called - period: \(period.rawValue), periodString: \(periodString ?? "nil")")
         await fetchFromBackend(for: period, periodString: periodString)
         print("✅ refreshData completed")
+    }
+
+    // MARK: - Fetch All Historical Data
+
+    /// Fetch all historical data using trends to discover available periods
+    /// This loads all past periods with data, going as far back as possible
+    func fetchAllHistoricalData() async {
+        await MainActor.run {
+            isLoading = true
+            error = nil
+        }
+
+        do {
+            print("📥 Fetching all historical data using trends endpoint...")
+
+            // First, fetch trends to discover all periods with data (max 52 months = ~4 years)
+            let trendsResponse = try await AnalyticsAPIService.shared.getTrends(
+                periodType: .month,
+                numPeriods: 52
+            )
+
+            print("✅ Received \(trendsResponse.trends.count) periods from trends")
+
+            // Filter to periods with actual spending
+            let periodsWithData = trendsResponse.trends.filter { $0.totalSpend > 0 }
+            print("   Periods with data: \(periodsWithData.count)")
+
+            if periodsWithData.isEmpty {
+                // No historical data, just set empty state
+                await MainActor.run {
+                    self.storeBreakdowns = []
+                    self.isLoading = false
+                    self.hasInitiallyFetched = true
+                    self.lastFetchDate = Date()
+                }
+                return
+            }
+
+            // Fetch summary for each period to get store breakdowns
+            var allBreakdowns: [StoreBreakdown] = []
+            var latestHealthScore: Double?
+
+            for trendPeriod in periodsWithData {
+                print("   📊 Fetching summary for \(trendPeriod.period)...")
+
+                // Parse start and end dates from the trend period
+                guard let startDate = DateFormatter.yyyyMMdd.date(from: trendPeriod.periodStart),
+                      let endDate = DateFormatter.yyyyMMdd.date(from: trendPeriod.periodEnd) else {
+                    print("   ⚠️ Could not parse dates for \(trendPeriod.period)")
+                    continue
+                }
+
+                // Create filters for this specific period
+                // Use 'custom' period type with explicit dates to fetch historical data
+                var filters = AnalyticsFilters()
+                filters.period = .custom
+                filters.startDate = startDate
+                filters.endDate = endDate
+
+                do {
+                    let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+
+                    // Convert to StoreBreakdowns
+                    let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: .month)
+                    allBreakdowns.append(contentsOf: breakdowns)
+
+                    // Store the health score from the most recent period (first one with data)
+                    if latestHealthScore == nil {
+                        latestHealthScore = summary.averageHealthScore
+                    }
+
+                    print("   ✅ Added \(breakdowns.count) stores for \(trendPeriod.period)")
+
+                } catch {
+                    print("   ⚠️ Failed to fetch summary for \(trendPeriod.period): \(error.localizedDescription)")
+                }
+            }
+
+            // Sort by period (most recent first)
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+
+            allBreakdowns.sort { breakdown1, breakdown2 in
+                let date1 = dateFormatter.date(from: breakdown1.period) ?? Date.distantPast
+                let date2 = dateFormatter.date(from: breakdown2.period) ?? Date.distantPast
+                return date1 > date2
+            }
+
+            await MainActor.run {
+                self.storeBreakdowns = allBreakdowns
+                self.averageHealthScore = latestHealthScore
+                self.isLoading = false
+                self.hasInitiallyFetched = true
+                self.lastFetchDate = Date()
+                print("✅ Loaded \(allBreakdowns.count) total store breakdowns across \(periodsWithData.count) periods")
+            }
+
+        } catch let apiError as AnalyticsAPIError {
+            print("❌ Failed to fetch historical data: \(apiError.localizedDescription)")
+            await MainActor.run {
+                self.error = apiError.localizedDescription
+                self.isLoading = false
+            }
+        } catch {
+            print("❌ Unexpected error fetching historical data: \(error.localizedDescription)")
+            await MainActor.run {
+                self.error = error.localizedDescription
+                self.isLoading = false
+            }
+        }
     }
     
     // MARK: - Convert API Response to StoreBreakdown
@@ -490,6 +604,13 @@ class StoreDataManager: ObservableObject {
             let startOfYear = calendar.date(from: components)!
             let endOfYear = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: startOfYear)!
             return (outputFormatter.string(from: startOfYear), outputFormatter.string(from: endOfYear))
+
+        case .custom:
+            // Custom periods use the same format as month (parsed from "MMMM yyyy")
+            let components = calendar.dateComponents([.year, .month], from: parsedDate)
+            let startOfMonth = calendar.date(from: components)!
+            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+            return (outputFormatter.string(from: startOfMonth), outputFormatter.string(from: endOfMonth))
         }
     }
 

@@ -13,7 +13,8 @@ enum PeriodType: String, Codable, CaseIterable {
     case week
     case month
     case year
-    
+    case custom
+
     var displayName: String {
         rawValue.capitalized
     }

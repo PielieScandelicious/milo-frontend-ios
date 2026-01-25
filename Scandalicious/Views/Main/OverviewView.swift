@@ -101,7 +101,7 @@ struct OverviewView: View {
 
     private var availablePeriods: [String] {
         // Only show periods that have actual data
-        let periods = dataManager.breakdownsByPeriod().keys.sorted()
+        let periods = Array(dataManager.breakdownsByPeriod().keys)
 
         // If no periods with data, show only the current month (empty state)
         if periods.isEmpty {
@@ -111,7 +111,16 @@ struct OverviewView: View {
             return [dateFormatter.string(from: Date())]
         }
 
-        return periods
+        // Sort periods chronologically (oldest first, most recent last/right)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+
+        return periods.sorted { period1, period2 in
+            let date1 = dateFormatter.date(from: period1) ?? Date.distantPast
+            let date2 = dateFormatter.date(from: period2) ?? Date.distantPast
+            return date1 < date2  // Oldest first (left), most recent last (right)
+        }
     }
     
     private var currentBreakdowns: [StoreBreakdown] {
@@ -824,25 +833,48 @@ struct OverviewView: View {
     }
     
     private var liquidGlassPeriodFilter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(availablePeriods, id: \.self) { period in
-                    periodButton(for: period)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(availablePeriods, id: \.self) { period in
+                        periodButton(for: period, proxy: proxy)
+                            .id(period)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .onAppear {
+                // Scroll to selected period on appear (centered)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo(selectedPeriod, anchor: .center)
+                    }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .onChange(of: availablePeriods) { _, _ in
+                // When periods load, scroll to selected period
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo(selectedPeriod, anchor: .center)
+                    }
+                }
+            }
         }
     }
-    
-    private func periodButton(for period: String) -> some View {
+
+    private func periodButton(for period: String, proxy: ScrollViewProxy) -> some View {
         Button {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                 selectedPeriod = period
-                // Haptic feedback
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
             }
+            // Scroll to center the selected period
+            withAnimation(.easeOut(duration: 0.3)) {
+                proxy.scrollTo(period, anchor: .center)
+            }
+            // Haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
         } label: {
             Text(period)
                 .font(.system(size: 15, weight: .semibold))
