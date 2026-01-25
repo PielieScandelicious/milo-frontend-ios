@@ -156,7 +156,8 @@ struct AllStoresBreakdownView: View {
         defer { isLoadingTrends = false }
 
         do {
-            let response = try await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 6)
+            // Fetch enough periods to cover historical data (52 months = ~4 years)
+            let response = try await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 52)
             await MainActor.run {
                 self.trends = response.periods
             }

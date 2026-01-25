@@ -280,9 +280,9 @@ class StoreDataManager: ObservableObject {
                 }
 
                 // Create filters for this specific period
-                // Use 'custom' period type with explicit dates to fetch historical data
+                // Use 'month' period type with explicit dates to fetch historical data
                 var filters = AnalyticsFilters()
-                filters.period = .custom
+                filters.period = .month
                 filters.startDate = startDate
                 filters.endDate = endDate
 
@@ -574,6 +574,7 @@ class StoreDataManager: ObservableObject {
 
         let outputFormatter = DateFormatter()
         outputFormatter.dateFormat = "yyyy-MM-dd"
+        outputFormatter.timeZone = TimeZone(identifier: "UTC")
 
         guard let parsedDate = dateFormatter.date(from: period) else {
             // Fallback to current month if parsing fails
@@ -628,6 +629,7 @@ extension DateFormatter {
     static var yyyyMMdd: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
         return formatter
     }
 }

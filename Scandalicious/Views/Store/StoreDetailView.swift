@@ -182,8 +182,8 @@ struct StoreDetailView: View {
         defer { isLoadingTrends = false }
 
         do {
-            // Use the store-specific trends endpoint
-            let response = try await AnalyticsAPIService.shared.getStoreTrends(storeName: storeBreakdown.storeName, periodType: .month, numPeriods: 6)
+            // Use the store-specific trends endpoint (52 months = ~4 years of history)
+            let response = try await AnalyticsAPIService.shared.getStoreTrends(storeName: storeBreakdown.storeName, periodType: .month, numPeriods: 52)
             await MainActor.run {
                 self.trends = response.periods
             }

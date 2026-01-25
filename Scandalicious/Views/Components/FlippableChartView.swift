@@ -28,33 +28,57 @@ struct SpendingTrendLineChart: View {
     }
 
     private var visibleTrends: [TrendPeriod] {
-        // If a period is selected, filter to show only periods up to and including it
-        let filteredTrends: [TrendPeriod]
-        if let selectedPeriod = selectedPeriod {
-            filteredTrends = sortedTrends.filter { trend in
-                comparePeriods(trend.period, selectedPeriod) <= 0
-            }
-        } else {
-            filteredTrends = sortedTrends
+        // Always generate exactly 5 periods ending at the selected period
+        // Fill with zero if no data exists for a period
+        guard let selectedPeriod = selectedPeriod else {
+            return Array(sortedTrends.suffix(5))
         }
-        return Array(filteredTrends.suffix(5))
-    }
 
-    /// Compare two period strings (e.g., "January 2026" vs "December 2025")
-    /// Returns: negative if period1 < period2, 0 if equal, positive if period1 > period2
-    private func comparePeriods(_ period1: String, _ period2: String) -> Int {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
         formatter.locale = Locale(identifier: "en_US")
 
-        guard let date1 = formatter.date(from: period1),
-              let date2 = formatter.date(from: period2) else {
-            return 0
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        guard let selectedDate = formatter.date(from: selectedPeriod) else {
+            return Array(sortedTrends.suffix(5))
         }
 
-        if date1 < date2 { return -1 }
-        if date1 > date2 { return 1 }
-        return 0
+        // Generate 5 periods ending at selected period
+        var generatedPeriods: [TrendPeriod] = []
+        let calendar = Calendar.current
+
+        for i in (0..<5).reversed() {
+            guard let periodDate = calendar.date(byAdding: .month, value: -i, to: selectedDate) else { continue }
+
+            let periodString = formatter.string(from: periodDate)
+
+            // Get start and end dates for this period
+            let components = calendar.dateComponents([.year, .month], from: periodDate)
+            let startOfMonth = calendar.date(from: components) ?? periodDate
+            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) ?? periodDate
+
+            let periodStart = dateFormatter.string(from: startOfMonth)
+            let periodEnd = dateFormatter.string(from: endOfMonth)
+
+            // Find matching trend data or create empty one
+            if let existingTrend = sortedTrends.first(where: { $0.period == periodString }) {
+                generatedPeriods.append(existingTrend)
+            } else {
+                // Create a trend with zero spend for this period
+                let emptyTrend = TrendPeriod(
+                    period: periodString,
+                    periodStart: periodStart,
+                    periodEnd: periodEnd,
+                    totalSpend: 0,
+                    transactionCount: 0
+                )
+                generatedPeriods.append(emptyTrend)
+            }
+        }
+
+        return generatedPeriods
     }
 
     private var maxSpend: Double {
@@ -273,32 +297,57 @@ struct StoreTrendLineChart: View {
     }
 
     private var visibleTrends: [TrendPeriod] {
-        // If a period is selected, filter to show only periods up to and including it
-        let filteredTrends: [TrendPeriod]
-        if let selectedPeriod = selectedPeriod {
-            filteredTrends = sortedTrends.filter { trend in
-                comparePeriods(trend.period, selectedPeriod) <= 0
-            }
-        } else {
-            filteredTrends = sortedTrends
+        // Always generate exactly 5 periods ending at the selected period
+        // Fill with zero if no data exists for a period
+        guard let selectedPeriod = selectedPeriod else {
+            return Array(sortedTrends.suffix(5))
         }
-        return Array(filteredTrends.suffix(5))
-    }
 
-    /// Compare two period strings (e.g., "January 2026" vs "December 2025")
-    private func comparePeriods(_ period1: String, _ period2: String) -> Int {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
         formatter.locale = Locale(identifier: "en_US")
 
-        guard let date1 = formatter.date(from: period1),
-              let date2 = formatter.date(from: period2) else {
-            return 0
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        guard let selectedDate = formatter.date(from: selectedPeriod) else {
+            return Array(sortedTrends.suffix(5))
         }
 
-        if date1 < date2 { return -1 }
-        if date1 > date2 { return 1 }
-        return 0
+        // Generate 5 periods ending at selected period
+        var generatedPeriods: [TrendPeriod] = []
+        let calendar = Calendar.current
+
+        for i in (0..<5).reversed() {
+            guard let periodDate = calendar.date(byAdding: .month, value: -i, to: selectedDate) else { continue }
+
+            let periodString = formatter.string(from: periodDate)
+
+            // Get start and end dates for this period
+            let components = calendar.dateComponents([.year, .month], from: periodDate)
+            let startOfMonth = calendar.date(from: components) ?? periodDate
+            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) ?? periodDate
+
+            let periodStart = dateFormatter.string(from: startOfMonth)
+            let periodEnd = dateFormatter.string(from: endOfMonth)
+
+            // Find matching trend data or create empty one
+            if let existingTrend = sortedTrends.first(where: { $0.period == periodString }) {
+                generatedPeriods.append(existingTrend)
+            } else {
+                // Create a trend with zero spend for this period
+                let emptyTrend = TrendPeriod(
+                    period: periodString,
+                    periodStart: periodStart,
+                    periodEnd: periodEnd,
+                    totalSpend: 0,
+                    transactionCount: 0
+                )
+                generatedPeriods.append(emptyTrend)
+            }
+        }
+
+        return generatedPeriods
     }
 
     private var maxSpend: Double {
