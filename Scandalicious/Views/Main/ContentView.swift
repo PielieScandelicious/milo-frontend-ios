@@ -67,28 +67,38 @@ struct ContentView: View {
                     // Step 1: Fetch lightweight period metadata (falls back if endpoint unavailable)
                     await dataManager.fetchPeriodMetadata()
 
-                    // Step 2: Load current period + 5 previous periods for smooth swiping
+                    // Step 2: Load current period + adjacent periods BEFORE showing UI
+                    // This ensures smooth swiping without lag on first launch
                     // If fallback was used, all data is already loaded via fetchAllHistoricalData()
                     if !dataManager.periodMetadata.isEmpty {
-                        // Get the first 6 periods (current + 5 previous) to preload
-                        let periodsToPreload = Array(dataManager.periodMetadata.prefix(6))
+                        // Get periods to preload - we need current + 2 before + 2 after for smooth swiping
+                        // Since periodMetadata is sorted most recent first, we preload first 5 periods
+                        let periodsToPreload = Array(dataManager.periodMetadata.prefix(8))
                         print("📊 Preloading \(periodsToPreload.count) periods for smooth swiping")
 
-                        // Load current period first (blocking)
-                        if let currentPeriod = periodsToPreload.first?.period {
-                            print("📊 Loading current period: \(currentPeriod)")
-                            await dataManager.fetchPeriodDetails(currentPeriod)
-                        }
+                        // Load current period + immediate neighbors first (blocking)
+                        // These are critical for smooth UX - load in parallel but wait for all
+                        let criticalPeriods = Array(periodsToPreload.prefix(5))
+                        print("📊 Loading \(criticalPeriods.count) critical periods before showing UI...")
 
-                        // Show UI immediately after current period loads
+                        await withTaskGroup(of: Void.self) { group in
+                            for periodMeta in criticalPeriods {
+                                group.addTask {
+                                    await dataManager.fetchPeriodDetails(periodMeta.period)
+                                }
+                            }
+                        }
+                        print("✅ Critical periods loaded - showing UI")
+
+                        // Show UI after critical periods are loaded
                         await MainActor.run {
                             hasLoadedInitialData = true
                         }
 
-                        // Then load the next 5 periods in parallel (background)
-                        if periodsToPreload.count > 1 {
-                            let remainingPeriods = Array(periodsToPreload.dropFirst())
-                            print("📊 Background loading \(remainingPeriods.count) previous periods...")
+                        // Then load remaining periods in background
+                        if periodsToPreload.count > criticalPeriods.count {
+                            let remainingPeriods = Array(periodsToPreload.dropFirst(criticalPeriods.count))
+                            print("📊 Background loading \(remainingPeriods.count) additional periods...")
                             await withTaskGroup(of: Void.self) { group in
                                 for periodMeta in remainingPeriods {
                                     group.addTask {

@@ -70,8 +70,10 @@ struct OverviewView: View {
     @State private var showingDeleteConfirmation = false
     @State private var lastRefreshTime: Date?
     @State private var timerTick = false
+    @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
+    @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
     @Binding var showSignOutConfirmation: Bool
-    
+
     // User defaults key for storing order
     private let orderStorageKey = "StoreBreakdownsOrder"
 
@@ -131,18 +133,64 @@ struct OverviewView: View {
     }
     
     private var currentBreakdowns: [StoreBreakdown] {
-        // Always use displayedBreakdowns to maintain consistent ordering
-        // This prevents items from jumping when entering/exiting edit mode
-        if displayedBreakdowns.isEmpty {
-            updateDisplayedBreakdownsSync()
+        // Use displayedBreakdowns only if it belongs to the current selected period
+        // This prevents showing stale data from a previous period
+        if !displayedBreakdowns.isEmpty && displayedBreakdownsPeriod == selectedPeriod {
+            return displayedBreakdowns
         }
-        return displayedBreakdowns
+        return cachedBreakdownsByPeriod[selectedPeriod] ?? []
     }
-    
-    // Synchronous version for use in computed properties
-    private func updateDisplayedBreakdownsSync() {
-        var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
-        
+
+    /// Get cached breakdowns for a specific period
+    /// This avoids recalculating on every render and ensures correct data per period
+    private func getCachedBreakdowns(for period: String) -> [StoreBreakdown] {
+        // For the selected period in edit mode, use displayedBreakdowns to support drag reordering
+        // But ONLY if displayedBreakdowns actually belongs to this period
+        if isEditMode && period == selectedPeriod && period == displayedBreakdownsPeriod && !displayedBreakdowns.isEmpty {
+            return displayedBreakdowns
+        }
+        // Always return cached data for the specific period requested
+        return cachedBreakdownsByPeriod[period] ?? []
+    }
+
+    /// Build the cache for all available periods
+    /// Called once when data loads or sort changes
+    private func rebuildBreakdownCache() {
+        var newCache: [String: [StoreBreakdown]] = [:]
+
+        // Group breakdowns by period
+        let groupedByPeriod = Dictionary(grouping: dataManager.storeBreakdowns) { $0.period }
+
+        for (period, periodBreakdowns) in groupedByPeriod {
+            var sorted = periodBreakdowns
+
+            // Apply sorting
+            switch selectedSort {
+            case .highestSpend:
+                sorted.sort { $0.totalStoreSpend > $1.totalStoreSpend }
+            case .lowestSpend:
+                sorted.sort { $0.totalStoreSpend < $1.totalStoreSpend }
+            case .storeName:
+                sorted.sort { $0.storeName < $1.storeName }
+            }
+
+            // Apply saved custom order if available
+            sorted = applyCustomOrder(to: sorted, for: period)
+
+            newCache[period] = sorted
+        }
+
+        cachedBreakdownsByPeriod = newCache
+
+        // Also update displayedBreakdowns for the current period
+        displayedBreakdowns = newCache[selectedPeriod] ?? []
+        displayedBreakdownsPeriod = selectedPeriod
+    }
+
+    /// Update cache for a specific period only
+    private func updateCacheForPeriod(_ period: String) {
+        var breakdowns = dataManager.storeBreakdowns.filter { $0.period == period }
+
         // Apply sorting
         switch selectedSort {
         case .highestSpend:
@@ -152,41 +200,22 @@ struct OverviewView: View {
         case .storeName:
             breakdowns.sort { $0.storeName < $1.storeName }
         }
-        
+
         // Apply saved custom order if available
-        breakdowns = applyCustomOrder(to: breakdowns, for: selectedPeriod)
-        
-        displayedBreakdowns = breakdowns
+        breakdowns = applyCustomOrder(to: breakdowns, for: period)
+
+        cachedBreakdownsByPeriod[period] = breakdowns
+
+        // Update displayedBreakdowns if this is the selected period
+        if period == selectedPeriod {
+            displayedBreakdowns = breakdowns
+            displayedBreakdownsPeriod = period
+        }
     }
-    
-    // Update displayed breakdowns when filters change
+
+    // Update displayed breakdowns when filters change (legacy, now uses cache)
     private func updateDisplayedBreakdowns() {
-        print("🔄 updateDisplayedBreakdowns called")
-        print("   selectedPeriod: '\(selectedPeriod)'")
-        print("   Total breakdowns in dataManager: \(dataManager.storeBreakdowns.count)")
-
-        // Debug: Print all periods in the data
-        let allPeriods = Set(dataManager.storeBreakdowns.map { $0.period })
-        print("   Available periods: \(allPeriods)")
-
-        var breakdowns = dataManager.storeBreakdowns.filter { $0.period == selectedPeriod }
-        print("   Filtered breakdowns for '\(selectedPeriod)': \(breakdowns.count)")
-
-        // Apply sorting
-        switch selectedSort {
-        case .highestSpend:
-            breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
-        case .lowestSpend:
-            breakdowns.sort { $0.totalStoreSpend < $1.totalStoreSpend }
-        case .storeName:
-            breakdowns.sort { $0.storeName < $1.storeName }
-        }
-
-        // Apply saved custom order if available
-        breakdowns = applyCustomOrder(to: breakdowns, for: selectedPeriod)
-
-        displayedBreakdowns = breakdowns
-        print("   Final displayedBreakdowns count: \(displayedBreakdowns.count)")
+        updateCacheForPeriod(selectedPeriod)
     }
     
     // MARK: - Custom Order Persistence
@@ -434,7 +463,8 @@ struct OverviewView: View {
             if dataManager.transactionManager == nil {
                 dataManager.configure(with: transactionManager)
             }
-            updateDisplayedBreakdowns()
+            // Build the cache for all periods on first appear
+            rebuildBreakdownCache()
 
             // Initialize lastCheckedUploadTimestamp from persistent storage on first appear
             // This prevents re-detecting old uploads as "new" on app launch
@@ -481,8 +511,20 @@ struct OverviewView: View {
             Task {
                 // Wait a moment for backend to fully process
                 try? await Task.sleep(for: .seconds(1))
-                await dataManager.refreshData(for: .month, periodString: selectedPeriod)
-                print("✅ Backend data refreshed after receipt upload for period: \(selectedPeriod)")
+
+                // Always refresh the CURRENT month since new receipts go into the current period
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "MMMM yyyy"
+                dateFormatter.locale = Locale(identifier: "en_US")
+                let currentMonthPeriod = dateFormatter.string(from: Date())
+
+                await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
+
+                // If viewing the current month, update displayed breakdowns
+                if selectedPeriod == currentMonthPeriod {
+                    updateDisplayedBreakdowns()
+                }
+                print("✅ Backend data refreshed after receipt upload for period: \(currentMonthPeriod)")
 
                 // Also refresh rate limit status
                 await rateLimitManager.syncFromBackend()
@@ -494,6 +536,7 @@ struct OverviewView: View {
                 // Wait a moment for backend to process deletion
                 try? await Task.sleep(for: .seconds(0.5))
                 await dataManager.refreshData(for: .month, periodString: selectedPeriod)
+                updateDisplayedBreakdowns()
                 print("✅ Backend data refreshed after receipt deletion for period: \(selectedPeriod)")
 
                 // Rate limit sync is already handled in ReceiptDetailsView, no need to sync again here
@@ -547,19 +590,22 @@ struct OverviewView: View {
             if isEditMode {
                 isEditMode = false
             }
-            updateDisplayedBreakdowns()
-            // Prefetch insights for the new period
-            prefetchInsights()
 
-            // Lazy load store breakdowns for this period if not already loaded
-            // Only applies when using new /analytics/periods endpoint (periodMetadata is populated)
-            // When using fallback, all data is already loaded via fetchAllHistoricalData()
-            if !dataManager.periodMetadata.isEmpty {
-                Task {
-                    // Load current period if needed
+            // Defer non-critical work to after swipe animation completes
+            // This prevents jank during the page transition
+            Task { @MainActor in
+                // Small delay to let the swipe animation complete
+                try? await Task.sleep(for: .milliseconds(50))
+
+                updateDisplayedBreakdowns()
+                prefetchInsights()
+
+                // Lazy load store breakdowns for this period if not already loaded
+                if !dataManager.periodMetadata.isEmpty {
                     if !dataManager.isPeriodLoaded(newValue) {
                         await dataManager.fetchPeriodDetails(newValue)
-                        updateDisplayedBreakdowns()
+                        // Update cache for the newly loaded period
+                        updateCacheForPeriod(newValue)
                     }
 
                     // Prefetch adjacent periods for smooth swiping (2 in each direction)
@@ -572,11 +618,13 @@ struct OverviewView: View {
             if isEditMode {
                 isEditMode = false
             }
-            updateDisplayedBreakdowns()
+            // Rebuild entire cache since sorting affects all periods
+            rebuildBreakdownCache()
         }
         .onChange(of: dataManager.storeBreakdowns) { oldValue, newValue in
             if !isEditMode {
-                updateDisplayedBreakdowns()
+                // Rebuild cache when underlying data changes
+                rebuildBreakdownCache()
             }
             // Prefetch insights when data changes
             prefetchInsights()
@@ -663,12 +711,17 @@ struct OverviewView: View {
 
         // Prefetch in parallel
         if !periodsToPrefetch.isEmpty {
-            print("📊 Prefetching \(periodsToPrefetch.count) adjacent periods: \(periodsToPrefetch)")
             await withTaskGroup(of: Void.self) { group in
                 for periodString in periodsToPrefetch {
                     group.addTask {
                         await dataManager.fetchPeriodDetails(periodString)
                     }
+                }
+            }
+            // Update cache for prefetched periods on main thread
+            await MainActor.run {
+                for periodString in periodsToPrefetch {
+                    updateCacheForPeriod(periodString)
                 }
             }
         }
@@ -879,6 +932,13 @@ struct OverviewView: View {
         .padding(.horizontal)
     }
 
+    // Grid columns - defined once to avoid recreating on every render
+    private let storeGridColumns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
+
     private var swipeableContentView: some View {
         VStack(spacing: 0) {
             // Fixed header with period navigation
@@ -886,7 +946,7 @@ struct OverviewView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 4)
 
-            // Pageable content area
+            // Pageable content area - simplified without GeometryReader for better performance
             TabView(selection: $selectedPeriod) {
                 ForEach(availablePeriods, id: \.self) { period in
                     periodContentView(for: period)
@@ -907,7 +967,8 @@ struct OverviewView: View {
 
     private func periodContentView(for period: String) -> some View {
         ScrollView {
-            VStack(spacing: 12) {
+            // Use LazyVStack for better performance with many items
+            LazyVStack(spacing: 12) {
                 totalSpendingCardForPeriod(period)
                 healthScoreCardForPeriod(period)
                 storeBreakdownsGridForPeriod(period)
@@ -921,7 +982,14 @@ struct OverviewView: View {
     }
 
     // Period-specific versions of the cards to ensure proper data display
+    // Uses cached breakdowns for performance - avoids recalculating on every render
     private func breakdownsForPeriod(_ period: String) -> [StoreBreakdown] {
+        // Use cached data if available
+        if let cached = cachedBreakdownsByPeriod[period], !cached.isEmpty {
+            return cached
+        }
+
+        // Fallback: calculate and cache if not yet available
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == period }
 
         // Apply sorting
@@ -1048,6 +1116,8 @@ struct OverviewView: View {
                     size: 85,
                     showLabel: false
                 )
+                // Pre-rasterize the gauge as a bitmap for smoother swiping
+                .drawingGroup()
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Health Score")
@@ -1112,29 +1182,22 @@ struct OverviewView: View {
     }
 
     private func storeBreakdownsGridForPeriod(_ period: String) -> some View {
-        let breakdowns = period == selectedPeriod ? currentBreakdowns : breakdownsForPeriod(period)
+        // Use cached breakdowns to avoid recalculating during swipes
+        let breakdowns = getCachedBreakdowns(for: period)
         let isLoadingPeriod = !dataManager.periodMetadata.isEmpty && !dataManager.isPeriodLoaded(period) && breakdowns.isEmpty
         let storeCount = storeCountForPeriod(period)
 
         return VStack(spacing: 0) {
             if isLoadingPeriod && storeCount > 0 {
                 // Show skeleton loading cards
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 16),
-                    GridItem(.flexible(), spacing: 16),
-                    GridItem(.flexible(), spacing: 16)
-                ], spacing: 20) {
+                LazyVGrid(columns: storeGridColumns, spacing: 20) {
                     ForEach(0..<storeCount, id: \.self) { _ in
                         SkeletonStoreCard()
                     }
                 }
                 .padding(.horizontal)
             } else {
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 16),
-                    GridItem(.flexible(), spacing: 16),
-                    GridItem(.flexible(), spacing: 16)
-                ], spacing: 20) {
+                LazyVGrid(columns: storeGridColumns, spacing: 20) {
                     ForEach(breakdowns) { breakdown in
                         ZStack(alignment: .topTrailing) {
                             // The card itself
@@ -1199,7 +1262,7 @@ struct OverviewView: View {
                 .padding(.horizontal)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: isLoadingPeriod)
+        // Removed .animation() modifier - it conflicts with TabView swipe animation and causes jank
     }
 
     private var liquidGlassPeriodFilter: some View {
@@ -1329,6 +1392,8 @@ struct DropViewDelegate: DropDelegate {
                 size: 96,
                 currencySymbol: "€"
             )
+            // Pre-rasterize the chart as a bitmap for smoother scrolling/swiping
+            .drawingGroup()
 
             Text(breakdown.storeName)
                 .font(.system(size: 16, weight: .semibold))
