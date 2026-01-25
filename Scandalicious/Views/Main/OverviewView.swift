@@ -100,7 +100,14 @@ struct OverviewView: View {
     }
 
     private var availablePeriods: [String] {
-        // Only show periods that have actual data
+        // Use period metadata if available (from lightweight /analytics/periods endpoint)
+        if !dataManager.periodMetadata.isEmpty {
+            // Period metadata is already sorted by backend (most recent first)
+            // Reverse to get oldest first (left), most recent last (right) for swipe UX
+            return dataManager.periodMetadata.map { $0.period }.reversed()
+        }
+
+        // Fallback: Use breakdowns if metadata not loaded yet
         let periods = Array(dataManager.breakdownsByPeriod().keys)
 
         // If no periods with data, show only the current month (empty state)
@@ -307,37 +314,7 @@ struct OverviewView: View {
                 .padding()
                 .transition(.opacity)
             } else {
-                // Content
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Liquid Glass Period Filter at the top
-                        liquidGlassPeriodFilter
-                            .padding(.top, 12)
-                            .padding(.bottom, 12)
-
-                        // Content
-                        VStack(spacing: 24) {
-                            // Total spending card
-                            totalSpendingCard
-
-                            // Health score card
-                            healthScoreCard
-
-                            // Store breakdowns grid
-                            storeBreakdownsGrid
-                        }
-                        .padding(.top, 8)
-                        .padding(.bottom, 32)
-                    }
-                    .frame(maxWidth: .infinity)
-                    // NOTE: Removed .contentShape and gesture to debug pull-to-refresh
-                    // .contentShape(Rectangle())
-                    // .simultaneousGesture(TapGesture().onEnded { ... })
-                }
-                .scrollIndicators(.hidden)
-                .scrollBounceBehavior(.always)
-                .scrollDismissesKeyboard(.interactively)
-                .background(Color(white: 0.05))
+                swipeableContentView
             }
             
             // Edit mode exit button overlay
@@ -573,6 +550,16 @@ struct OverviewView: View {
             updateDisplayedBreakdowns()
             // Prefetch insights for the new period
             prefetchInsights()
+
+            // Lazy load store breakdowns for this period if not already loaded
+            // Only applies when using new /analytics/periods endpoint (periodMetadata is populated)
+            // When using fallback, all data is already loaded via fetchAllHistoricalData()
+            if !dataManager.periodMetadata.isEmpty && !dataManager.isPeriodLoaded(newValue) {
+                Task {
+                    await dataManager.fetchPeriodDetails(newValue)
+                    updateDisplayedBreakdowns()
+                }
+            }
         }
         .onChange(of: selectedSort) { oldValue, newValue in
             // Exit edit mode when changing sort to avoid inconsistency
@@ -837,135 +824,136 @@ struct OverviewView: View {
         }
         .padding(.horizontal)
     }
-    
-    private var liquidGlassPeriodFilter: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(availablePeriods, id: \.self) { period in
-                        periodButton(for: period, proxy: proxy)
-                            .id(period)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            }
-            .onAppear {
-                // Scroll to selected period on appear (centered)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo(selectedPeriod, anchor: .center)
-                    }
+
+    private var swipeableContentView: some View {
+        VStack(spacing: 0) {
+            // Fixed header with period navigation
+            liquidGlassPeriodFilter
+                .padding(.top, 4)
+                .padding(.bottom, 4)
+
+            // Pageable content area
+            TabView(selection: $selectedPeriod) {
+                ForEach(availablePeriods, id: \.self) { period in
+                    periodContentView(for: period)
+                        .tag(period)
                 }
             }
-            .onChange(of: availablePeriods) { _, _ in
-                // When periods load, scroll to selected period
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo(selectedPeriod, anchor: .center)
-                    }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .onChange(of: selectedPeriod) { oldValue, newValue in
+                // Haptic feedback when page changes via swipe
+                if oldValue != newValue {
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
                 }
             }
         }
+        .background(Color(white: 0.05))
     }
 
-    private func periodButton(for period: String, proxy: ScrollViewProxy) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                selectedPeriod = period
+    private func periodContentView(for period: String) -> some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                totalSpendingCardForPeriod(period)
+                healthScoreCardForPeriod(period)
+                storeBreakdownsGridForPeriod(period)
             }
-            // Scroll to center the selected period
-            withAnimation(.easeOut(duration: 0.3)) {
-                proxy.scrollTo(period, anchor: .center)
-            }
-            // Haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
-        } label: {
-            Text(period)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(selectedPeriod == period ? Color.black : Color.white.opacity(0.7))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background {
-                    if selectedPeriod == period {
-                        Capsule()
-                            .fill(Color.white)
-                            .shadow(color: .white.opacity(0.3), radius: 8, x: 0, y: 4)
-                    } else {
-                        Capsule()
-                            .fill(Color.white.opacity(0.08))
-                    }
-                }
+            .padding(.top, 4)
+            .padding(.bottom, 32)
         }
-        .buttonStyle(PlainButtonStyle())
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.always)
+        .scrollDismissesKeyboard(.interactively)
     }
-    
-    private var periodSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(availablePeriods, id: \.self) { period in
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedPeriod = period
-                        }
-                    } label: {
-                        Text(period)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(selectedPeriod == period ? .black : .white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(
-                                Capsule()
-                                    .fill(selectedPeriod == period ? Color.white : Color.white.opacity(0.1))
-                            )
-                    }
-                }
-            }
-            .padding(.horizontal)
+
+    // Period-specific versions of the cards to ensure proper data display
+    private func breakdownsForPeriod(_ period: String) -> [StoreBreakdown] {
+        var breakdowns = dataManager.storeBreakdowns.filter { $0.period == period }
+
+        // Apply sorting
+        switch selectedSort {
+        case .highestSpend:
+            breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
+        case .lowestSpend:
+            breakdowns.sort { $0.totalStoreSpend < $1.totalStoreSpend }
+        case .storeName:
+            breakdowns.sort { $0.storeName < $1.storeName }
         }
+
+        // Apply saved custom order if available
+        return applyCustomOrder(to: breakdowns, for: period)
     }
-    
-    private var totalSpendingCard: some View {
-        Button {
+
+    private func totalSpendForPeriod(_ period: String) -> Double {
+        // First check period metadata (from lightweight /analytics/periods)
+        if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
+            return metadata.totalSpend
+        }
+        // Fallback to cached values or calculated sum
+        return dataManager.periodTotalSpends[period] ?? breakdownsForPeriod(period).reduce(0) { $0 + $1.totalStoreSpend }
+    }
+
+    private func totalReceiptsForPeriod(_ period: String) -> Int {
+        // First check period metadata (from lightweight /analytics/periods)
+        if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
+            return metadata.receiptCount
+        }
+        // Fallback to cached values or calculated sum
+        return dataManager.periodReceiptCounts[period] ?? breakdownsForPeriod(period).reduce(0) { $0 + $1.visitCount }
+    }
+
+    private func healthScoreForPeriod(_ period: String) -> Double? {
+        // First check period metadata (from lightweight /analytics/periods)
+        if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
+            return metadata.averageHealthScore
+        }
+        // Fallback to dataManager's health score for selected period
+        return dataManager.averageHealthScore
+    }
+
+    private func storeCountForPeriod(_ period: String) -> Int {
+        // First check period metadata
+        if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
+            return metadata.storeCount
+        }
+        // Fallback to breakdown count
+        return breakdownsForPeriod(period).count
+    }
+
+    private func totalSpendingCardForPeriod(_ period: String) -> some View {
+        let spending = totalSpendForPeriod(period)
+        let breakdowns = breakdownsForPeriod(period)
+
+        return Button {
             showingAllStoresBreakdown = true
         } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 Text("Total Spending")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.white.opacity(0.5))
                     .textCase(.uppercase)
                     .tracking(1.2)
 
-                Text(String(format: "€%.0f", totalPeriodSpending))
-                    .font(.system(size: 44, weight: .heavy, design: .rounded))
+                Text(String(format: "€%.0f", spending))
+                    .font(.system(size: 48, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
 
-                Text(selectedPeriod)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-
-                // Syncing/Synced indicator
-                Group {
+                // Syncing/Synced indicator inline
+                HStack(spacing: 5) {
                     if dataManager.isLoading || isReceiptUploading {
-                        HStack(spacing: 6) {
-                            SyncingArrowsView()
-                            Text("Syncing...")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundColor(.blue)
-                        .padding(.top, 4)
+                        SyncingArrowsView()
+                            .font(.system(size: 12))
+                        Text("Syncing...")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.blue)
                     } else {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.icloud.fill")
-                                .font(.system(size: 10))
-                            Text("Synced")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundColor(.green)
-                        .padding(.top, 4)
+                        Image(systemName: "checkmark.icloud.fill")
+                            .font(.system(size: 12))
+                        Text("Synced")
+                            .font(.system(size: 13, weight: .medium))
                     }
                 }
+                .foregroundColor(dataManager.isLoading || isReceiptUploading ? .blue : .green)
             }
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity)
@@ -980,106 +968,61 @@ struct OverviewView: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
         .overlay(alignment: .bottomLeading) {
-            if totalPeriodSpending > 0 {
+            if spending > 0 {
                 InsightButton(insightType: .totalSpending(
-                    amount: totalPeriodSpending,
-                    period: selectedPeriod,
-                    storeCount: currentBreakdowns.count,
-                    topStore: currentBreakdowns.first?.storeName
+                    amount: spending,
+                    period: period,
+                    storeCount: breakdowns.count,
+                    topStore: breakdowns.first?.storeName
                 ))
                 .padding(12)
             }
         }
         .padding(.horizontal)
     }
-    
-    // Helper function to format time ago
-    private func timeAgo(from date: Date) -> String {
-        let seconds = Int(Date().timeIntervalSince(date))
 
-        if seconds < 60 {
-            return ""
-        } else if seconds < 3600 {
-            let minutes = seconds / 60
-            return "\(minutes)m ago"
-        } else if seconds < 86400 {
-            let hours = seconds / 3600
-            return "\(hours)h ago"
-        } else {
-            let days = seconds / 86400
-            return "\(days)d ago"
-        }
-    }
-
-    // MARK: - Health Score Card
-
-    private var healthScoreCard: some View {
-        // Use the average health score from the data manager (fetched from backend)
-        // Only show score if there are breakdowns for the current period
-        let averageScore: Double? = currentBreakdowns.isEmpty ? nil : dataManager.averageHealthScore
-        let totalVisits = currentBreakdowns.reduce(0) { $0 + $1.visitCount }
+    private func healthScoreCardForPeriod(_ period: String) -> some View {
+        let averageScore: Double? = healthScoreForPeriod(period)
+        let totalVisits = totalReceiptsForPeriod(period)
 
         return Button {
             showingHealthScoreTransactions = true
         } label: {
-            VStack(spacing: 12) {
-                HStack {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(averageScore.healthScoreColor)
+            HStack(spacing: 20) {
+                LiquidGaugeView(
+                    score: averageScore,
+                    size: 80,
+                    showLabel: false
+                )
 
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Health Score")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
                         .textCase(.uppercase)
-                        .tracking(1)
-
-                    Spacer()
+                        .tracking(1.2)
 
                     if let score = averageScore {
-                        Text(score.healthScoreLabel)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(score.healthScoreColor)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(score.healthScoreColor.opacity(0.15))
-                            )
-                    }
-                }
-
-                HStack(alignment: .center, spacing: 16) {
-                    LiquidGaugeView(
-                        score: averageScore,
-                        size: 70,
-                        showLabel: false
-                    )
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        if let score = averageScore {
-                            Text("\(score.formattedHealthScore) / 5.0")
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                        HStack(spacing: 6) {
+                            Text(score.formattedHealthScore)
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
 
-                            Text("Average")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                        } else {
-                            Text("No Data Yet")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.5))
-
-                            Text("Upload receipts to see your health score")
-                                .font(.system(size: 12, weight: .medium))
+                            Text("/ 5.0")
+                                .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         }
+                    } else {
+                        Text("No Data")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.4))
                     }
-
-                    Spacer()
                 }
+
+                Spacer()
             }
-            .padding(16)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 22)
         }
         .buttonStyle(TotalSpendingCardButtonStyle())
         .background(
@@ -1090,96 +1033,199 @@ struct OverviewView: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
+        .overlay(alignment: .topTrailing) {
+            if let score = averageScore {
+                Text(score.healthScoreLabel)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(score.healthScoreColor)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule()
+                            .fill(score.healthScoreColor.opacity(0.15))
+                    )
+                    .padding(12)
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             if averageScore != nil {
                 InsightButton(insightType: .healthScore(
                     score: averageScore,
-                    period: selectedPeriod,
+                    period: period,
                     totalItems: totalVisits
                 ))
-                .padding(12)
+                .padding(10)
             }
         }
         .padding(.horizontal)
     }
 
-    private var storeBreakdownsGrid: some View {
-        VStack(spacing: 0) {
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 16),
-                GridItem(.flexible(), spacing: 16),
-                GridItem(.flexible(), spacing: 16)
-            ], spacing: 20) {
-                ForEach(currentBreakdowns) { breakdown in
-                    ZStack(alignment: .topTrailing) {
-                        // The card itself
-                        if isEditMode {
-                            storeChartCard(breakdown)
-                                .modifier(JiggleModifier(isJiggling: isEditMode && draggingItem?.id != breakdown.id))
-                                .scaleEffect(draggingItem?.id == breakdown.id ? 1.05 : 1.0)
-                                .opacity(draggingItem?.id == breakdown.id ? 0.5 : 1.0) // Show we're dragging
-                                .zIndex(draggingItem?.id == breakdown.id ? 1 : 0)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: draggingItem?.id == breakdown.id)
-                                .onDrag {
-                                    self.draggingItem = breakdown
-                                    // Haptic feedback when starting drag
-                                    let generator = UIImpactFeedbackGenerator(style: .light)
-                                    generator.impactOccurred()
-                                    
-                                    return NSItemProvider(object: breakdown.id as NSString)
-                                }
-                                .onDrop(of: [UTType.text], delegate: DropViewDelegate(
-                                    destinationItem: breakdown,
-                                    items: $displayedBreakdowns,
-                                    draggingItem: $draggingItem,
-                                    onReorder: saveCustomOrder
-                                ))
-                        } else {
-                            // Use gesture with high priority to ensure long press works
-                            storeChartCard(breakdown)
-                                .contentShape(Rectangle()) // Ensure entire card area is tappable
-                                .onTapGesture {
-                                    selectedBreakdown = breakdown
-                                }
-                                .onLongPressGesture(minimumDuration: 0.5) {
-                                    // Enter edit mode on long press
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        isEditMode = true
+    private func storeBreakdownsGridForPeriod(_ period: String) -> some View {
+        let breakdowns = period == selectedPeriod ? currentBreakdowns : breakdownsForPeriod(period)
+        let isLoadingPeriod = !dataManager.periodMetadata.isEmpty && !dataManager.isPeriodLoaded(period) && breakdowns.isEmpty
+        let storeCount = storeCountForPeriod(period)
+
+        return VStack(spacing: 0) {
+            if isLoadingPeriod && storeCount > 0 {
+                // Show skeleton loading cards
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 16),
+                    GridItem(.flexible(), spacing: 16),
+                    GridItem(.flexible(), spacing: 16)
+                ], spacing: 20) {
+                    ForEach(0..<storeCount, id: \.self) { _ in
+                        SkeletonStoreCard()
+                    }
+                }
+                .padding(.horizontal)
+            } else {
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 16),
+                    GridItem(.flexible(), spacing: 16),
+                    GridItem(.flexible(), spacing: 16)
+                ], spacing: 20) {
+                    ForEach(breakdowns) { breakdown in
+                        ZStack(alignment: .topTrailing) {
+                            // The card itself
+                            if isEditMode && period == selectedPeriod {
+                                storeChartCard(breakdown)
+                                    .modifier(JiggleModifier(isJiggling: isEditMode && draggingItem?.id != breakdown.id))
+                                    .scaleEffect(draggingItem?.id == breakdown.id ? 1.05 : 1.0)
+                                    .opacity(draggingItem?.id == breakdown.id ? 0.5 : 1.0)
+                                    .zIndex(draggingItem?.id == breakdown.id ? 1 : 0)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: draggingItem?.id == breakdown.id)
+                                    .onDrag {
+                                        self.draggingItem = breakdown
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
+                                        return NSItemProvider(object: breakdown.id as NSString)
                                     }
-                                    
-                                    // Haptic feedback
-                                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                                    generator.impactOccurred()
-                                }
-                        }
-                        
-                        // Delete button (X) in edit mode
-                        if isEditMode {
-                            Button {
-                                // Show confirmation dialog
-                                breakdownToDelete = breakdown
-                                showingDeleteConfirmation = true
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.red)
-                                    .background(
-                                        Circle()
-                                            .fill(Color.white)
-                                            .frame(width: 18, height: 18)
-                                    )
-                                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                                    .onDrop(of: [UTType.text], delegate: DropViewDelegate(
+                                        destinationItem: breakdown,
+                                        items: $displayedBreakdowns,
+                                        draggingItem: $draggingItem,
+                                        onReorder: saveCustomOrder
+                                    ))
+                            } else {
+                                storeChartCard(breakdown)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        selectedBreakdown = breakdown
+                                    }
+                                    .onLongPressGesture(minimumDuration: 0.5) {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            isEditMode = true
+                                        }
+                                        let generator = UIImpactFeedbackGenerator(style: .medium)
+                                        generator.impactOccurred()
+                                    }
                             }
-                            .buttonStyle(DeleteButtonStyle())
-                            .offset(x: 8, y: -8)
-                            .transition(.scale.combined(with: .opacity))
-                            .zIndex(1)
+
+                            // Delete button (X) in edit mode
+                            if isEditMode && period == selectedPeriod {
+                                Button {
+                                    breakdownToDelete = breakdown
+                                    showingDeleteConfirmation = true
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.red)
+                                        .background(
+                                            Circle()
+                                                .fill(Color.white)
+                                                .frame(width: 18, height: 18)
+                                        )
+                                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                                }
+                                .buttonStyle(DeleteButtonStyle())
+                                .offset(x: 8, y: -8)
+                                .transition(.scale.combined(with: .opacity))
+                                .zIndex(1)
+                            }
                         }
                     }
                 }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
+        .animation(.easeInOut(duration: 0.3), value: isLoadingPeriod)
+    }
+
+    private var liquidGlassPeriodFilter: some View {
+        HStack(spacing: 12) {
+            // Previous period button (older)
+            Button {
+                goToPreviousPeriod()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(canGoToPreviousPeriod ? .white : .white.opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle()
+                            .fill(Color.white.opacity(canGoToPreviousPeriod ? 0.1 : 0.05))
+                    )
+            }
+            .disabled(!canGoToPreviousPeriod)
+
+            Spacer()
+
+            // Current period display
+            Text(selectedPeriod)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            // Next period button (newer)
+            Button {
+                goToNextPeriod()
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(canGoToNextPeriod ? .white : .white.opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle()
+                            .fill(Color.white.opacity(canGoToNextPeriod ? 0.1 : 0.05))
+                    )
+            }
+            .disabled(!canGoToNextPeriod)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 2)
+    }
+
+    private var currentPeriodIndex: Int {
+        availablePeriods.firstIndex(of: selectedPeriod) ?? 0
+    }
+
+    private var canGoToPreviousPeriod: Bool {
+        currentPeriodIndex > 0
+    }
+
+    private var canGoToNextPeriod: Bool {
+        currentPeriodIndex < availablePeriods.count - 1
+    }
+
+    private func goToPreviousPeriod() {
+        guard canGoToPreviousPeriod else { return }
+        withAnimation {
+            selectedPeriod = availablePeriods[currentPeriodIndex - 1]
+        }
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
+
+    private func goToNextPeriod() {
+        guard canGoToNextPeriod else { return }
+        withAnimation {
+            selectedPeriod = availablePeriods[currentPeriodIndex + 1]
+        }
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 
 // MARK: - Drop Delegate for Drag and Drop Reordering
@@ -1227,29 +1273,29 @@ struct DropViewDelegate: DropDelegate {
 }
     
     private func storeChartCard(_ breakdown: StoreBreakdown) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             IconDonutChartView(
                 data: breakdown.categories.toIconChartData(),
                 totalAmount: breakdown.totalStoreSpend,
-                size: 80,
+                size: 96,
                 currencySymbol: "€"
             )
 
             Text(breakdown.storeName)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 8)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color.white.opacity(0.05))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
     }
@@ -1361,6 +1407,77 @@ struct JiggleModifier: ViewModifier {
                     try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
                 }
             }
+    }
+}
+
+// MARK: - Skeleton Store Card (Loading Placeholder)
+struct SkeletonStoreCard: View {
+    @State private var isAnimating = false
+
+    var body: some View {
+        VStack(spacing: 10) {
+            // Skeleton donut chart
+            Circle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 96, height: 96)
+                .overlay(
+                    Circle()
+                        .fill(Color(white: 0.05))
+                        .frame(width: 59, height: 59)
+                )
+                .overlay(
+                    Circle()
+                        .trim(from: 0, to: 0.7)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 15, lineCap: .round)
+                        )
+                        .frame(width: 81, height: 81)
+                        .rotationEffect(.degrees(isAnimating ? 360 : 0))
+                )
+
+            // Skeleton store name
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 65, height: 16)
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .overlay(
+            // Shimmer effect
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0),
+                            Color.white.opacity(0.05),
+                            Color.white.opacity(0)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .offset(x: isAnimating ? 150 : -150)
+        )
+        .clipped()
+        .onAppear {
+            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                isAnimating = true
+            }
+        }
     }
 }
 

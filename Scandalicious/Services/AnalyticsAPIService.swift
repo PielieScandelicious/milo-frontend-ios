@@ -146,6 +146,22 @@ actor AnalyticsAPIService {
         )
     }
 
+    /// Fetch lightweight period metadata for fast initial loading
+    /// - Parameters:
+    ///   - periodType: Period type (week, month, year). Defaults to month.
+    ///   - numPeriods: Number of periods to fetch (1-52, default 52)
+    func fetchPeriods(periodType: PeriodType = .month, numPeriods: Int = 52) async throws -> PeriodsResponse {
+        let queryItems = [
+            URLQueryItem(name: "period_type", value: periodType.rawValue),
+            URLQueryItem(name: "num_periods", value: String(min(max(numPeriods, 1), 52)))
+        ]
+
+        return try await performRequest(
+            endpoint: "/analytics/periods",
+            queryItems: queryItems
+        )
+    }
+
     /// Delete a receipt by ID
     /// - Parameter receiptId: The receipt ID to delete
     func deleteReceipt(receiptId: String) async throws {
@@ -473,6 +489,11 @@ extension AnalyticsAPIService {
     /// Nonisolated wrapper for fetchReceipts
     nonisolated func getReceipts(filters: ReceiptFilters = ReceiptFilters()) async throws -> ReceiptsListResponse {
         return try await fetchReceipts(filters: filters)
+    }
+
+    /// Nonisolated wrapper for fetchPeriods
+    nonisolated func getPeriods(periodType: PeriodType = .month, numPeriods: Int = 52) async throws -> PeriodsResponse {
+        return try await fetchPeriods(periodType: periodType, numPeriods: numPeriods)
     }
 }
 

@@ -605,3 +605,47 @@ struct ReceiptFilters {
         return items
     }
 }
+
+// MARK: - Periods Response (Lightweight period metadata for fast loading)
+
+struct PeriodsResponse: Codable {
+    let periods: [PeriodMetadata]
+    let totalPeriods: Int
+
+    enum CodingKeys: String, CodingKey {
+        case periods
+        case totalPeriods = "total_periods"
+    }
+}
+
+struct PeriodMetadata: Codable, Identifiable {
+    let period: String              // e.g., "January 2026"
+    let periodStart: String         // e.g., "2026-01-01"
+    let periodEnd: String           // e.g., "2026-01-31"
+    let totalSpend: Double
+    let receiptCount: Int
+    let storeCount: Int
+    let transactionCount: Int
+    let averageHealthScore: Double?
+
+    var id: String { period }
+
+    enum CodingKeys: String, CodingKey {
+        case period
+        case periodStart = "period_start"
+        case periodEnd = "period_end"
+        case totalSpend = "total_spend"
+        case receiptCount = "receipt_count"
+        case storeCount = "store_count"
+        case transactionCount = "transaction_count"
+        case averageHealthScore = "average_health_score"
+    }
+
+    var startDate: Date? {
+        DateFormatter.yyyyMMdd.date(from: periodStart)
+    }
+
+    var endDate: Date? {
+        DateFormatter.yyyyMMdd.date(from: periodEnd)
+    }
+}

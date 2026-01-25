@@ -75,6 +75,13 @@ class StoreDataManager: ObservableObject {
     @Published var periodTotalSpends: [String: Double] = [:]  // Total spend per period from backend (sum of item_price)
     @Published var periodReceiptCounts: [String: Int] = [:]  // Total receipt count per period
 
+    // Lightweight period metadata for fast initial loading
+    @Published var periodMetadata: [PeriodMetadata] = []
+    @Published var isLoadingPeriods = false
+
+    // Track which periods have been fully loaded with store breakdowns
+    private var loadedPeriods: Set<String> = []
+
     var transactionManager: TransactionManager?
     private var hasInitiallyFetched = false
     
@@ -260,6 +267,137 @@ class StoreDataManager: ObservableObject {
         print("🔄 refreshData called - period: \(period.rawValue), periodString: \(periodString ?? "nil")")
         await fetchFromBackend(for: period, periodString: periodString)
         print("✅ refreshData completed")
+    }
+
+    // MARK: - Fetch Period Metadata (Lightweight)
+
+    /// Fetch lightweight period metadata from /analytics/periods endpoint
+    /// This is fast (single API call) and returns summary info for all periods
+    /// Falls back to fetchAllHistoricalData() if the endpoint is not available
+    func fetchPeriodMetadata() async {
+        await MainActor.run {
+            isLoadingPeriods = true
+            error = nil
+        }
+
+        do {
+            print("📥 Fetching period metadata from /analytics/periods...")
+
+            let response = try await AnalyticsAPIService.shared.getPeriods(periodType: .month, numPeriods: 52)
+
+            print("✅ Received \(response.periods.count) periods from backend")
+
+            await MainActor.run {
+                self.periodMetadata = response.periods
+
+                // Pre-populate periodTotalSpends and periodReceiptCounts from metadata
+                for period in response.periods {
+                    self.periodTotalSpends[period.period] = period.totalSpend
+                    self.periodReceiptCounts[period.period] = period.receiptCount
+                }
+
+                // Set health score from the most recent period
+                if let latestPeriod = response.periods.first {
+                    self.averageHealthScore = latestPeriod.averageHealthScore
+                }
+
+                self.isLoadingPeriods = false
+                self.hasInitiallyFetched = true
+                self.lastFetchDate = Date()
+
+                print("✅ Period metadata loaded - \(response.totalPeriods) total periods")
+            }
+
+        } catch {
+            // Endpoint not available yet - fall back to loading all historical data
+            print("⚠️ /analytics/periods endpoint not available, falling back to fetchAllHistoricalData()")
+            print("   Error: \(error.localizedDescription)")
+
+            await MainActor.run {
+                self.isLoadingPeriods = false
+            }
+
+            // Fall back to the old method that works with existing endpoints
+            await fetchAllHistoricalData()
+        }
+    }
+
+    /// Check if a period's detailed store breakdowns have been loaded
+    func isPeriodLoaded(_ period: String) -> Bool {
+        loadedPeriods.contains(period)
+    }
+
+    /// Fetch detailed store breakdowns for a specific period (lazy loading)
+    /// - Parameter periodString: The period to load (e.g., "January 2026")
+    func fetchPeriodDetails(_ periodString: String) async {
+        // Skip if already loaded
+        guard !loadedPeriods.contains(periodString) else {
+            print("⏭️ Period '\(periodString)' already loaded, skipping")
+            return
+        }
+
+        await MainActor.run {
+            isRefreshing = true
+        }
+
+        do {
+            print("📥 Fetching store breakdowns for period: \(periodString)")
+
+            // Parse the period string to get date range
+            let (startDateStr, endDateStr) = parsePeriodToDates(periodString, periodType: .month)
+
+            guard let startDate = DateFormatter.yyyyMMdd.date(from: startDateStr),
+                  let endDate = DateFormatter.yyyyMMdd.date(from: endDateStr) else {
+                print("❌ Could not parse dates for \(periodString)")
+                await MainActor.run { isRefreshing = false }
+                return
+            }
+
+            // Create filters for this period
+            var filters = AnalyticsFilters()
+            filters.period = .month
+            filters.startDate = startDate
+            filters.endDate = endDate
+
+            // Fetch summary to get store breakdowns
+            let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+
+            print("✅ Received \(summary.stores.count) stores for \(periodString)")
+
+            // Convert to StoreBreakdowns
+            let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: .month)
+
+            await MainActor.run {
+                // Remove any existing breakdowns for this period (in case of refresh)
+                self.storeBreakdowns.removeAll { $0.period == periodString }
+
+                // Add the new breakdowns
+                self.storeBreakdowns.append(contentsOf: breakdowns)
+
+                // Mark this period as loaded
+                self.loadedPeriods.insert(periodString)
+
+                // Update health score if this is the current period
+                if let metadata = self.periodMetadata.first, metadata.period == periodString {
+                    self.averageHealthScore = summary.averageHealthScore
+                }
+
+                self.isRefreshing = false
+
+                print("✅ Loaded \(breakdowns.count) store breakdowns for '\(periodString)'")
+            }
+
+        } catch {
+            print("❌ Failed to fetch period details for \(periodString): \(error.localizedDescription)")
+            await MainActor.run {
+                isRefreshing = false
+            }
+        }
+    }
+
+    /// Get available periods from metadata (for period picker)
+    var availablePeriods: [String] {
+        periodMetadata.map { $0.period }
     }
 
     // MARK: - Fetch All Historical Data

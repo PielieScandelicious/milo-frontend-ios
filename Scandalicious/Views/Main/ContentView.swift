@@ -59,14 +59,29 @@ struct ContentView: View {
             if !hasLoadedInitialData {
                 dataManager.configure(with: transactionManager)
 
-                // Fetch all historical data in a persistent task
+                // Optimized loading: fetch lightweight period metadata first (1 API call)
+                // Falls back to fetchAllHistoricalData if /analytics/periods is not available
                 Task {
-                    print("🚀 App launched - fetching all historical data")
-                    await dataManager.fetchAllHistoricalData()
+                    print("🚀 App launched - fetching period metadata (optimized)")
+
+                    // Step 1: Fetch lightweight period metadata (falls back if endpoint unavailable)
+                    await dataManager.fetchPeriodMetadata()
+
+                    // Step 2: Load current period's detailed store breakdowns (only if using new endpoint)
+                    // If fallback was used, storeBreakdowns are already loaded
+                    if !dataManager.periodMetadata.isEmpty {
+                        if let currentPeriod = dataManager.periodMetadata.first?.period {
+                            print("📊 Loading details for current period: \(currentPeriod)")
+                            await dataManager.fetchPeriodDetails(currentPeriod)
+                        }
+                    } else {
+                        print("📊 Using fallback: all historical data already loaded")
+                    }
+
                     await MainActor.run {
                         hasLoadedInitialData = true
                     }
-                    print("✅ All historical data loaded successfully")
+                    print("✅ Initial data loaded successfully")
                 }
             }
         }
