@@ -69,9 +69,9 @@ struct OverviewView: View {
     @State private var breakdownToDelete: StoreBreakdown?
     @State private var showingDeleteConfirmation = false
     @State private var lastRefreshTime: Date?
-    @State private var timerTick = false
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
     @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
+    @State private var hasWarmedAdjacentViews = false  // Track if adjacent page views have been pre-rendered
     @Binding var showSignOutConfirmation: Bool
 
     // User defaults key for storing order
@@ -131,7 +131,24 @@ struct OverviewView: View {
             return date1 < date2  // Oldest first (left), most recent last (right)
         }
     }
-    
+
+    /// Adjacent periods that need view pre-warming for smooth swiping
+    /// Returns 1 period before and 1 period after the current selection
+    private var adjacentPeriodsToWarm: [String] {
+        guard let currentIndex = availablePeriods.firstIndex(of: selectedPeriod) else { return [] }
+        var periods: [String] = []
+
+        // Previous period (older - to the left)
+        if currentIndex > 0 {
+            periods.append(availablePeriods[currentIndex - 1])
+        }
+        // Next period (newer - to the right)
+        if currentIndex < availablePeriods.count - 1 {
+            periods.append(availablePeriods[currentIndex + 1])
+        }
+        return periods
+    }
+
     private var currentBreakdowns: [StoreBreakdown] {
         // Use displayedBreakdowns only if it belongs to the current selected period
         // This prevents showing stale data from a previous period
@@ -552,10 +569,6 @@ struct OverviewView: View {
                 print("✅ Backend data refreshed after receipts data change for period: \(selectedPeriod)")
             }
         }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            // Trigger re-render to update time display and green highlight
-            timerTick.toggle()
-        }
         .onChange(of: dataManager.lastFetchDate) { _, newValue in
             // Set green highlight whenever data is fetched (initial load, refresh, etc.)
             if newValue != nil {
@@ -611,6 +624,10 @@ struct OverviewView: View {
                     // Prefetch adjacent periods for smooth swiping (2 in each direction)
                     await prefetchAdjacentPeriods(around: newValue)
                 }
+
+                // Re-warm adjacent views for the new period after animation settles
+                // This ensures smooth swiping regardless of how far user navigated
+                hasWarmedAdjacentViews = false
             }
         }
         .onChange(of: selectedSort) { oldValue, newValue in
@@ -940,25 +957,34 @@ struct OverviewView: View {
     ]
 
     private var swipeableContentView: some View {
-        VStack(spacing: 0) {
+        TabView(selection: $selectedPeriod) {
+            ForEach(availablePeriods, id: \.self) { period in
+                periodContentView(for: period)
+                    .tag(period)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .safeAreaInset(edge: .top, spacing: 0) {
             // Fixed header with period navigation
             liquidGlassPeriodFilter
                 .padding(.top, 4)
                 .padding(.bottom, 4)
-
-            // Pageable content area
-            TabView(selection: $selectedPeriod) {
-                ForEach(availablePeriods, id: \.self) { period in
-                    periodContentView(for: period)
-                        .tag(period)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .onChange(of: selectedPeriod) { oldValue, newValue in
-                // Haptic feedback when page changes via swipe
-                if oldValue != newValue {
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
+                .background(Color(white: 0.05))
+        }
+        .background {
+            // Pre-warm adjacent page views to eliminate first-swipe lag
+            // This forces SwiftUI to create view hierarchy and Metal shader compilation
+            // before the user swipes, ensuring smooth transitions
+            if !hasWarmedAdjacentViews && !adjacentPeriodsToWarm.isEmpty {
+                AdjacentPagesWarmer(
+                    periods: adjacentPeriodsToWarm,
+                    getCachedBreakdowns: getCachedBreakdowns,
+                    healthScoreForPeriod: healthScoreForPeriod
+                )
+                .task {
+                    // Allow time for views to render and Metal shaders to compile
+                    try? await Task.sleep(for: .milliseconds(200))
+                    hasWarmedAdjacentViews = true
                 }
             }
         }
@@ -967,18 +993,26 @@ struct OverviewView: View {
 
     private func periodContentView(for period: String) -> some View {
         ScrollView {
-            // Use regular VStack since we only have 3 items
             VStack(spacing: 12) {
+                // Sequential fade-in: creates visual hierarchy and guides the eye
+                // Using subtle, fast animations for a premium feel
                 totalSpendingCardForPeriod(period)
+                    .premiumFadeIn(delay: 0)
+
                 healthScoreCardForPeriod(period)
+                    .premiumFadeIn(delay: 0.08)
+
                 storeBreakdownsGridForPeriod(period)
             }
             .padding(.top, 4)
             .padding(.bottom, 32)
+            .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.always)
+        .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
+        .scrollClipDisabled(false)
+        .contentMargins(.vertical, 0, for: .scrollContent)
     }
 
     // Period-specific versions of the cards to ensure proper data display
@@ -1188,18 +1222,19 @@ struct OverviewView: View {
 
         return VStack(spacing: 0) {
             if isLoadingPeriod && storeCount > 0 {
-                // Show skeleton loading cards
+                // Show skeleton loading cards with staggered appearance
                 LazyVGrid(columns: storeGridColumns, spacing: 20) {
-                    ForEach(0..<storeCount, id: \.self) { _ in
-                        SkeletonStoreCard()
+                    ForEach(0..<storeCount, id: \.self) { index in
+                        SkeletonStoreCard(index: index)
                     }
                 }
                 .padding(.horizontal)
+                .transition(.opacity)
             } else {
                 LazyVGrid(columns: storeGridColumns, spacing: 20) {
-                    ForEach(breakdowns) { breakdown in
+                    ForEach(Array(breakdowns.enumerated()), id: \.element.id) { index, breakdown in
                         ZStack(alignment: .topTrailing) {
-                            // The card itself
+                            // The card itself with staggered appearance
                             if isEditMode && period == selectedPeriod {
                                 storeChartCard(breakdown)
                                     .modifier(JiggleModifier(isJiggling: isEditMode && draggingItem?.id != breakdown.id))
@@ -1221,6 +1256,7 @@ struct OverviewView: View {
                                     ))
                             } else {
                                 storeChartCard(breakdown)
+                                    .staggeredAppearance(index: index, totalCount: breakdowns.count)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
                                         selectedBreakdown = breakdown
@@ -1259,9 +1295,10 @@ struct OverviewView: View {
                     }
                 }
                 .padding(.horizontal)
+                .transition(.opacity)
             }
         }
-        // Removed .animation() modifier - it conflicts with TabView swipe animation and causes jank
+        .animation(.easeOut(duration: 0.2), value: isLoadingPeriod)
     }
 
     private var liquidGlassPeriodFilter: some View {
@@ -1279,14 +1316,17 @@ struct OverviewView: View {
                             .fill(Color.white.opacity(canGoToPreviousPeriod ? 0.1 : 0.05))
                     )
             }
+            .buttonStyle(PeriodNavButtonStyle())
             .disabled(!canGoToPreviousPeriod)
 
             Spacer()
 
-            // Current period display
+            // Current period display with smooth text transition
             Text(selectedPeriod)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
+                .contentTransition(.interpolate)
+                .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
 
             Spacer()
 
@@ -1303,6 +1343,7 @@ struct OverviewView: View {
                             .fill(Color.white.opacity(canGoToNextPeriod ? 0.1 : 0.05))
                     )
             }
+            .buttonStyle(PeriodNavButtonStyle())
             .disabled(!canGoToNextPeriod)
         }
         .padding(.horizontal, 16)
@@ -1522,9 +1563,110 @@ struct JiggleModifier: ViewModifier {
     }
 }
 
+// MARK: - Premium Fade In Modifier
+/// Refined fade-in animation following premium UX principles:
+/// - Fast but smooth (350ms) - feels responsive, not sluggish
+/// - Subtle transforms - 98% scale, 8pt offset (barely noticeable but adds polish)
+/// - Consistent easing - easeOut for natural deceleration
+struct PremiumFadeInModifier: ViewModifier {
+    let delay: Double
+    @State private var isVisible = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isVisible ? 1 : 0)
+            .scaleEffect(isVisible ? 1 : 0.98)
+            .offset(y: isVisible ? 0 : 8)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.35).delay(delay)) {
+                    isVisible = true
+                }
+            }
+            .onDisappear {
+                isVisible = false
+            }
+    }
+}
+
+// MARK: - Staggered Card Appearance Modifier
+/// Premium staggered animation for store cards:
+/// - Starts after header cards (160ms base delay)
+/// - Quick stagger between cards (60ms) - fast enough to feel cohesive
+/// - Subtle transforms for polish without distraction
+struct StaggeredCardModifier: ViewModifier {
+    let index: Int
+    @State private var isVisible = false
+
+    // Base delay after header cards + per-card stagger
+    private var appearDelay: Double {
+        0.16 + (Double(index) * 0.06)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isVisible ? 1 : 0)
+            .scaleEffect(isVisible ? 1 : 0.97)
+            .offset(y: isVisible ? 0 : 10)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.4).delay(appearDelay)) {
+                    isVisible = true
+                }
+            }
+            .onDisappear {
+                isVisible = false
+            }
+    }
+}
+
+extension View {
+    /// Premium fade-in with subtle scale and offset
+    func premiumFadeIn(delay: Double = 0) -> some View {
+        modifier(PremiumFadeInModifier(delay: delay))
+    }
+
+    /// Staggered appearance for grid items
+    func staggeredAppearance(index: Int, totalCount: Int = 0) -> some View {
+        modifier(StaggeredCardModifier(index: index))
+    }
+}
+
+// MARK: - Animated Number Text
+/// Smoothly animates number changes with a counting effect
+struct AnimatedNumberText: View {
+    let value: Double
+    let format: String
+    let prefix: String
+    let font: Font
+    let color: Color
+
+    @State private var displayValue: Double = 0
+
+    var body: some View {
+        Text("\(prefix)\(String(format: format, displayValue))")
+            .font(font)
+            .foregroundColor(color)
+            .contentTransition(.numericText())
+            .onAppear {
+                displayValue = value
+            }
+            .onChange(of: value) { oldValue, newValue in
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    displayValue = newValue
+                }
+            }
+    }
+}
+
 // MARK: - Skeleton Store Card (Loading Placeholder)
 struct SkeletonStoreCard: View {
+    let index: Int
     @State private var isAnimating = false
+    @State private var shimmerOffset: CGFloat = -150
+
+    // Fast stagger (40ms) for premium feel
+    private var appearDelay: Double {
+        0.16 + (Double(index) * 0.04)
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -1582,14 +1724,74 @@ struct SkeletonStoreCard: View {
                         endPoint: .trailing
                     )
                 )
-                .offset(x: isAnimating ? 150 : -150)
+                .offset(x: shimmerOffset)
         )
         .clipped()
+        .opacity(isAnimating ? 1 : 0)
+        .scaleEffect(isAnimating ? 1 : 0.98)
         .onAppear {
-            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+            // Premium fade-in
+            withAnimation(.easeOut(duration: 0.3).delay(appearDelay)) {
                 isAnimating = true
             }
+            // Continuous shimmer animation
+            withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
+                shimmerOffset = 150
+            }
         }
+    }
+}
+
+// MARK: - Adjacent Pages Warmer
+/// Pre-renders chart components for adjacent periods to eliminate first-swipe lag.
+/// This forces SwiftUI to create the view hierarchy and triggers Metal shader compilation
+/// before the user swipes, ensuring smooth page transitions.
+struct AdjacentPagesWarmer: View {
+    let periods: [String]
+    let getCachedBreakdowns: (String) -> [StoreBreakdown]
+    let healthScoreForPeriod: (String) -> Double?
+
+    var body: some View {
+        // Render chart components at full size but positioned far offscreen
+        // Full size rendering ensures Metal shaders are fully compiled
+        VStack(spacing: 0) {
+            ForEach(periods, id: \.self) { period in
+                let breakdowns = getCachedBreakdowns(period)
+                let healthScore = healthScoreForPeriod(period)
+
+                // Pre-render the LiquidGaugeView (health score card)
+                LiquidGaugeView(
+                    score: healthScore,
+                    size: 85,
+                    showLabel: false
+                )
+                .drawingGroup()
+
+                // Pre-render IconDonutChartViews for store cards (limit to first 6 for performance)
+                ForEach(breakdowns.prefix(6)) { breakdown in
+                    IconDonutChartView(
+                        data: breakdown.categories.toIconChartData(),
+                        totalAmount: breakdown.totalStoreSpend,
+                        size: 96,
+                        currencySymbol: "€"
+                    )
+                    .drawingGroup()
+                }
+            }
+        }
+        .frame(width: UIScreen.main.bounds.width)
+        .offset(x: UIScreen.main.bounds.width * 3) // Position far offscreen to the right
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Period Navigation Button Style
+struct PeriodNavButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.85 : 1.0)
+            .opacity(configuration.isPressed ? 0.6 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
