@@ -1301,19 +1301,29 @@ struct OverviewView: View {
 
             Spacer()
 
-            // Modern period display with month and year
-            HStack(spacing: 6) {
-                Text(periodComponents.month)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .tracking(1.0)
-                    .contentTransition(.interpolate)
+            // Modern period display with month, year, and page dots
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(periodComponents.month)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .tracking(1.0)
+                        .contentTransition(.interpolate)
 
-                if !periodComponents.year.isEmpty {
-                    Text(periodComponents.year)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                        .contentTransition(.numericText())
+                    if !periodComponents.year.isEmpty {
+                        Text(periodComponents.year)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                            .contentTransition(.numericText())
+                    }
+                }
+
+                // Page indicator dots
+                if availablePeriods.count > 1 {
+                    PeriodDotsView(
+                        totalCount: availablePeriods.count,
+                        currentIndex: currentPeriodIndex
+                    )
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
@@ -1799,6 +1809,75 @@ struct AdjacentPagesWarmer: View {
         .frame(width: UIScreen.main.bounds.width)
         .offset(x: UIScreen.main.bounds.width * 3) // Position far offscreen to the right
         .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Period Dots View
+/// Shows page indicator dots for period navigation
+/// Uses a sliding window approach for many periods
+struct PeriodDotsView: View {
+    let totalCount: Int
+    let currentIndex: Int
+
+    private let maxVisibleDots = 5
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if totalCount <= maxVisibleDots {
+                // Show all dots if 5 or fewer periods
+                ForEach(0..<totalCount, id: \.self) { index in
+                    dotView(for: index, isActive: index == currentIndex)
+                }
+            } else {
+                // Sliding window for many periods
+                let (startIndex, endIndex) = visibleRange
+
+                // Leading indicator if not at start
+                if startIndex > 0 {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(width: 3, height: 3)
+                }
+
+                ForEach(startIndex..<endIndex, id: \.self) { index in
+                    dotView(for: index, isActive: index == currentIndex)
+                }
+
+                // Trailing indicator if not at end
+                if endIndex < totalCount {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(width: 3, height: 3)
+                }
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentIndex)
+    }
+
+    private var visibleRange: (start: Int, end: Int) {
+        let halfWindow = maxVisibleDots / 2
+
+        var start = currentIndex - halfWindow
+        var end = currentIndex + halfWindow + 1
+
+        // Adjust if at edges
+        if start < 0 {
+            end -= start
+            start = 0
+        }
+        if end > totalCount {
+            start -= (end - totalCount)
+            end = totalCount
+        }
+        start = max(0, start)
+
+        return (start, end)
+    }
+
+    private func dotView(for index: Int, isActive: Bool) -> some View {
+        Circle()
+            .fill(isActive ? Color.white : Color.white.opacity(0.25))
+            .frame(width: isActive ? 6 : 4, height: isActive ? 6 : 4)
     }
 }
 
