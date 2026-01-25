@@ -15,80 +15,40 @@ struct SpendingTrendLineChart: View {
     let totalAmount: Double
     let accentColor: Color
     var selectedPeriod: String? = nil  // e.g., "January 2026"
+    var isVisible: Bool = true  // Whether chart is currently visible (for scroll triggering)
 
     @State private var animationProgress: CGFloat = 0
-    @State private var selectedIndex: Int? = nil
 
     private let yAxisWidth: CGFloat = 32
     private let gridLineCount = 4
+    private let periodWidth: CGFloat = 50  // Width per period in scrollable area
 
     private var sortedTrends: [TrendPeriod] {
         // Sort by date, oldest first
         trends.sorted { $0.periodStart < $1.periodStart }
     }
 
-    private var visibleTrends: [TrendPeriod] {
-        // Always generate exactly 5 periods ending at the selected period
-        // Fill with zero if no data exists for a period
+    /// All periods from oldest to newest
+    private var allPeriods: [TrendPeriod] {
+        sortedTrends
+    }
+
+    /// Index of the selected period in allPeriods
+    private var selectedPeriodIndex: Int {
         guard let selectedPeriod = selectedPeriod else {
-            return Array(sortedTrends.suffix(5))
+            return allPeriods.count - 1
         }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        formatter.locale = Locale(identifier: "en_US")
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        guard let selectedDate = formatter.date(from: selectedPeriod) else {
-            return Array(sortedTrends.suffix(5))
-        }
-
-        // Generate 5 periods ending at selected period
-        var generatedPeriods: [TrendPeriod] = []
-        let calendar = Calendar.current
-
-        for i in (0..<5).reversed() {
-            guard let periodDate = calendar.date(byAdding: .month, value: -i, to: selectedDate) else { continue }
-
-            let periodString = formatter.string(from: periodDate)
-
-            // Get start and end dates for this period
-            let components = calendar.dateComponents([.year, .month], from: periodDate)
-            let startOfMonth = calendar.date(from: components) ?? periodDate
-            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) ?? periodDate
-
-            let periodStart = dateFormatter.string(from: startOfMonth)
-            let periodEnd = dateFormatter.string(from: endOfMonth)
-
-            // Find matching trend data or create empty one
-            if let existingTrend = sortedTrends.first(where: { $0.period == periodString }) {
-                generatedPeriods.append(existingTrend)
-            } else {
-                // Create a trend with zero spend for this period
-                let emptyTrend = TrendPeriod(
-                    period: periodString,
-                    periodStart: periodStart,
-                    periodEnd: periodEnd,
-                    totalSpend: 0,
-                    transactionCount: 0
-                )
-                generatedPeriods.append(emptyTrend)
-            }
-        }
-
-        return generatedPeriods
+        return allPeriods.firstIndex { $0.period == selectedPeriod } ?? allPeriods.count - 1
     }
 
     private var maxSpend: Double {
-        let max = visibleTrends.map { $0.totalSpend }.max() ?? 1
+        let max = allPeriods.map { $0.totalSpend }.max() ?? 1
         // Round up to a nice number
         return ceil(max / 50) * 50
     }
 
     private var minSpend: Double {
-        let min = visibleTrends.map { $0.totalSpend }.min() ?? 0
+        let min = allPeriods.map { $0.totalSpend }.min() ?? 0
         // Round down to a nice number
         return max(0, floor(min / 50) * 50)
     }
@@ -116,123 +76,43 @@ struct SpendingTrendLineChart: View {
                 }
                 .frame(width: yAxisWidth)
 
-                // Chart area
-                GeometryReader { geometry in
-                    let chartWidth = geometry.size.width
-                    let chartHeight = geometry.size.height
-
-                    ZStack {
-                        // Horizontal grid lines
-                        ForEach(0...gridLineCount, id: \.self) { index in
-                            let y = chartHeight * CGFloat(index) / CGFloat(gridLineCount)
-                            Path { path in
-                                path.move(to: CGPoint(x: 0, y: y))
-                                path.addLine(to: CGPoint(x: chartWidth, y: y))
+                // Scrollable chart area
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 0) {
+                            ForEach(Array(allPeriods.enumerated()), id: \.element.id) { index, trend in
+                                periodColumn(index: index, trend: trend)
+                                    .frame(width: periodWidth)
+                                    .id(index)
                             }
-                            .stroke(Color.white.opacity(0.1), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                         }
-
-                        // Gradient fill under the line
-                        if visibleTrends.count > 1 {
-                            Path { path in
-                                let points = calculatePoints(width: chartWidth, height: chartHeight)
-                                guard !points.isEmpty else { return }
-
-                                path.move(to: CGPoint(x: points[0].x, y: chartHeight))
-                                path.addLine(to: CGPoint(x: points[0].x, y: points[0].y))
-
-                                for i in 1..<points.count {
-                                    let current = points[i]
-                                    let previous = points[i - 1]
-                                    let control1 = CGPoint(
-                                        x: previous.x + (current.x - previous.x) * 0.5,
-                                        y: previous.y
-                                    )
-                                    let control2 = CGPoint(
-                                        x: previous.x + (current.x - previous.x) * 0.5,
-                                        y: current.y
-                                    )
-                                    path.addCurve(to: current, control1: control1, control2: control2)
-                                }
-
-                                path.addLine(to: CGPoint(x: points[points.count - 1].x, y: chartHeight))
-                                path.closeSubpath()
-                            }
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        accentColor.opacity(0.3 * animationProgress),
-                                        accentColor.opacity(0.05 * animationProgress)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.viewAligned)
+                    .scrollBounceBehavior(.basedOnSize)
+                    .defaultScrollAnchor(.trailing)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            proxy.scrollTo(selectedPeriodIndex, anchor: .trailing)
                         }
-
-                        // Line
-                        if visibleTrends.count > 1 {
-                            Path { path in
-                                let points = calculatePoints(width: chartWidth, height: chartHeight)
-                                guard !points.isEmpty else { return }
-
-                                path.move(to: points[0])
-
-                                for i in 1..<points.count {
-                                    let current = points[i]
-                                    let previous = points[i - 1]
-                                    let control1 = CGPoint(
-                                        x: previous.x + (current.x - previous.x) * 0.5,
-                                        y: previous.y
-                                    )
-                                    let control2 = CGPoint(
-                                        x: previous.x + (current.x - previous.x) * 0.5,
-                                        y: current.y
-                                    )
-                                    path.addCurve(to: current, control1: control1, control2: control2)
-                                }
-                            }
-                            .trim(from: 0, to: animationProgress)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [accentColor, accentColor.opacity(0.7)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
-                            )
-                        }
-
-                        // Data points
-                        let points = calculatePoints(width: chartWidth, height: chartHeight)
-                        ForEach(Array(visibleTrends.enumerated()), id: \.element.id) { index, trend in
-                            if index < points.count {
-                                Circle()
-                                    .fill(accentColor)
-                                    .frame(width: 6, height: 6)
-                                    .scaleEffect(animationProgress)
-                                    .position(points[index])
+                    }
+                    .onChange(of: isVisible) { _, visible in
+                        if visible {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                proxy.scrollTo(selectedPeriodIndex, anchor: .trailing)
                             }
                         }
                     }
-                }
-                .frame(height: size * 0.55)
-            }
-
-            // Period labels
-            if visibleTrends.count > 0 {
-                HStack(spacing: 0) {
-                    Spacer().frame(width: yAxisWidth + 4)
-                    ForEach(Array(visibleTrends.enumerated()), id: \.element.id) { index, trend in
-                        Text(formatPeriodLabel(trend.periodStart))
-                            .font(.system(size: size * 0.045, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .frame(maxWidth: .infinity)
+                    .onChange(of: selectedPeriod) { _, _ in
+                        withAnimation {
+                            proxy.scrollTo(selectedPeriodIndex, anchor: .trailing)
+                        }
                     }
                 }
             }
         }
         .frame(width: size * 1.33, height: size * 1.09)
+        .clipped()
         .onAppear {
             withAnimation(.spring(response: 1.0, dampingFraction: 0.8).delay(0.1)) {
                 animationProgress = 1.0
@@ -240,18 +120,53 @@ struct SpendingTrendLineChart: View {
         }
     }
 
-    private func calculatePoints(width: CGFloat, height: CGFloat) -> [CGPoint] {
-        guard !visibleTrends.isEmpty else { return [] }
+    @ViewBuilder
+    private func periodColumn(index: Int, trend: TrendPeriod) -> some View {
+        let chartHeight = size * 0.55
+        let normalizedY = spendRange > 0 ? (trend.totalSpend - minSpend) / spendRange : 0.5
+        let yPosition = chartHeight - (CGFloat(normalizedY) * chartHeight)
 
-        let padding: CGFloat = 8
-        let effectiveWidth = width - padding * 2
-        let stepX = visibleTrends.count > 1 ? effectiveWidth / CGFloat(visibleTrends.count - 1) : effectiveWidth / 2
+        VStack(spacing: 0) {
+            // Chart area for this period
+            ZStack {
+                // Data point
+                Circle()
+                    .fill(index == selectedPeriodIndex ? accentColor : accentColor.opacity(0.7))
+                    .frame(width: index == selectedPeriodIndex ? 8 : 6, height: index == selectedPeriodIndex ? 8 : 6)
+                    .scaleEffect(animationProgress)
+                    .position(x: periodWidth / 2, y: yPosition)
 
-        return visibleTrends.enumerated().map { index, trend in
-            let x = padding + (visibleTrends.count > 1 ? CGFloat(index) * stepX : effectiveWidth / 2)
-            let normalizedY = (trend.totalSpend - minSpend) / spendRange
-            let y = height - (CGFloat(normalizedY) * height)
-            return CGPoint(x: x, y: y)
+                // Line to next point (if not last)
+                if index < allPeriods.count - 1 {
+                    let nextTrend = allPeriods[index + 1]
+                    let nextNormalizedY = spendRange > 0 ? (nextTrend.totalSpend - minSpend) / spendRange : 0.5
+                    let nextYPosition = chartHeight - (CGFloat(nextNormalizedY) * chartHeight)
+
+                    Path { path in
+                        path.move(to: CGPoint(x: periodWidth / 2, y: yPosition))
+                        let control1 = CGPoint(x: periodWidth, y: yPosition)
+                        let control2 = CGPoint(x: periodWidth, y: nextYPosition)
+                        path.addCurve(to: CGPoint(x: periodWidth + periodWidth / 2, y: nextYPosition),
+                                      control1: control1, control2: control2)
+                    }
+                    .trim(from: 0, to: animationProgress)
+                    .stroke(
+                        LinearGradient(
+                            colors: [accentColor, accentColor.opacity(0.7)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+                    )
+                }
+            }
+            .frame(height: chartHeight)
+
+            // Period label
+            Text(formatPeriodLabel(trend.periodStart))
+                .font(.system(size: size * 0.045, weight: index == selectedPeriodIndex ? .bold : .medium))
+                .foregroundColor(index == selectedPeriodIndex ? .white.opacity(0.8) : .white.opacity(0.5))
+                .frame(height: 20)
         }
     }
 
@@ -286,77 +201,38 @@ struct StoreTrendLineChart: View {
     let totalAmount: Double
     let accentColor: Color
     var selectedPeriod: String? = nil  // e.g., "January 2026"
+    var isVisible: Bool = true  // Whether chart is currently visible (for scroll triggering)
 
     @State private var animationProgress: CGFloat = 0
 
     private let yAxisWidth: CGFloat = 32
     private let gridLineCount = 4
+    private let periodWidth: CGFloat = 50  // Width per period in scrollable area
 
     private var sortedTrends: [TrendPeriod] {
         trends.sorted { $0.periodStart < $1.periodStart }
     }
 
-    private var visibleTrends: [TrendPeriod] {
-        // Always generate exactly 5 periods ending at the selected period
-        // Fill with zero if no data exists for a period
+    /// All periods from oldest to newest
+    private var allPeriods: [TrendPeriod] {
+        sortedTrends
+    }
+
+    /// Index of the selected period in allPeriods
+    private var selectedPeriodIndex: Int {
         guard let selectedPeriod = selectedPeriod else {
-            return Array(sortedTrends.suffix(5))
+            return allPeriods.count - 1
         }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        formatter.locale = Locale(identifier: "en_US")
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        guard let selectedDate = formatter.date(from: selectedPeriod) else {
-            return Array(sortedTrends.suffix(5))
-        }
-
-        // Generate 5 periods ending at selected period
-        var generatedPeriods: [TrendPeriod] = []
-        let calendar = Calendar.current
-
-        for i in (0..<5).reversed() {
-            guard let periodDate = calendar.date(byAdding: .month, value: -i, to: selectedDate) else { continue }
-
-            let periodString = formatter.string(from: periodDate)
-
-            // Get start and end dates for this period
-            let components = calendar.dateComponents([.year, .month], from: periodDate)
-            let startOfMonth = calendar.date(from: components) ?? periodDate
-            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) ?? periodDate
-
-            let periodStart = dateFormatter.string(from: startOfMonth)
-            let periodEnd = dateFormatter.string(from: endOfMonth)
-
-            // Find matching trend data or create empty one
-            if let existingTrend = sortedTrends.first(where: { $0.period == periodString }) {
-                generatedPeriods.append(existingTrend)
-            } else {
-                // Create a trend with zero spend for this period
-                let emptyTrend = TrendPeriod(
-                    period: periodString,
-                    periodStart: periodStart,
-                    periodEnd: periodEnd,
-                    totalSpend: 0,
-                    transactionCount: 0
-                )
-                generatedPeriods.append(emptyTrend)
-            }
-        }
-
-        return generatedPeriods
+        return allPeriods.firstIndex { $0.period == selectedPeriod } ?? allPeriods.count - 1
     }
 
     private var maxSpend: Double {
-        let max = visibleTrends.map { $0.totalSpend }.max() ?? 1
+        let max = allPeriods.map { $0.totalSpend }.max() ?? 1
         return ceil(max / 50) * 50
     }
 
     private var minSpend: Double {
-        let min = visibleTrends.map { $0.totalSpend }.min() ?? 0
+        let min = allPeriods.map { $0.totalSpend }.min() ?? 0
         return max(0, floor(min / 50) * 50)
     }
 
@@ -383,123 +259,43 @@ struct StoreTrendLineChart: View {
                 }
                 .frame(width: yAxisWidth)
 
-                // Chart area
-                GeometryReader { geometry in
-                    let chartWidth = geometry.size.width
-                    let chartHeight = geometry.size.height
-
-                    ZStack {
-                        // Horizontal grid lines
-                        ForEach(0...gridLineCount, id: \.self) { index in
-                            let y = chartHeight * CGFloat(index) / CGFloat(gridLineCount)
-                            Path { path in
-                                path.move(to: CGPoint(x: 0, y: y))
-                                path.addLine(to: CGPoint(x: chartWidth, y: y))
+                // Scrollable chart area
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 0) {
+                            ForEach(Array(allPeriods.enumerated()), id: \.element.id) { index, trend in
+                                periodColumn(index: index, trend: trend)
+                                    .frame(width: periodWidth)
+                                    .id(index)
                             }
-                            .stroke(Color.white.opacity(0.1), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                         }
-
-                        // Gradient fill under the line
-                        if visibleTrends.count > 1 {
-                            Path { path in
-                                let points = calculatePoints(width: chartWidth, height: chartHeight)
-                                guard !points.isEmpty else { return }
-
-                                path.move(to: CGPoint(x: points[0].x, y: chartHeight))
-                                path.addLine(to: CGPoint(x: points[0].x, y: points[0].y))
-
-                                for i in 1..<points.count {
-                                    let current = points[i]
-                                    let previous = points[i - 1]
-                                    let control1 = CGPoint(
-                                        x: previous.x + (current.x - previous.x) * 0.5,
-                                        y: previous.y
-                                    )
-                                    let control2 = CGPoint(
-                                        x: previous.x + (current.x - previous.x) * 0.5,
-                                        y: current.y
-                                    )
-                                    path.addCurve(to: current, control1: control1, control2: control2)
-                                }
-
-                                path.addLine(to: CGPoint(x: points[points.count - 1].x, y: chartHeight))
-                                path.closeSubpath()
-                            }
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        accentColor.opacity(0.3 * animationProgress),
-                                        accentColor.opacity(0.05 * animationProgress)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.viewAligned)
+                    .scrollBounceBehavior(.basedOnSize)
+                    .defaultScrollAnchor(.trailing)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            proxy.scrollTo(selectedPeriodIndex, anchor: .trailing)
                         }
-
-                        // Line
-                        if visibleTrends.count > 1 {
-                            Path { path in
-                                let points = calculatePoints(width: chartWidth, height: chartHeight)
-                                guard !points.isEmpty else { return }
-
-                                path.move(to: points[0])
-
-                                for i in 1..<points.count {
-                                    let current = points[i]
-                                    let previous = points[i - 1]
-                                    let control1 = CGPoint(
-                                        x: previous.x + (current.x - previous.x) * 0.5,
-                                        y: previous.y
-                                    )
-                                    let control2 = CGPoint(
-                                        x: previous.x + (current.x - previous.x) * 0.5,
-                                        y: current.y
-                                    )
-                                    path.addCurve(to: current, control1: control1, control2: control2)
-                                }
-                            }
-                            .trim(from: 0, to: animationProgress)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [accentColor, accentColor.opacity(0.7)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
-                            )
-                        }
-
-                        // Data points
-                        let points = calculatePoints(width: chartWidth, height: chartHeight)
-                        ForEach(Array(visibleTrends.enumerated()), id: \.element.id) { index, trend in
-                            if index < points.count {
-                                Circle()
-                                    .fill(accentColor)
-                                    .frame(width: 6, height: 6)
-                                    .scaleEffect(animationProgress)
-                                    .position(points[index])
+                    }
+                    .onChange(of: isVisible) { _, visible in
+                        if visible {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                proxy.scrollTo(selectedPeriodIndex, anchor: .trailing)
                             }
                         }
                     }
-                }
-                .frame(height: size * 0.7)
-            }
-
-            // Period labels
-            if visibleTrends.count > 0 {
-                HStack(spacing: 0) {
-                    Spacer().frame(width: yAxisWidth + 4)
-                    ForEach(Array(visibleTrends.enumerated()), id: \.element.id) { index, trend in
-                        Text(formatPeriodLabel(trend.periodStart))
-                            .font(.system(size: size * 0.045, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .frame(maxWidth: .infinity)
+                    .onChange(of: selectedPeriod) { _, _ in
+                        withAnimation {
+                            proxy.scrollTo(selectedPeriodIndex, anchor: .trailing)
+                        }
                     }
                 }
             }
         }
         .frame(width: size * 1.33, height: size * 1.09)
+        .clipped()
         .onAppear {
             withAnimation(.spring(response: 1.0, dampingFraction: 0.8).delay(0.1)) {
                 animationProgress = 1.0
@@ -507,18 +303,53 @@ struct StoreTrendLineChart: View {
         }
     }
 
-    private func calculatePoints(width: CGFloat, height: CGFloat) -> [CGPoint] {
-        guard !visibleTrends.isEmpty else { return [] }
+    @ViewBuilder
+    private func periodColumn(index: Int, trend: TrendPeriod) -> some View {
+        let chartHeight = size * 0.7
+        let normalizedY = spendRange > 0 ? (trend.totalSpend - minSpend) / spendRange : 0.5
+        let yPosition = chartHeight - (CGFloat(normalizedY) * chartHeight)
 
-        let padding: CGFloat = 8
-        let effectiveWidth = width - padding * 2
-        let stepX = visibleTrends.count > 1 ? effectiveWidth / CGFloat(visibleTrends.count - 1) : effectiveWidth / 2
+        VStack(spacing: 0) {
+            // Chart area for this period
+            ZStack {
+                // Data point
+                Circle()
+                    .fill(index == selectedPeriodIndex ? accentColor : accentColor.opacity(0.7))
+                    .frame(width: index == selectedPeriodIndex ? 8 : 6, height: index == selectedPeriodIndex ? 8 : 6)
+                    .scaleEffect(animationProgress)
+                    .position(x: periodWidth / 2, y: yPosition)
 
-        return visibleTrends.enumerated().map { index, trend in
-            let x = padding + (visibleTrends.count > 1 ? CGFloat(index) * stepX : effectiveWidth / 2)
-            let normalizedY = (trend.totalSpend - minSpend) / spendRange
-            let y = height - (CGFloat(normalizedY) * height)
-            return CGPoint(x: x, y: y)
+                // Line to next point (if not last)
+                if index < allPeriods.count - 1 {
+                    let nextTrend = allPeriods[index + 1]
+                    let nextNormalizedY = spendRange > 0 ? (nextTrend.totalSpend - minSpend) / spendRange : 0.5
+                    let nextYPosition = chartHeight - (CGFloat(nextNormalizedY) * chartHeight)
+
+                    Path { path in
+                        path.move(to: CGPoint(x: periodWidth / 2, y: yPosition))
+                        let control1 = CGPoint(x: periodWidth, y: yPosition)
+                        let control2 = CGPoint(x: periodWidth, y: nextYPosition)
+                        path.addCurve(to: CGPoint(x: periodWidth + periodWidth / 2, y: nextYPosition),
+                                      control1: control1, control2: control2)
+                    }
+                    .trim(from: 0, to: animationProgress)
+                    .stroke(
+                        LinearGradient(
+                            colors: [accentColor, accentColor.opacity(0.7)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+                    )
+                }
+            }
+            .frame(height: chartHeight)
+
+            // Period label
+            Text(formatPeriodLabel(trend.periodStart))
+                .font(.system(size: size * 0.045, weight: index == selectedPeriodIndex ? .bold : .medium))
+                .foregroundColor(index == selectedPeriodIndex ? .white.opacity(0.8) : .white.opacity(0.5))
+                .frame(height: 20)
         }
     }
 
@@ -585,7 +416,8 @@ struct FlippableDonutChartView: View {
                 subtitle: subtitle,
                 totalAmount: totalAmount,
                 accentColor: accentColor,
-                selectedPeriod: selectedPeriod
+                selectedPeriod: selectedPeriod,
+                isVisible: isFlipped
             )
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(
@@ -645,7 +477,8 @@ struct FlippableAllStoresChartView: View {
                 size: size,
                 totalAmount: totalAmount,
                 accentColor: accentColor,
-                selectedPeriod: selectedPeriod
+                selectedPeriod: selectedPeriod,
+                isVisible: isFlipped
             )
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(
