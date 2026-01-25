@@ -101,7 +101,8 @@ struct AllStoresBreakdownView: View {
                             segments: storeSegments,
                             size: 220,
                             trends: trends,
-                            accentColor: Color(red: 0.95, green: 0.25, blue: 0.3)
+                            accentColor: Color(red: 0.95, green: 0.25, blue: 0.3),
+                            selectedPeriod: period
                         )
                         .padding(.top, 24)
                         .padding(.bottom, 12)

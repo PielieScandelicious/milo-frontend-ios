@@ -14,6 +14,7 @@ struct SpendingTrendLineChart: View {
     let subtitle: String
     let totalAmount: Double
     let accentColor: Color
+    var selectedPeriod: String? = nil  // e.g., "January 2026"
 
     @State private var animationProgress: CGFloat = 0
     @State private var selectedIndex: Int? = nil
@@ -27,7 +28,33 @@ struct SpendingTrendLineChart: View {
     }
 
     private var visibleTrends: [TrendPeriod] {
-        Array(sortedTrends.suffix(5))
+        // If a period is selected, filter to show only periods up to and including it
+        let filteredTrends: [TrendPeriod]
+        if let selectedPeriod = selectedPeriod {
+            filteredTrends = sortedTrends.filter { trend in
+                comparePeriods(trend.period, selectedPeriod) <= 0
+            }
+        } else {
+            filteredTrends = sortedTrends
+        }
+        return Array(filteredTrends.suffix(5))
+    }
+
+    /// Compare two period strings (e.g., "January 2026" vs "December 2025")
+    /// Returns: negative if period1 < period2, 0 if equal, positive if period1 > period2
+    private func comparePeriods(_ period1: String, _ period2: String) -> Int {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        formatter.locale = Locale(identifier: "en_US")
+
+        guard let date1 = formatter.date(from: period1),
+              let date2 = formatter.date(from: period2) else {
+            return 0
+        }
+
+        if date1 < date2 { return -1 }
+        if date1 > date2 { return 1 }
+        return 0
     }
 
     private var maxSpend: Double {
@@ -234,6 +261,7 @@ struct StoreTrendLineChart: View {
     let size: CGFloat
     let totalAmount: Double
     let accentColor: Color
+    var selectedPeriod: String? = nil  // e.g., "January 2026"
 
     @State private var animationProgress: CGFloat = 0
 
@@ -245,7 +273,32 @@ struct StoreTrendLineChart: View {
     }
 
     private var visibleTrends: [TrendPeriod] {
-        Array(sortedTrends.suffix(5))
+        // If a period is selected, filter to show only periods up to and including it
+        let filteredTrends: [TrendPeriod]
+        if let selectedPeriod = selectedPeriod {
+            filteredTrends = sortedTrends.filter { trend in
+                comparePeriods(trend.period, selectedPeriod) <= 0
+            }
+        } else {
+            filteredTrends = sortedTrends
+        }
+        return Array(filteredTrends.suffix(5))
+    }
+
+    /// Compare two period strings (e.g., "January 2026" vs "December 2025")
+    private func comparePeriods(_ period1: String, _ period2: String) -> Int {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        formatter.locale = Locale(identifier: "en_US")
+
+        guard let date1 = formatter.date(from: period1),
+              let date2 = formatter.date(from: period2) else {
+            return 0
+        }
+
+        if date1 < date2 { return -1 }
+        if date1 > date2 { return 1 }
+        return 0
     }
 
     private var maxSpend: Double {
@@ -453,6 +506,7 @@ struct FlippableDonutChartView: View {
     let size: CGFloat
     var trends: [TrendPeriod] = []
     var accentColor: Color = Color(red: 0.95, green: 0.25, blue: 0.3) // Modern red
+    var selectedPeriod: String? = nil  // e.g., "January 2026"
 
     @State private var isFlipped = false
     @State private var flipDegrees: Double = 0
@@ -481,7 +535,8 @@ struct FlippableDonutChartView: View {
                 size: size,
                 subtitle: subtitle,
                 totalAmount: totalAmount,
-                accentColor: accentColor
+                accentColor: accentColor,
+                selectedPeriod: selectedPeriod
             )
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(
@@ -522,6 +577,7 @@ struct FlippableAllStoresChartView: View {
     let size: CGFloat
     var trends: [TrendPeriod] = []
     var accentColor: Color = Color(red: 0.95, green: 0.25, blue: 0.3) // Modern red
+    var selectedPeriod: String? = nil  // e.g., "January 2026"
 
     @State private var isFlipped = false
     @State private var flipDegrees: Double = 0
@@ -538,7 +594,8 @@ struct FlippableAllStoresChartView: View {
                 trends: trends,
                 size: size,
                 totalAmount: totalAmount,
-                accentColor: accentColor
+                accentColor: accentColor,
+                selectedPeriod: selectedPeriod
             )
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(

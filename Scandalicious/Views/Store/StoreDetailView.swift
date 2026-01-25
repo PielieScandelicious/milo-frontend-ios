@@ -93,7 +93,8 @@ struct StoreDetailView: View {
                             segments: storeBreakdown.categories.toChartSegments(),
                             size: 220,
                             trends: trends,
-                            accentColor: chartAccentColor
+                            accentColor: chartAccentColor,
+                            selectedPeriod: storeBreakdown.period
                         )
                         .padding(.top, 20)
                         
