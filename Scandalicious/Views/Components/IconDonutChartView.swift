@@ -40,6 +40,11 @@ struct IconDonutChartView: View {
 
     @State private var animationProgress: CGFloat = 0
 
+    /// Skip animation for small charts (store cards) to improve swipe performance
+    private var shouldAnimate: Bool {
+        size > 120
+    }
+
     init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
@@ -131,7 +136,13 @@ struct IconDonutChartView: View {
         }
         .frame(width: size, height: size)
         .onAppear {
-            withAnimation(.spring(response: 1.2, dampingFraction: 0.75)) {
+            // Skip animation for small charts (store cards) to improve swipe performance
+            if shouldAnimate {
+                withAnimation(.spring(response: 1.2, dampingFraction: 0.75)) {
+                    animationProgress = 1.0
+                }
+            } else {
+                // Instant display for small charts
                 animationProgress = 1.0
             }
         }

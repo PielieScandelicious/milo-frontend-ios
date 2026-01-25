@@ -20,6 +20,11 @@ struct LiquidGaugeView: View {
     @StateObject private var motionManager = MotionManager()
     @State private var fillProgress: CGFloat = 0
 
+    /// Skip animation and motion for small gauges (overview cards) to improve swipe performance
+    private var shouldAnimate: Bool {
+        size > 100
+    }
+
     private var normalizedScore: CGFloat {
         guard let score = score else { return 0 }
         let linearProgress = CGFloat(score / 5.0)
@@ -193,14 +198,21 @@ struct LiquidGaugeView: View {
             }
         }
         .onAppear {
-            motionManager.start()
-
-            withAnimation(.easeOut(duration: 1.0)) {
+            // Skip animation and motion for small gauges to improve swipe performance
+            if shouldAnimate {
+                motionManager.start()
+                withAnimation(.easeOut(duration: 1.0)) {
+                    fillProgress = 1.0
+                }
+            } else {
+                // Instant display for small gauges
                 fillProgress = 1.0
             }
         }
         .onDisappear {
-            motionManager.stop()
+            if shouldAnimate {
+                motionManager.stop()
+            }
         }
     }
 }
