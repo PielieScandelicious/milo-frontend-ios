@@ -1052,7 +1052,6 @@ struct OverviewView: View {
 
     private func totalSpendingCardForPeriod(_ period: String) -> some View {
         let spending = totalSpendForPeriod(period)
-        let breakdowns = breakdownsForPeriod(period)
 
         return Button {
             showingAllStoresBreakdown = true
@@ -1097,23 +1096,11 @@ struct OverviewView: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
-        .overlay(alignment: .bottomLeading) {
-            if spending > 0 {
-                InsightButton(insightType: .totalSpending(
-                    amount: spending,
-                    period: period,
-                    storeCount: breakdowns.count,
-                    topStore: breakdowns.first?.storeName
-                ))
-                .padding(12)
-            }
-        }
         .padding(.horizontal, 16)
     }
 
     private func healthScoreCardForPeriod(_ period: String) -> some View {
         let averageScore: Double? = healthScoreForPeriod(period)
-        let totalVisits = totalReceiptsForPeriod(period)
 
         return Button {
             showingHealthScoreTransactions = true
@@ -1175,16 +1162,6 @@ struct OverviewView: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
-        .overlay(alignment: .bottomTrailing) {
-            if averageScore != nil {
-                InsightButton(insightType: .healthScore(
-                    score: averageScore,
-                    period: period,
-                    totalItems: totalVisits
-                ))
-                .padding(10)
-            }
-        }
         .padding(.horizontal, 16)
     }
 
