@@ -945,43 +945,45 @@ struct OverviewView: View {
     ]
 
     private var swipeableContentView: some View {
-        TabView(selection: $selectedHeaderTab) {
-            ForEach(HeaderTab.allCases, id: \.self) { tab in
-                tabContentView(for: tab)
-                    .tag(tab)
+        GeometryReader { geometry in
+            TabView(selection: $selectedHeaderTab) {
+                ForEach(HeaderTab.allCases, id: \.self) { tab in
+                    tabContentView(for: tab, bottomSafeArea: geometry.safeAreaInsets.bottom)
+                        .tag(tab)
+                }
             }
-        }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .safeAreaInset(edge: .top, spacing: 0) {
-            // Fixed header with period navigation and tabs
-            VStack(spacing: 12) {
-                modernPeriodNavigation
-                headerTabSelector
-            }
-            .padding(.bottom, 10)
-            .frame(maxWidth: .infinity)
-            .background(
-                headerPurpleColor
-                    .ignoresSafeArea(edges: .top)
-            )
-            .zIndex(100)
-        }
-        .background {
-            // Pre-warm adjacent page views to eliminate first-swipe lag
-            if !hasWarmedAdjacentViews && !adjacentPeriodsToWarm.isEmpty {
-                AdjacentPagesWarmer(
-                    periods: adjacentPeriodsToWarm,
-                    getCachedBreakdowns: getCachedBreakdowns,
-                    healthScoreForPeriod: healthScoreForPeriod,
-                    totalSpendForPeriod: totalSpendForPeriod
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .safeAreaInset(edge: .top, spacing: 0) {
+                // Fixed header with period navigation and tabs
+                VStack(spacing: 12) {
+                    modernPeriodNavigation
+                    headerTabSelector
+                }
+                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity)
+                .background(
+                    headerPurpleColor
+                        .ignoresSafeArea(edges: .top)
                 )
-                .task {
-                    try? await Task.sleep(for: .milliseconds(200))
-                    hasWarmedAdjacentViews = true
+                .zIndex(100)
+            }
+            .background {
+                // Pre-warm adjacent page views to eliminate first-swipe lag
+                if !hasWarmedAdjacentViews && !adjacentPeriodsToWarm.isEmpty {
+                    AdjacentPagesWarmer(
+                        periods: adjacentPeriodsToWarm,
+                        getCachedBreakdowns: getCachedBreakdowns,
+                        healthScoreForPeriod: healthScoreForPeriod,
+                        totalSpendForPeriod: totalSpendForPeriod
+                    )
+                    .task {
+                        try? await Task.sleep(for: .milliseconds(200))
+                        hasWarmedAdjacentViews = true
+                    }
                 }
             }
         }
-        .background(appBackgroundColor)
+        .ignoresSafeArea(edges: .bottom) // Allow content to extend behind tab bar
     }
 
     // MARK: - Header Purple Color
@@ -1075,32 +1077,24 @@ struct OverviewView: View {
     }
 
     // MARK: - Tab Content View (for swipe navigation between tabs)
-    private func tabContentView(for tab: HeaderTab) -> some View {
-        let breakdowns = getCachedBreakdowns(for: selectedPeriod)
-        let hasMoreThanSixStores = breakdowns.count > 6
-
-        return ScrollView {
+    private func tabContentView(for tab: HeaderTab, bottomSafeArea: CGFloat) -> some View {
+        ScrollView {
             VStack(spacing: 12) {
                 switch tab {
                 case .overview:
                     overviewContentForPeriod(selectedPeriod)
-
                 case .stores:
                     storeBreakdownsGridForPeriod(selectedPeriod)
-
                 case .receipts:
                     receiptsContentForPeriod(selectedPeriod)
                 }
             }
             .padding(.top, 8)
-            .padding(.bottom, hasMoreThanSixStores && tab == .stores ? 24 : 8)
+            .padding(.bottom, bottomSafeArea) // Add padding so last item can scroll above tab bar
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.always)
-        .scrollDismissesKeyboard(.interactively)
-        .clipped()
-        .contentMargins(.top, 0, for: .scrollContent)
+        .scrollClipDisabled() // Allow content to render behind the translucent tab bar
     }
 
     // MARK: - Overview Content

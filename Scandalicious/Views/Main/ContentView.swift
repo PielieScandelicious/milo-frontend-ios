@@ -43,6 +43,8 @@ struct ContentView: View {
                     }
                     .tag(Tab.dobby)
             }
+            .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+            .toolbarBackgroundVisibility(.visible, for: .tabBar)
 
             // Loading screen overlay
             if !hasLoadedInitialData {
