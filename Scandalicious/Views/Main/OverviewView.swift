@@ -26,6 +26,12 @@ enum SortOption: String, CaseIterable {
     case storeName = "Store Name"
 }
 
+// MARK: - Header Tab Options
+enum HeaderTab: String, CaseIterable {
+    case overview = "Overview"
+    case receipts = "Receipts"
+}
+
 
 
 struct OverviewView: View {
@@ -51,6 +57,7 @@ struct OverviewView: View {
         return dateFormatter.string(from: Date())
     }()
     @State private var selectedSort: SortOption = .highestSpend
+    @State private var selectedHeaderTab: HeaderTab = .overview
     @State private var showingFilterSheet = false
     @State private var isEditMode = false {
         didSet {
@@ -298,7 +305,7 @@ struct OverviewView: View {
     
     var body: some View {
         ZStack {
-            Color(white: 0.05).ignoresSafeArea()
+            appBackgroundColor.ignoresSafeArea()
             
             // Subtle overlay in edit mode - visual dimming effect
             if isEditMode {
@@ -937,40 +944,160 @@ struct OverviewView: View {
     ]
 
     private var swipeableContentView: some View {
-        TabView(selection: $selectedPeriod) {
-            ForEach(availablePeriods, id: \.self) { period in
-                periodContentView(for: period)
-                    .tag(period)
+        ZStack(alignment: .top) {
+            // Purple gradient background - spans from top safe area
+            purpleGradientHeader
+
+            // Main content with TabView
+            TabView(selection: $selectedPeriod) {
+                ForEach(availablePeriods, id: \.self) { period in
+                    periodContentView(for: period)
+                        .tag(period)
+                }
             }
-        }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .safeAreaInset(edge: .top, spacing: 0) {
-            // Fixed header with period navigation
-            liquidGlassPeriodFilter
-                .padding(.top, 4)
-                .padding(.bottom, 4)
-                .background(Color(white: 0.05))
-                .zIndex(100) // Ensure period bar stays above scroll content
-        }
-        .background {
-            // Pre-warm adjacent page views to eliminate first-swipe lag
-            // This forces SwiftUI to create view hierarchy and Metal shader compilation
-            // before the user swipes, ensuring smooth transitions
-            if !hasWarmedAdjacentViews && !adjacentPeriodsToWarm.isEmpty {
-                AdjacentPagesWarmer(
-                    periods: adjacentPeriodsToWarm,
-                    getCachedBreakdowns: getCachedBreakdowns,
-                    healthScoreForPeriod: healthScoreForPeriod,
-                    totalSpendForPeriod: totalSpendForPeriod
-                )
-                .task {
-                    // Allow time for views to render and Metal shaders to compile
-                    try? await Task.sleep(for: .milliseconds(200))
-                    hasWarmedAdjacentViews = true
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .safeAreaInset(edge: .top, spacing: 0) {
+                // Fixed header with period navigation and tabs
+                VStack(spacing: 12) {
+                    modernPeriodNavigation
+                    headerTabSelector
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+                .zIndex(100)
+            }
+            .background {
+                // Pre-warm adjacent page views to eliminate first-swipe lag
+                if !hasWarmedAdjacentViews && !adjacentPeriodsToWarm.isEmpty {
+                    AdjacentPagesWarmer(
+                        periods: adjacentPeriodsToWarm,
+                        getCachedBreakdowns: getCachedBreakdowns,
+                        healthScoreForPeriod: healthScoreForPeriod,
+                        totalSpendForPeriod: totalSpendForPeriod
+                    )
+                    .task {
+                        try? await Task.sleep(for: .milliseconds(200))
+                        hasWarmedAdjacentViews = true
+                    }
                 }
             }
         }
-        .background(Color(white: 0.05))
+        .background(appBackgroundColor)
+    }
+
+    // MARK: - Purple Gradient Header Background
+    private var purpleGradientHeader: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Color(red: 0.58, green: 0.25, blue: 0.92), location: 0.0),    // Rich purple at top
+                .init(color: Color(red: 0.52, green: 0.22, blue: 0.85), location: 0.35),   // Stays solid longer
+                .init(color: Color(red: 0.45, green: 0.18, blue: 0.75), location: 0.55),   // Start transitioning
+                .init(color: Color(red: 0.12, green: 0.10, blue: 0.18), location: 0.85),   // Blend to background
+                .init(color: Color(red: 0.08, green: 0.07, blue: 0.12), location: 1.0)     // Match background
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: UIScreen.main.bounds.height * 0.22)
+        .ignoresSafeArea(edges: .top)
+    }
+
+    // MARK: - Background Color
+    private var appBackgroundColor: Color {
+        Color(red: 0.08, green: 0.07, blue: 0.12) // Rich dark with subtle purple undertone
+    }
+
+    // MARK: - Modern Period Navigation
+    private var modernPeriodNavigation: some View {
+        HStack(spacing: 0) {
+            // Previous period button
+            Button {
+                goToPreviousPeriod()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(canGoToPreviousPeriod ? .white : .white.opacity(0.3))
+                    .frame(width: 44, height: 44)
+            }
+            .disabled(!canGoToPreviousPeriod)
+
+            Spacer()
+
+            // Center: Period display with transaction count
+            VStack(spacing: 4) {
+                Text(selectedPeriod.uppercased())
+                    .font(.system(size: 16, weight: .bold, design: .default))
+                    .foregroundColor(.white)
+                    .tracking(1.5)
+                    .contentTransition(.interpolate)
+
+                // Receipt count sublabel
+                Text(receiptCountLabel)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+            }
+            .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
+
+            Spacer()
+
+            // Next period button
+            Button {
+                goToNextPeriod()
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(canGoToNextPeriod ? .white : .white.opacity(0.3))
+                    .frame(width: 44, height: 44)
+            }
+            .disabled(!canGoToNextPeriod)
+        }
+        .padding(.horizontal, 8)
+    }
+
+    // MARK: - Receipt Count Label
+    private var receiptCountLabel: String {
+        let receiptCount = totalReceiptsForPeriod(selectedPeriod)
+        if receiptCount == 0 {
+            return "NO RECEIPTS"
+        } else if receiptCount == 1 {
+            return "1 RECEIPT"
+        } else {
+            return "\(receiptCount) RECEIPTS"
+        }
+    }
+
+    // MARK: - Header Tab Selector
+    private var headerTabSelector: some View {
+        HStack(spacing: 4) {
+            ForEach(HeaderTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedHeaderTab = tab
+                    }
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                } label: {
+                    Text(tab.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(selectedHeaderTab == tab ? .white : .white.opacity(0.6))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule()
+                                .fill(selectedHeaderTab == tab ? Color.white.opacity(0.2) : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.1))
+        )
     }
 
     private func periodContentView(for period: String) -> some View {
@@ -1253,90 +1380,6 @@ struct OverviewView: View {
         .animation(.easeOut(duration: 0.2), value: isLoadingPeriod)
     }
 
-    /// Formats the period into month and year components
-    private var periodComponents: (month: String, year: String) {
-        let parts = selectedPeriod.split(separator: " ")
-        if parts.count == 2 {
-            return (String(parts[0]).uppercased(), String(parts[1]))
-        }
-        return (selectedPeriod.uppercased(), "")
-    }
-
-    private var liquidGlassPeriodFilter: some View {
-        HStack(spacing: 0) {
-            // Previous period button
-            Button {
-                goToPreviousPeriod()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(canGoToPreviousPeriod ? .white : .white.opacity(0.25))
-                    .frame(width: 36, height: 36)
-            }
-            .buttonStyle(PeriodNavButtonStyle())
-            .disabled(!canGoToPreviousPeriod)
-
-            Spacer()
-
-            // Modern period display with month, year, and page dots
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    Text(periodComponents.month)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .tracking(1.0)
-                        .contentTransition(.interpolate)
-
-                    if !periodComponents.year.isEmpty {
-                        Text(periodComponents.year)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .contentTransition(.numericText())
-                    }
-                }
-
-                // Page indicator dots
-                if availablePeriods.count > 1 {
-                    PeriodDotsView(
-                        totalCount: availablePeriods.count,
-                        currentIndex: currentPeriodIndex
-                    )
-                }
-            }
-            .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
-
-            Spacer()
-
-            // Next period button
-            Button {
-                goToNextPeriod()
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(canGoToNextPeriod ? .white : .white.opacity(0.25))
-                    .frame(width: 36, height: 36)
-            }
-            .buttonStyle(PeriodNavButtonStyle())
-            .disabled(!canGoToNextPeriod)
-        }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.03))
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-        .padding(.horizontal, 16)
-    }
-
     private var currentPeriodIndex: Int {
         availablePeriods.firstIndex(of: selectedPeriod) ?? 0
     }
@@ -1462,7 +1505,7 @@ struct FilterSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(white: 0.05).ignoresSafeArea()
+                Color(red: 0.08, green: 0.07, blue: 0.12).ignoresSafeArea()
                 
                 List {
                     Section {
@@ -1676,7 +1719,7 @@ struct SkeletonStoreCard: View {
                 .frame(width: 96, height: 96)
                 .overlay(
                     Circle()
-                        .fill(Color(white: 0.05))
+                        .fill(Color(red: 0.08, green: 0.07, blue: 0.12))
                         .frame(width: 59, height: 59)
                 )
                 .overlay(
