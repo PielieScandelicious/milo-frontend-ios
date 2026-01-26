@@ -944,62 +944,49 @@ struct OverviewView: View {
     ]
 
     private var swipeableContentView: some View {
-        ZStack(alignment: .top) {
-            // Purple gradient background - spans from top safe area
-            purpleGradientHeader
-
-            // Main content with TabView
-            TabView(selection: $selectedPeriod) {
-                ForEach(availablePeriods, id: \.self) { period in
-                    periodContentView(for: period)
-                        .tag(period)
-                }
+        TabView(selection: $selectedPeriod) {
+            ForEach(availablePeriods, id: \.self) { period in
+                periodContentView(for: period)
+                    .tag(period)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .safeAreaInset(edge: .top, spacing: 0) {
-                // Fixed header with period navigation and tabs
-                VStack(spacing: 12) {
-                    modernPeriodNavigation
-                    headerTabSelector
-                }
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-                .zIndex(100)
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .safeAreaInset(edge: .top, spacing: 0) {
+            // Fixed header with period navigation and tabs
+            VStack(spacing: 12) {
+                modernPeriodNavigation
+                headerTabSelector
             }
-            .background {
-                // Pre-warm adjacent page views to eliminate first-swipe lag
-                if !hasWarmedAdjacentViews && !adjacentPeriodsToWarm.isEmpty {
-                    AdjacentPagesWarmer(
-                        periods: adjacentPeriodsToWarm,
-                        getCachedBreakdowns: getCachedBreakdowns,
-                        healthScoreForPeriod: healthScoreForPeriod,
-                        totalSpendForPeriod: totalSpendForPeriod
-                    )
-                    .task {
-                        try? await Task.sleep(for: .milliseconds(200))
-                        hasWarmedAdjacentViews = true
-                    }
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity)
+            .background(
+                headerPurpleColor
+                    .ignoresSafeArea(edges: .top)
+            )
+            .zIndex(100)
+        }
+        .background {
+            // Pre-warm adjacent page views to eliminate first-swipe lag
+            if !hasWarmedAdjacentViews && !adjacentPeriodsToWarm.isEmpty {
+                AdjacentPagesWarmer(
+                    periods: adjacentPeriodsToWarm,
+                    getCachedBreakdowns: getCachedBreakdowns,
+                    healthScoreForPeriod: healthScoreForPeriod,
+                    totalSpendForPeriod: totalSpendForPeriod
+                )
+                .task {
+                    try? await Task.sleep(for: .milliseconds(200))
+                    hasWarmedAdjacentViews = true
                 }
             }
         }
         .background(appBackgroundColor)
     }
 
-    // MARK: - Purple Gradient Header Background
-    private var purpleGradientHeader: some View {
-        LinearGradient(
-            stops: [
-                .init(color: Color(red: 0.58, green: 0.25, blue: 0.92), location: 0.0),    // Rich purple at top
-                .init(color: Color(red: 0.52, green: 0.22, blue: 0.85), location: 0.35),   // Stays solid longer
-                .init(color: Color(red: 0.45, green: 0.18, blue: 0.75), location: 0.55),   // Start transitioning
-                .init(color: Color(red: 0.12, green: 0.10, blue: 0.18), location: 0.85),   // Blend to background
-                .init(color: Color(red: 0.08, green: 0.07, blue: 0.12), location: 1.0)     // Match background
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: UIScreen.main.bounds.height * 0.22)
-        .ignoresSafeArea(edges: .top)
+    // MARK: - Header Purple Color
+    private var headerPurpleColor: Color {
+        Color(red: 0.55, green: 0.23, blue: 0.90)
     }
 
     // MARK: - Background Color
