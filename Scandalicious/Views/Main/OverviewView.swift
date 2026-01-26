@@ -80,6 +80,8 @@ struct OverviewView: View {
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
     @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
     @State private var hasWarmedAdjacentViews = false  // Track if adjacent page views have been pre-rendered
+    @State private var overviewTrends: [TrendPeriod] = []  // Trends for the overview chart
+    @State private var isLoadingTrends = false
     @Binding var showSignOutConfirmation: Bool
 
     // User defaults key for storing order
@@ -503,6 +505,11 @@ struct OverviewView: View {
                 await rateLimitManager.syncFromBackend()
             }
 
+            // Fetch trends for the overview chart
+            Task {
+                await fetchOverviewTrends()
+            }
+
             // Prefetch daily insights in background
             prefetchInsights()
         }
@@ -681,6 +688,24 @@ struct OverviewView: View {
                 period: selectedPeriod,
                 totalItems: totalVisits
             ))
+        }
+    }
+
+    // MARK: - Overview Trends Fetching
+
+    /// Fetches trends data for the overview chart
+    private func fetchOverviewTrends() async {
+        guard !isLoadingTrends else { return }
+        isLoadingTrends = true
+        defer { isLoadingTrends = false }
+
+        do {
+            let response = try await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 52)
+            await MainActor.run {
+                self.overviewTrends = response.periods
+            }
+        } catch {
+            print("Failed to fetch overview trends: \(error)")
         }
     }
 
@@ -1142,7 +1167,7 @@ struct OverviewView: View {
                     segments: segments,
                     size: 200,
                     totalReceipts: totalReceipts,
-                    trends: [],
+                    trends: overviewTrends,
                     accentColor: Color(red: 0.95, green: 0.25, blue: 0.3),
                     selectedPeriod: period
                 )
