@@ -958,7 +958,6 @@ struct OverviewView: View {
                 modernPeriodNavigation
                 headerTabSelector
             }
-            .padding(.top, 8)
             .padding(.bottom, 10)
             .frame(maxWidth: .infinity)
             .background(
