@@ -29,6 +29,7 @@ enum SortOption: String, CaseIterable {
 // MARK: - Header Tab Options
 enum HeaderTab: String, CaseIterable {
     case overview = "Overview"
+    case stores = "Stores"
     case receipts = "Receipts"
 }
 
