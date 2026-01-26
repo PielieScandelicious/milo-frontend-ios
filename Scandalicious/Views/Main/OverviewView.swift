@@ -958,7 +958,7 @@ struct OverviewView: View {
                 headerTabSelector
             }
             .padding(.top, 8)
-            .padding(.bottom, 16)
+            .padding(.bottom, 10)
             .frame(maxWidth: .infinity)
             .background(
                 headerPurpleColor
