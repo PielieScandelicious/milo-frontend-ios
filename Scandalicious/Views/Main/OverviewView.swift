@@ -592,6 +592,11 @@ struct OverviewView: View {
                 isEditMode = false
             }
 
+            // Always return to Overview tab when switching periods
+            if selectedHeaderTab != .overview {
+                selectedHeaderTab = .overview
+            }
+
             // Defer non-critical work to after swipe animation completes
             // This prevents jank during the page transition
             Task { @MainActor in
@@ -1125,13 +1130,12 @@ struct OverviewView: View {
         let totalReceipts = totalReceiptsForPeriod(period)
         let segments = storeSegmentsForPeriod(period)
 
+        // All Overview components fade in together at the same time
         return VStack(spacing: 16) {
-            // Total spending and health score cards
             totalSpendingCardForPeriod(period)
 
             healthScoreCardForPeriod(period)
 
-            // Donut chart with store breakdown
             if !breakdowns.isEmpty {
                 FlippableAllStoresChartView(
                     totalAmount: totalSpend,
@@ -1145,11 +1149,9 @@ struct OverviewView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 8)
 
-                // Store legend
                 VStack(spacing: 8) {
-                    ForEach(segments, id: \.id) { segment in
+                    ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                         Button {
-                            // Navigate to store transactions
                             if let breakdown = breakdowns.first(where: { $0.storeName == segment.storeName }) {
                                 selectedBreakdown = breakdown
                             }
@@ -1162,6 +1164,7 @@ struct OverviewView: View {
                 .padding(.horizontal, 16)
             }
         }
+        .smoothFadeIn(delay: 0.08, period: period)
     }
 
     // MARK: - Store Segments for Period
@@ -1257,6 +1260,7 @@ struct OverviewView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 60)
+        .smoothFadeIn(delay: 0.1, period: period)
     }
 
     // Period-specific versions of the cards to ensure proper data display
@@ -1467,6 +1471,7 @@ struct OverviewView: View {
                                     ))
                             } else {
                                 storeChartCard(breakdown, totalPeriodSpend: totalPeriodSpend, rank: index, totalStores: breakdowns.count)
+                                    .staggeredGridAppearance(index: index, columns: 3, period: period)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
                                         selectedBreakdown = breakdown
@@ -1737,70 +1742,123 @@ struct JiggleModifier: ViewModifier {
     }
 }
 
-// MARK: - Premium Fade In Modifier
-/// Refined fade-in animation following premium UX principles:
-/// - Fast but smooth (350ms) - feels responsive, not sluggish
-/// - Subtle transforms - 98% scale, 8pt offset (barely noticeable but adds polish)
-/// - Consistent easing - easeOut for natural deceleration
-struct PremiumFadeInModifier: ViewModifier {
+// MARK: - Period-Aware Fade In Modifier
+/// Fade-in animation that plays when view appears OR when period changes.
+struct PeriodFadeInModifier: ViewModifier {
     let delay: Double
+    let period: String
     @State private var isVisible = false
+    @State private var animatedPeriod: String = ""
+    @State private var isOnScreen = false
 
     func body(content: Content) -> some View {
         content
             .opacity(isVisible ? 1 : 0)
-            .scaleEffect(isVisible ? 1 : 0.98)
-            .offset(y: isVisible ? 0 : 8)
+            .scaleEffect(isVisible ? 1 : 0.96)
+            .offset(y: isVisible ? 0 : 12)
+            .onChange(of: period) { oldValue, newValue in
+                // Reset and re-animate when period changes while view is on screen
+                isVisible = false
+                animatedPeriod = ""
+                if isOnScreen {
+                    triggerAnimation()
+                }
+            }
             .onAppear {
-                withAnimation(.easeOut(duration: 0.35).delay(delay)) {
-                    isVisible = true
+                isOnScreen = true
+                // Animate when view appears on screen with a new period
+                if animatedPeriod != period {
+                    triggerAnimation()
                 }
             }
             .onDisappear {
-                isVisible = false
+                isOnScreen = false
             }
+    }
+
+    private func triggerAnimation() {
+        guard animatedPeriod != period else { return }
+        isVisible = false
+        animatedPeriod = period
+
+        Task {
+            if delay > 0 {
+                try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
+            }
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.85)) {
+                isVisible = true
+            }
+        }
     }
 }
 
-// MARK: - Staggered Card Appearance Modifier
-/// Premium staggered animation for store cards:
-/// - Starts after header cards (160ms base delay)
-/// - Quick stagger between cards (60ms) - fast enough to feel cohesive
-/// - Subtle transforms for polish without distraction
-struct StaggeredCardModifier: ViewModifier {
+// MARK: - Period-Aware Staggered Grid Card Modifier
+/// Premium staggered animation for grid cards (left-to-right, top-to-bottom).
+/// Triggers when view appears OR when period changes while visible.
+struct PeriodStaggeredGridCardModifier: ViewModifier {
     let index: Int
+    let columns: Int
+    let period: String
     @State private var isVisible = false
+    @State private var animatedPeriod: String = ""
+    @State private var isOnScreen = false
 
-    // Base delay after header cards + per-card stagger
+    // Calculate delay based on position: left-to-right within row, then next row
     private var appearDelay: Double {
-        0.16 + (Double(index) * 0.06)
+        let row = index / columns
+        let col = index % columns
+        // Base delay + row delay + column delay (left to right)
+        return 0.15 + (Double(row) * 0.12) + (Double(col) * 0.08)
     }
 
     func body(content: Content) -> some View {
         content
             .opacity(isVisible ? 1 : 0)
-            .scaleEffect(isVisible ? 1 : 0.97)
-            .offset(y: isVisible ? 0 : 10)
+            .scaleEffect(isVisible ? 1 : 0.92)
+            .offset(y: isVisible ? 0 : 15)
+            .onChange(of: period) { oldValue, newValue in
+                // Reset and re-animate when period changes while view is on screen
+                isVisible = false
+                animatedPeriod = ""
+                if isOnScreen {
+                    triggerAnimation()
+                }
+            }
             .onAppear {
-                withAnimation(.easeOut(duration: 0.4).delay(appearDelay)) {
-                    isVisible = true
+                isOnScreen = true
+                // Animate when view appears on screen with a new period
+                if animatedPeriod != period {
+                    triggerAnimation()
                 }
             }
             .onDisappear {
-                isVisible = false
+                isOnScreen = false
             }
+    }
+
+    private func triggerAnimation() {
+        guard animatedPeriod != period else { return }
+        isVisible = false
+        animatedPeriod = period
+
+        Task {
+            try? await Task.sleep(for: .milliseconds(Int(appearDelay * 1000)))
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                isVisible = true
+            }
+        }
     }
 }
 
 extension View {
-    /// Premium fade-in with subtle scale and offset
-    func premiumFadeIn(delay: Double = 0) -> some View {
-        modifier(PremiumFadeInModifier(delay: delay))
+    /// Period-aware fade-in - resets when period changes, persists during tab swipes
+    func smoothFadeIn(delay: Double = 0, period: String) -> some View {
+        modifier(PeriodFadeInModifier(delay: delay, period: period))
     }
 
-    /// Staggered appearance for grid items
-    func staggeredAppearance(index: Int, totalCount: Int = 0) -> some View {
-        modifier(StaggeredCardModifier(index: index))
+    /// Period-aware staggered grid appearance (left-to-right, top-to-bottom)
+    func staggeredGridAppearance(index: Int, columns: Int = 3, period: String) -> some View {
+        modifier(PeriodStaggeredGridCardModifier(index: index, columns: columns, period: period))
     }
 }
 
