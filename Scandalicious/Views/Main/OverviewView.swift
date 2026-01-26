@@ -1323,12 +1323,17 @@ struct OverviewView: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.03))
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
         )
+        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
         .padding(.horizontal, 16)
     }
 

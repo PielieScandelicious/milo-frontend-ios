@@ -88,7 +88,7 @@ struct StoreDetailView: View {
                     VStack(spacing: 20) {
                         FlippableDonutChartView(
                             title: "",
-                            subtitle: "visits",
+                            subtitle: storeBreakdown.visitCount == 1 ? "receipt" : "receipts",
                             totalAmount: Double(storeBreakdown.visitCount),
                             segments: storeBreakdown.categories.toChartSegments(),
                             size: 220,
@@ -183,12 +183,14 @@ struct StoreDetailView: View {
 
         do {
             // Use the store-specific trends endpoint (52 months = ~4 years of history)
+            print("[StoreDetailView] Fetching trends for store: \(storeBreakdown.storeName)")
             let response = try await AnalyticsAPIService.shared.getStoreTrends(storeName: storeBreakdown.storeName, periodType: .month, numPeriods: 52)
+            print("[StoreDetailView] Fetched \(response.periods.count) trend periods for \(storeBreakdown.storeName)")
             await MainActor.run {
                 self.trends = response.periods
             }
         } catch {
-            print("Failed to fetch trends for \(storeBreakdown.storeName): \(error)")
+            print("[StoreDetailView] Failed to fetch trends for \(storeBreakdown.storeName): \(error)")
         }
     }
 
