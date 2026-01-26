@@ -1094,25 +1094,53 @@ struct OverviewView: View {
 
         return ScrollView {
             VStack(spacing: 12) {
-                // Sequential fade-in: creates visual hierarchy and guides the eye
-                // Using subtle, fast animations for a premium feel
-                totalSpendingCardForPeriod(period)
-                    .premiumFadeIn(delay: 0)
+                switch selectedHeaderTab {
+                case .overview:
+                    // Overview: Total spending and health score cards
+                    totalSpendingCardForPeriod(period)
+                        .premiumFadeIn(delay: 0)
 
-                healthScoreCardForPeriod(period)
-                    .premiumFadeIn(delay: 0.08)
+                    healthScoreCardForPeriod(period)
+                        .premiumFadeIn(delay: 0.08)
 
-                storeBreakdownsGridForPeriod(period)
+                case .stores:
+                    // Stores: Store breakdown grid
+                    storeBreakdownsGridForPeriod(period)
+
+                case .receipts:
+                    // Receipts: Placeholder - will show receipts list
+                    receiptsContentForPeriod(period)
+                }
             }
-            .padding(.top, 8) // Small gap from period bar
-            .padding(.bottom, hasMoreThanSixStores ? 24 : 8)
+            .padding(.top, 8)
+            .padding(.bottom, hasMoreThanSixStores && selectedHeaderTab == .stores ? 24 : 8)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.always) // Always bounce against period bar
+        .scrollBounceBehavior(.always)
         .scrollDismissesKeyboard(.interactively)
-        .clipped() // Clip content at scroll view bounds - prevents content going under period bar
-        .contentMargins(.top, 0, for: .scrollContent) // No top margin - bounce against period bar
+        .clipped()
+        .contentMargins(.top, 0, for: .scrollContent)
+        .animation(.easeInOut(duration: 0.2), value: selectedHeaderTab)
+    }
+
+    // MARK: - Receipts Content
+    private func receiptsContentForPeriod(_ period: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "doc.text.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.white.opacity(0.3))
+
+            Text("Receipts")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.white)
+
+            Text("Coming soon")
+                .font(.system(size: 14))
+                .foregroundColor(.white.opacity(0.5))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 60)
     }
 
     // Period-specific versions of the cards to ensure proper data display
