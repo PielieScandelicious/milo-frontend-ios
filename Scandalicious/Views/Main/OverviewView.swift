@@ -946,13 +946,35 @@ struct OverviewView: View {
 
     private var swipeableContentView: some View {
         GeometryReader { geometry in
-            TabView(selection: $selectedHeaderTab) {
-                ForEach(HeaderTab.allCases, id: \.self) { tab in
-                    tabContentView(for: tab, bottomSafeArea: geometry.safeAreaInsets.bottom)
-                        .tag(tab)
+            ScrollViewReader { scrollProxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(HeaderTab.allCases, id: \.self) { tab in
+                            tabContentView(for: tab, bottomSafeArea: geometry.safeAreaInsets.bottom)
+                                .frame(width: geometry.size.width)
+                                .id(tab)
+                                .containerRelativeFrame(.horizontal)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollPosition(id: Binding(
+                    get: { selectedHeaderTab },
+                    set: { newValue in
+                        if let newValue = newValue {
+                            selectedHeaderTab = newValue
+                        }
+                    }
+                ))
+                .onChange(of: selectedHeaderTab) { oldValue, newValue in
+                    // Programmatically scroll when button is tapped with smooth spring animation
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        scrollProxy.scrollTo(newValue, anchor: .center)
+                    }
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
             .safeAreaInset(edge: .top, spacing: 0) {
                 // Fixed header with period navigation and tabs
                 VStack(spacing: 12) {
@@ -1049,9 +1071,7 @@ struct OverviewView: View {
         HStack(spacing: 4) {
             ForEach(HeaderTab.allCases, id: \.self) { tab in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedHeaderTab = tab
-                    }
+                    selectedHeaderTab = tab
                     let generator = UIImpactFeedbackGenerator(style: .light)
                     generator.impactOccurred()
                 } label: {
@@ -1064,6 +1084,7 @@ struct OverviewView: View {
                             Capsule()
                                 .fill(selectedHeaderTab == tab ? Color.white.opacity(0.2) : Color.clear)
                         )
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedHeaderTab)
                 }
                 .buttonStyle(.plain)
             }
@@ -1107,10 +1128,8 @@ struct OverviewView: View {
         return VStack(spacing: 16) {
             // Total spending and health score cards
             totalSpendingCardForPeriod(period)
-                .premiumFadeIn(delay: 0)
 
             healthScoreCardForPeriod(period)
-                .premiumFadeIn(delay: 0.08)
 
             // Donut chart with store breakdown
             if !breakdowns.isEmpty {
@@ -1125,7 +1144,6 @@ struct OverviewView: View {
                 )
                 .padding(.top, 16)
                 .padding(.bottom, 8)
-                .premiumFadeIn(delay: 0.16)
 
                 // Store legend
                 VStack(spacing: 8) {
@@ -1142,7 +1160,6 @@ struct OverviewView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .premiumFadeIn(delay: 0.24)
             }
         }
     }
@@ -1450,7 +1467,6 @@ struct OverviewView: View {
                                     ))
                             } else {
                                 storeChartCard(breakdown, totalPeriodSpend: totalPeriodSpend, rank: index, totalStores: breakdowns.count)
-                                    .staggeredAppearance(index: index, totalCount: breakdowns.count)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
                                         selectedBreakdown = breakdown
