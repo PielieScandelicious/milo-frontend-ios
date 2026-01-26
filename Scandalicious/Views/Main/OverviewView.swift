@@ -70,8 +70,8 @@ struct OverviewView: View {
     @State private var isDragging = false
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
-    @State private var showingAllStoresBreakdown = false
     @State private var showingAllTransactions = false
+    @State private var showTrendlineInOverview = false  // Toggle between pie chart and trendline
     @State private var showingHealthScoreTransactions = false
     @State private var showingProfileMenu = false
     @State private var breakdownToDelete: StoreBreakdown?
@@ -390,9 +390,6 @@ struct OverviewView: View {
         .navigationDestination(item: $selectedBreakdown) { breakdown in
             StoreDetailView(storeBreakdown: breakdown)
         }
-        .navigationDestination(isPresented: $showingAllStoresBreakdown) {
-            AllStoresBreakdownView(period: selectedPeriod, breakdowns: currentBreakdowns, totalSpend: totalPeriodSpending, totalReceipts: totalPeriodReceipts)
-        }
         .navigationDestination(isPresented: $showingAllTransactions) {
             TransactionListView(
                 storeName: "All Stores",
@@ -597,6 +594,11 @@ struct OverviewView: View {
             // Exit edit mode when changing periods to avoid inconsistency
             if isEditMode {
                 isEditMode = false
+            }
+
+            // Reset trendline toggle when changing periods (show pie chart)
+            if showTrendlineInOverview {
+                showTrendlineInOverview = false
             }
 
             // Always return to Overview tab when switching periods
@@ -1162,14 +1164,13 @@ struct OverviewView: View {
             healthScoreCardForPeriod(period)
 
             if !breakdowns.isEmpty {
-                FlippableAllStoresChartView(
-                    totalAmount: totalSpend,
-                    segments: segments,
+                // Pie chart showing store breakdown
+                IconDonutChartView(
+                    data: segments.toIconChartData(),
+                    totalAmount: Double(totalReceipts),
                     size: 200,
-                    totalReceipts: totalReceipts,
-                    trends: overviewTrends,
-                    accentColor: Color(red: 0.95, green: 0.25, blue: 0.3),
-                    selectedPeriod: period
+                    currencySymbol: "",
+                    subtitle: "receipts"
                 )
                 .padding(.top, 16)
                 .padding(.bottom, 8)
@@ -1342,38 +1343,87 @@ struct OverviewView: View {
         let spending = totalSpendForPeriod(period)
 
         return Button {
-            showingAllStoresBreakdown = true
-        } label: {
-            VStack(spacing: 6) {
-                Text("Total Spending")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .textCase(.uppercase)
-                    .tracking(1.2)
-
-                Text(String(format: "€%.0f", spending))
-                    .font(.system(size: 40, weight: .heavy, design: .rounded))
-                    .foregroundColor(.white)
-
-                // Syncing/Synced indicator inline
-                HStack(spacing: 4) {
-                    if dataManager.isLoading || isReceiptUploading {
-                        SyncingArrowsView()
-                            .font(.system(size: 11))
-                        Text("Syncing...")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.blue)
-                    } else {
-                        Image(systemName: "checkmark.icloud.fill")
-                            .font(.system(size: 11))
-                        Text("Synced")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                }
-                .foregroundColor(dataManager.isLoading || isReceiptUploading ? .blue : .green)
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                showTrendlineInOverview.toggle()
             }
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity)
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+        } label: {
+            Group {
+                if showTrendlineInOverview {
+                    // Trendline view
+                    VStack(spacing: 8) {
+                        Text("Spending Trends")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                            .textCase(.uppercase)
+                            .tracking(1.2)
+
+                        if overviewTrends.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "chart.line.uptrend.xyaxis")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.white.opacity(0.3))
+                                Text("No trend data")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
+                            .frame(height: 180)
+                        } else {
+                            StoreTrendLineChart(
+                                trends: overviewTrends,
+                                size: 160,
+                                totalAmount: spending,
+                                accentColor: Color(red: 0.95, green: 0.25, blue: 0.3),
+                                selectedPeriod: period,
+                                isVisible: true
+                            )
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "eurosign.circle.fill")
+                                .font(.system(size: 11))
+                            Text("Tap for Total")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(.white.opacity(0.5))
+                    }
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity)
+                } else {
+                    // Total spending view
+                    VStack(spacing: 6) {
+                        Text("Total Spending")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                            .textCase(.uppercase)
+                            .tracking(1.2)
+
+                        Text(String(format: "€%.0f", spending))
+                            .font(.system(size: 40, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+
+                        // Syncing/Synced indicator inline
+                        HStack(spacing: 4) {
+                            if dataManager.isLoading || isReceiptUploading {
+                                SyncingArrowsView()
+                                    .font(.system(size: 11))
+                                Text("Syncing...")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.blue)
+                            } else {
+                                Image(systemName: "chart.line.uptrend.xyaxis")
+                                    .font(.system(size: 11))
+                                Text("Tap for Trends")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                        }
+                        .foregroundColor(dataManager.isLoading || isReceiptUploading ? .blue : .white.opacity(0.5))
+                    }
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity)
+                }
+            }
         }
         .buttonStyle(TotalSpendingCardButtonStyle())
         .background(
