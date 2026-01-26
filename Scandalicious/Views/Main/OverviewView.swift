@@ -945,10 +945,10 @@ struct OverviewView: View {
     ]
 
     private var swipeableContentView: some View {
-        TabView(selection: $selectedPeriod) {
-            ForEach(availablePeriods, id: \.self) { period in
-                periodContentView(for: period)
-                    .tag(period)
+        TabView(selection: $selectedHeaderTab) {
+            ForEach(HeaderTab.allCases, id: \.self) { tab in
+                tabContentView(for: tab)
+                    .tag(tab)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -997,86 +997,49 @@ struct OverviewView: View {
 
     // MARK: - Modern Period Navigation
     private var modernPeriodNavigation: some View {
-        HStack(spacing: 0) {
-            // Previous period button
-            Button {
-                goToPreviousPeriod()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(canGoToPreviousPeriod ? .white : .white.opacity(0.3))
-                    .frame(width: 44, height: 44)
-            }
-            .disabled(!canGoToPreviousPeriod)
-
-            Spacer()
-
-            // Center: Period display with transaction count
-            VStack(spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(selectedPeriod.uppercased())
-                        .font(.system(size: 16, weight: .bold, design: .default))
-                        .foregroundColor(.white)
-                        .tracking(1.5)
-                        .contentTransition(.interpolate)
-
-                    // Current period indicator
-                    if isCurrentPeriod {
-                        Text("NOW")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule()
-                                    .fill(Color.white.opacity(0.25))
-                            )
-                    }
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                // Previous period button
+                Button {
+                    goToPreviousPeriod()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(canGoToPreviousPeriod ? .white : .white.opacity(0.3))
+                        .frame(width: 44, height: 28)
                 }
+                .disabled(!canGoToPreviousPeriod)
 
-                // Receipt count sublabel
-                Text(receiptCountLabel)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .textCase(.uppercase)
-                    .tracking(0.8)
+                Spacer()
+
+                // Center: Period display
+                Text(selectedPeriod.uppercased())
+                    .font(.system(size: 16, weight: .bold, design: .default))
+                    .foregroundColor(.white)
+                    .tracking(1.5)
+                    .contentTransition(.interpolate)
+                    .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
+
+                Spacer()
+
+                // Next period button
+                Button {
+                    goToNextPeriod()
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(canGoToNextPeriod ? .white : .white.opacity(0.3))
+                        .frame(width: 44, height: 28)
+                }
+                .disabled(!canGoToNextPeriod)
             }
-            .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
+            .padding(.horizontal, 8)
 
-            Spacer()
-
-            // Next period button
-            Button {
-                goToNextPeriod()
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(canGoToNextPeriod ? .white : .white.opacity(0.3))
-                    .frame(width: 44, height: 44)
-            }
-            .disabled(!canGoToNextPeriod)
-        }
-        .padding(.horizontal, 8)
-    }
-
-    // MARK: - Current Period Check
-    private var isCurrentPeriod: Bool {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentMonth = dateFormatter.string(from: Date())
-        return selectedPeriod == currentMonth
-    }
-
-    // MARK: - Receipt Count Label
-    private var receiptCountLabel: String {
-        let receiptCount = totalReceiptsForPeriod(selectedPeriod)
-        if receiptCount == 0 {
-            return "NO RECEIPTS"
-        } else if receiptCount == 1 {
-            return "1 RECEIPT"
-        } else {
-            return "\(receiptCount) RECEIPTS"
+            // Period dots indicator
+            PeriodDotsView(
+                totalCount: availablePeriods.count,
+                currentIndex: currentPeriodIndex
+            )
         }
     }
 
@@ -1112,32 +1075,26 @@ struct OverviewView: View {
         )
     }
 
-    private func periodContentView(for period: String) -> some View {
-        let breakdowns = getCachedBreakdowns(for: period)
+    // MARK: - Tab Content View (for swipe navigation between tabs)
+    private func tabContentView(for tab: HeaderTab) -> some View {
+        let breakdowns = getCachedBreakdowns(for: selectedPeriod)
         let hasMoreThanSixStores = breakdowns.count > 6
 
         return ScrollView {
             VStack(spacing: 12) {
-                switch selectedHeaderTab {
+                switch tab {
                 case .overview:
-                    // Overview: Total spending and health score cards
-                    totalSpendingCardForPeriod(period)
-                        .premiumFadeIn(delay: 0)
-
-                    healthScoreCardForPeriod(period)
-                        .premiumFadeIn(delay: 0.08)
+                    overviewContentForPeriod(selectedPeriod)
 
                 case .stores:
-                    // Stores: Store breakdown grid
-                    storeBreakdownsGridForPeriod(period)
+                    storeBreakdownsGridForPeriod(selectedPeriod)
 
                 case .receipts:
-                    // Receipts: Placeholder - will show receipts list
-                    receiptsContentForPeriod(period)
+                    receiptsContentForPeriod(selectedPeriod)
                 }
             }
             .padding(.top, 8)
-            .padding(.bottom, hasMoreThanSixStores && selectedHeaderTab == .stores ? 24 : 8)
+            .padding(.bottom, hasMoreThanSixStores && tab == .stores ? 24 : 8)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -1145,7 +1102,132 @@ struct OverviewView: View {
         .scrollDismissesKeyboard(.interactively)
         .clipped()
         .contentMargins(.top, 0, for: .scrollContent)
-        .animation(.easeInOut(duration: 0.2), value: selectedHeaderTab)
+    }
+
+    // MARK: - Overview Content
+    private func overviewContentForPeriod(_ period: String) -> some View {
+        let breakdowns = getCachedBreakdowns(for: period)
+        let totalSpend = totalSpendForPeriod(period)
+        let totalReceipts = totalReceiptsForPeriod(period)
+        let segments = storeSegmentsForPeriod(period)
+
+        return VStack(spacing: 16) {
+            // Total spending and health score cards
+            totalSpendingCardForPeriod(period)
+                .premiumFadeIn(delay: 0)
+
+            healthScoreCardForPeriod(period)
+                .premiumFadeIn(delay: 0.08)
+
+            // Donut chart with store breakdown
+            if !breakdowns.isEmpty {
+                FlippableAllStoresChartView(
+                    totalAmount: totalSpend,
+                    segments: segments,
+                    size: 200,
+                    totalReceipts: totalReceipts,
+                    trends: [],
+                    accentColor: Color(red: 0.95, green: 0.25, blue: 0.3),
+                    selectedPeriod: period
+                )
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+                .premiumFadeIn(delay: 0.16)
+
+                // Store legend
+                VStack(spacing: 8) {
+                    ForEach(segments, id: \.id) { segment in
+                        Button {
+                            // Navigate to store transactions
+                            if let breakdown = breakdowns.first(where: { $0.storeName == segment.storeName }) {
+                                selectedBreakdown = breakdown
+                            }
+                        } label: {
+                            overviewStoreRow(segment: segment)
+                        }
+                        .buttonStyle(OverviewStoreRowButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .premiumFadeIn(delay: 0.24)
+            }
+        }
+    }
+
+    // MARK: - Store Segments for Period
+    private func storeSegmentsForPeriod(_ period: String) -> [StoreChartSegment] {
+        let breakdowns = getCachedBreakdowns(for: period)
+        let totalSpend = totalSpendForPeriod(period)
+
+        guard totalSpend > 0 else { return [] }
+
+        var currentAngle: Double = 0
+        let colors: [Color] = [
+            Color(red: 0.3, green: 0.7, blue: 1.0),   // Blue
+            Color(red: 0.4, green: 0.8, blue: 0.5),   // Green
+            Color(red: 1.0, green: 0.7, blue: 0.3),   // Orange
+            Color(red: 0.9, green: 0.4, blue: 0.6),   // Pink
+            Color(red: 0.7, green: 0.5, blue: 1.0),   // Purple
+            Color(red: 0.3, green: 0.9, blue: 0.9),   // Cyan
+            Color(red: 1.0, green: 0.6, blue: 0.4),   // Coral
+            Color(red: 0.6, green: 0.9, blue: 0.4),   // Lime
+        ]
+
+        return breakdowns.enumerated().map { index, breakdown in
+            let percentage = breakdown.totalStoreSpend / totalSpend
+            let angleRange = 360.0 * percentage
+            let segment = StoreChartSegment(
+                startAngle: .degrees(currentAngle),
+                endAngle: .degrees(currentAngle + angleRange),
+                color: colors[index % colors.count],
+                storeName: breakdown.storeName,
+                amount: breakdown.totalStoreSpend,
+                percentage: Int(percentage * 100),
+                healthScore: breakdown.averageHealthScore
+            )
+            currentAngle += angleRange
+            return segment
+        }
+    }
+
+    // MARK: - Overview Store Row
+    private func overviewStoreRow(segment: StoreChartSegment) -> some View {
+        HStack {
+            Circle()
+                .fill(segment.color)
+                .frame(width: 10, height: 10)
+
+            Text(segment.storeName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Spacer()
+
+            Text("\(segment.percentage)%")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.5))
+                .frame(width: 40, alignment: .trailing)
+
+            Text(String(format: "€%.0f", segment.amount))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .frame(width: 60, alignment: .trailing)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.white.opacity(0.3))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 
     // MARK: - Receipts Content
@@ -1976,6 +2058,16 @@ struct TotalSpendingCardButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Overview Store Row Button Style
+struct OverviewStoreRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
