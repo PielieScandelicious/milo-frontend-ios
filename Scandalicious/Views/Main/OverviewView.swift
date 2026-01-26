@@ -985,13 +985,11 @@ struct OverviewView: View {
                             tabContentView(for: tab, bottomSafeArea: geometry.safeAreaInsets.bottom)
                                 .frame(width: geometry.size.width)
                                 .id(tab)
-                                .containerRelativeFrame(.horizontal)
                         }
                     }
                     .scrollTargetLayout()
                 }
-                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
-                .scrollBounceBehavior(.basedOnSize)
+                .scrollTargetBehavior(.paging)
                 .scrollPosition(id: Binding(
                     get: { selectedHeaderTab },
                     set: { newValue in
@@ -1131,7 +1129,7 @@ struct OverviewView: View {
 
     // MARK: - Tab Content View (for swipe navigation between tabs)
     private func tabContentView(for tab: HeaderTab, bottomSafeArea: CGFloat) -> some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
                 switch tab {
                 case .overview:
@@ -1143,11 +1141,10 @@ struct OverviewView: View {
                 }
             }
             .padding(.top, 8)
-            .padding(.bottom, bottomSafeArea) // Add padding so last item can scroll above tab bar
+            .padding(.bottom, bottomSafeArea)
             .frame(maxWidth: .infinity)
+            .contentShape(Rectangle()) // Ensure entire content area is scrollable
         }
-        .scrollIndicators(.hidden)
-        .scrollClipDisabled() // Allow content to render behind the translucent tab bar
     }
 
     // MARK: - Overview Content
@@ -1545,19 +1542,22 @@ struct OverviewView: View {
                                         onReorder: saveCustomOrder
                                     ))
                             } else {
-                                storeChartCard(breakdown, totalPeriodSpend: totalPeriodSpend, rank: index, totalStores: breakdowns.count)
-                                    .staggeredGridAppearance(index: index, columns: 3, period: period)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        selectedBreakdown = breakdown
-                                    }
-                                    .onLongPressGesture(minimumDuration: 0.5) {
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                            isEditMode = true
+                                Button {
+                                    selectedBreakdown = breakdown
+                                } label: {
+                                    storeChartCard(breakdown, totalPeriodSpend: totalPeriodSpend, rank: index, totalStores: breakdowns.count)
+                                }
+                                .buttonStyle(StoreCardButtonStyle())
+                                .simultaneousGesture(
+                                    LongPressGesture(minimumDuration: 0.5)
+                                        .onEnded { _ in
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                isEditMode = true
+                                            }
+                                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                                            generator.impactOccurred()
                                         }
-                                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                                        generator.impactOccurred()
-                                    }
+                                )
                             }
 
                             // Delete button (X) in edit mode
@@ -1621,50 +1621,6 @@ struct OverviewView: View {
         generator.impactOccurred()
     }
 
-// MARK: - Drop Delegate for Drag and Drop Reordering
-struct DropViewDelegate: DropDelegate {
-    let destinationItem: StoreBreakdown
-    @Binding var items: [StoreBreakdown]
-    @Binding var draggingItem: StoreBreakdown?
-    let onReorder: () -> Void // Callback to save order
-    
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        return DropProposal(operation: .move)
-    }
-    
-    func performDrop(info: DropInfo) -> Bool {
-        // Haptic feedback on drop completion
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-        
-        draggingItem = nil
-        
-        // Save the new order after drop completes
-        onReorder()
-        
-        return true
-    }
-    
-    func dropEntered(info: DropInfo) {
-        guard let draggingItem = draggingItem else { return }
-        
-        if draggingItem != destinationItem {
-            let fromIndex = items.firstIndex(of: draggingItem)
-            let toIndex = items.firstIndex(of: destinationItem)
-            
-            if let fromIndex = fromIndex, let toIndex = toIndex {
-                // Haptic feedback on reorder
-                let generator = UISelectionFeedbackGenerator()
-                generator.selectionChanged()
-                
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
-                }
-            }
-        }
-    }
-}
-    
     private func storeChartCard(_ breakdown: StoreBreakdown, totalPeriodSpend: Double, rank: Int, totalStores: Int) -> some View {
         // Calculate this store's percentage of total period spending
         let otherSpend = max(0, totalPeriodSpend - breakdown.totalStoreSpend)
@@ -1705,6 +1661,50 @@ struct DropViewDelegate: DropDelegate {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Drop Delegate for Drag and Drop Reordering
+struct DropViewDelegate: DropDelegate {
+    let destinationItem: StoreBreakdown
+    @Binding var items: [StoreBreakdown]
+    @Binding var draggingItem: StoreBreakdown?
+    let onReorder: () -> Void // Callback to save order
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        // Haptic feedback on drop completion
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+
+        draggingItem = nil
+
+        // Save the new order after drop completes
+        onReorder()
+
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingItem = draggingItem else { return }
+
+        if draggingItem != destinationItem {
+            let fromIndex = items.firstIndex(of: draggingItem)
+            let toIndex = items.firstIndex(of: destinationItem)
+
+            if let fromIndex = fromIndex, let toIndex = toIndex {
+                // Haptic feedback on reorder
+                let generator = UISelectionFeedbackGenerator()
+                generator.selectionChanged()
+
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+                }
+            }
+        }
     }
 }
 
@@ -1867,73 +1867,10 @@ struct PeriodFadeInModifier: ViewModifier {
     }
 }
 
-// MARK: - Period-Aware Staggered Grid Card Modifier
-/// Premium staggered animation for grid cards (left-to-right, top-to-bottom).
-/// Triggers when view appears OR when period changes while visible.
-struct PeriodStaggeredGridCardModifier: ViewModifier {
-    let index: Int
-    let columns: Int
-    let period: String
-    @State private var isVisible = false
-    @State private var animatedPeriod: String = ""
-    @State private var isOnScreen = false
-
-    // Calculate delay based on position: left-to-right within row, then next row
-    private var appearDelay: Double {
-        let row = index / columns
-        let col = index % columns
-        // Base delay + row delay + column delay (left to right)
-        return 0.15 + (Double(row) * 0.12) + (Double(col) * 0.08)
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(isVisible ? 1 : 0)
-            .scaleEffect(isVisible ? 1 : 0.92)
-            .offset(y: isVisible ? 0 : 15)
-            .onChange(of: period) { oldValue, newValue in
-                // Reset and re-animate when period changes while view is on screen
-                isVisible = false
-                animatedPeriod = ""
-                if isOnScreen {
-                    triggerAnimation()
-                }
-            }
-            .onAppear {
-                isOnScreen = true
-                // Animate when view appears on screen with a new period
-                if animatedPeriod != period {
-                    triggerAnimation()
-                }
-            }
-            .onDisappear {
-                isOnScreen = false
-            }
-    }
-
-    private func triggerAnimation() {
-        guard animatedPeriod != period else { return }
-        isVisible = false
-        animatedPeriod = period
-
-        Task {
-            try? await Task.sleep(for: .milliseconds(Int(appearDelay * 1000)))
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                isVisible = true
-            }
-        }
-    }
-}
-
 extension View {
     /// Period-aware fade-in - resets when period changes, persists during tab swipes
     func smoothFadeIn(delay: Double = 0, period: String) -> some View {
         modifier(PeriodFadeInModifier(delay: delay, period: period))
-    }
-
-    /// Period-aware staggered grid appearance (left-to-right, top-to-bottom)
-    func staggeredGridAppearance(index: Int, columns: Int = 3, period: String) -> some View {
-        modifier(PeriodStaggeredGridCardModifier(index: index, columns: columns, period: period))
     }
 }
 
