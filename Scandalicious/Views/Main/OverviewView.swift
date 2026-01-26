@@ -1013,11 +1013,26 @@ struct OverviewView: View {
 
             // Center: Period display with transaction count
             VStack(spacing: 4) {
-                Text(selectedPeriod.uppercased())
-                    .font(.system(size: 16, weight: .bold, design: .default))
-                    .foregroundColor(.white)
-                    .tracking(1.5)
-                    .contentTransition(.interpolate)
+                HStack(spacing: 8) {
+                    Text(selectedPeriod.uppercased())
+                        .font(.system(size: 16, weight: .bold, design: .default))
+                        .foregroundColor(.white)
+                        .tracking(1.5)
+                        .contentTransition(.interpolate)
+
+                    // Current period indicator
+                    if isCurrentPeriod {
+                        Text("NOW")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.25))
+                            )
+                    }
+                }
 
                 // Receipt count sublabel
                 Text(receiptCountLabel)
@@ -1042,6 +1057,15 @@ struct OverviewView: View {
             .disabled(!canGoToNextPeriod)
         }
         .padding(.horizontal, 8)
+    }
+
+    // MARK: - Current Period Check
+    private var isCurrentPeriod: Bool {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        let currentMonth = dateFormatter.string(from: Date())
+        return selectedPeriod == currentMonth
     }
 
     // MARK: - Receipt Count Label
