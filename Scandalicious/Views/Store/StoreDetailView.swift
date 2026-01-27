@@ -18,14 +18,22 @@ struct StoreDetailView: View {
     @State private var trends: [TrendPeriod] = []
     @State private var isLoadingTrends = false
 
+    // Live data that can be refreshed from backend
+    @State private var currentTotalSpend: Double = 0
+    @State private var currentVisitCount: Int = 0
+    @State private var currentCategories: [Category] = []
+    @State private var currentHealthScore: Double?
+    @State private var isRefreshing = false
+    @State private var hasInitialized = false
+
     // Accent color for the line chart - modern red
     private var chartAccentColor: Color {
         Color(red: 0.95, green: 0.25, blue: 0.3)
     }
 
-    // Top 5 categories + "Other" grouping
+    // Top 5 categories + "Other" grouping - uses refreshable currentCategories
     private var groupedChartSegments: [ChartSegment] {
-        let sortedCategories = storeBreakdown.categories.sorted { $0.spent > $1.spent }
+        let sortedCategories = currentCategories.sorted { $0.spent > $1.spent }
 
         if sortedCategories.count <= 5 {
             return sortedCategories.toChartSegments()
@@ -65,13 +73,13 @@ struct StoreDetailView: View {
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.white.opacity(0.6))
 
-                            Text(String(format: "€%.0f", storeBreakdown.totalStoreSpend))
+                            Text(String(format: "€%.0f", currentTotalSpend))
                                 .font(.system(size: 48, weight: .heavy, design: .rounded))
                                 .foregroundColor(.white)
                                 .padding(.top, 8)
 
                             // Health Score indicator (placeholder - will show when backend provides data)
-                            if let healthScore = storeBreakdown.averageHealthScore {
+                            if let healthScore = currentHealthScore {
                                 Divider()
                                     .background(Color.white.opacity(0.2))
                                     .padding(.horizontal, 40)
@@ -111,8 +119,8 @@ struct StoreDetailView: View {
                     VStack(spacing: 20) {
                         FlippableDonutChartView(
                             title: "",
-                            subtitle: storeBreakdown.visitCount == 1 ? "receipt" : "receipts",
-                            totalAmount: Double(storeBreakdown.visitCount),
+                            subtitle: currentVisitCount == 1 ? "receipt" : "receipts",
+                            totalAmount: Double(currentVisitCount),
                             segments: groupedChartSegments,
                             size: 220,
                             trends: trends,
@@ -200,6 +208,92 @@ struct StoreDetailView: View {
         }
         .task {
             await fetchTrends()
+        }
+        .onAppear {
+            if !hasInitialized {
+                // First appearance: initialize state from the passed-in breakdown
+                currentTotalSpend = storeBreakdown.totalStoreSpend
+                currentVisitCount = storeBreakdown.visitCount
+                currentCategories = storeBreakdown.categories
+                currentHealthScore = storeBreakdown.averageHealthScore
+                hasInitialized = true
+            } else {
+                // Subsequent appearances (navigating back): refresh from backend
+                // This handles the case where a receipt was deleted in ReceiptsListView
+                print("🔄 [StoreDetailView] Re-appeared - refreshing from backend")
+                Task {
+                    await refreshStoreData()
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
+            print("🗑️ [StoreDetailView] Received receiptsDataDidChange - refreshing store data")
+            Task {
+                // Wait for backend to process the change
+                try? await Task.sleep(for: .seconds(0.5))
+                await refreshStoreData()
+            }
+        }
+    }
+
+    // MARK: - Refresh Store Data from Backend
+
+    private func refreshStoreData() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        do {
+            // Parse the period to get date range
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+            dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+            guard let parsedDate = dateFormatter.date(from: storeBreakdown.period) else {
+                print("❌ [StoreDetailView] Could not parse period: \(storeBreakdown.period)")
+                return
+            }
+
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: "UTC")!
+
+            let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
+            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+
+            // Create filters for this store and period
+            var filters = AnalyticsFilters()
+            filters.period = .month
+            filters.startDate = startOfMonth
+            filters.endDate = endOfMonth
+            filters.storeName = storeBreakdown.storeName
+
+            print("📡 [StoreDetailView] Fetching fresh data for \(storeBreakdown.storeName)")
+            let storeDetails = try await AnalyticsAPIService.shared.getStoreDetails(
+                storeName: storeBreakdown.storeName,
+                filters: filters
+            )
+
+            // Convert categories
+            let categories = storeDetails.categories.map { categoryBreakdown in
+                Category(
+                    name: categoryBreakdown.name,
+                    spent: categoryBreakdown.spent,
+                    percentage: Int(categoryBreakdown.percentage)
+                )
+            }
+
+            // Update state on main thread
+            await MainActor.run {
+                currentTotalSpend = storeDetails.totalSpend
+                currentVisitCount = storeDetails.visitCount
+                currentCategories = categories
+                currentHealthScore = storeDetails.averageHealthScore
+                print("✅ [StoreDetailView] Updated: €\(storeDetails.totalSpend), \(storeDetails.visitCount) receipts")
+            }
+
+        } catch {
+            print("❌ [StoreDetailView] Failed to refresh store data: \(error.localizedDescription)")
         }
     }
 
