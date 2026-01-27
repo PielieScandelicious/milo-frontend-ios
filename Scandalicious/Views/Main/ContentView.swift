@@ -156,11 +156,8 @@ struct ViewTab: View {
 // MARK: - Scan Tab
 struct ScanTab: View {
     var body: some View {
-        NavigationStack {
-            ReceiptScanView()
-                .toolbar(.hidden, for: .navigationBar)
-        }
-        .id("ScanTab") // Prevent recreation
+        ReceiptScanView()
+            .id("ScanTab") // Prevent recreation
     }
 }
 
