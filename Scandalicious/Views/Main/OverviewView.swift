@@ -1111,7 +1111,7 @@ struct OverviewView: View {
                 // Receipts list - sorted newest to oldest
                 LazyVStack(spacing: 12) {
                     ForEach(sortedReceipts) { receipt in
-                        SwipeableReceiptRow(
+                        ReceiptRowWithDelete(
                             receipt: receipt,
                             onTap: {
                                 selectedReceiptForDetail = receipt
