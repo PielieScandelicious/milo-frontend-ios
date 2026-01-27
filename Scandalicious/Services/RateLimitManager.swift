@@ -133,7 +133,7 @@ class RateLimitManager: ObservableObject {
 
     /// Formatted message usage string
     var usageDisplayString: String {
-        "\(messagesRemaining)/\(messagesLimit) messages left"
+        "\(messagesRemaining)/\(messagesLimit) messages"
     }
 
     /// Message to display when rate limited
