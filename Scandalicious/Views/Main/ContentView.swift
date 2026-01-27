@@ -12,7 +12,7 @@ struct ContentView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @StateObject private var transactionManager = TransactionManager()
     @StateObject private var dataManager = StoreDataManager()
-    @State private var selectedTab: Tab = .view
+    @State private var selectedTab: Tab = .scan
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
     
