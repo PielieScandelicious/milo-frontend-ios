@@ -54,10 +54,7 @@ struct ScandaLiciousAIChatView: View {
                                 MessageBubbleView(message: message)
                                     .environmentObject(viewModel)
                                     .id(message.id)
-                                    .transition(.asymmetric(
-                                        insertion: .opacity.combined(with: .move(edge: .bottom)),
-                                        removal: .opacity
-                                    ))
+                                    .transition(.opacity)
                             }
                         }
                         
@@ -425,9 +422,8 @@ struct MessageBubbleView: View {
                     }
                 }
                 .opacity(isVisible ? 1.0 : 0.0)
-                .offset(x: isVisible ? 0 : (message.role == .assistant ? -30 : 30))
                 .onAppear {
-                    withAnimation(.easeInOut(duration: 0.8).delay(0.1)) {
+                    withAnimation(.easeIn(duration: 0.3)) {
                         isVisible = true
                     }
                 }
