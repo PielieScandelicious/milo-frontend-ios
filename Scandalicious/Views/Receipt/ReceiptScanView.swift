@@ -132,9 +132,9 @@ struct ReceiptScanView: View {
 
                     // Hide after delay and start processing
                     Task {
-                        try? await Task.sleep(for: .seconds(0.8))
+                        try? await Task.sleep(for: .seconds(1.8))
                         await MainActor.run {
-                            withAnimation(.easeOut(duration: 0.2)) {
+                            withAnimation(.easeOut(duration: 0.3)) {
                                 showCaptureSuccess = false
                             }
                         }
@@ -799,6 +799,10 @@ struct CaptureSuccessOverlay: View {
             Color.black.opacity(0.6)
                 .ignoresSafeArea()
 
+            // Confetti layer - always present, animates on appear
+            ConfettiView()
+                .allowsHitTesting(false)
+
             // Success card
             VStack(spacing: 20) {
                 // Animated checkmark circle
@@ -857,6 +861,197 @@ struct CaptureSuccessOverlay: View {
                 ringOpacity = 0
             }
         }
+    }
+}
+
+// MARK: - Confetti View
+
+struct ConfettiView: View {
+    @State private var confettiPieces: [ConfettiData] = []
+
+    private let confettiColors: [Color] = [
+        Color.green,
+        Color(red: 0.3, green: 0.85, blue: 0.5),
+        Color.yellow,
+        Color.orange,
+        Color.pink,
+        Color.purple,
+        Color.blue,
+        Color.cyan,
+        Color.red,
+        Color.mint
+    ]
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                ForEach(confettiPieces) { piece in
+                    ConfettiPieceView(data: piece, screenSize: geometry.size)
+                }
+            }
+            .onAppear {
+                generateConfetti()
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    private func generateConfetti() {
+        var pieces: [ConfettiData] = []
+        let totalPieces = 80
+
+        // Create evenly distributed burst in all 360 degrees
+        for i in 0..<totalPieces {
+            // Distribute angles evenly with small random variation
+            let baseAngle = (Double(i) / Double(totalPieces)) * 360.0
+            let angleVariation = Double.random(in: -8...8)
+            let angle = (baseAngle + angleVariation) * .pi / 180
+
+            // Random distance for depth variation
+            let distance = CGFloat.random(in: 150...400)
+
+            // Determine which "wave" this piece is in (creates layered burst effect)
+            let wave = i % 3
+            let waveDelay = Double(wave) * 0.05
+
+            pieces.append(ConfettiData(
+                id: i,
+                color: confettiColors[i % confettiColors.count],
+                size: CGFloat.random(in: 6...16),
+                shapeType: Int.random(in: 0...3), // Added star shape
+                angle: angle,
+                distance: distance,
+                gravityOffset: CGFloat.random(in: 100...300), // Gravity pull down
+                animationDuration: Double.random(in: 0.8...1.4),
+                finalRotation: Double.random(in: 540...1080),
+                delay: waveDelay + Double.random(in: 0...0.1)
+            ))
+        }
+
+        confettiPieces = pieces
+    }
+}
+
+// MARK: - Confetti Data
+
+struct ConfettiData: Identifiable {
+    let id: Int
+    let color: Color
+    let size: CGFloat
+    let shapeType: Int // 0=circle, 1=rectangle, 2=triangle, 3=star
+    let angle: Double
+    let distance: CGFloat
+    let gravityOffset: CGFloat
+    let animationDuration: Double
+    let finalRotation: Double
+    let delay: Double
+}
+
+// MARK: - Confetti Piece View
+
+struct ConfettiPieceView: View {
+    let data: ConfettiData
+    let screenSize: CGSize
+
+    @State private var offset: CGSize = .zero
+    @State private var rotation: Double = 0
+    @State private var opacity: Double = 1
+    @State private var scale: CGFloat = 0
+
+    var body: some View {
+        Group {
+            switch data.shapeType {
+            case 0:
+                Circle()
+                    .fill(data.color)
+                    .frame(width: data.size, height: data.size)
+            case 1:
+                Rectangle()
+                    .fill(data.color)
+                    .frame(width: data.size, height: data.size * 0.6)
+            case 2:
+                Triangle()
+                    .fill(data.color)
+                    .frame(width: data.size, height: data.size)
+            default:
+                Star()
+                    .fill(data.color)
+                    .frame(width: data.size * 1.2, height: data.size * 1.2)
+            }
+        }
+        .scaleEffect(scale)
+        .rotationEffect(.degrees(rotation))
+        .offset(offset)
+        .opacity(opacity)
+        .position(x: screenSize.width / 2, y: screenSize.height / 2)
+        .onAppear {
+            // Calculate burst direction (360 degrees around center)
+            let burstX = cos(data.angle) * data.distance
+            let burstY = sin(data.angle) * data.distance
+
+            // Add gravity effect - pieces fall down after bursting
+            let finalY = burstY + data.gravityOffset
+
+            // Pop in with scale
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6).delay(data.delay)) {
+                scale = 1.0
+            }
+
+            // Burst outward animation - fast explosive start
+            withAnimation(.easeOut(duration: data.animationDuration).delay(data.delay)) {
+                offset = CGSize(width: burstX, height: finalY)
+                rotation = data.finalRotation
+            }
+
+            // Fade out near the end
+            withAnimation(.easeIn(duration: 0.4).delay(data.delay + data.animationDuration * 0.7)) {
+                opacity = 0
+            }
+        }
+    }
+}
+
+// MARK: - Triangle Shape
+
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+// MARK: - Star Shape
+
+struct Star: Shape {
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let outerRadius = min(rect.width, rect.height) / 2
+        let innerRadius = outerRadius * 0.4
+        let points = 5
+
+        var path = Path()
+
+        for i in 0..<(points * 2) {
+            let angle = (Double(i) * .pi / Double(points)) - (.pi / 2)
+            let radius = i % 2 == 0 ? outerRadius : innerRadius
+            let point = CGPoint(
+                x: center.x + CGFloat(cos(angle)) * radius,
+                y: center.y + CGFloat(sin(angle)) * radius
+            )
+
+            if i == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+
+        path.closeSubpath()
+        return path
     }
 }
 
