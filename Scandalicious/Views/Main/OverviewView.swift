@@ -950,7 +950,7 @@ struct OverviewView: View {
                 }
             }
             .padding(.top, 8)
-            .padding(.bottom, bottomSafeArea + 100) // Extra padding to clear tab bar
+            .padding(.bottom, bottomSafeArea + 90) // Extra padding to clear tab bar
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle()) // Ensure entire content area is scrollable
         }
