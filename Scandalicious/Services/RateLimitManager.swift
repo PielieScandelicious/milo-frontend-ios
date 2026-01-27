@@ -384,8 +384,16 @@ class RateLimitManager: ObservableObject {
             syncFromResponse(status)
             print("✅ Rate limit synced - Receipts: \(receiptsUsed)/\(receiptsLimit) used, \(receiptsRemaining) remaining")
         } catch {
-            lastSyncError = error.localizedDescription
-            print("❌ Failed to sync rate limit: \(error)")
+            // Check if it's a timeout error - these are non-critical and shouldn't alarm the user
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut {
+                // Timeout is non-critical - just log quietly and continue
+                print("⏱️ Rate limit sync timed out - using cached values (this is normal)")
+            } else {
+                // Only set lastSyncError for actual failures, not timeouts
+                lastSyncError = error.localizedDescription
+                print("❌ Failed to sync rate limit: \(error)")
+            }
             // Non-critical - app continues with cached/default values
         }
 
@@ -474,7 +482,7 @@ class RateLimitManager: ObservableObject {
         request.setValue("no-cache, no-store, must-revalidate", forHTTPHeaderField: "Cache-Control")
         request.setValue("no-cache", forHTTPHeaderField: "Pragma")
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        request.timeoutInterval = 10
+        request.timeoutInterval = 30
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
