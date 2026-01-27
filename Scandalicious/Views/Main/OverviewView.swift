@@ -8,7 +8,6 @@
 
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 import FirebaseAuth
 import Combine
 
@@ -29,7 +28,6 @@ enum SortOption: String, CaseIterable {
 // MARK: - Header Tab Options
 enum HeaderTab: String, CaseIterable {
     case overview = "Overview"
-    case stores = "Stores"
     case receipts = "Receipts"
 }
 
@@ -60,22 +58,12 @@ struct OverviewView: View {
     @State private var selectedSort: SortOption = .highestSpend
     @State private var selectedHeaderTab: HeaderTab = .overview
     @State private var showingFilterSheet = false
-    @State private var isEditMode = false {
-        didSet {
-            print("🔵🔵🔵 isEditMode changed from \(oldValue) to \(isEditMode)")
-        }
-    }
-    @State private var draggingItem: StoreBreakdown?
-    @State private var dragOffset: CGSize = .zero
-    @State private var isDragging = false
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var showingAllTransactions = false
     @State private var showTrendlineInOverview = false  // Toggle between pie chart and trendline
     @State private var showingHealthScoreTransactions = false
     @State private var showingProfileMenu = false
-    @State private var breakdownToDelete: StoreBreakdown?
-    @State private var showingDeleteConfirmation = false
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
     @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
@@ -83,9 +71,6 @@ struct OverviewView: View {
     @State private var overviewTrends: [TrendPeriod] = []  // Trends for the overview chart
     @State private var isLoadingTrends = false
     @Binding var showSignOutConfirmation: Bool
-
-    // User defaults key for storing order
-    private let orderStorageKey = "StoreBreakdownsOrder"
 
     // Receipt limit status icon
     private var receiptLimitIcon: String {
@@ -171,12 +156,6 @@ struct OverviewView: View {
     /// Get cached breakdowns for a specific period
     /// This avoids recalculating on every render and ensures correct data per period
     private func getCachedBreakdowns(for period: String) -> [StoreBreakdown] {
-        // For the selected period in edit mode, use displayedBreakdowns to support drag reordering
-        // But ONLY if displayedBreakdowns actually belongs to this period
-        if isEditMode && period == selectedPeriod && period == displayedBreakdownsPeriod && !displayedBreakdowns.isEmpty {
-            return displayedBreakdowns
-        }
-        // Always return cached data for the specific period requested
         return cachedBreakdownsByPeriod[period] ?? []
     }
 
@@ -224,45 +203,7 @@ struct OverviewView: View {
     private func updateDisplayedBreakdowns() {
         updateCacheForPeriod(selectedPeriod)
     }
-    
-    // MARK: - Custom Order Persistence
-    
-    private func saveCustomOrder() {
-        // Save the current order for this period
-        let storeIds = displayedBreakdowns.map { $0.id }
-        let key = "\(orderStorageKey)_\(selectedPeriod)"
-        UserDefaults.standard.set(storeIds, forKey: key)
-        print("💾 Saved custom order for \(selectedPeriod): \(storeIds)")
-    }
-    
-    private func applyCustomOrder(to breakdowns: [StoreBreakdown], for period: String) -> [StoreBreakdown] {
-        let key = "\(orderStorageKey)_\(period)"
-        guard let savedOrder = UserDefaults.standard.array(forKey: key) as? [String] else {
-            // No saved order, return as-is
-            return breakdowns
-        }
-        
-        // Create a dictionary for quick lookup
-        var breakdownDict = Dictionary(uniqueKeysWithValues: breakdowns.map { ($0.id, $0) })
-        
-        // Build ordered array based on saved order
-        var orderedBreakdowns: [StoreBreakdown] = []
-        
-        // First, add items in the saved order
-        for id in savedOrder {
-            if let breakdown = breakdownDict[id] {
-                orderedBreakdowns.append(breakdown)
-                breakdownDict.removeValue(forKey: id)
-            }
-        }
-        
-        // Then append any new items that weren't in the saved order
-        orderedBreakdowns.append(contentsOf: breakdownDict.values.sorted { $0.storeName < $1.storeName })
-        
-        print("📋 Applied custom order for \(period), \(orderedBreakdowns.count) items")
-        return orderedBreakdowns
-    }
-    
+
     private var totalPeriodSpending: Double {
         // Use the total spend from backend (sum of item_price) instead of summing store amounts
         dataManager.periodTotalSpends[selectedPeriod] ?? currentBreakdowns.reduce(0) { $0 + $1.totalStoreSpend }
@@ -273,51 +214,10 @@ struct OverviewView: View {
         dataManager.periodReceiptCounts[selectedPeriod] ?? currentBreakdowns.reduce(0) { $0 + $1.visitCount }
     }
 
-    // MARK: - Delete Functions
-    private func deleteBreakdowns(at offsets: IndexSet) {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            for index in offsets {
-                let breakdown = displayedBreakdowns[index]
-                dataManager.deleteBreakdownLocally(breakdown)
-            }
-            updateDisplayedBreakdowns()
-        }
-    }
-
-    private func deleteBreakdown(_ breakdown: StoreBreakdown) async {
-        // Determine period type from selected period
-        let periodType: PeriodType = {
-            switch selectedPeriod.lowercased() {
-            case let p where p.contains("week"): return .week
-            case let p where p.contains("year"): return .year
-            default: return .month
-            }
-        }()
-
-        let success = await dataManager.deleteBreakdown(breakdown, periodType: periodType)
-
-        if success {
-            await MainActor.run {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    displayedBreakdowns.removeAll { $0.id == breakdown.id }
-                    isEditMode = false
-                }
-            }
-        }
-    }
-    
     var body: some View {
         ZStack {
             appBackgroundColor.ignoresSafeArea()
-            
-            // Subtle overlay in edit mode - visual dimming effect
-            if isEditMode {
-                Color.black.opacity(0.15)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .allowsHitTesting(false) // Don't block touches - tap handled by ScrollView content
-            }
-            
+
             if let error = dataManager.error {
                 // Error state
                 VStack(spacing: 20) {
@@ -352,39 +252,6 @@ struct OverviewView: View {
             } else {
                 swipeableContentView
             }
-            
-            // Edit mode exit button overlay
-            if isEditMode {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                isEditMode = false
-                            }
-                            // Haptic feedback
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                        } label: {
-                            Text("Done")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 12)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.blue)
-                                        .shadow(color: .blue.opacity(0.5), radius: 10, x: 0, y: 4)
-                                )
-                        }
-                        .padding(.trailing, 20)
-                        .padding(.top, 20)
-                    }
-                    Spacer()
-                }
-                .allowsHitTesting(true)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $selectedBreakdown) { breakdown in
@@ -411,56 +278,6 @@ struct OverviewView: View {
             FilterSheet(
                 selectedSort: $selectedSort
             )
-        }
-        .alert(
-            "Delete \(breakdownToDelete?.storeName ?? "Store")?",
-            isPresented: $showingDeleteConfirmation
-        ) {
-            Button("Cancel", role: .cancel) {
-                breakdownToDelete = nil
-            }
-            Button("Delete", role: .destructive) {
-                // Haptic feedback
-                let generator = UIImpactFeedbackGenerator(style: .medium)
-                generator.impactOccurred()
-
-                if let breakdown = breakdownToDelete {
-                    Task {
-                        await deleteBreakdown(breakdown)
-                    }
-                }
-                breakdownToDelete = nil
-            }
-        } message: {
-            Text("This will remove all transactions for this store from \(selectedPeriod). This action cannot be undone.")
-        }
-        .alert("Delete Failed", isPresented: .init(
-            get: { dataManager.deleteError != nil },
-            set: { if !$0 { dataManager.deleteError = nil } }
-        )) {
-            Button("OK", role: .cancel) {
-                dataManager.deleteError = nil
-            }
-        } message: {
-            Text(dataManager.deleteError ?? "An error occurred while deleting.")
-        }
-        .overlay {
-            if dataManager.isDeleting {
-                ZStack {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(.white)
-                        Text("Deleting...")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                    }
-                    .padding(30)
-                    .background(Color(white: 0.15).cornerRadius(16))
-                }
-            }
         }
         .onAppear {
             // Configure with transaction manager if not already configured
@@ -584,18 +401,7 @@ struct OverviewView: View {
                 print("   📅 Switched to period: \(newPeriod)")
             }
         }
-        .onDisappear {
-            // Exit edit mode when switching tabs or navigating away
-            if isEditMode {
-                isEditMode = false
-            }
-        }
         .onChange(of: selectedPeriod) { oldValue, newValue in
-            // Exit edit mode when changing periods to avoid inconsistency
-            if isEditMode {
-                isEditMode = false
-            }
-
             // Reset trendline toggle when changing periods (show pie chart)
             if showTrendlineInOverview {
                 showTrendlineInOverview = false
@@ -633,18 +439,12 @@ struct OverviewView: View {
             }
         }
         .onChange(of: selectedSort) { oldValue, newValue in
-            // Exit edit mode when changing sort to avoid inconsistency
-            if isEditMode {
-                isEditMode = false
-            }
             // Rebuild entire cache since sorting affects all periods
             rebuildBreakdownCache()
         }
         .onChange(of: dataManager.storeBreakdowns) { oldValue, newValue in
-            if !isEditMode {
-                // Rebuild cache when underlying data changes
-                rebuildBreakdownCache()
-            }
+            // Rebuild cache when underlying data changes
+            rebuildBreakdownCache()
             // Prefetch insights when data changes
             prefetchInsights()
         }
@@ -969,13 +769,6 @@ struct OverviewView: View {
         .padding(.horizontal)
     }
 
-    // Grid columns - defined once to avoid recreating on every render
-    private let storeGridColumns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     private var swipeableContentView: some View {
         GeometryReader { geometry in
             ScrollViewReader { scrollProxy in
@@ -1134,8 +927,6 @@ struct OverviewView: View {
                 switch tab {
                 case .overview:
                     overviewContentForPeriod(selectedPeriod)
-                case .stores:
-                    storeBreakdownsGridForPeriod(selectedPeriod)
                 case .receipts:
                     receiptsContentForPeriod(selectedPeriod)
                 }
@@ -1150,7 +941,6 @@ struct OverviewView: View {
     // MARK: - Overview Content
     private func overviewContentForPeriod(_ period: String) -> some View {
         let breakdowns = getCachedBreakdowns(for: period)
-        let totalSpend = totalSpendForPeriod(period)
         let totalReceipts = totalReceiptsForPeriod(period)
         let segments = storeSegmentsForPeriod(period)
 
@@ -1327,15 +1117,6 @@ struct OverviewView: View {
         return dataManager.averageHealthScore
     }
 
-    private func storeCountForPeriod(_ period: String) -> Int {
-        // First check period metadata
-        if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
-            return metadata.storeCount
-        }
-        // Fallback to breakdown count
-        return breakdownsForPeriod(period).count
-    }
-
     private func totalSpendingCardForPeriod(_ period: String) -> some View {
         let spending = totalSpendForPeriod(period)
 
@@ -1500,97 +1281,6 @@ struct OverviewView: View {
         .padding(.horizontal, 16)
     }
 
-    private func storeBreakdownsGridForPeriod(_ period: String) -> some View {
-        // Use cached breakdowns to avoid recalculating during swipes
-        let breakdowns = getCachedBreakdowns(for: period)
-        let isLoadingPeriod = !dataManager.periodMetadata.isEmpty && !dataManager.isPeriodLoaded(period) && breakdowns.isEmpty
-        let storeCount = storeCountForPeriod(period)
-        let totalPeriodSpend = totalSpendForPeriod(period)
-
-        return VStack(spacing: 0) {
-            if isLoadingPeriod && storeCount > 0 {
-                // Show skeleton loading cards with staggered appearance
-                LazyVGrid(columns: storeGridColumns, spacing: 12) {
-                    ForEach(0..<storeCount, id: \.self) { index in
-                        SkeletonStoreCard(index: index)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .transition(.opacity)
-            } else {
-                LazyVGrid(columns: storeGridColumns, spacing: 12) {
-                    ForEach(Array(breakdowns.enumerated()), id: \.element.id) { index, breakdown in
-                        ZStack(alignment: .topTrailing) {
-                            // The card itself with staggered appearance
-                            if isEditMode && period == selectedPeriod {
-                                storeChartCard(breakdown, totalPeriodSpend: totalPeriodSpend, rank: index, totalStores: breakdowns.count)
-                                    .modifier(JiggleModifier(isJiggling: isEditMode && draggingItem?.id != breakdown.id))
-                                    .scaleEffect(draggingItem?.id == breakdown.id ? 1.05 : 1.0)
-                                    .opacity(draggingItem?.id == breakdown.id ? 0.5 : 1.0)
-                                    .zIndex(draggingItem?.id == breakdown.id ? 1 : 0)
-                                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: draggingItem?.id == breakdown.id)
-                                    .onDrag {
-                                        self.draggingItem = breakdown
-                                        let generator = UIImpactFeedbackGenerator(style: .light)
-                                        generator.impactOccurred()
-                                        return NSItemProvider(object: breakdown.id as NSString)
-                                    }
-                                    .onDrop(of: [UTType.text], delegate: DropViewDelegate(
-                                        destinationItem: breakdown,
-                                        items: $displayedBreakdowns,
-                                        draggingItem: $draggingItem,
-                                        onReorder: saveCustomOrder
-                                    ))
-                            } else {
-                                Button {
-                                    selectedBreakdown = breakdown
-                                } label: {
-                                    storeChartCard(breakdown, totalPeriodSpend: totalPeriodSpend, rank: index, totalStores: breakdowns.count)
-                                }
-                                .buttonStyle(StoreCardButtonStyle())
-                                .simultaneousGesture(
-                                    LongPressGesture(minimumDuration: 0.5)
-                                        .onEnded { _ in
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                isEditMode = true
-                                            }
-                                            let generator = UIImpactFeedbackGenerator(style: .medium)
-                                            generator.impactOccurred()
-                                        }
-                                )
-                            }
-
-                            // Delete button (X) in edit mode
-                            if isEditMode && period == selectedPeriod {
-                                Button {
-                                    breakdownToDelete = breakdown
-                                    showingDeleteConfirmation = true
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(.red)
-                                        .background(
-                                            Circle()
-                                                .fill(Color.white)
-                                                .frame(width: 18, height: 18)
-                                        )
-                                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                                }
-                                .buttonStyle(DeleteButtonStyle())
-                                .offset(x: 8, y: -8)
-                                .transition(.scale.combined(with: .opacity))
-                                .zIndex(1)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .transition(.opacity)
-            }
-        }
-        .animation(.easeOut(duration: 0.2), value: isLoadingPeriod)
-    }
-
     private var currentPeriodIndex: Int {
         availablePeriods.firstIndex(of: selectedPeriod) ?? 0
     }
@@ -1619,92 +1309,6 @@ struct OverviewView: View {
         }
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
-    }
-
-    private func storeChartCard(_ breakdown: StoreBreakdown, totalPeriodSpend: Double, rank: Int, totalStores: Int) -> some View {
-        // Calculate this store's percentage of total period spending
-        let otherSpend = max(0, totalPeriodSpend - breakdown.totalStoreSpend)
-
-        // Modern red color for all charts
-        let storeColor = Color(red: 0.95, green: 0.25, blue: 0.30)
-
-        // Create chart data: this store vs. other stores
-        let chartData: [ChartData] = [
-            ChartData(value: breakdown.totalStoreSpend, color: storeColor, label: breakdown.storeName),
-            ChartData(value: otherSpend, color: Color.white.opacity(0.1), label: "Other")
-        ]
-
-        return VStack(spacing: 6) {
-            IconDonutChartView(
-                data: chartData,
-                totalAmount: breakdown.totalStoreSpend,
-                size: 84,
-                currencySymbol: "€"
-            )
-            .drawingGroup()
-
-            Text(breakdown.storeName.uppercased())
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.white)
-                .tracking(0.5)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 10)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Drop Delegate for Drag and Drop Reordering
-struct DropViewDelegate: DropDelegate {
-    let destinationItem: StoreBreakdown
-    @Binding var items: [StoreBreakdown]
-    @Binding var draggingItem: StoreBreakdown?
-    let onReorder: () -> Void // Callback to save order
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        return DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        // Haptic feedback on drop completion
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-
-        draggingItem = nil
-
-        // Save the new order after drop completes
-        onReorder()
-
-        return true
-    }
-
-    func dropEntered(info: DropInfo) {
-        guard let draggingItem = draggingItem else { return }
-
-        if draggingItem != destinationItem {
-            let fromIndex = items.firstIndex(of: draggingItem)
-            let toIndex = items.firstIndex(of: destinationItem)
-
-            if let fromIndex = fromIndex, let toIndex = toIndex {
-                // Haptic feedback on reorder
-                let generator = UISelectionFeedbackGenerator()
-                generator.selectionChanged()
-
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
-                }
-            }
-        }
     }
 }
 
@@ -1755,65 +1359,6 @@ struct FilterSheet: View {
             }
         }
         .preferredColorScheme(.dark)
-    }
-}
-
-// MARK: - Jiggle Modifier for Edit Mode
-struct JiggleModifier: ViewModifier {
-    let isJiggling: Bool
-    @State private var rotation: Double = 0
-    @State private var offset: CGSize = .zero
-    
-    // Random but consistent values per instance
-    private let rotationAngle: Double
-    private let duration: Double
-    private let offsetMagnitude: CGFloat
-    
-    init(isJiggling: Bool) {
-        self.isJiggling = isJiggling
-        // Slight randomization for more natural feel
-        self.rotationAngle = Double.random(in: 2.0...3.0)
-        self.duration = Double.random(in: 0.12...0.14)
-        self.offsetMagnitude = CGFloat.random(in: 0.3...0.6)
-    }
-    
-    func body(content: Content) -> some View {
-        content
-            .rotationEffect(.degrees(rotation))
-            .offset(offset)
-            .task(id: isJiggling) {
-                guard isJiggling else {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        rotation = 0
-                        offset = .zero
-                    }
-                    return
-                }
-                
-                // Start with random direction for natural look
-                let startRotation: Double = Bool.random() ? rotationAngle : -rotationAngle
-                let startOffsetX: CGFloat = Bool.random() ? offsetMagnitude : -offsetMagnitude
-                let startOffsetY: CGFloat = Bool.random() ? offsetMagnitude : -offsetMagnitude
-                
-                rotation = startRotation
-                offset = CGSize(width: startOffsetX, height: startOffsetY)
-                
-                // Continuous jiggle loop with varied timing
-                while isJiggling {
-                    // Rotation jiggle
-                    withAnimation(.easeInOut(duration: duration)) {
-                        rotation = -rotation
-                    }
-                    
-                    // Offset jiggle (slightly different timing for organic feel)
-                    withAnimation(.easeInOut(duration: duration * 1.1)) {
-                        offset.width = -offset.width
-                        offset.height = offset.height * 0.9 // Subtle variation
-                    }
-                    
-                    try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
-                }
-            }
     }
 }
 
@@ -1898,91 +1443,6 @@ struct AnimatedNumberText: View {
                     displayValue = newValue
                 }
             }
-    }
-}
-
-// MARK: - Skeleton Store Card (Loading Placeholder)
-struct SkeletonStoreCard: View {
-    let index: Int
-    @State private var isAnimating = false
-    @State private var shimmerOffset: CGFloat = -150
-
-    // Fast stagger (40ms) for premium feel
-    private var appearDelay: Double {
-        0.16 + (Double(index) * 0.04)
-    }
-
-    var body: some View {
-        VStack(spacing: 10) {
-            // Skeleton donut chart
-            Circle()
-                .fill(Color.white.opacity(0.08))
-                .frame(width: 96, height: 96)
-                .overlay(
-                    Circle()
-                        .fill(Color(red: 0.08, green: 0.07, blue: 0.12))
-                        .frame(width: 59, height: 59)
-                )
-                .overlay(
-                    Circle()
-                        .trim(from: 0, to: 0.7)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            style: StrokeStyle(lineWidth: 15, lineCap: .round)
-                        )
-                        .frame(width: 81, height: 81)
-                        .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                )
-
-            // Skeleton store name
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.white.opacity(0.08))
-                .frame(width: 65, height: 16)
-        }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-        .overlay(
-            // Shimmer effect
-            RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0),
-                            Color.white.opacity(0.05),
-                            Color.white.opacity(0)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .offset(x: shimmerOffset)
-        )
-        .clipped()
-        .opacity(isAnimating ? 1 : 0)
-        .scaleEffect(isAnimating ? 1 : 0.98)
-        .onAppear {
-            // Premium fade-in
-            withAnimation(.easeOut(duration: 0.3).delay(appearDelay)) {
-                isAnimating = true
-            }
-            // Continuous shimmer animation
-            withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
-                shimmerOffset = 150
-            }
-        }
     }
 }
 
@@ -2121,16 +1581,6 @@ struct PeriodNavButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Store Card Button Style
-struct StoreCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
-}
-
 // MARK: - Total Spending Card Button Style
 struct TotalSpendingCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -2148,24 +1598,6 @@ struct OverviewStoreRowButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .opacity(configuration.isPressed ? 0.8 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
-}
-
-// MARK: - Delete Button Style
-struct DeleteButtonStyle: ButtonStyle {
-    @State private var isPulsing = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.85 : (isPulsing ? 1.1 : 1.0))
-            .opacity(configuration.isPressed ? 0.7 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-            .onAppear {
-                // Subtle pulse animation on appear
-                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                    isPulsing = true
-                }
-            }
     }
 }
 
