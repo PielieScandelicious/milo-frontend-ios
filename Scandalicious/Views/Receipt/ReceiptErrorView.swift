@@ -13,7 +13,7 @@ enum ReceiptStatusType {
     case uploading(subtitle: String)
     case processing(subtitle: String)
     case success(message: String)
-    case failed(message: String, canRetry: Bool)
+    case failed(message: String, canRetry: Bool, title: String = "Upload Failed")
 }
 
 /// A unified view for displaying all receipt upload states in a consistent box
@@ -43,7 +43,7 @@ struct ReceiptStatusView: View {
             }
             
             // Action Buttons (only for failed state)
-            if case .failed(_, let canRetry) = status {
+            if case .failed(_, let canRetry, _) = status {
                 VStack(spacing: 12) {
                     if canRetry, let onRetry = onRetry {
                         Button {
@@ -141,8 +141,8 @@ struct ReceiptStatusView: View {
             return "Processing..."
         case .success:
             return "Done!"
-        case .failed:
-            return "Upload Failed"
+        case .failed(_, _, let title):
+            return title
         }
     }
     
@@ -154,7 +154,7 @@ struct ReceiptStatusView: View {
             return subtitle
         case .success(let message):
             return message
-        case .failed(let message, _):
+        case .failed(let message, _, _):
             return message
         }
     }
@@ -181,9 +181,9 @@ struct ReceiptErrorView: View {
     let message: String
     let onRetry: (() -> Void)?
     let onDismiss: () -> Void
-    
+
     init(
-        title: String = "Processing Failed!",
+        title: String = "Upload Failed",
         message: String,
         onRetry: (() -> Void)? = nil,
         onDismiss: @escaping () -> Void
@@ -193,10 +193,10 @@ struct ReceiptErrorView: View {
         self.onRetry = onRetry
         self.onDismiss = onDismiss
     }
-    
+
     var body: some View {
         ReceiptStatusView(
-            status: .failed(message: message, canRetry: onRetry != nil),
+            status: .failed(message: message, canRetry: onRetry != nil, title: title),
             onRetry: onRetry,
             onDismiss: onDismiss
         )
@@ -527,8 +527,8 @@ class ReceiptStatusViewController: UIViewController {
                 containerBottomConstraint = messageLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -32)
             }
 
-        case .failed(let message, let canRetry):
-            titleLabel.text = "Upload Failed"
+        case .failed(let message, let canRetry, let title):
+            titleLabel.text = title
             messageLabel.text = message
             messageLabel.isHidden = message.isEmpty
             messageLabelHeightConstraint?.isActive = message.isEmpty

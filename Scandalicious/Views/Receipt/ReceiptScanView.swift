@@ -17,6 +17,7 @@ struct ReceiptScanView: View {
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
     @State private var errorMessage: String?
+    @State private var errorTitle: String = "Upload Failed"
     @State private var showError = false
     @State private var uploadState: ReceiptUploadState = .idle
     @State private var uploadedReceipt: ReceiptUploadResponse?
@@ -82,9 +83,11 @@ struct ReceiptScanView: View {
         }
         .receiptErrorOverlay(
             isPresented: $showError,
+            title: errorTitle,
             message: errorMessage ?? "Failed to process receipt",
             onRetry: canRetryAfterError ? {
                 errorMessage = nil
+                errorTitle = "Upload Failed"
                 capturedImage = nil
                 uploadState = .idle
                 canRetryAfterError = false
@@ -248,11 +251,15 @@ struct ReceiptScanView: View {
             }
         } label: {
             ZStack(alignment: .bottomTrailing) {
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.secondary)
+                Circle()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 36, height: 36)
 
-                // Usage indicator dot - shows reddest state
+                Image(systemName: "person.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .frame(width: 36, height: 36)
+
                 Circle()
                     .fill(profileBadgeColor)
                     .frame(width: 10, height: 10)
@@ -260,7 +267,7 @@ struct ReceiptScanView: View {
                         Circle()
                             .stroke(Color(.systemBackground), lineWidth: 1.5)
                     )
-                    .offset(x: 2, y: 2)
+                    .offset(x: -2, y: -2)
             }
         }
     }
@@ -598,7 +605,7 @@ struct ReceiptScanView: View {
                 capturedImage = nil
                 canRetryAfterError = true
 
-                var message = "Receipt quality too low.\n\n"
+                var message = ""
                 if !qualityResult.issues.isEmpty {
                     for issue in qualityResult.issues {
                         message += "• \(issue.rawValue)\n"
@@ -607,6 +614,7 @@ struct ReceiptScanView: View {
                 }
                 message += "Tips: Good lighting, hold steady, capture entire receipt"
 
+                errorTitle = "Quality Check Failed"
                 errorMessage = message
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
