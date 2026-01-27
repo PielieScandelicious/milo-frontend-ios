@@ -196,6 +196,23 @@ class StoreDataManager: ObservableObject {
                 self.periodTotalSpends[periodKey] = summary.totalSpend
                 self.periodReceiptCounts[periodKey] = receiptCount
 
+                // Also update periodMetadata if it exists for this period
+                // This ensures totalSpendForPeriod and totalReceiptsForPeriod return fresh data
+                if let index = self.periodMetadata.firstIndex(where: { $0.period == periodKey }) {
+                    let existingMetadata = self.periodMetadata[index]
+                    self.periodMetadata[index] = PeriodMetadata(
+                        period: periodKey,
+                        periodStart: existingMetadata.periodStart,
+                        periodEnd: existingMetadata.periodEnd,
+                        totalSpend: summary.totalSpend,
+                        receiptCount: receiptCount,
+                        storeCount: summary.stores.count,
+                        transactionCount: summary.transactionCount,
+                        averageHealthScore: summary.averageHealthScore
+                    )
+                    print("📊 Updated periodMetadata for '\(periodKey)': €\(summary.totalSpend), \(receiptCount) receipts")
+                }
+
                 self.averageHealthScore = summary.averageHealthScore
                 self.isLoading = false
                 self.isRefreshing = false
