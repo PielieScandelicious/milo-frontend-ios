@@ -255,8 +255,8 @@ struct ReceiptScanView: View {
                     .fill(Color.white.opacity(0.15))
                     .frame(width: 36, height: 36)
 
-                Image(systemName: "person.fill")
-                    .font(.system(size: 16))
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
                     .frame(width: 36, height: 36)
 
