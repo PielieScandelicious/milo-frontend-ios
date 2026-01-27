@@ -36,6 +36,9 @@ struct ScandaLiciousAIChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
+                        // Top spacing to lower content
+                        Color.clear
+                            .frame(height: 40)
                         if viewModel.messages.isEmpty && showWelcome {
                             WelcomeView(
                                 messageText: $messageText,
