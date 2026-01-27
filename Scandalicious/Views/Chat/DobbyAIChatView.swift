@@ -23,7 +23,6 @@ struct ScandaLiciousAIChatView: View {
     @State private var showWelcome = true
     @State private var showManageSubscription = false
     @State private var showRateLimitAlert = false
-    @State private var showProfile = false
     @State private var showClearButton = false
 
     
@@ -154,51 +153,6 @@ struct ScandaLiciousAIChatView: View {
         .navigationTitle(viewModel.messages.isEmpty ? "" : "Dobby")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Profile button - trailing (right side)
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    // Usage & Subscription
-                    Section {
-                        // Message rate limit usage display with smart color
-                        Button(action: {}) {
-                            Label(rateLimitManager.usageDisplayString, systemImage: usageIconName)
-                        }
-                        .tint(usageColor)
-
-                        // Receipt upload limit
-                        Button(action: {}) {
-                            Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts", systemImage: receiptLimitIcon)
-                        }
-                        .tint(receiptLimitColor)
-                    }
-
-                    // Profile
-                    Section {
-                        Button {
-                            showProfile = true
-                        } label: {
-                            Label("Profile", systemImage: "person.fill")
-                        }
-                    }
-                } label: {
-                    ZStack(alignment: .bottomTrailing) {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundStyle(.secondary)
-
-                        // Usage indicator dot - shows reddest state
-                        Circle()
-                            .fill(profileBadgeColor)
-                            .frame(width: 10, height: 10)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color(.systemBackground), lineWidth: 1.5)
-                            )
-                            .offset(x: 2, y: 2)
-                    }
-                }
-            }
-
             // Clear chat button - leading (left side), only visible when chat is active
             if showClearButton {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -218,13 +172,6 @@ struct ScandaLiciousAIChatView: View {
             }
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
-        .sheet(isPresented: $showProfile) {
-            NavigationStack {
-                ProfileView()
-                    .environmentObject(authManager)
-                    .environmentObject(subscriptionManager)
-            }
-        }
         .alert("Message Limit Reached", isPresented: $showRateLimitAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -243,85 +190,6 @@ struct ScandaLiciousAIChatView: View {
                 await rateLimitManager.syncFromBackend()
             }
         }
-    }
-
-    // MARK: - Usage Display Helpers
-
-    private var usageIconName: String {
-        let used = rateLimitManager.usagePercentage
-        if used >= 0.95 {
-            return "exclamationmark.bubble.fill"
-        } else if used >= 0.8 {
-            return "bubble.left.and.exclamationmark.bubble.right.fill"
-        } else {
-            return "bubble.left.fill"
-        }
-    }
-
-    private var usageColor: Color {
-        let used = rateLimitManager.usagePercentage
-        // Interpolate from green (0% used) to red (100% used)
-        // Green: RGB(0.2, 0.8, 0.2) -> Red: RGB(0.9, 0.2, 0.2)
-        let red = 0.2 + (used * 0.7)    // 0.2 -> 0.9
-        let green = 0.8 - (used * 0.6)  // 0.8 -> 0.2
-        let blue = 0.2
-        return Color(red: red, green: green, blue: blue)
-    }
-
-    // Receipt limit status icon
-    private var receiptLimitIcon: String {
-        switch rateLimitManager.receiptLimitState {
-        case .normal:
-            return "checkmark.circle.fill"
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .exhausted:
-            return "xmark.circle.fill"
-        }
-    }
-
-    // Receipt limit status color
-    private var receiptLimitColor: Color {
-        switch rateLimitManager.receiptLimitState {
-        case .normal:
-            return .green
-        case .warning:
-            return .orange
-        case .exhausted:
-            return .red
-        }
-    }
-
-    // Profile badge color - shows the reddest state between messages and receipts
-    private var profileBadgeColor: Color {
-        // Check receipts first - discrete states
-        let receiptState = rateLimitManager.receiptLimitState
-
-        // Check message usage percentage
-        let messageUsage = rateLimitManager.usagePercentage
-
-        // Priority: exhausted receipts or critical message usage (>95%) = red
-        if receiptState == .exhausted || messageUsage >= 0.95 {
-            return .red
-        }
-
-        // Warning receipts (1-5 left) or high message usage (80-95%) = orange/red
-        if receiptState == .warning {
-            // If messages are also high usage, return the redder color
-            if messageUsage >= 0.8 {
-                // Return whichever is redder - compare the colors
-                return messageUsage >= 0.9 ? usageColor : .orange
-            }
-            return .orange
-        }
-
-        // If messages are at warning level or higher, use message color
-        if messageUsage >= 0.8 {
-            return usageColor
-        }
-
-        // Otherwise use the interpolated message usage color (green to yellow)
-        return usageColor
     }
 
     private func sendMessage() {

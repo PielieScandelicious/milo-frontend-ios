@@ -6,10 +6,14 @@
 //
 
 import SwiftUI
+import StoreKit
 
 struct ReceiptScanView: View {
     @EnvironmentObject var transactionManager: TransactionManager
+    @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject private var rateLimitManager = RateLimitManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
     @State private var errorMessage: String?
@@ -20,6 +24,7 @@ struct ReceiptScanView: View {
     @State private var canRetryAfterError = false
     @State private var showRateLimitAlert = false
     @State private var showCaptureSuccess = false
+    @State private var showProfile = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastCheckedUploadTimestamp: TimeInterval = 0
 
@@ -27,31 +32,42 @@ struct ReceiptScanView: View {
     @State private var isSyncing = false
     @State private var isTabVisible = false
 
+    // Recent receipt tracking
+    @State private var recentReceipt: ReceiptUploadResponse?
+    @State private var showRecentReceiptDetails = false
+
+    // Total receipts count (all time)
+    @State private var totalReceiptsScanned: Int = 0
+
     var body: some View {
-        ZStack {
-            scanPlaceholderView
+        NavigationStack {
+            ZStack {
+                // Main content
+                mainContentView
 
-            // Capture success overlay
-            if showCaptureSuccess {
-                CaptureSuccessOverlay()
-                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
-            }
-
-            // Syncing status banner at top
-            VStack {
-                if isTabVisible && (isSyncing || rateLimitManager.isReceiptUploading) {
-                    syncingStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                } else if isTabVisible && rateLimitManager.showReceiptSynced {
-                    syncedStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                // Capture success overlay
+                if showCaptureSuccess {
+                    CaptureSuccessOverlay()
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
-                Spacer()
+
+                // Floating scan button (bottom right)
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        floatingScanButton
+                            .padding(.trailing, 24)
+                            .padding(.bottom, 24)
+                    }
+                }
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSyncing)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
+            .toolbar {
+                // Profile button - trailing (right side)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    profileMenuButton
+                }
+            }
         }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -59,6 +75,7 @@ struct ReceiptScanView: View {
                     isTabVisible = true
                 }
             }
+            loadTotalReceiptsCount()
         }
         .onDisappear {
             isTabVisible = false
@@ -79,13 +96,29 @@ struct ReceiptScanView: View {
         }
         .sheet(isPresented: $showReceiptDetails) {
             showReceiptDetails = false
-            uploadedReceipt = nil
+            // Keep recent receipt for display
         } content: {
             if let receipt = uploadedReceipt {
                 ReceiptDetailsView(receipt: receipt) {
                     // Receipt was deleted - notify to refresh data
                     NotificationCenter.default.post(name: .receiptDeleted, object: nil)
+                    recentReceipt = nil
                 }
+            }
+        }
+        .sheet(isPresented: $showRecentReceiptDetails) {
+            if let receipt = recentReceipt {
+                ReceiptDetailsView(receipt: receipt) {
+                    NotificationCenter.default.post(name: .receiptDeleted, object: nil)
+                    recentReceipt = nil
+                }
+            }
+        }
+        .sheet(isPresented: $showProfile) {
+            NavigationStack {
+                ProfileView()
+                    .environmentObject(authManager)
+                    .environmentObject(subscriptionManager)
             }
         }
         .onChange(of: capturedImage) { _, newImage in
@@ -147,167 +180,409 @@ struct ReceiptScanView: View {
             print("🔄 [ScanTab] App became active (UIApplication notification)")
             checkForShareExtensionUploads()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
+            // Refresh total count when a receipt is uploaded
+            loadTotalReceiptsCount()
+        }
         .animation(.easeInOut, value: uploadState)
     }
 
-    // MARK: - Scan Placeholder View
+    // MARK: - Floating Scan Button
 
-    private var scanPlaceholderView: some View {
+    private var floatingScanButton: some View {
         Button {
-            // Check rate limit before showing camera
             if rateLimitManager.canUploadReceipt() {
                 showCamera = true
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             } else {
                 showRateLimitAlert = true
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
             }
         } label: {
-            VStack(spacing: 0) {
-                Spacer()
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple, .blue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 64, height: 64)
+                    .shadow(color: .purple.opacity(0.4), radius: 12, y: 6)
 
-                // Main camera button area
-                VStack(spacing: 24) {
-                    // Camera icon with gradient background
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.blue, .cyan],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 120, height: 120)
-                            .shadow(color: .blue.opacity(0.4), radius: 24, y: 10)
+                Image(systemName: "doc.text.viewfinder")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .buttonStyle(ScaleScanButtonStyle())
+    }
 
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 52))
-                            .foregroundStyle(.white)
-                    }
+    // MARK: - Profile Menu Button
 
-                    // Title and description
-                    VStack(spacing: 10) {
-                        Text("Snap Your Receipt")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-
-                        Text("Take a photo and we'll extract all items automatically")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
+    private var profileMenuButton: some View {
+        Menu {
+            // Usage & Subscription
+            Section {
+                // Message rate limit usage display with smart color
+                Button(action: {}) {
+                    Label(rateLimitManager.usageDisplayString, systemImage: usageIconName)
                 }
-                .padding(.bottom, 48)
+                .tint(usageColor)
 
-                Spacer()
+                // Receipt upload limit
+                Button(action: {}) {
+                    Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts", systemImage: receiptLimitIcon)
+                }
+                .tint(receiptLimitColor)
+            }
 
-                // Upload limit indicator
-                uploadLimitIndicator
+            // Profile
+            Section {
+                Button {
+                    showProfile = true
+                } label: {
+                    Label("Profile", systemImage: "person.fill")
+                }
+            }
+        } label: {
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: "person.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
+
+                // Usage indicator dot - shows reddest state
+                Circle()
+                    .fill(profileBadgeColor)
+                    .frame(width: 10, height: 10)
+                    .overlay(
+                        Circle()
+                            .stroke(Color(.systemBackground), lineWidth: 1.5)
+                    )
+                    .offset(x: 2, y: 2)
+            }
+        }
+    }
+
+    // MARK: - Usage Display Helpers
+
+    private var usageIconName: String {
+        let used = rateLimitManager.usagePercentage
+        if used >= 0.95 {
+            return "exclamationmark.bubble.fill"
+        } else if used >= 0.8 {
+            return "bubble.left.and.exclamationmark.bubble.right.fill"
+        } else {
+            return "bubble.left.fill"
+        }
+    }
+
+    private var usageColor: Color {
+        let used = rateLimitManager.usagePercentage
+        let red = 0.2 + (used * 0.7)
+        let green = 0.8 - (used * 0.6)
+        let blue = 0.2
+        return Color(red: red, green: green, blue: blue)
+    }
+
+    private var receiptLimitIcon: String {
+        switch rateLimitManager.receiptLimitState {
+        case .normal: return "checkmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .exhausted: return "xmark.circle.fill"
+        }
+    }
+
+    private var receiptLimitColor: Color {
+        switch rateLimitManager.receiptLimitState {
+        case .normal: return .green
+        case .warning: return .orange
+        case .exhausted: return .red
+        }
+    }
+
+    private var profileBadgeColor: Color {
+        let receiptState = rateLimitManager.receiptLimitState
+        let messageUsage = rateLimitManager.usagePercentage
+
+        if receiptState == .exhausted || messageUsage >= 0.95 {
+            return .red
+        }
+        if receiptState == .warning {
+            if messageUsage >= 0.8 {
+                return messageUsage >= 0.9 ? usageColor : .orange
+            }
+            return .orange
+        }
+        if messageUsage >= 0.8 {
+            return usageColor
+        }
+        return usageColor
+    }
+
+    // MARK: - Main Content View
+
+    private var mainContentView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Syncing banner at top
+                if isTabVisible && (isSyncing || rateLimitManager.isReceiptUploading) {
+                    syncingStatusBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .padding(.top, 8)
+                } else if isTabVisible && rateLimitManager.showReceiptSynced {
+                    syncedStatusBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .padding(.top, 8)
+                }
+
+                // Total Receipts Visualization Card
+                totalReceiptsCard
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                    .padding(.top, 16)
 
-                // Bottom tip
-                HStack(spacing: 12) {
-                    Image(systemName: "square.and.arrow.up.fill")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(.purple)
+                // Recent Receipt Card (if exists)
+                if let receipt = recentReceipt {
+                    recentReceiptCard(receipt: receipt)
+                        .padding(.horizontal, 20)
+                }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Got a digital receipt?")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
+                // Share tip card
+                shareHintCard
+                    .padding(.horizontal, 20)
 
-                        Text("Use the Share button from any app")
-                            .font(.system(size: 13, weight: .medium))
+                // Bottom spacing for floating button
+                Color.clear
+                    .frame(height: 100)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(white: 0.05))
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSyncing)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
+    }
+
+    // MARK: - Total Receipts Card
+
+    private var totalReceiptsCard: some View {
+        VStack(spacing: 16) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 80, height: 80)
+
+                Image(systemName: "doc.text.viewfinder")
+                    .font(.system(size: 36, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .blue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            // Count
+            VStack(spacing: 6) {
+                Text("\(totalReceiptsScanned)")
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text("Receipts Scanned")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+
+            // Remaining stat (centered)
+            VStack(spacing: 4) {
+                Text("\(rateLimitManager.receiptsRemaining)")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(receiptLimitColor)
+                Text("Remaining This Month")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .padding(.top, 8)
+        }
+        .padding(.vertical, 28)
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+    }
+
+    // MARK: - Recent Receipt Card
+
+    private func recentReceiptCard(receipt: ReceiptUploadResponse) -> some View {
+        Button {
+            showRecentReceiptDetails = true
+        } label: {
+            HStack(spacing: 14) {
+                // Store icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.green.opacity(0.15))
+                        .frame(width: 48, height: 48)
+
+                    Image(systemName: "cart.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.green)
+                }
+
+                // Receipt info
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Recent Scan")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.green)
+
+                        Spacer()
+
+                        Text("Just now")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+
+                    Text(receipt.storeName ?? "Receipt")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    HStack(spacing: 12) {
+                        if let total = receipt.totalAmount {
+                            Text(String(format: "€%.2f", total))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+
+                        Text("\(receipt.itemsCount) items")
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.white.opacity(0.5))
                     }
-
-                    Spacer()
                 }
-                .padding()
-                .background(Color.white.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.3))
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(white: 0.05))
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.green.opacity(0.2), lineWidth: 1)
+                    )
+            )
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Upload Limit Indicator
+    // MARK: - Share Hint Card
 
-    private var uploadLimitIndicator: some View {
-        let state = rateLimitManager.receiptLimitState
-        let color: Color = {
-            switch state {
-            case .normal: return .green
-            case .warning: return .orange
-            case .exhausted: return .red
-            }
-        }()
+    private var shareHintCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "square.and.arrow.up.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.purple)
 
-        return HStack(spacing: 10) {
-            Image(systemName: state == .exhausted ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(color)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(rateLimitManager.receiptUsageDisplayString)
-                    .font(.system(size: 14, weight: .semibold))
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Got a digital receipt?")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
 
-                Text(rateLimitManager.resetDaysFormatted)
-                    .font(.system(size: 12, weight: .medium))
+                Text("Use the Share button from any app")
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
             }
 
             Spacer()
-
-            if state == .exhausted {
-                Text("Limit Reached")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(color.opacity(0.3))
-                    .clipShape(Capsule())
-            }
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(color.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
-                )
-        )
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Syncing Status Banners
 
     private var syncingStatusBanner: some View {
-        HStack(spacing: 6) {
-            SyncingArrowsView()
-            Text("Syncing...")
-                .font(.system(size: 12, weight: .medium))
+        HStack(spacing: 10) {
+            // Spinning arrow animation
+            ScanSyncingArrowView()
+
+            Text("Syncing receipt...")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
         }
-        .foregroundColor(.blue)
-        .padding(.top, 12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(Color.blue.opacity(0.2))
+                .overlay(
+                    Capsule()
+                        .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                )
+        )
     }
 
     private var syncedStatusBanner: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "checkmark.icloud.fill")
-                .font(.system(size: 11))
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16, weight: .semibold))
             Text("Synced")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 14, weight: .semibold))
         }
         .foregroundColor(.green)
-        .padding(.top, 12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(Color.green.opacity(0.15))
+                .overlay(
+                    Capsule()
+                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+
+    // MARK: - Load Total Receipts
+
+    private func loadTotalReceiptsCount() {
+        Task {
+            do {
+                // Get all-time receipts count by fetching with no date filter
+                let response = try await AnalyticsAPIService.shared.fetchReceipts(filters: ReceiptFilters(page: 1, pageSize: 1))
+                await MainActor.run {
+                    totalReceiptsScanned = response.total
+                }
+            } catch {
+                print("Failed to load total receipts count: \(error)")
+            }
+        }
     }
 
     // MARK: - Process Receipt
@@ -377,14 +652,16 @@ struct ReceiptScanView: View {
                 case .success, .completed:
                     uploadState = .success(response)
                     uploadedReceipt = response
+                    recentReceipt = response  // Save for recent receipt card
 
                     // Optimistically update rate limit counter
                     rateLimitManager.decrementReceiptLocal()
 
+                    // Update total receipts count
+                    totalReceiptsScanned += 1
+
                     NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
-
-                    showReceiptDetails = true
 
                     Task {
                         try? await Task.sleep(for: .seconds(1))
@@ -632,7 +909,34 @@ struct CameraPickerView: UIViewControllerRepresentable {
     }
 }
 
+// MARK: - Scan Syncing Arrow View
+
+struct ScanSyncingArrowView: View {
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let seconds = timeline.date.timeIntervalSinceReferenceDate
+            let rotation = seconds.truncatingRemainder(dividingBy: 1.0) * 360
+
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.blue)
+                .rotationEffect(.degrees(rotation))
+        }
+    }
+}
+
+// MARK: - Scale Scan Button Style
+
+struct ScaleScanButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
 #Preview {
     ReceiptScanView()
         .environmentObject(TransactionManager())
+        .environmentObject(AuthenticationManager())
 }

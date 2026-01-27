@@ -101,6 +101,15 @@ struct OverviewView: View {
         }
     }
 
+    // Check if the selected period is the current month
+    private var isCurrentPeriod: Bool {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        let currentPeriod = dateFormatter.string(from: Date())
+        return selectedPeriod == currentPeriod
+    }
+
     private var availablePeriods: [String] {
         // Use period metadata if available (from lightweight /analytics/periods endpoint)
         if !dataManager.periodMetadata.isEmpty {
@@ -1318,9 +1327,9 @@ struct OverviewView: View {
                             .font(.system(size: 40, weight: .heavy, design: .rounded))
                             .foregroundColor(.white)
 
-                        // Syncing/Synced indicator inline
+                        // Syncing/Synced indicator inline (only show syncing on current period)
                         HStack(spacing: 4) {
-                            if dataManager.isLoading || isReceiptUploading {
+                            if isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
                                 SyncingArrowsView()
                                     .font(.system(size: 11))
                                 Text("Syncing...")
@@ -1333,7 +1342,7 @@ struct OverviewView: View {
                                     .font(.system(size: 12, weight: .medium))
                             }
                         }
-                        .foregroundColor(dataManager.isLoading || isReceiptUploading ? .blue : .white.opacity(0.5))
+                        .foregroundColor(isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue : .white.opacity(0.5))
                     }
                     .padding(.vertical, 20)
                     .frame(maxWidth: .infinity)
