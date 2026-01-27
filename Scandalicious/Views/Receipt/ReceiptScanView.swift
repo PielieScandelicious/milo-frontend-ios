@@ -508,7 +508,7 @@ struct ReceiptScanView: View {
         HStack(spacing: 12) {
             Image(systemName: "square.and.arrow.up.fill")
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.purple)
+                .foregroundStyle(.orange)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("Got a digital receipt?")
