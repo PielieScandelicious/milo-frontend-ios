@@ -43,6 +43,7 @@ struct ContentView: View {
                     }
                     .tag(Tab.dobby)
             }
+            .tint(Color(red: 0.55, green: 0.23, blue: 0.90)) // Purple accent matching header
             .toolbarBackground(.ultraThinMaterial, for: .tabBar)
             .toolbarBackgroundVisibility(.visible, for: .tabBar)
 

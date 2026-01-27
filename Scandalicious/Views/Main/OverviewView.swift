@@ -1041,7 +1041,7 @@ struct OverviewView: View {
                 .fill(segment.color)
                 .frame(width: 10, height: 10)
 
-            Text(segment.storeName)
+            Text(segment.storeName.uppercased())
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white)
                 .lineLimit(1)
