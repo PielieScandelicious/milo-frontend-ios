@@ -397,7 +397,7 @@ struct ReceiptScanView: View {
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
 
-                Text("Receipts Scanned")
+                Text("Total Receipts Scanned")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.white.opacity(0.6))
             }
@@ -453,17 +453,9 @@ struct ReceiptScanView: View {
 
                 // Receipt info
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Recent Scan")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.green)
-
-                        Spacer()
-
-                        Text("Just now")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
+                    Text("Recent Scan")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.green)
 
                     Text(receipt.storeName ?? "Receipt")
                         .font(.system(size: 16, weight: .semibold))
@@ -482,6 +474,8 @@ struct ReceiptScanView: View {
                             .foregroundStyle(.white.opacity(0.5))
                     }
                 }
+
+                Spacer()
 
                 // Chevron
                 Image(systemName: "chevron.right")
