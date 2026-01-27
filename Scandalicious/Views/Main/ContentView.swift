@@ -39,7 +39,7 @@ struct ContentView: View {
 
                 ScandaLiciousTab()
                     .tabItem {
-                        Label("Dobby", systemImage: "sparkles")
+                        Label("Milo", systemImage: "sparkles")
                     }
                     .tag(Tab.dobby)
             }

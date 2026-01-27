@@ -22,7 +22,7 @@ struct OnboardingView: View {
                 VStack(spacing: 32) {
                     // Welcome Header
                     VStack(spacing: 12) {
-                        Text("Welcome to Dobby")
+                        Text("Welcome to Milo")
                             .font(.system(size: 42, weight: .bold, design: .rounded))
                             .foregroundStyle(.purple.gradient)
 

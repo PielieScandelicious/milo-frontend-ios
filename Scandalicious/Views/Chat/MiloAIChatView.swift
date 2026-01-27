@@ -107,7 +107,7 @@ struct ScandaLiciousAIChatView: View {
                 HStack(alignment: .bottom, spacing: 8) {
                     // Message input field
                     HStack(alignment: .bottom, spacing: 8) {
-                        TextField("Ask Dobby", text: $messageText, axis: .vertical)
+                        TextField("Ask Milo", text: $messageText, axis: .vertical)
                             .textFieldStyle(.plain)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
@@ -150,7 +150,7 @@ struct ScandaLiciousAIChatView: View {
                 .background(Color(white: 0.05))
             }
         }
-        .navigationTitle(viewModel.messages.isEmpty ? "" : "Dobby")
+        .navigationTitle(viewModel.messages.isEmpty ? "" : "Milo")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // Clear chat button - leading (left side), only visible when chat is active
@@ -257,7 +257,7 @@ struct WelcomeView: View {
                     )
                     .padding(.bottom, 8)
 
-                Text("Dobby")
+                Text("Milo")
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
 
@@ -686,7 +686,7 @@ class ChatViewModel: ObservableObject {
         // Create a cancellable task
         currentTask = Task {
             do {
-                let stream = await DobbyAIChatService.shared.sendMessageStreaming(
+                let stream = await MiloAIChatService.shared.sendMessageStreaming(
                     text,
                     transactions: transactions,
                     conversationHistory: messages.filter { $0.id != assistantMessageId }

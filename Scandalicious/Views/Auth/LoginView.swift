@@ -41,7 +41,7 @@ struct LoginView: View {
                             .font(.system(size: 60))
                             .foregroundStyle(.blue)
                         
-                        Text("Welcome to Dobby")
+                        Text("Welcome to Milo")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
