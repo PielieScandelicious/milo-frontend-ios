@@ -409,16 +409,36 @@ struct FlippableDonutChartView: View {
 
     var body: some View {
         ZStack {
-            // Back side - Spending Trend Line Chart
-            SpendingTrendLineChart(
-                trends: trends,
-                size: size,
-                subtitle: subtitle,
-                totalAmount: totalAmount,
-                accentColor: accentColor,
-                selectedPeriod: selectedPeriod,
-                isVisible: isFlipped
-            )
+            // Back side - Spending Trend Line Chart or empty state
+            Group {
+                if trends.isEmpty {
+                    // Empty state when no trends data
+                    VStack(spacing: 12) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: size * 0.2))
+                            .foregroundColor(.white.opacity(0.3))
+
+                        Text("No trend data")
+                            .font(.system(size: size * 0.08, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+
+                        Text("Tap to flip back")
+                            .font(.system(size: size * 0.06))
+                            .foregroundColor(.white.opacity(0.25))
+                    }
+                    .frame(width: size * 1.33, height: size * 1.09)
+                } else {
+                    SpendingTrendLineChart(
+                        trends: trends,
+                        size: size,
+                        subtitle: subtitle,
+                        totalAmount: totalAmount,
+                        accentColor: accentColor,
+                        selectedPeriod: selectedPeriod,
+                        isVisible: isFlipped
+                    )
+                }
+            }
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(
                 .degrees(180),
@@ -430,8 +450,8 @@ struct FlippableDonutChartView: View {
                 data: chartData,
                 totalAmount: totalAmount,
                 size: size,
-                currencySymbol: subtitle == "visits" ? "" : "€",
-                subtitle: subtitle == "visits" ? "visits" : nil
+                currencySymbol: ["visits", "receipt", "receipts"].contains(subtitle) ? "" : "€",
+                subtitle: ["visits", "receipt", "receipts"].contains(subtitle) ? subtitle : nil
             )
             .opacity(isFlipped ? 0 : 1)
         }
@@ -471,15 +491,35 @@ struct FlippableAllStoresChartView: View {
 
     var body: some View {
         ZStack {
-            // Back side - Spending Trend Line Chart
-            StoreTrendLineChart(
-                trends: trends,
-                size: size,
-                totalAmount: totalAmount,
-                accentColor: accentColor,
-                selectedPeriod: selectedPeriod,
-                isVisible: isFlipped
-            )
+            // Back side - Spending Trend Line Chart or empty state
+            Group {
+                if trends.isEmpty {
+                    // Empty state when no trends data
+                    VStack(spacing: 12) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: size * 0.2))
+                            .foregroundColor(.white.opacity(0.3))
+
+                        Text("No trend data")
+                            .font(.system(size: size * 0.08, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+
+                        Text("Tap to flip back")
+                            .font(.system(size: size * 0.06))
+                            .foregroundColor(.white.opacity(0.25))
+                    }
+                    .frame(width: size * 1.33, height: size * 1.09)
+                } else {
+                    StoreTrendLineChart(
+                        trends: trends,
+                        size: size,
+                        totalAmount: totalAmount,
+                        accentColor: accentColor,
+                        selectedPeriod: selectedPeriod,
+                        isVisible: isFlipped
+                    )
+                }
+            }
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(
                 .degrees(180),

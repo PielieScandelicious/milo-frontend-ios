@@ -23,6 +23,29 @@ struct StoreDetailView: View {
         Color(red: 0.95, green: 0.25, blue: 0.3)
     }
 
+    // Top 5 categories + "Other" grouping
+    private var groupedChartSegments: [ChartSegment] {
+        let sortedCategories = storeBreakdown.categories.sorted { $0.spent > $1.spent }
+
+        if sortedCategories.count <= 5 {
+            return sortedCategories.toChartSegments()
+        }
+
+        // Take top 5 and sum the rest into "Other"
+        let top5 = Array(sortedCategories.prefix(5))
+        let remaining = Array(sortedCategories.dropFirst(5))
+        let otherSpent = remaining.reduce(0) { $0 + $1.spent }
+        let totalSpent = sortedCategories.reduce(0) { $0 + $1.spent }
+        let otherPercentage = totalSpent > 0 ? Int((otherSpent / totalSpent) * 100) : 0
+
+        // Create a Category for "Other"
+        let otherCategory = Category(name: "Other", spent: otherSpent, percentage: otherPercentage)
+
+        // Combine top 5 + Other and convert to segments
+        let combinedCategories = top5 + [otherCategory]
+        return combinedCategories.toChartSegments()
+    }
+
     var body: some View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
@@ -88,9 +111,9 @@ struct StoreDetailView: View {
                     VStack(spacing: 20) {
                         FlippableDonutChartView(
                             title: "",
-                            subtitle: "visits",
+                            subtitle: storeBreakdown.visitCount == 1 ? "receipt" : "receipts",
                             totalAmount: Double(storeBreakdown.visitCount),
-                            segments: storeBreakdown.categories.toChartSegments(),
+                            segments: groupedChartSegments,
                             size: 220,
                             trends: trends,
                             accentColor: chartAccentColor,
@@ -100,15 +123,19 @@ struct StoreDetailView: View {
                         
                         // Legend with tap interaction
                         VStack(spacing: 12) {
-                            ForEach(Array(storeBreakdown.categories.toChartSegments().enumerated()), id: \.element.id) { _, segment in
+                            ForEach(Array(groupedChartSegments.enumerated()), id: \.element.id) { _, segment in
                                 Button {
-                                    selectedCategory = segment.label
-                                    selectedCategoryColor = segment.color
-                                    showingCategoryTransactions = true
+                                    // Don't navigate for "Other" category
+                                    if segment.label != "Other" {
+                                        selectedCategory = segment.label
+                                        selectedCategoryColor = segment.color
+                                        showingCategoryTransactions = true
+                                    }
                                 } label: {
-                                    categoryRow(segment: segment)
+                                    categoryRow(segment: segment, isOther: segment.label == "Other")
                                 }
                                 .buttonStyle(CategoryRowButtonStyle())
+                                .disabled(segment.label == "Other")
                             }
                         }
                         .padding(.horizontal)
@@ -183,40 +210,48 @@ struct StoreDetailView: View {
 
         do {
             // Use the store-specific trends endpoint (52 months = ~4 years of history)
+            print("[StoreDetailView] Fetching trends for store: \(storeBreakdown.storeName)")
             let response = try await AnalyticsAPIService.shared.getStoreTrends(storeName: storeBreakdown.storeName, periodType: .month, numPeriods: 52)
+            print("[StoreDetailView] Fetched \(response.periods.count) trend periods for \(storeBreakdown.storeName)")
             await MainActor.run {
                 self.trends = response.periods
             }
         } catch {
-            print("Failed to fetch trends for \(storeBreakdown.storeName): \(error)")
+            print("[StoreDetailView] Failed to fetch trends for \(storeBreakdown.storeName): \(error)")
         }
     }
 
-    private func categoryRow(segment: ChartSegment) -> some View {
+    private func categoryRow(segment: ChartSegment, isOther: Bool = false) -> some View {
         HStack {
             Circle()
                 .fill(segment.color)
                 .frame(width: 12, height: 12)
-            
+
             Text(segment.label)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white)
-            
+                .foregroundColor(isOther ? .white.opacity(0.7) : .white)
+
             Spacer()
-            
+
             Text("\(segment.percentage)%")
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundColor(.white.opacity(0.6))
                 .frame(width: 45, alignment: .trailing)
-            
+
             Text(String(format: "€%.0f", segment.value))
                 .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(isOther ? .white.opacity(0.7) : .white)
                 .frame(width: 70, alignment: .trailing)
-            
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white.opacity(0.3))
+
+            if !isOther {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
+            } else {
+                // Placeholder to maintain alignment
+                Color.clear
+                    .frame(width: 12)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

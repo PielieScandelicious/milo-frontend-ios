@@ -95,7 +95,12 @@ extension String {
         if categoryName.contains("ready") || categoryName.contains("meal") {
             return Color(red: 1.0, green: 0.6, blue: 0.4)  // Coral
         }
-        
+
+        // "Other" category (grouped smaller categories) - Neutral gray
+        if categoryName == "other" {
+            return Color(red: 0.55, green: 0.55, blue: 0.6)  // Neutral gray
+        }
+
         // Default fallback colors for uncategorized items
         let fallbackColors: [Color] = [
             Color(red: 0.6, green: 0.7, blue: 0.8),   // Gray-blue

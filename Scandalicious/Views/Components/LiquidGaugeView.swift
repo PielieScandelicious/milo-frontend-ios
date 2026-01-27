@@ -85,8 +85,23 @@ struct LiquidGaugeView: View {
         return segmentArea / .pi
     }
 
+    /// Interpolated color on a green-to-red gradient based on score (0-5)
+    /// Provides instant emotional feedback: green = healthy, red = unhealthy
     private var liquidColor: Color {
-        score.healthScoreColor
+        guard let score = score else {
+            return Color(white: 0.5)
+        }
+
+        // Normalize score to 0-1 range
+        let normalized = min(max(score / 5.0, 0), 1)
+
+        // Green (healthy) to Red (unhealthy) gradient
+        // Score 5.0 = vibrant green, Score 0.0 = deep red
+        let red = 1.0 - normalized * 0.7      // 1.0 -> 0.3
+        let green = 0.3 + normalized * 0.5    // 0.3 -> 0.8
+        let blue = 0.3 + normalized * 0.15    // 0.3 -> 0.45
+
+        return Color(red: red, green: green, blue: blue)
     }
 
     var body: some View {
