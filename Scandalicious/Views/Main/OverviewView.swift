@@ -38,6 +38,7 @@ struct OverviewView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject var dataManager: StoreDataManager
     @ObservedObject var rateLimitManager = RateLimitManager.shared
+    @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
     // Track the last time we checked for Share Extension uploads
@@ -70,6 +71,10 @@ struct OverviewView: View {
     @State private var hasWarmedAdjacentViews = false  // Track if adjacent page views have been pre-rendered
     @State private var overviewTrends: [TrendPeriod] = []  // Trends for the overview chart
     @State private var isLoadingTrends = false
+    @State private var selectedReceiptForDetail: APIReceipt?
+    @State private var showingReceiptDetail = false
+    @State private var isDeletingReceipt = false
+    @State private var receiptDeleteError: String?
     @Binding var showSignOutConfirmation: Bool
 
     // Receipt limit status icon
@@ -274,6 +279,11 @@ struct OverviewView: View {
                 sortOrder: .healthScoreDescending
             )
         }
+        .navigationDestination(isPresented: $showingReceiptDetail) {
+            if let receipt = selectedReceiptForDetail {
+                ReceiptTransactionsView(receipt: receipt)
+            }
+        }
         .sheet(isPresented: $showingFilterSheet) {
             FilterSheet(
                 selectedSort: $selectedSort
@@ -441,6 +451,14 @@ struct OverviewView: View {
         .onChange(of: selectedSort) { oldValue, newValue in
             // Rebuild entire cache since sorting affects all periods
             rebuildBreakdownCache()
+        }
+        .onChange(of: selectedHeaderTab) { oldValue, newValue in
+            // Load receipts when switching to the Receipts tab
+            if newValue == .receipts {
+                Task {
+                    await receiptsViewModel.loadReceipts(period: selectedPeriod, storeName: nil, reset: true)
+                }
+            }
         }
         .onChange(of: dataManager.storeBreakdowns) { oldValue, newValue in
             // Rebuild cache when underlying data changes
@@ -1058,22 +1076,141 @@ struct OverviewView: View {
 
     // MARK: - Receipts Content
     private func receiptsContentForPeriod(_ period: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "doc.text.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.white.opacity(0.3))
+        VStack(spacing: 12) {
+            if receiptsViewModel.state.isLoading && receiptsViewModel.receipts.isEmpty {
+                // Loading state
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
 
-            Text("Receipts")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(.white)
+                    Text("Loading receipts...")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 80)
+            } else if receiptsViewModel.receipts.isEmpty {
+                // Empty state
+                VStack(spacing: 16) {
+                    Image(systemName: "doc.text.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.white.opacity(0.3))
 
-            Text("Coming soon")
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.5))
+                    Text("No Receipts")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    Text("No receipts found for this period")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 60)
+            } else {
+                // Receipts list - sorted newest to oldest
+                LazyVStack(spacing: 12) {
+                    ForEach(sortedReceipts) { receipt in
+                        SwipeableReceiptRow(
+                            receipt: receipt,
+                            onTap: {
+                                selectedReceiptForDetail = receipt
+                                showingReceiptDetail = true
+                            },
+                            onDelete: {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    deleteReceiptFromOverview(receipt)
+                                }
+                            }
+                        )
+                        .transition(.asymmetric(
+                            insertion: .opacity,
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
+                    }
+
+                    // Load more indicator
+                    if receiptsViewModel.hasMorePages {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .padding()
+                            .onAppear {
+                                Task {
+                                    await receiptsViewModel.loadNextPage(period: period, storeName: nil)
+                                }
+                            }
+                    }
+                }
+                .animation(.easeInOut(duration: 0.3), value: receiptsViewModel.receipts.count)
+                .padding(.horizontal, 16)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 60)
         .smoothFadeIn(delay: 0.1, period: period)
+        .overlay {
+            if isDeletingReceipt {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.2)
+
+                        Text("Deleting...")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(white: 0.15))
+                    )
+                }
+            }
+        }
+        .alert("Delete Failed", isPresented: .constant(receiptDeleteError != nil)) {
+            Button("OK") {
+                receiptDeleteError = nil
+            }
+        } message: {
+            if let error = receiptDeleteError {
+                Text(error)
+            }
+        }
+    }
+
+    /// Receipts sorted from newest to oldest
+    private var sortedReceipts: [APIReceipt] {
+        receiptsViewModel.receipts.sorted { receipt1, receipt2 in
+            // Parse dates and sort descending (newest first)
+            let date1 = receipt1.dateParsed ?? Date.distantPast
+            let date2 = receipt2.dateParsed ?? Date.distantPast
+            return date1 > date2
+        }
+    }
+
+    /// Delete a receipt from the overview
+    private func deleteReceiptFromOverview(_ receipt: APIReceipt) {
+        isDeletingReceipt = true
+
+        Task {
+            do {
+                try await receiptsViewModel.deleteReceipt(receipt, period: selectedPeriod, storeName: nil)
+
+                // Haptic feedback for successful deletion
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+            } catch {
+                receiptDeleteError = error.localizedDescription
+
+                // Haptic feedback for failure
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+            }
+
+            isDeletingReceipt = false
+        }
     }
 
     // Period-specific versions of the cards to ensure proper data display
