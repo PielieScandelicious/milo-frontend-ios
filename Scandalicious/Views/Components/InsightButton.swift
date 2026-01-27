@@ -14,8 +14,8 @@ struct InsightButton: View {
 
     @State private var showingInsight = false
 
-    // Dobby purple - matches the chat icon
-    private let dobbyPurple = Color(red: 0.45, green: 0.15, blue: 0.85)
+    // Milo purple - matches the chat icon
+    private let miloPurple = Color(red: 0.45, green: 0.15, blue: 0.85)
 
     var body: some View {
         Button {
@@ -27,16 +27,16 @@ struct InsightButton: View {
                 Text("Daily Insight")
                     .font(.system(size: 11, weight: .medium))
             }
-            .foregroundColor(dobbyPurple)
+            .foregroundColor(miloPurple)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
                 Capsule()
-                    .fill(dobbyPurple.opacity(0.15))
+                    .fill(miloPurple.opacity(0.15))
             )
             .overlay(
                 Capsule()
-                    .stroke(dobbyPurple.opacity(0.3), lineWidth: 1)
+                    .stroke(miloPurple.opacity(0.3), lineWidth: 1)
             )
         }
         .buttonStyle(InsightButtonStyle())
@@ -290,7 +290,7 @@ struct InsightSheetView: View {
                 Divider()
                     .background(Color.white.opacity(0.1))
 
-                Text("Insight by Dobby")
+                Text("Insight by Milo")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
                     .padding(.top, 16)

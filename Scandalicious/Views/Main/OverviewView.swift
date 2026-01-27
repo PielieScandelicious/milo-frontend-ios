@@ -731,7 +731,7 @@ struct OverviewView: View {
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color(red: 0.0, green: 0.48, blue: 1.0))
                     .padding(10)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
@@ -781,7 +781,7 @@ struct OverviewView: View {
             } label: {
                 Image(systemName: "person.circle.fill")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color(red: 0.0, green: 0.48, blue: 1.0))
                     .padding(10)
                     .background(
                         RoundedRectangle(cornerRadius: 12)

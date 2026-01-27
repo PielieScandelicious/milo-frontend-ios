@@ -4,11 +4,11 @@
 <dict>
     <!-- Camera Permission -->
     <key>NSCameraUsageDescription</key>
-    <string>Dobby needs access to your camera to scan receipts and automatically categorize your purchases.</string>
+    <string>Milo needs access to your camera to scan receipts and automatically categorize your purchases.</string>
     
     <!-- Photo Library Permission -->
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Dobby needs access to your photo library to import receipt images for automatic categorization.</string>
+    <string>Milo needs access to your photo library to import receipt images for automatic categorization.</string>
     
     <!-- Add these keys to your existing Info.plist file -->
 </dict>

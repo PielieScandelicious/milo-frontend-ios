@@ -39,11 +39,11 @@ struct ContentView: View {
 
                 ScandaLiciousTab()
                     .tabItem {
-                        Label("Dobby", systemImage: "sparkles")
+                        Label("Milo", systemImage: "sparkles")
                     }
                     .tag(Tab.dobby)
             }
-            .tint(Color(red: 0.55, green: 0.23, blue: 0.90)) // Purple accent matching header
+            .tint(.blue) // Apple blue
             .toolbarBackground(.ultraThinMaterial, for: .tabBar)
             .toolbarBackgroundVisibility(.visible, for: .tabBar)
 

@@ -43,7 +43,7 @@ struct PaywallView: View {
 
                 Spacer()
 
-                // Header with Dobby icon
+                // Header with Milo icon
                 headerSection
 
                 Spacer()
@@ -136,7 +136,7 @@ struct PaywallView: View {
 
     private var headerSection: some View {
         VStack(spacing: 12) {
-            // Dobby icon with glow
+            // Milo icon with glow
             ZStack {
                 Circle()
                     .fill(
@@ -160,7 +160,7 @@ struct PaywallView: View {
                     )
             }
 
-            Text("Meet Dobby")
+            Text("Meet Milo")
                 .font(.system(size: 32, weight: .bold))
                 .foregroundStyle(.white)
 

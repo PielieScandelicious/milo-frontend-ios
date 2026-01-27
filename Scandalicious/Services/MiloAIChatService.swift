@@ -10,7 +10,7 @@ import Foundation
 import FirebaseAuth
 
 // Disambiguate Transaction type from SwiftData
-typealias DobbyTransaction = Transaction
+typealias MiloTransaction = Transaction
 
 // MARK: - Chat Message Model
 struct ChatMessage: Identifiable, Codable, Sendable {
@@ -104,9 +104,9 @@ enum ChatServiceError: LocalizedError {
     }
 }
 
-// MARK: - Dobby AI Chat Service (Backend Version with Firebase Auth)
-actor DobbyAIChatService {
-    static let shared = DobbyAIChatService()
+// MARK: - Milo AI Chat Service (Backend Version with Firebase Auth)
+actor MiloAIChatService {
+    static let shared = MiloAIChatService()
 
     private init() {}
 
@@ -144,7 +144,7 @@ actor DobbyAIChatService {
     }
     
     // MARK: - Send Chat Message (Streaming) - RECOMMENDED
-    nonisolated func sendMessageStreaming(_ userMessage: String, transactions: [DobbyTransaction], conversationHistory: [ChatMessage]) -> AsyncThrowingStream<String, Error> {
+    nonisolated func sendMessageStreaming(_ userMessage: String, transactions: [MiloTransaction], conversationHistory: [ChatMessage]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -155,7 +155,7 @@ actor DobbyAIChatService {
                     }
                     
                     // Get auth token
-                    let authToken = try await DobbyAIChatService.shared.getAuthToken()
+                    let authToken = try await MiloAIChatService.shared.getAuthToken()
                     
                     // Convert conversation history to backend format
                     let backendHistory = conversationHistory
@@ -281,7 +281,7 @@ actor DobbyAIChatService {
     }
     
     // MARK: - Send Chat Message (Non-streaming) - Fallback
-    nonisolated func sendMessage(_ userMessage: String, transactions: [DobbyTransaction], conversationHistory: [ChatMessage]) async throws -> String {
+    nonisolated func sendMessage(_ userMessage: String, transactions: [MiloTransaction], conversationHistory: [ChatMessage]) async throws -> String {
         let endpoint = await MainActor.run { AppConfiguration.chatEndpoint }
         guard let url = URL(string: endpoint) else {
             throw ChatServiceError.invalidURL
@@ -290,11 +290,11 @@ actor DobbyAIChatService {
         // Get auth token with retry logic
         var authToken: String
         do {
-            authToken = try await DobbyAIChatService.shared.getAuthToken()
+            authToken = try await MiloAIChatService.shared.getAuthToken()
         } catch {
             // Try one more time to refresh the token
             try? await Task.sleep(for: .milliseconds(500))
-            authToken = try await DobbyAIChatService.shared.getAuthToken()
+            authToken = try await MiloAIChatService.shared.getAuthToken()
         }
         
         // Convert conversation history to backend format
@@ -331,7 +331,7 @@ actor DobbyAIChatService {
             
             // Try to refresh token and retry once
             try? await Task.sleep(for: .milliseconds(500))
-            let newToken = try await DobbyAIChatService.shared.getAuthToken()
+            let newToken = try await MiloAIChatService.shared.getAuthToken()
             request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
             
             let (retryData, retryResponse) = try await URLSession.shared.data(for: request)
