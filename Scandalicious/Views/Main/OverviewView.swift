@@ -75,6 +75,7 @@ struct OverviewView: View {
     @State private var showingReceiptDetail = false
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
+    @State private var scrollOffset: CGFloat = 0 // Track scroll for header fade effect
     @Binding var showSignOutConfirmation: Bool
 
     // Receipt limit status icon
@@ -798,46 +799,62 @@ struct OverviewView: View {
 
     private var swipeableContentView: some View {
         GeometryReader { geometry in
-            ScrollViewReader { scrollProxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 0) {
-                        ForEach(HeaderTab.allCases, id: \.self) { tab in
-                            tabContentView(for: tab, bottomSafeArea: geometry.safeAreaInsets.bottom)
-                                .frame(width: geometry.size.width)
-                                .id(tab)
-                        }
-                    }
-                    .scrollTargetLayout()
-                }
-                .scrollTargetBehavior(.paging)
-                .scrollPosition(id: Binding(
-                    get: { selectedHeaderTab },
-                    set: { newValue in
-                        if let newValue = newValue {
-                            selectedHeaderTab = newValue
-                        }
-                    }
-                ))
-                .onChange(of: selectedHeaderTab) { oldValue, newValue in
-                    // Programmatically scroll when button is tapped with smooth spring animation
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        scrollProxy.scrollTo(newValue, anchor: .center)
-                    }
-                }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                // Fixed header with period navigation and tabs
-                VStack(spacing: 12) {
-                    modernPeriodNavigation
-                    headerTabSelector
-                }
-                .padding(.bottom, 10)
-                .frame(maxWidth: .infinity)
-                .background(
-                    headerPurpleColor
-                        .ignoresSafeArea(edges: .top)
+            let gradientHeight = geometry.size.height * 0.32 + geometry.safeAreaInsets.top // 32% of screen + safe area
+
+            ZStack(alignment: .top) {
+                // Full-screen gradient background that fades from purple to black (like Apple Health)
+                LinearGradient(
+                    stops: [
+                        .init(color: headerPurpleColor, location: 0.0),
+                        .init(color: headerPurpleColor.opacity(0.85), location: 0.12),
+                        .init(color: headerPurpleColor.opacity(0.6), location: 0.25),
+                        .init(color: headerPurpleColor.opacity(0.35), location: 0.4),
+                        .init(color: headerPurpleColor.opacity(0.15), location: 0.55),
+                        .init(color: headerPurpleColor.opacity(0.05), location: 0.7),
+                        .init(color: appBackgroundColor, location: 0.85)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-                .zIndex(100)
+                .frame(height: gradientHeight)
+                .offset(y: -scrollOffset * 0.6) // Parallax effect - scrolls away slower
+                .opacity(max(0, 1.0 - scrollOffset / 200)) // Fade as scrolling
+                .ignoresSafeArea(edges: .top)
+
+                // Main content
+                ScrollViewReader { scrollProxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 0) {
+                            ForEach(HeaderTab.allCases, id: \.self) { tab in
+                                tabContentView(for: tab, bottomSafeArea: geometry.safeAreaInsets.bottom, screenHeight: geometry.size.height)
+                                    .frame(width: geometry.size.width)
+                                    .id(tab)
+                            }
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.paging)
+                    .scrollPosition(id: Binding(
+                        get: { selectedHeaderTab },
+                        set: { newValue in
+                            if let newValue = newValue {
+                                selectedHeaderTab = newValue
+                            }
+                        }
+                    ))
+                    .onChange(of: selectedHeaderTab) { oldValue, newValue in
+                        // Programmatically scroll when button is tapped with smooth spring animation
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            scrollProxy.scrollTo(newValue, anchor: .center)
+                        }
+                    }
+                }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    // Fixed period navigation - transparent background, sits on gradient
+                    modernPeriodNavigation
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity)
+                }
             }
             .background {
                 // Pre-warm adjacent page views to eliminate first-swipe lag
@@ -860,12 +877,12 @@ struct OverviewView: View {
 
     // MARK: - Header Purple Color
     private var headerPurpleColor: Color {
-        Color(red: 0.55, green: 0.23, blue: 0.90)
+        Color(red: 0.35, green: 0.10, blue: 0.60) // Deeper, richer purple
     }
 
     // MARK: - Background Color
     private var appBackgroundColor: Color {
-        Color(red: 0.08, green: 0.07, blue: 0.12) // Rich dark with subtle purple undertone
+        Color(white: 0.05) // Match scan and milo views - almost black
     }
 
     // MARK: - Modern Period Navigation
@@ -948,9 +965,13 @@ struct OverviewView: View {
     }
 
     // MARK: - Tab Content View (for swipe navigation between tabs)
-    private func tabContentView(for tab: HeaderTab, bottomSafeArea: CGFloat) -> some View {
+    private func tabContentView(for tab: HeaderTab, bottomSafeArea: CGFloat, screenHeight: CGFloat) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
+                // Tab selector scrolls with content
+                headerTabSelector
+                    .padding(.top, 4)
+
                 switch tab {
                 case .overview:
                     overviewContentForPeriod(selectedPeriod)
@@ -962,6 +983,19 @@ struct OverviewView: View {
             .padding(.bottom, bottomSafeArea + 90) // Extra padding to clear tab bar
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle()) // Ensure entire content area is scrollable
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(
+                            key: ScrollOffsetPreferenceKey.self,
+                            value: -proxy.frame(in: .named("scrollView")).origin.y
+                        )
+                }
+            )
+        }
+        .coordinateSpace(name: "scrollView")
+        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+            scrollOffset = value
         }
     }
 
@@ -1462,11 +1496,11 @@ struct OverviewView: View {
 struct FilterSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedSort: SortOption
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(red: 0.08, green: 0.07, blue: 0.12).ignoresSafeArea()
+                Color(white: 0.05).ignoresSafeArea()
                 
                 List {
                     Section {
@@ -1505,6 +1539,14 @@ struct FilterSheet: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Scroll Offset Preference Key
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
