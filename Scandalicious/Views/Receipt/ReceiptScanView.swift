@@ -192,6 +192,11 @@ struct ReceiptScanView: View {
 
     // MARK: - Floating Scan Button
 
+    // Deep purple color matching overview tab theme
+    private var deepPurple: Color {
+        Color(red: 0.35, green: 0.10, blue: 0.60)
+    }
+
     private var floatingScanButton: some View {
         Button {
             if rateLimitManager.canUploadReceipt() {
@@ -206,13 +211,16 @@ struct ReceiptScanView: View {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [.purple, .blue],
+                            colors: [
+                                Color(red: 0.45, green: 0.15, blue: 0.70),
+                                deepPurple
+                            ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 64, height: 64)
-                    .shadow(color: .purple.opacity(0.4), radius: 12, y: 6)
+                    .shadow(color: deepPurple.opacity(0.5), radius: 12, y: 6)
 
                 Image(systemName: "doc.text.viewfinder")
                     .font(.system(size: 26, weight: .semibold))
