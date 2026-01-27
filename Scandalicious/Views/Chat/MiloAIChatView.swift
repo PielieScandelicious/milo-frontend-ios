@@ -95,9 +95,9 @@ struct ScandaLiciousAIChatView: View {
                 // Gradient fade effect above input
                 LinearGradient(
                     colors: [
-                        Color(.systemBackground).opacity(0),
-                        Color(.systemBackground).opacity(0.8),
-                        Color(.systemBackground)
+                        Color(white: 0.05).opacity(0),
+                        Color(white: 0.05).opacity(0.8),
+                        Color(white: 0.05)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
