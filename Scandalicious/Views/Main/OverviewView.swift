@@ -1505,8 +1505,8 @@ private struct StoreRowButton: View {
                     .fill(segment.color)
                     .frame(width: 4, height: 32)
 
-                // Store name
-                Text(segment.storeName)
+                // Store name - use original casing for brand identity
+                Text(segment.storeName.localizedCapitalized)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
