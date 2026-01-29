@@ -787,7 +787,6 @@ struct OverviewView: View {
                         )
                 }
             )
-            .simultaneousGesture(periodSwipeGesture)
         }
         .coordinateSpace(name: "scrollView")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
@@ -880,20 +879,29 @@ struct OverviewView: View {
 
         // All Overview components fade in together at the same time
         return VStack(spacing: 16) {
-            spendingAndHealthCardForPeriod(period)
+            // Swipeable area: spending card + pie chart
+            // Both swipe (change period) and tap (toggle trendline) work simultaneously
+            VStack(spacing: 16) {
+                spendingAndHealthCardForPeriod(period)
 
+                if !segments.isEmpty {
+                    // Pie chart showing store breakdown - use cached chart data
+                    IconDonutChartView(
+                        data: chartDataForPeriod(period),
+                        totalAmount: Double(totalReceiptsForPeriod(period)),
+                        size: 200,
+                        currencySymbol: "",
+                        subtitle: "receipts"
+                    )
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                }
+            }
+            .contentShape(Rectangle())
+            .simultaneousGesture(periodSwipeGesture)
+
+            // Store rows - NOT swipeable, only tappable
             if !segments.isEmpty {
-                // Pie chart showing store breakdown - use cached chart data
-                IconDonutChartView(
-                    data: chartDataForPeriod(period),
-                    totalAmount: Double(totalReceiptsForPeriod(period)),
-                    size: 200,
-                    currencySymbol: "",
-                    subtitle: "receipts"
-                )
-                .padding(.top, 16)
-                .padding(.bottom, 8)
-
                 // Stores section header
                 storesSectionHeader(storeCount: segments.count)
                     .padding(.horizontal, 16)
@@ -1384,15 +1392,15 @@ struct OverviewView: View {
                     }
                     .padding(.vertical, 16)
                     .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 } else {
                     // Total spending view with health score
                     VStack(spacing: 16) {
                         // Spending section
                         VStack(spacing: 4) {
-                            Text("Total Spending")
+                            Text("SPENT THIS MONTH")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.white.opacity(0.5))
-                                .textCase(.uppercase)
                                 .tracking(1.2)
 
                             Text(String(format: "€%.0f", spending))
@@ -1426,6 +1434,7 @@ struct OverviewView: View {
                     }
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 }
             }
             .buttonStyle(TotalSpendingCardButtonStyle())
@@ -1528,8 +1537,8 @@ private struct StoreRowButton: View {
                     .fill(segment.color)
                     .frame(width: 4, height: 32)
 
-                // Store name
-                Text(segment.storeName)
+                // Store name - use original casing for brand identity
+                Text(segment.storeName.localizedCapitalized)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
