@@ -283,7 +283,8 @@ class ReceiptStatusViewController: UIViewController {
     private var currentStatus: ReceiptStatusType
     private let onRetry: (() -> Void)?
     private let onDismiss: () -> Void
-    
+    private var hasShownConfetti = false
+
     // Constraints that need to be updated based on content visibility
     private var containerBottomConstraint: NSLayoutConstraint?
     private var containerMinHeightConstraint: NSLayoutConstraint?
@@ -359,7 +360,14 @@ class ReceiptStatusViewController: UIViewController {
         button.isHidden = true
         return button
     }()
-    
+
+    private let confettiView: UIKitConfettiView = {
+        let view = UIKitConfettiView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+
     init(
         status: ReceiptStatusType,
         onRetry: (() -> Void)? = nil,
@@ -381,14 +389,44 @@ class ReceiptStatusViewController: UIViewController {
         setupActions()
         updateUI(for: currentStatus)
     }
-    
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        // Trigger confetti if initially presented with success status
+        if case .success = currentStatus, !hasShownConfetti {
+            hasShownConfetti = true
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            confettiView.isHidden = false
+            confettiView.startConfetti()
+        }
+    }
+
     func updateStatus(_ newStatus: ReceiptStatusType) {
         currentStatus = newStatus
 
-        // Trigger haptic feedback immediately on success
-        if case .success = newStatus {
+        // Trigger haptic feedback and confetti on success
+        if case .success = newStatus, !hasShownConfetti {
+            hasShownConfetti = true
+
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
+
+            // Show confetti after layout is complete
+            confettiView.isHidden = false
+            view.layoutIfNeeded()
+            DispatchQueue.main.async { [weak self] in
+                self?.confettiView.startConfetti()
+            }
+        } else if case .success = newStatus {
+            // Already showed confetti, just show the view
+            confettiView.isHidden = false
+        } else {
+            confettiView.isHidden = true
+            hasShownConfetti = false // Reset for potential future success state
         }
 
         UIView.transition(with: containerView, duration: 0.3, options: .transitionCrossDissolve) {
@@ -397,17 +435,28 @@ class ReceiptStatusViewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.4)
-        
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+
         view.addSubview(containerView)
         containerView.addSubview(iconContainerView)
         containerView.addSubview(titleLabel)
         containerView.addSubview(messageLabel)
         containerView.addSubview(retryButton)
         containerView.addSubview(dismissButton)
-        
+
+        // Add confetti view last (in front of everything)
+        view.addSubview(confettiView)
+
         // Add activity indicator to icon container
         iconContainerView.addSubview(activityIndicator)
+
+        // Confetti view constraints - full screen
+        NSLayoutConstraint.activate([
+            confettiView.topAnchor.constraint(equalTo: view.topAnchor),
+            confettiView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            confettiView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            confettiView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
         
         // Create height constraint for message label (can be set to 0 when hidden)
         messageLabelHeightConstraint = messageLabel.heightAnchor.constraint(equalToConstant: 0)
@@ -618,6 +667,192 @@ class ReceiptStatusViewController: UIViewController {
 
 /// Legacy error view controller - kept for backward compatibility
 typealias ReceiptErrorViewController = ReceiptStatusViewController
+
+// MARK: - UIKit Confetti View
+
+/// A UIKit-based confetti animation view that matches the SwiftUI CaptureSuccessOverlay confetti
+class UIKitConfettiView: UIView {
+
+    private let confettiColors: [UIColor] = [
+        UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0),    // Green
+        UIColor(red: 0.3, green: 0.85, blue: 0.5, alpha: 1.0),   // Light green
+        UIColor.systemYellow,
+        UIColor.systemOrange,
+        UIColor.systemPink,
+        UIColor.systemPurple,
+        UIColor.systemBlue,
+        UIColor.systemCyan,
+        UIColor.systemRed,
+        UIColor.systemMint
+    ]
+
+    private var confettiLayers: [CALayer] = []
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isUserInteractionEnabled = false
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        backgroundColor = .clear
+        isUserInteractionEnabled = false
+    }
+
+    func startConfetti() {
+        // Remove any existing confetti
+        confettiLayers.forEach { $0.removeFromSuperlayer() }
+        confettiLayers.removeAll()
+
+        // Use screen bounds as fallback if view bounds aren't ready
+        let viewBounds = bounds.width > 0 ? bounds : UIScreen.main.bounds
+
+        let totalPieces = 80
+        let centerX = viewBounds.width / 2
+        let centerY = viewBounds.height / 2
+
+        for i in 0..<totalPieces {
+            // Calculate burst angle - distribute evenly with small variation
+            let baseAngle = (Double(i) / Double(totalPieces)) * 360.0
+            let angleVariation = Double.random(in: -8...8)
+            let angle = (baseAngle + angleVariation) * .pi / 180
+
+            // Random distance for depth variation
+            let distance = CGFloat.random(in: 150...400)
+
+            // Calculate final position
+            let burstX = CGFloat(cos(angle)) * distance
+            let burstY = CGFloat(sin(angle)) * distance
+            let gravityOffset = CGFloat.random(in: 100...300)
+            let finalY = burstY + gravityOffset
+
+            // Create confetti piece
+            let size = CGFloat.random(in: 6...16)
+            let shapeType = Int.random(in: 0...3)
+            let pieceLayer = createConfettiPiece(size: size, shapeType: shapeType, colorIndex: i % confettiColors.count)
+            pieceLayer.position = CGPoint(x: centerX, y: centerY)
+            pieceLayer.opacity = 0
+            layer.addSublayer(pieceLayer)
+            confettiLayers.append(pieceLayer)
+
+            // Animation parameters
+            let wave = i % 3
+            let waveDelay = Double(wave) * 0.05 + Double.random(in: 0...0.1)
+            let animationDuration = Double.random(in: 0.8...1.4)
+            let finalRotation = Double.random(in: 540...1080) * .pi / 180
+
+            // Pop in animation
+            let scaleIn = CAKeyframeAnimation(keyPath: "transform.scale")
+            scaleIn.values = [0, 1.1, 1.0]
+            scaleIn.keyTimes = [0, 0.6, 1.0]
+            scaleIn.duration = 0.2
+            scaleIn.beginTime = CACurrentMediaTime() + waveDelay
+            scaleIn.fillMode = .forwards
+            scaleIn.isRemovedOnCompletion = false
+
+            // Fade in
+            let fadeIn = CABasicAnimation(keyPath: "opacity")
+            fadeIn.fromValue = 0
+            fadeIn.toValue = 1
+            fadeIn.duration = 0.1
+            fadeIn.beginTime = CACurrentMediaTime() + waveDelay
+            fadeIn.fillMode = .forwards
+            fadeIn.isRemovedOnCompletion = false
+
+            // Position animation (burst outward with gravity)
+            let positionAnimation = CABasicAnimation(keyPath: "position")
+            positionAnimation.fromValue = CGPoint(x: centerX, y: centerY)
+            positionAnimation.toValue = CGPoint(x: centerX + burstX, y: centerY + finalY)
+            positionAnimation.duration = animationDuration
+            positionAnimation.beginTime = CACurrentMediaTime() + waveDelay
+            positionAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            positionAnimation.fillMode = .forwards
+            positionAnimation.isRemovedOnCompletion = false
+
+            // Rotation animation
+            let rotationAnimation = CABasicAnimation(keyPath: "transform.rotation.z")
+            rotationAnimation.fromValue = 0
+            rotationAnimation.toValue = finalRotation
+            rotationAnimation.duration = animationDuration
+            rotationAnimation.beginTime = CACurrentMediaTime() + waveDelay
+            rotationAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            rotationAnimation.fillMode = .forwards
+            rotationAnimation.isRemovedOnCompletion = false
+
+            // Fade out near the end
+            let fadeOut = CABasicAnimation(keyPath: "opacity")
+            fadeOut.fromValue = 1
+            fadeOut.toValue = 0
+            fadeOut.duration = 0.4
+            fadeOut.beginTime = CACurrentMediaTime() + waveDelay + animationDuration * 0.7
+            fadeOut.fillMode = .forwards
+            fadeOut.isRemovedOnCompletion = false
+
+            // Apply animations
+            pieceLayer.add(scaleIn, forKey: "scaleIn")
+            pieceLayer.add(fadeIn, forKey: "fadeIn")
+            pieceLayer.add(positionAnimation, forKey: "position")
+            pieceLayer.add(rotationAnimation, forKey: "rotation")
+            pieceLayer.add(fadeOut, forKey: "fadeOut")
+        }
+
+        // Clean up after animations complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.confettiLayers.forEach { $0.removeFromSuperlayer() }
+            self?.confettiLayers.removeAll()
+        }
+    }
+
+    private func createConfettiPiece(size: CGFloat, shapeType: Int, colorIndex: Int) -> CALayer {
+        let layer = CAShapeLayer()
+        layer.fillColor = confettiColors[colorIndex].cgColor
+
+        let path: UIBezierPath
+
+        switch shapeType {
+        case 0: // Circle
+            path = UIBezierPath(ovalIn: CGRect(x: -size/2, y: -size/2, width: size, height: size))
+        case 1: // Rectangle
+            path = UIBezierPath(rect: CGRect(x: -size/2, y: -size*0.3, width: size, height: size * 0.6))
+        case 2: // Triangle
+            path = UIBezierPath()
+            path.move(to: CGPoint(x: 0, y: -size/2))
+            path.addLine(to: CGPoint(x: size/2, y: size/2))
+            path.addLine(to: CGPoint(x: -size/2, y: size/2))
+            path.close()
+        default: // Star
+            path = createStarPath(size: size * 1.2)
+        }
+
+        layer.path = path.cgPath
+        return layer
+    }
+
+    private func createStarPath(size: CGFloat) -> UIBezierPath {
+        let path = UIBezierPath()
+        let outerRadius = size / 2
+        let innerRadius = outerRadius * 0.4
+        let points = 5
+
+        for i in 0..<(points * 2) {
+            let radius = i % 2 == 0 ? outerRadius : innerRadius
+            let angle = (Double(i) * .pi / Double(points)) - (.pi / 2)
+            let point = CGPoint(
+                x: CGFloat(cos(angle)) * radius,
+                y: CGFloat(sin(angle)) * radius
+            )
+
+            if i == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.close()
+        return path
+    }
+}
 
 // MARK: - Animated Checkmark View
 

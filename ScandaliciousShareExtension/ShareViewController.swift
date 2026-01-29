@@ -662,8 +662,8 @@ class ShareViewController: UIViewController {
             }
         }
 
-        // Keep success visible briefly for the animation
-        try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2 seconds
+        // Keep success visible briefly for the animation (matches scan view timing)
+        try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8 seconds
 
         // Complete the request
         await MainActor.run {
@@ -672,7 +672,7 @@ class ShareViewController: UIViewController {
 
         print("✅ Extension completed")
     }
-    
+
     // MARK: - Upload Receipt Image
     private func saveReceiptImage(_ image: UIImage) async {
         print("💾 uploadReceiptImage started")
@@ -712,8 +712,8 @@ class ShareViewController: UIViewController {
             }
         }
 
-        // Keep success visible briefly for the animation
-        try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2 seconds
+        // Keep success visible briefly for the animation (matches scan view timing)
+        try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8 seconds
 
         // Complete the request
         await MainActor.run {
