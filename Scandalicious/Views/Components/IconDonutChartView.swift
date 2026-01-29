@@ -35,10 +35,11 @@ struct IconDonutChartView: View {
 
     /// Visual gap between segments in degrees (the actual empty space you see)
     private let visualGapDegrees: Double = 4.0
-    /// Stroke width as proportion of size (thicker pills)
-    private let strokeWidthRatio: CGFloat = 0.12
+    /// Stroke width as proportion of size
+    private let strokeWidthRatio: CGFloat = 0.08
 
-    @State private var animationTrigger: Bool = false
+    @State private var globalScale: CGFloat = 0.6
+    @State private var globalRotation: Double = -90 // Quarter turn back
 
     /// Unique identifier to track data changes and trigger re-animation
     private var dataFingerprint: String {
@@ -119,18 +120,23 @@ struct IconDonutChartView: View {
 
     var body: some View {
         ZStack {
-            // Donut segments - each appears one by one with staggered animation
-            ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
-                ExpandingArcSegment(
-                    startAngle: segment.startAngle,
-                    endAngle: segment.endAngle,
-                    color: segment.data.color,
-                    lineWidth: strokeWidth,
-                    frameSize: size - strokeWidth,
-                    index: index,
-                    isAnimating: animationTrigger
-                )
+            // All segments visible, rotate and scale together
+            ZStack {
+                ForEach(segments) { segment in
+                    Circle()
+                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                        .stroke(
+                            segment.data.color,
+                            style: StrokeStyle(
+                                lineWidth: strokeWidth,
+                                lineCap: .round
+                            )
+                        )
+                        .frame(width: size - strokeWidth, height: size - strokeWidth)
+                }
             }
+            .scaleEffect(globalScale)
+            .rotationEffect(.degrees(-90 + globalRotation)) // -90 starts from top
 
             // Center content (doesn't scale - stays in place)
             centerContent
@@ -138,21 +144,30 @@ struct IconDonutChartView: View {
         .frame(width: size, height: size)
         .onAppear {
             if shouldAnimate {
-                // Trigger animation on appear
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    animationTrigger = true
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+                        globalScale = 1.0
+                        globalRotation = 0
+                    }
                 }
             } else {
-                animationTrigger = true
+                globalScale = 1.0
+                globalRotation = 0
             }
         }
         .onChange(of: dataFingerprint) { _, _ in
             // Re-animate when data changes (e.g., period switch)
             if shouldAnimate {
-                // Reset and re-trigger animation
-                animationTrigger = false
+                // Reset to starting position
+                globalScale = 0.6
+                globalRotation = -90
+
+                // Expand and rotate to final position
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    animationTrigger = true
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+                        globalScale = 1.0
+                        globalRotation = 0
+                    }
                 }
             }
         }
@@ -208,97 +223,6 @@ private struct SegmentInfo: Identifiable {
     let midAngle: Double
 }
 
-// MARK: - Expanding Arc Segment (with staggered animation)
-
-private struct ExpandingArcSegment: View {
-    let startAngle: Double
-    let endAngle: Double
-    let color: Color
-    let lineWidth: CGFloat
-    let frameSize: CGFloat
-    let index: Int
-    let isAnimating: Bool
-
-    @State private var scale: CGFloat = 0.3
-    @State private var progress: CGFloat = 0
-    @State private var opacity: CGFloat = 0
-
-    private var delay: Double {
-        Double(index) * 0.15 // Stagger delay per segment
-    }
-
-    var body: some View {
-        let startFraction = startAngle / 360.0
-        let endFraction = endAngle / 360.0
-        let animatedEndFraction = startFraction + (endFraction - startFraction) * progress
-
-        Circle()
-            .trim(from: startFraction, to: animatedEndFraction)
-            .stroke(
-                color,
-                style: StrokeStyle(
-                    lineWidth: lineWidth,
-                    lineCap: .round
-                )
-            )
-            .frame(width: frameSize, height: frameSize)
-            .scaleEffect(scale)
-            .opacity(opacity)
-            .rotationEffect(.degrees(-90)) // Start from top
-            .onChange(of: isAnimating) { _, newValue in
-                if newValue {
-                    // Animate in with delay
-                    withAnimation(Animation.spring(response: 0.7, dampingFraction: 0.75).delay(delay)) {
-                        scale = 1.0
-                        progress = 1.0
-                        opacity = 1.0
-                    }
-                } else {
-                    // Reset immediately without animation
-                    scale = 0.3
-                    progress = 0
-                    opacity = 0
-                }
-            }
-            .onAppear {
-                if isAnimating {
-                    // If already animating on appear, trigger animation
-                    withAnimation(Animation.spring(response: 0.7, dampingFraction: 0.75).delay(delay)) {
-                        scale = 1.0
-                        progress = 1.0
-                        opacity = 1.0
-                    }
-                }
-            }
-    }
-}
-
-// MARK: - Donut Arc Segment (legacy, kept for reference)
-
-private struct DonutArcSegment: View {
-    let startAngle: Angle
-    let endAngle: Angle
-    let color: Color
-    let lineWidth: CGFloat
-    let animationProgress: CGFloat
-
-    var body: some View {
-        let startFraction = startAngle.degrees / 360.0
-        let endFraction = endAngle.degrees / 360.0
-        let animatedEndFraction = startFraction + (endFraction - startFraction) * animationProgress
-
-        Circle()
-            .trim(from: startFraction, to: animatedEndFraction)
-            .stroke(
-                color,
-                style: StrokeStyle(
-                    lineWidth: lineWidth,
-                    lineCap: .round
-                )
-            )
-            .rotationEffect(.degrees(-90)) // Start from top
-    }
-}
 
 // MARK: - Preview
 
