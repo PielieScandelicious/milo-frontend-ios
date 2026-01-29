@@ -40,6 +40,11 @@ struct IconDonutChartView: View {
 
     @State private var animationProgress: CGFloat = 0
 
+    /// Unique identifier to track data changes and trigger re-animation
+    private var dataFingerprint: String {
+        data.map { "\($0.value)" }.joined(separator: "-")
+    }
+
     /// Skip animation for small charts (store cards) to improve swipe performance
     private var shouldAnimate: Bool {
         size > 120
@@ -146,6 +151,16 @@ struct IconDonutChartView: View {
                 animationProgress = 1.0
             }
         }
+        .onChange(of: dataFingerprint) { _, _ in
+            // Re-animate when data changes (e.g., period switch)
+            if shouldAnimate {
+                // Reset progress and animate clockwise (slower, more satisfying sweep)
+                animationProgress = 0
+                withAnimation(.spring(response: 1.6, dampingFraction: 0.85)) {
+                    animationProgress = 1.0
+                }
+            }
+        }
     }
 
     // MARK: - Center Content
@@ -157,6 +172,8 @@ struct IconDonutChartView: View {
                 .foregroundColor(.white)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: formattedTotal)
 
             if let subtitle = subtitle, !subtitle.isEmpty {
                 Text(subtitleText)

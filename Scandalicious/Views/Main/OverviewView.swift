@@ -73,6 +73,7 @@ struct OverviewView: View {
     @State private var cachedSegmentsByPeriod: [String: [StoreChartSegment]] = [:] // Cache segments
     @State private var cachedChartDataByPeriod: [String: [ChartData]] = [:] // Cache chart data for IconDonutChart
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
+    @State private var storeRowsAppeared = false // Track staggered animation state
     @Binding var showSignOutConfirmation: Bool
 
     // Check if the selected period is the current month
@@ -444,6 +445,14 @@ struct OverviewView: View {
     private func handlePeriodChanged(newValue: String) {
         if showTrendlineInOverview { showTrendlineInOverview = false }
         expandedReceiptId = nil
+
+        // Reset store rows animation for staggered re-entry
+        storeRowsAppeared = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation {
+                storeRowsAppeared = true
+            }
+        }
 
         // Immediately update displayed breakdowns for the new period (no async delay)
         updateDisplayedBreakdowns()
@@ -884,17 +893,34 @@ struct OverviewView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 8)
 
-                // Store rows - use segment.id directly, avoid enumerated()
+                // Store rows with staggered animation
                 VStack(spacing: 8) {
-                    ForEach(segments) { segment in
+                    ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                         StoreRowButton(
                             segment: segment,
                             breakdowns: breakdowns,
                             onSelect: { selectedBreakdown = $0 }
                         )
+                        .opacity(storeRowsAppeared ? 1 : 0)
+                        .offset(y: storeRowsAppeared ? 0 : 15)
+                        .animation(
+                            .spring(response: 0.5, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.08),
+                            value: storeRowsAppeared
+                        )
                     }
                 }
                 .padding(.horizontal, 16)
+                .onAppear {
+                    // Trigger staggered animation when view appears
+                    if !storeRowsAppeared {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation {
+                                storeRowsAppeared = true
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -1263,6 +1289,8 @@ struct OverviewView: View {
                             Text(String(format: "€%.0f", spending))
                                 .font(.system(size: 44, weight: .heavy, design: .rounded))
                                 .foregroundColor(.white)
+                                .contentTransition(.numericText())
+                                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
                         }
 
                         // Health score inline - color changes based on score
