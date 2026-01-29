@@ -731,6 +731,26 @@ struct OverviewView: View {
             }
         }
         .ignoresSafeArea(edges: .bottom)
+        .gesture(
+            DragGesture(minimumDistance: 30, coordinateSpace: .local)
+                .onEnded { value in
+                    // Only trigger if horizontal movement is greater than vertical (to not interfere with scrolling)
+                    let horizontalAmount = value.translation.width
+                    let verticalAmount = abs(value.translation.height)
+
+                    guard abs(horizontalAmount) > verticalAmount else { return }
+
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        if horizontalAmount > 50 {
+                            // Swipe right -> go to previous (older) period
+                            goToPreviousPeriod()
+                        } else if horizontalAmount < -50 {
+                            // Swipe left -> go to next (newer) period
+                            goToNextPeriod()
+                        }
+                    }
+                }
+        )
     }
 
     // MARK: - Main Content View
