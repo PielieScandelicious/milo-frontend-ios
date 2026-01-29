@@ -2081,6 +2081,8 @@ struct ModernHealthScoreBadge: View {
                 Text(String(format: "%.1f", score))
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
+                    .contentTransition(.numericText())
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: score)
 
                 Text("Nutri Score")
                     .font(.system(size: 10, weight: .medium))
