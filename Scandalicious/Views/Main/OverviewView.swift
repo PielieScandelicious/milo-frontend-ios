@@ -1366,10 +1366,9 @@ struct OverviewView: View {
                     VStack(spacing: 16) {
                         // Spending section
                         VStack(spacing: 4) {
-                            Text("Total Spending")
+                            Text("SPENT THIS MONTH")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.white.opacity(0.5))
-                                .textCase(.uppercase)
                                 .tracking(1.2)
 
                             Text(String(format: "€%.0f", spending))
