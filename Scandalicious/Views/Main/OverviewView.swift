@@ -787,7 +787,6 @@ struct OverviewView: View {
                         )
                 }
             )
-            .simultaneousGesture(periodSwipeGesture)
         }
         .coordinateSpace(name: "scrollView")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
@@ -880,21 +879,29 @@ struct OverviewView: View {
 
         // All Overview components fade in together at the same time
         return VStack(spacing: 16) {
-            spendingAndHealthCardForPeriod(period)
+            // Swipeable area: spending card + pie chart
+            // Both swipe (change period) and tap (toggle trendline) work simultaneously
+            VStack(spacing: 16) {
+                spendingAndHealthCardForPeriod(period)
 
+                if !segments.isEmpty {
+                    // Pie chart showing store breakdown - use cached chart data
+                    IconDonutChartView(
+                        data: chartDataForPeriod(period),
+                        totalAmount: Double(totalReceiptsForPeriod(period)),
+                        size: 200,
+                        currencySymbol: "",
+                        subtitle: "receipts"
+                    )
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                }
+            }
+            .contentShape(Rectangle())
+            .simultaneousGesture(periodSwipeGesture)
+
+            // Store rows - NOT swipeable, only tappable
             if !segments.isEmpty {
-                // Pie chart showing store breakdown - use cached chart data
-                IconDonutChartView(
-                    data: chartDataForPeriod(period),
-                    totalAmount: Double(totalReceiptsForPeriod(period)),
-                    size: 200,
-                    currencySymbol: "",
-                    subtitle: "receipts"
-                )
-                .padding(.top, 16)
-                .padding(.bottom, 8)
-
-                // Store rows with staggered animation
                 VStack(spacing: 8) {
                     ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                         StoreRowButton(
@@ -1353,6 +1360,7 @@ struct OverviewView: View {
                     }
                     .padding(.vertical, 16)
                     .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 } else {
                     // Total spending view with health score
                     VStack(spacing: 16) {
@@ -1395,6 +1403,7 @@ struct OverviewView: View {
                     }
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 }
             }
             .buttonStyle(TotalSpendingCardButtonStyle())
