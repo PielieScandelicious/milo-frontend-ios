@@ -125,12 +125,52 @@ struct IconDonutChartView: View {
             // All segments visible, rotate and scale together
             ZStack {
                 ForEach(segments) { segment in
+                    // Subtle outer glow for depth
                     Circle()
                         .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
                         .stroke(
-                            segment.data.color,
+                            segment.data.color.opacity(0.25),
+                            style: StrokeStyle(
+                                lineWidth: strokeWidth + 3,
+                                lineCap: .round
+                            )
+                        )
+                        .blur(radius: 2)
+                        .frame(width: size - strokeWidth, height: size - strokeWidth)
+
+                    // Main segment with gradient
+                    Circle()
+                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    segment.data.color.opacity(1.0),
+                                    segment.data.color.opacity(0.7)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
                             style: StrokeStyle(
                                 lineWidth: strokeWidth,
+                                lineCap: .round
+                            )
+                        )
+                        .frame(width: size - strokeWidth, height: size - strokeWidth)
+
+                    // Inner highlight for glass effect
+                    Circle()
+                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.4),
+                                    Color.white.opacity(0.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .center
+                            ),
+                            style: StrokeStyle(
+                                lineWidth: strokeWidth * 0.5,
                                 lineCap: .round
                             )
                         )

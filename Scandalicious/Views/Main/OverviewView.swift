@@ -334,6 +334,9 @@ struct OverviewView: View {
             .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
                 handleReceiptUploadSuccess()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
+                handleReceiptDeleted()
+            }
             .onChange(of: transactionManager.transactions) { oldValue, newValue in
                 handleTransactionsChanged(oldValue: oldValue, newValue: newValue)
             }
@@ -447,6 +450,27 @@ struct OverviewView: View {
                 await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
             }
             await rateLimitManager.syncFromBackend()
+        }
+    }
+
+    private func handleReceiptDeleted() {
+        print("🗑️ Received receiptsDataDidChange - refreshing period data")
+
+        Task {
+            // Wait briefly for backend to process the deletion
+            try? await Task.sleep(for: .milliseconds(500))
+
+            // Refresh the period data to update pie chart and total spending
+            await dataManager.refreshData(for: .month, periodString: selectedPeriod)
+
+            // Also refresh the period metadata to get updated totals
+            await dataManager.fetchPeriodMetadata()
+
+            await MainActor.run {
+                // Update caches with fresh data
+                updateDisplayedBreakdowns()
+                cacheSegmentsForPeriod(selectedPeriod)
+            }
         }
     }
 
