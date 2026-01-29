@@ -2,1243 +2,678 @@
 //  CustomCameraView.swift
 //  Scandalicious
 //
-//  Custom camera view with shutter button, flash control, and scroll capture for long receipts
+//  Redesigned seamless receipt capture experience
+//  Single view for both single-shot and multi-section long receipts
 //
 
 import SwiftUI
 import AVFoundation
-import CoreImage
-import CoreMotion
-import Accelerate
-import Combine
+import UIKit
 
-// MARK: - Camera Mode
-
-enum CameraMode: Equatable {
-    case standard
-    case scrollCapture
+enum CaptureMode: String, CaseIterable {
+    case normal = "Normal"
+    case longReceipt = "Long Receipt"
 }
-
-// MARK: - Scroll Speed Indicator
-
-enum ScrollSpeedIndicator {
-    case tooFast
-    case perfect
-    case tooSlow
-    case stationary
-
-    var color: Color {
-        switch self {
-        case .tooFast: return .orange
-        case .perfect: return .green
-        case .tooSlow: return .yellow
-        case .stationary: return .gray
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .tooFast: return "Slow down"
-        case .perfect: return "Perfect speed"
-        case .tooSlow: return "Move a bit faster"
-        case .stationary: return "Start moving down"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .tooFast: return "tortoise.fill"
-        case .perfect: return "checkmark.circle.fill"
-        case .tooSlow: return "hare.fill"
-        case .stationary: return "arrow.down.circle"
-        }
-    }
-}
-
-// MARK: - Capture Quality
-
-enum CaptureQuality {
-    case excellent
-    case good
-    case poor
-
-    var color: Color {
-        switch self {
-        case .excellent: return .green
-        case .good: return .blue
-        case .poor: return .red
-        }
-    }
-}
-
-// MARK: - Flash Mode
-
-enum CameraFlashMode: CaseIterable {
-    case off, on, auto
-
-    var icon: String {
-        switch self {
-        case .off: return "bolt.slash.fill"
-        case .on: return "bolt.fill"
-        case .auto: return "bolt.badge.automatic.fill"
-        }
-    }
-
-    var avFlashMode: AVCaptureDevice.FlashMode {
-        switch self {
-        case .off: return .off
-        case .on: return .on
-        case .auto: return .auto
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .off: return "Off"
-        case .on: return "On"
-        case .auto: return "Auto"
-        }
-    }
-}
-
-// MARK: - Custom Camera View
 
 struct CustomCameraView: View {
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
     @Binding var capturedImage: UIImage?
 
-    @StateObject private var cameraManager = CameraManager()
-    @State private var flashMode: CameraFlashMode = .auto
-    @State private var cameraMode: CameraMode = .standard
-    @State private var isCapturing = false
-    @State private var showFlashPicker = false
-    @State private var shutterScale: CGFloat = 1.0
+    @StateObject private var cameraService = CameraService()
 
-    // Scroll capture state
-    @State private var scrollCaptureImages: [UIImage] = []
-    @State private var isScrollCapturing = false
-    @State private var scrollCaptureProgress: CGFloat = 0
-    @State private var captureTimer: Timer?
-    @State private var showScrollCaptureHint = true
+    // Mode selection
+    @State private var captureMode: CaptureMode = .normal
 
-    // Motion tracking for smooth scroll guidance
-    @StateObject private var motionManager = CameraMotionManager()
-    @State private var scrollSpeed: ScrollSpeedIndicator = .perfect
-    @State private var captureQuality: CaptureQuality = .good
+    // Animation states
+    @State private var showCaptureFlash = false
+    @State private var flyingImageData: FlyingImageData?
+    @State private var flyingToIndex: Int?
+    @State private var pendingAnimationImage: UIImage?
+    @State private var pendingAnimationIndex: Int?
+    @State private var pendingAnimationStartFrame: CGRect?
+    @State private var thumbnailFrames: [Int: CGRect] = [:]
 
-    // Photo preview confirmation state
-    @State private var showPhotoPreview = false
+    // Review states
+    @State private var showReviewSheet = false
+    @State private var isProcessing = false
     @State private var previewImage: UIImage?
+
+    private let cameraCoordinateSpace = "cameraView"
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Camera Preview
-                CameraPreviewView(session: cameraManager.session)
+                Color.black.ignoresSafeArea()
+
+                // Camera Preview - always active
+                CameraPreviewRepresentable(session: cameraService.session)
                     .ignoresSafeArea()
 
-                // Overlay UI
+                // Capture flash effect
+                if showCaptureFlash {
+                    Color.white
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                }
+
+                // Main UI overlay
                 VStack(spacing: 0) {
-                    // Top bar
+                    // Top bar with flash toggle
                     topBar
 
                     Spacer()
 
-                    // Mode indicator and scroll capture guide
-                    if cameraMode == .scrollCapture {
-                        scrollCaptureOverlay(geometry: geometry)
+                    // Captured sections thumbnail strip (only in long receipt mode)
+                    if captureMode == .longReceipt && !cameraService.allCapturedImages.isEmpty {
+                        capturedSectionsStrip(geometry: geometry)
+                            .padding(.bottom, 16)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
-
-                    Spacer()
 
                     // Bottom controls
                     bottomControls(geometry: geometry)
                 }
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: cameraService.allCapturedImages.count)
 
-                // Capture flash effect
-                if isCapturing {
-                    Color.white
-                        .ignoresSafeArea()
-                        .opacity(0.3)
-                        .transition(.opacity)
+                // Flying image animation - positioned in same coordinate space as thumbnails
+                if let flyingData = flyingImageData {
+                    FlyingImageView(
+                        image: flyingData.image,
+                        startFrame: flyingData.startFrame,
+                        endFrame: flyingData.endFrame,
+                        screenSize: geometry.size,
+                        onComplete: {
+                            flyingImageData = nil
+                            flyingToIndex = nil
+                        }
+                    )
+                    .ignoresSafeArea()
                 }
 
-                // Flash picker overlay
-                if showFlashPicker {
-                    flashPickerOverlay
-                }
-
-                // Photo preview overlay
-                if showPhotoPreview, let image = previewImage {
-                    photoPreviewOverlay(image: image)
+                // Processing overlay
+                if isProcessing {
+                    processingOverlay
                         .transition(.opacity)
                 }
             }
+            .coordinateSpace(name: cameraCoordinateSpace)
         }
-        .statusBarHidden(true)
-        .onAppear {
-            cameraManager.checkPermissionAndSetup()
-        }
-        .onDisappear {
-            cameraManager.stopSession()
-            captureTimer?.invalidate()
-            motionManager.stopMonitoring()
+        .statusBarHidden()
+        .animation(.easeInOut(duration: 0.15), value: showCaptureFlash)
+        .fullScreenCover(isPresented: $showReviewSheet) {
+            ReviewImageView(
+                images: cameraService.allCapturedImages,
+                previewImage: previewImage,
+                onConfirm: finishCapture,
+                onRetake: {
+                    cameraService.reset()
+                    previewImage = nil
+                    showReviewSheet = false
+                },
+                onAddMore: {
+                    showReviewSheet = false
+                },
+                showAddMore: captureMode == .longReceipt
+            )
         }
     }
 
     // MARK: - Top Bar
 
     private var topBar: some View {
-        HStack {
+        HStack(spacing: 16) {
             // Close button
-            Button {
+            Button(action: {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                // Clean up scroll capture if running
-                if isScrollCapturing {
-                    captureTimer?.invalidate()
-                    captureTimer = nil
-                    motionManager.stopMonitoring()
-                }
                 dismiss()
-            } label: {
+            }) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial.opacity(0.6))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 40, height: 40)
+                    .background(Color.black.opacity(0.5))
                     .clipShape(Circle())
             }
 
             Spacer()
 
-            // Flash button
-            Button {
+            // Flash toggle button
+            Button(action: {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    showFlashPicker.toggle()
+                cameraService.toggleFlash()
+            }) {
+                Image(systemName: cameraService.isFlashOn ? "bolt.fill" : "bolt.slash")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(cameraService.isFlashOn ? .yellow : .white)
+                    .frame(width: 40, height: 40)
+                    .background(cameraService.isFlashOn ? Color.yellow.opacity(0.2) : Color.black.opacity(0.5))
+                    .clipShape(Circle())
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 60)
+    }
+
+    // MARK: - Captured Sections Strip
+
+    @ViewBuilder
+    private func thumbnailItem(index: Int, image: UIImage) -> some View {
+        ThumbnailView(image: image, index: index + 1, isAnimatingIn: flyingToIndex == index)
+            .id(index)
+            .opacity(flyingToIndex == index ? 0 : 1)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear {
+                            let frame = geo.frame(in: .named(cameraCoordinateSpace))
+                            thumbnailFrames[index] = frame
+                            // Skip animation for first photo (index 0) - strip is still animating in
+                            if index > 0 {
+                                triggerPendingAnimation(for: index, with: frame)
+                            }
+                        }
                 }
-            } label: {
+            )
+    }
+
+    private func capturedSectionsStrip(geometry: GeometryProxy) -> some View {
+        HStack(spacing: 8) {
+            // Thumbnail images
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(cameraService.allCapturedImages.enumerated()), id: \.offset) { index, image in
+                            thumbnailItem(index: index, image: image)
+                        }
+                    }
+                    .padding(.leading, 16)
+                    .padding(.trailing, 8)
+                }
+                .onChange(of: cameraService.allCapturedImages.count) { newCount in
+                    withAnimation {
+                        proxy.scrollTo(newCount - 1, anchor: .trailing)
+                    }
+                }
+            }
+            .frame(height: 70)
+
+            // Review/Done button
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                preparePreviewAndShowReview()
+            }) {
                 HStack(spacing: 6) {
-                    Image(systemName: flashMode.icon)
+                    Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 16, weight: .semibold))
-
-                    if flashMode != .off {
-                        Text(flashMode.label)
-                            .font(.system(size: 14, weight: .semibold))
-                    }
+                    Text("Done")
+                        .font(.system(size: 14, weight: .bold))
                 }
-                .foregroundStyle(flashMode == .off ? .white.opacity(0.7) : .yellow)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(.ultraThinMaterial.opacity(0.6))
-                .clipShape(Capsule())
+                .foregroundColor(.black)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.green)
+                .cornerRadius(20)
             }
+            .padding(.trailing, 16)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-    }
-
-    // MARK: - Flash Picker Overlay
-
-    private var flashPickerOverlay: some View {
-        VStack {
-            Spacer()
-                .frame(height: 80)
-
-            HStack(spacing: 12) {
-                ForEach(CameraFlashMode.allCases, id: \.self) { mode in
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            flashMode = mode
-                            showFlashPicker = false
-                        }
-                    } label: {
-                        VStack(spacing: 8) {
-                            Image(systemName: mode.icon)
-                                .font(.system(size: 22, weight: .semibold))
-
-                            Text(mode.label)
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .foregroundStyle(flashMode == mode ? .yellow : .white)
-                        .frame(width: 70, height: 70)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(flashMode == mode ? Color.white.opacity(0.2) : Color.white.opacity(0.1))
-                        )
-                    }
-                }
-            }
-            .padding(16)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .transition(.move(edge: .top).combined(with: .opacity))
-
-            Spacer()
-        }
+        .padding(.vertical, 12)
         .background(
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        showFlashPicker = false
-                    }
-                }
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.black.opacity(0.7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                )
         )
-    }
-
-    // MARK: - Photo Preview Overlay
-
-    private func photoPreviewOverlay(image: UIImage) -> some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
-                // Top header
-                Text("Review your photo")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(.ultraThinMaterial.opacity(0.8))
-                    .clipShape(Capsule())
-                    .padding(.top, 16)
-                    .padding(.bottom, 12)
-
-                // Photo preview - scrollable for long receipts
-                ScrollView(.vertical, showsIndicators: true) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: geometry.size.width)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                // Bottom action buttons
-                VStack(spacing: 12) {
-                    Text("Is all the receipt text clear and readable?")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .multilineTextAlignment(.center)
-
-                    HStack(spacing: 16) {
-                        // Retake button
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                showPhotoPreview = false
-                                previewImage = nil
-                                // Reset scroll capture state for fresh retake
-                                scrollCaptureImages = []
-                                if cameraMode == .scrollCapture {
-                                    showScrollCaptureHint = true
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "arrow.counterclockwise")
-                                    .font(.system(size: 16, weight: .semibold))
-                                Text("Retake")
-                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            }
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Color.white.opacity(0.2))
-                            )
-                        }
-
-                        // Use Photo button
-                        Button {
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
-                            let imageToUse = image
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                showPhotoPreview = false
-                                previewImage = nil
-                            }
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                self.capturedImage = imageToUse
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                Text("Use Photo")
-                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            }
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.blue, .cyan],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                            )
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .padding(.bottom, geometry.safeAreaInsets.bottom)
-            }
-            .background(Color.black.ignoresSafeArea())
-        }
-    }
-
-    // MARK: - Scroll Capture Overlay
-
-    private func scrollCaptureOverlay(geometry: GeometryProxy) -> some View {
-        ZStack {
-            // Edge guides
-            HStack {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.cyan.opacity(0.6), .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: 3)
-
-                Spacer()
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, .cyan.opacity(0.6)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: 3)
-            }
-            .padding(.horizontal, 40)
-            .opacity(isScrollCapturing ? 1 : 0.3)
-            .animation(.easeInOut(duration: 0.3), value: isScrollCapturing)
-
-            VStack(spacing: 16) {
-                if showScrollCaptureHint && !isScrollCapturing {
-                    // Instructions card - scrollable for smaller screens
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 14) {
-                            ZStack {
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.blue.opacity(0.3), .cyan.opacity(0.3)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .frame(width: 56, height: 56)
-
-                                Image(systemName: "arrow.down")
-                                    .font(.system(size: 26, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .symbolEffect(.bounce.up.byLayer, options: .repeating.speed(0.5))
-                            }
-
-                            VStack(spacing: 6) {
-                                Text("Long Receipt Mode")
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-
-                                Text("Position at the top of receipt, then move phone slowly downward")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.7))
-                                    .multilineTextAlignment(.center)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            // Tips - compact layout
-                            HStack(spacing: 16) {
-                                tipItem(icon: "hand.raised.fill", text: "Steady")
-                                tipItem(icon: "light.max", text: "Good light")
-                                tipItem(icon: "arrow.down", text: "Slow")
-                            }
-                        }
-                        .padding(20)
-                    }
-                    .frame(maxHeight: min(geometry.size.height * 0.35, 280))
-                    .background(.ultraThinMaterial.opacity(0.9))
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-                    .padding(.horizontal, 24)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 1.1).combined(with: .opacity)
-                    ))
-                }
-
-                Spacer()
-
-                if isScrollCapturing {
-                    // Live capture feedback
-                    VStack(spacing: 12) {
-                        // Speed indicator
-                        HStack(spacing: 10) {
-                            Image(systemName: scrollSpeed.icon)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(scrollSpeed.color)
-
-                            Text(scrollSpeed.message)
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundStyle(scrollSpeed.color)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(scrollSpeed.color.opacity(0.2))
-                        .clipShape(Capsule())
-
-                        // Capture counter and progress
-                        HStack(spacing: 16) {
-                            // Recording indicator
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 10, height: 10)
-                                    .shadow(color: .red, radius: 4)
-
-                                Text("REC")
-                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                    .foregroundStyle(.red)
-                            }
-
-                            // Segment count
-                            HStack(spacing: 4) {
-                                Image(systemName: "square.stack.3d.up.fill")
-                                    .font(.system(size: 14, weight: .semibold))
-
-                                Text("\(scrollCaptureImages.count)")
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                            }
-                            .foregroundStyle(.white)
-
-                            // Progress ring
-                            ZStack {
-                                Circle()
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 3)
-                                    .frame(width: 30, height: 30)
-
-                                Circle()
-                                    .trim(from: 0, to: min(scrollCaptureProgress, 1.0))
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [.blue, .cyan],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                                    )
-                                    .frame(width: 30, height: 30)
-                                    .rotationEffect(.degrees(-90))
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(.ultraThinMaterial.opacity(0.9))
-                        .clipShape(Capsule())
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .padding(.vertical, 60)
-        }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isScrollCapturing)
-        .animation(.easeInOut(duration: 0.2), value: scrollSpeed)
-    }
-
-    private func tipItem(icon: String, text: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.cyan)
-
-            Text(text)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
-        }
+        .padding(.horizontal, 12)
     }
 
     // MARK: - Bottom Controls
 
     private func bottomControls(geometry: GeometryProxy) -> some View {
-        VStack(spacing: 24) {
-            // Mode selector
-            HStack(spacing: 0) {
-                modeButton(mode: .standard, title: "Standard", icon: "camera.fill")
-                modeButton(mode: .scrollCapture, title: "Long Receipt", icon: "rectangle.expand.vertical")
-            }
-            .padding(4)
-            .background(.ultraThinMaterial.opacity(0.6))
-            .clipShape(Capsule())
-
-            // Shutter area
-            HStack(alignment: .center) {
-                // Gallery button placeholder (for symmetry)
-                Circle()
-                    .fill(Color.clear)
-                    .frame(width: 60, height: 60)
-
-                Spacer()
-
-                // Shutter button
-                shutterButton
-
-                Spacer()
-
-                // Gallery/Preview of captured images (for scroll capture)
-                if cameraMode == .scrollCapture && !scrollCaptureImages.isEmpty {
-                    ZStack {
-                        ForEach(Array(scrollCaptureImages.suffix(3).enumerated()), id: \.offset) { index, image in
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 50, height: 50)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.white.opacity(0.5), lineWidth: 2)
-                                )
-                                .offset(x: CGFloat(index) * 4, y: CGFloat(index) * -4)
-                        }
-
-                        // Count badge
-                        Text("\(scrollCaptureImages.count)")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 24, height: 24)
-                            .background(Color.blue)
-                            .clipShape(Circle())
-                            .offset(x: 25, y: -25)
-                    }
-                    .frame(width: 60, height: 60)
-                } else {
+        VStack(spacing: 16) {
+            // Shutter button
+            Button(action: { capturePhoto(geometry: geometry) }) {
+                ZStack {
+                    // Outer ring
                     Circle()
-                        .fill(Color.clear)
-                        .frame(width: 60, height: 60)
+                        .stroke(Color.white, lineWidth: 4)
+                        .frame(width: 74, height: 74)
+
+                    // Inner filled circle
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 62, height: 62)
+
+                    // Plus icon if already has captures (only in long receipt mode)
+                    if captureMode == .longReceipt && !cameraService.allCapturedImages.isEmpty {
+                        Image(systemName: "plus")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.black.opacity(0.3))
+                    }
                 }
             }
-            .padding(.horizontal, 40)
-            .padding(.bottom, geometry.safeAreaInsets.bottom + 20)
+            .disabled(cameraService.isCaptureInProgress)
+            .opacity(cameraService.isCaptureInProgress ? 0.6 : 1.0)
+
+            // Mode selector - hide when in long receipt mode with captures
+            if !(captureMode == .longReceipt && !cameraService.allCapturedImages.isEmpty) {
+                modeSelector
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
         }
-        .padding(.top, 16)
+        .padding(.bottom, 40)
+    }
+
+    // MARK: - Mode Selector
+
+    private var modeSelector: some View {
+        HStack(spacing: 0) {
+            ForEach(CaptureMode.allCases, id: \.self) { mode in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        // Reset images when switching modes
+                        if captureMode != mode {
+                            cameraService.reset()
+                        }
+                        captureMode = mode
+                    }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }) {
+                    Text(mode.rawValue)
+                        .font(.system(size: 13, weight: captureMode == mode ? .semibold : .regular))
+                        .foregroundColor(captureMode == mode ? .black : .white.opacity(0.7))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(captureMode == mode ? Color.white : Color.clear)
+                        )
+                }
+            }
+        }
+        .padding(4)
         .background(
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.6)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(edges: .bottom)
+            Capsule()
+                .fill(Color.white.opacity(0.15))
         )
     }
 
-    // MARK: - Mode Button
+    // MARK: - Processing Overlay
 
-    private func modeButton(mode: CameraMode, title: String, icon: String) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                if cameraMode != mode {
-                    // Stop any ongoing scroll capture before switching modes
-                    if isScrollCapturing {
-                        captureTimer?.invalidate()
-                        captureTimer = nil
-                        motionManager.stopMonitoring()
-                        isScrollCapturing = false
+    private var processingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.85).ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                ZStack {
+                    ForEach(0..<3, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white.opacity(0.15))
+                            .frame(width: 60, height: 80)
+                            .offset(y: CGFloat(index) * -8)
+                            .scaleEffect(1.0 - CGFloat(index) * 0.05)
                     }
-                    cameraMode = mode
-                    scrollCaptureImages = []
-                    showScrollCaptureHint = true
-                }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
 
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.2)
+                }
+
+                Text("Preparing preview...")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
             }
-            .foregroundStyle(cameraMode == mode ? .white : .white.opacity(0.6))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(40)
             .background(
-                Capsule()
-                    .fill(cameraMode == mode ? Color.white.opacity(0.25) : Color.clear)
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.white.opacity(0.1))
             )
-        }
-    }
-
-    // MARK: - Shutter Button
-
-    private var shutterButton: some View {
-        Button {
-            handleShutterPress()
-        } label: {
-            ZStack {
-                // Outer ring
-                Circle()
-                    .stroke(Color.white, lineWidth: 4)
-                    .frame(width: 80, height: 80)
-
-                // Inner fill
-                Circle()
-                    .fill(
-                        cameraMode == .scrollCapture && isScrollCapturing
-                            ? Color.red
-                            : Color.white
-                    )
-                    .frame(width: 66, height: 66)
-                    .overlay {
-                        if cameraMode == .scrollCapture && isScrollCapturing {
-                            // Stop icon when recording
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.white)
-                                .frame(width: 24, height: 24)
-                        }
-                    }
-
-                // Pulse animation ring for scroll capture
-                if cameraMode == .scrollCapture && isScrollCapturing {
-                    Circle()
-                        .stroke(Color.red.opacity(0.5), lineWidth: 2)
-                        .frame(width: 90, height: 90)
-                        .scaleEffect(shutterScale)
-                        .opacity(2 - shutterScale)
-                }
-            }
-            .scaleEffect(isCapturing ? 0.9 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isCapturing)
-        }
-        .onAppear {
-            // Pulse animation
-            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
-                shutterScale = 1.3
-            }
         }
     }
 
     // MARK: - Actions
 
-    private func handleShutterPress() {
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+    private func capturePhoto(geometry: GeometryProxy) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
-        switch cameraMode {
-        case .standard:
-            captureStandardPhoto()
-
-        case .scrollCapture:
-            if isScrollCapturing {
-                stopScrollCapture()
-            } else {
-                startScrollCapture()
+        // Show flash effect
+        withAnimation(.easeIn(duration: 0.05)) {
+            showCaptureFlash = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeOut(duration: 0.15)) {
+                showCaptureFlash = false
             }
         }
-    }
 
-    private func captureStandardPhoto() {
-        withAnimation(.easeInOut(duration: 0.1)) {
-            isCapturing = true
-        }
-
-        cameraManager.capturePhoto(flashMode: flashMode.avFlashMode) { image in
-            DispatchQueue.main.async {
-                withAnimation(.easeInOut(duration: 0.1)) {
-                    self.isCapturing = false
-                }
-
-                if let image = image {
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    // Show preview for user confirmation
-                    withAnimation(.easeIn(duration: 0.2)) {
-                        self.previewImage = image
-                        self.showPhotoPreview = true
-                    }
-                }
-            }
-        }
-    }
-
-    private func startScrollCapture() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            isScrollCapturing = true
-            showScrollCaptureHint = false
-            scrollCaptureImages = []
-            scrollCaptureProgress = 0
-        }
-
-        // Start motion monitoring
-        motionManager.startMonitoring()
-
-        // Capture initial frame
-        captureScrollFrame()
-
-        // Start timer for continuous capture and motion updates
-        // Use Timer with explicit RunLoop.main to ensure it fires properly
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [motionManager, cameraManager] _ in
-            // Update speed indicator on main thread
-            DispatchQueue.main.async {
-                self.scrollSpeed = motionManager.getSpeedIndicator()
-            }
-
-            // Only capture if phone is relatively stable (not shaking) and not already capturing
-            if motionManager.isStable && !cameraManager.isCapturing {
-                self.captureScrollFrame()
-            }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        captureTimer = timer
-    }
-
-    private func captureScrollFrame() {
-        // Don't capture if already capturing
-        guard !cameraManager.isCapturing else { return }
-
-        cameraManager.capturePhoto(flashMode: flashMode == .off ? .off : .auto) { image in
-            DispatchQueue.main.async {
-                if let image = image {
-                    self.scrollCaptureImages.append(image)
-
-                    // Update progress (assuming max ~20 segments for a very long receipt)
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        self.scrollCaptureProgress = CGFloat(self.scrollCaptureImages.count) / 20.0
-                    }
-
-                    // Light haptic for each capture
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                }
-            }
-        }
-    }
-
-    private func stopScrollCapture() {
-        captureTimer?.invalidate()
-        captureTimer = nil
-
-        // Stop motion monitoring
-        motionManager.stopMonitoring()
-
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            isScrollCapturing = false
-        }
-
-        // Stitch images together
-        if scrollCaptureImages.count >= 2 {
-            // Show processing feedback
-            UINotificationFeedbackGenerator().notificationOccurred(.warning)
-
-            // Capture images locally before async task
-            let imagesToStitch = scrollCaptureImages
-
-            Task {
-                if let stitchedImage = await stitchImages(imagesToStitch) {
-                    await MainActor.run {
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        // Show preview for user confirmation
-                        withAnimation(.easeIn(duration: 0.2)) {
-                            self.previewImage = stitchedImage
-                            self.showPhotoPreview = true
-                        }
-                    }
-                } else {
-                    // Stitching failed, use first image as fallback
-                    await MainActor.run {
-                        if let fallbackImage = imagesToStitch.first {
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
-                            // Show preview for user confirmation
-                            withAnimation(.easeIn(duration: 0.2)) {
-                                self.previewImage = fallbackImage
-                                self.showPhotoPreview = true
-                            }
-                        }
-                    }
-                }
-            }
-        } else if let singleImage = scrollCaptureImages.first {
-            // Only one image captured, show preview for confirmation
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(.easeIn(duration: 0.2)) {
-                self.previewImage = singleImage
-                self.showPhotoPreview = true
+        if captureMode == .normal {
+            // Normal mode: capture and immediately show review
+            cameraService.capturePhoto { capturedImg in
+                guard let image = capturedImg else { return }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                self.previewImage = image
+                self.showReviewSheet = true
             }
         } else {
-            // No images captured, just reset state
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                showScrollCaptureHint = true
+            // Long receipt mode: capture and add to thumbnail strip
+            let viewSize = geometry.size
+            let imageWidth: CGFloat = 120
+            let imageHeight: CGFloat = 160
+            let startFrame = CGRect(
+                x: (viewSize.width - imageWidth) / 2,
+                y: (viewSize.height - imageHeight) / 2 - 40,
+                width: imageWidth,
+                height: imageHeight
+            )
+
+            let targetIndex = cameraService.allCapturedImages.count
+
+            cameraService.capturePhoto { capturedImg in
+                guard let image = capturedImg else { return }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+
+                // Store pending animation data - animation will trigger when thumbnail frame is captured
+                self.pendingAnimationImage = image
+                self.pendingAnimationIndex = targetIndex
+                self.pendingAnimationStartFrame = startFrame
             }
         }
     }
 
-    // MARK: - Image Stitching
+    private func triggerPendingAnimation(for index: Int, with frame: CGRect) {
+        // Check if this is the thumbnail we're waiting to animate to
+        guard let pendingIndex = pendingAnimationIndex,
+              let pendingImage = pendingAnimationImage,
+              let startFrame = pendingAnimationStartFrame,
+              index == pendingIndex else {
+            return
+        }
 
-    private func stitchImages(_ images: [UIImage]) async -> UIImage? {
-        guard !images.isEmpty else { return nil }
-        guard images.count >= 2 else { return images.first }
+        // Clear pending state
+        pendingAnimationImage = nil
+        pendingAnimationIndex = nil
+        pendingAnimationStartFrame = nil
 
-        return await withCheckedContinuation { continuation in
+        // Track which thumbnail we're animating to (to hide it during animation)
+        flyingToIndex = index
+
+        // Start the flying animation to the actual thumbnail position
+        flyingImageData = FlyingImageData(
+            image: pendingImage,
+            startFrame: startFrame,
+            endFrame: frame
+        )
+    }
+
+    private func preparePreviewAndShowReview() {
+        guard !cameraService.allCapturedImages.isEmpty else { return }
+
+        if cameraService.allCapturedImages.count == 1 {
+            previewImage = cameraService.allCapturedImages[0]
+            showReviewSheet = true
+        } else {
+            isProcessing = true
             DispatchQueue.global(qos: .userInitiated).async {
-                // Configuration
-                let overlapRatio: CGFloat = 0.38 // 38% overlap between consecutive captures
-                let firstImage = images[0]
-                let width = firstImage.size.width
-                let singleHeight = firstImage.size.height
-                let effectiveHeight = singleHeight * (1 - overlapRatio)
-                let blendZoneHeight = singleHeight * overlapRatio
-
-                // Calculate total canvas height
-                let totalHeight = singleHeight + (CGFloat(images.count - 1) * effectiveHeight)
-
-                // Create high-quality renderer
-                let format = UIGraphicsImageRendererFormat()
-                format.scale = firstImage.scale
-                format.opaque = true
-
-                let renderer = UIGraphicsImageRenderer(
-                    size: CGSize(width: width, height: totalHeight),
-                    format: format
-                )
-
-                let stitchedImage = renderer.image { ctx in
-                    let context = ctx.cgContext
-
-                    // Fill background
-                    context.setFillColor(UIColor.white.cgColor)
-                    context.fill(CGRect(x: 0, y: 0, width: width, height: totalHeight))
-
-                    var yOffset: CGFloat = 0
-
-                    for (index, image) in images.enumerated() {
-                        let imageRect = CGRect(x: 0, y: yOffset, width: width, height: singleHeight)
-
-                        if index == 0 {
-                            // First image: draw completely
-                            image.draw(in: imageRect)
-                        } else {
-                            // For subsequent images: use gradient blending in overlap zone
-
-                            // 1. Draw the non-overlapping portion (below blend zone)
-                            let nonOverlapY = yOffset + blendZoneHeight
-                            let nonOverlapHeight = singleHeight - blendZoneHeight
-
-                            if nonOverlapHeight > 0 {
-                                context.saveGState()
-                                context.clip(to: CGRect(x: 0, y: nonOverlapY, width: width, height: nonOverlapHeight))
-                                image.draw(in: imageRect)
-                                context.restoreGState()
-                            }
-
-                            // 2. Draw the blend zone with alpha gradient
-                            // We'll draw horizontal strips with increasing alpha
-                            let strips = Int(blendZoneHeight / 2) // One strip per 2 points
-                            for strip in 0..<strips {
-                                let stripY = yOffset + CGFloat(strip) * 2
-                                let alpha = CGFloat(strip) / CGFloat(strips)
-
-                                context.saveGState()
-                                context.setAlpha(alpha)
-                                context.clip(to: CGRect(x: 0, y: stripY, width: width, height: 2))
-                                image.draw(in: imageRect)
-                                context.restoreGState()
-                            }
-                        }
-
-                        yOffset += effectiveHeight
-                    }
+                let stacked = ImageStacker.stack(cameraService.allCapturedImages)
+                DispatchQueue.main.async {
+                    isProcessing = false
+                    previewImage = stacked ?? cameraService.allCapturedImages[0]
+                    showReviewSheet = true
                 }
+            }
+        }
+    }
 
-                continuation.resume(returning: stitchedImage)
+    private func finishCapture() {
+        guard let image = previewImage else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        capturedImage = image
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        dismiss()
+    }
+}
+
+// MARK: - Flying Image Data
+
+struct FlyingImageData: Equatable {
+    let image: UIImage
+    let startFrame: CGRect
+    let endFrame: CGRect
+    let id = UUID()
+
+    static func == (lhs: FlyingImageData, rhs: FlyingImageData) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+// MARK: - Flying Image View
+
+struct FlyingImageView: View {
+    let image: UIImage
+    let startFrame: CGRect
+    let endFrame: CGRect
+    let screenSize: CGSize
+    let onComplete: () -> Void
+
+    @State private var currentFrame: CGRect = .zero
+    @State private var opacity: CGFloat = 1
+
+    var body: some View {
+        GeometryReader { _ in
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: currentFrame.width, height: currentFrame.height)
+                .clipped()
+                .cornerRadius(8)
+                .position(x: currentFrame.midX, y: currentFrame.midY)
+                .opacity(opacity)
+                .shadow(color: .black.opacity(0.4 * opacity), radius: 12, y: 6)
+        }
+        .onAppear {
+            // Set initial frame
+            currentFrame = startFrame
+
+            // Animate to end position
+            withAnimation(.easeOut(duration: 0.38)) {
+                currentFrame = endFrame
+            }
+
+            // Fade out at the end
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                withAnimation(.easeOut(duration: 0.06)) {
+                    opacity = 0
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+                    onComplete()
+                }
             }
         }
     }
 }
 
-// MARK: - Camera Preview View
+// MARK: - Thumbnail View
 
-struct CameraPreviewView: UIViewRepresentable {
+struct ThumbnailView: View {
+    let image: UIImage
+    let index: Int
+    var isAnimatingIn: Bool = false
+
+    var body: some View {
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 50, height: 66)
+            .clipped()
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+            )
+    }
+}
+
+// MARK: - Review Image View
+
+struct ReviewImageView: View {
+    let images: [UIImage]
+    let previewImage: UIImage?
+    let onConfirm: () -> Void
+    let onRetake: () -> Void
+    let onAddMore: () -> Void
+    var showAddMore: Bool = true
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Image preview - scrollable for long receipts, fitted for normal
+                if showAddMore {
+                    // Long receipt mode: scrollable
+                    ScrollView {
+                        if let image = previewImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
+                                .padding(16)
+                        }
+                    }
+                    .background(Color(UIColor.secondarySystemBackground))
+                } else {
+                    // Normal mode: fit to view without scroll
+                    VStack {
+                        Spacer()
+                        if let image = previewImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                )
+                                .shadow(color: .black.opacity(0.15), radius: 12, y: 6)
+                                .padding(.horizontal, 20)
+                        }
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(UIColor.secondarySystemBackground))
+                }
+
+                Spacer(minLength: 8)
+
+                // Bottom actions
+                VStack(spacing: 10) {
+                    // Primary action - Upload
+                    Button(action: onConfirm) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                            Text("Upload Receipt")
+                                .font(.system(size: 16, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.green)
+                        .cornerRadius(14)
+                    }
+
+                    // Secondary actions
+                    HStack(spacing: 12) {
+                        Button(action: onRetake) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("Retake")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(10)
+                        }
+
+                        if showAddMore {
+                            Button(action: onAddMore) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 14, weight: .semibold))
+                                    Text("Add More")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .foregroundColor(.blue)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(10)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 34)
+                .padding(.top, 12)
+                .background(Color(UIColor.systemBackground))
+            }
+            .navigationTitle("Review")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: showAddMore ? onAddMore : onRetake) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Camera Preview
+
+struct CameraPreviewRepresentable: UIViewControllerRepresentable {
     let session: AVCaptureSession
 
-    func makeUIView(context: Context) -> CameraPreviewUIView {
-        let view = CameraPreviewUIView()
-        view.session = session
-        return view
+    func makeUIViewController(context: Context) -> CameraPreviewViewController {
+        let controller = CameraPreviewViewController()
+        controller.session = session
+        return controller
     }
 
-    func updateUIView(_ uiView: CameraPreviewUIView, context: Context) {}
+    func updateUIViewController(_ uiViewController: CameraPreviewViewController, context: Context) {}
 }
 
-class CameraPreviewUIView: UIView {
-    var session: AVCaptureSession? {
-        didSet {
-            if let session = session {
-                previewLayer.session = session
-            }
-        }
+class CameraPreviewViewController: UIViewController {
+    var session: AVCaptureSession?
+    private var previewLayer: AVCaptureVideoPreviewLayer?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+
+        guard let session = session else { return }
+
+        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+        previewLayer.videoGravity = .resizeAspectFill
+        previewLayer.frame = view.bounds
+        view.layer.addSublayer(previewLayer)
+        self.previewLayer = previewLayer
     }
 
-    private lazy var previewLayer: AVCaptureVideoPreviewLayer = {
-        let layer = AVCaptureVideoPreviewLayer()
-        layer.videoGravity = .resizeAspectFill
-        return layer
-    }()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        layer.addSublayer(previewLayer)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        previewLayer.frame = bounds
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer?.frame = view.bounds
     }
 }
-
-// MARK: - Camera Manager
-
-class CameraManager: NSObject, ObservableObject {
-    @Published var isAuthorized = false
-    @Published var error: String?
-    @Published var isCapturing = false
-
-    let session = AVCaptureSession()
-    private var photoOutput = AVCapturePhotoOutput()
-    private var currentDevice: AVCaptureDevice?
-
-    // Use a dictionary to track multiple concurrent captures
-    private var captureCompletions: [Int64: (UIImage?) -> Void] = [:]
-    private var captureIdCounter: Int64 = 0
-    private let captureQueue = DispatchQueue(label: "com.scandalicious.captureQueue")
-
-    func checkPermissionAndSetup() {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            setupCamera()
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                DispatchQueue.main.async {
-                    if granted {
-                        self?.setupCamera()
-                    } else {
-                        self?.error = "Camera access denied"
-                    }
-                }
-            }
-        default:
-            error = "Camera access denied"
-        }
-    }
-
-    private func setupCamera() {
-        session.beginConfiguration()
-        session.sessionPreset = .photo
-
-        // Add video input
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-            error = "No camera available"
-            return
-        }
-
-        currentDevice = device
-
-        do {
-            let input = try AVCaptureDeviceInput(device: device)
-            if session.canAddInput(input) {
-                session.addInput(input)
-            }
-        } catch {
-            self.error = error.localizedDescription
-            return
-        }
-
-        // Add photo output
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
-            // Use maximum available photo dimensions for best quality
-            if let maxDimensions = device.activeFormat.supportedMaxPhotoDimensions.max(by: {
-                $0.width * $0.height < $1.width * $1.height
-            }) {
-                photoOutput.maxPhotoDimensions = maxDimensions
-            }
-        }
-
-        session.commitConfiguration()
-
-        // Start session on background thread
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.session.startRunning()
-            DispatchQueue.main.async {
-                self?.isAuthorized = true
-            }
-        }
-    }
-
-    func stopSession() {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.session.stopRunning()
-        }
-    }
-
-    func capturePhoto(flashMode: AVCaptureDevice.FlashMode, completion: @escaping (UIImage?) -> Void) {
-        // Prevent concurrent captures from overwhelming the system
-        guard !isCapturing else {
-            completion(nil)
-            return
-        }
-
-        captureQueue.sync {
-            isCapturing = true
-            captureIdCounter += 1
-            let captureId = captureIdCounter
-            captureCompletions[captureId] = completion
-        }
-
-        let settings = AVCapturePhotoSettings()
-
-        if photoOutput.supportedFlashModes.contains(flashMode) {
-            settings.flashMode = flashMode
-        }
-
-        photoOutput.capturePhoto(with: settings, delegate: self)
-    }
-
-    func toggleTorch(on: Bool) {
-        guard let device = currentDevice, device.hasTorch else { return }
-
-        do {
-            try device.lockForConfiguration()
-            device.torchMode = on ? .on : .off
-            device.unlockForConfiguration()
-        } catch {
-            print("Failed to toggle torch: \(error)")
-        }
-    }
-}
-
-// MARK: - AVCapturePhotoCaptureDelegate
-
-extension CameraManager: AVCapturePhotoCaptureDelegate {
-    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        defer {
-            DispatchQueue.main.async {
-                self.isCapturing = false
-            }
-        }
-
-        // Get the completion handler for this capture
-        let completion: ((UIImage?) -> Void)? = captureQueue.sync {
-            // Get the oldest completion (FIFO)
-            if let firstKey = captureCompletions.keys.sorted().first {
-                return captureCompletions.removeValue(forKey: firstKey)
-            }
-            return nil
-        }
-
-        if let error = error {
-            print("Photo capture error: \(error)")
-            completion?(nil)
-            return
-        }
-
-        guard let data = photo.fileDataRepresentation(),
-              let image = UIImage(data: data) else {
-            completion?(nil)
-            return
-        }
-
-        // Fix orientation
-        let fixedImage = fixOrientation(image)
-        completion?(fixedImage)
-    }
-
-    private func fixOrientation(_ image: UIImage) -> UIImage {
-        if image.imageOrientation == .up {
-            return image
-        }
-
-        UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
-        image.draw(in: CGRect(origin: .zero, size: image.size))
-        let normalizedImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-
-        return normalizedImage ?? image
-    }
-}
-
-// MARK: - Motion Manager
-
-class CameraMotionManager: ObservableObject {
-    private let motionManager = CMMotionManager()
-    @Published var verticalVelocity: Double = 0
-    @Published var isMovingDown: Bool = false
-    @Published var isStable: Bool = true
-
-    private var lastAcceleration: CMAcceleration?
-    private var velocityHistory: [Double] = []
-
-    func startMonitoring() {
-        guard motionManager.isAccelerometerAvailable else { return }
-
-        motionManager.accelerometerUpdateInterval = 0.05 // 20Hz
-
-        motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
-            guard let self = self, let acceleration = data?.acceleration else { return }
-
-            // Track vertical movement (y-axis in portrait mode)
-            let currentVelocity = acceleration.y
-
-            // Add to history for smoothing
-            self.velocityHistory.append(currentVelocity)
-            if self.velocityHistory.count > 10 {
-                self.velocityHistory.removeFirst()
-            }
-
-            // Calculate smoothed velocity
-            let smoothedVelocity = self.velocityHistory.reduce(0, +) / Double(self.velocityHistory.count)
-
-            DispatchQueue.main.async {
-                self.verticalVelocity = smoothedVelocity
-                self.isMovingDown = smoothedVelocity > 0.05 // Positive = moving down
-                self.isStable = abs(acceleration.x) < 0.15 && abs(acceleration.z) < 0.15
-            }
-
-            self.lastAcceleration = acceleration
-        }
-    }
-
-    func stopMonitoring() {
-        motionManager.stopAccelerometerUpdates()
-        velocityHistory.removeAll()
-    }
-
-    func getSpeedIndicator() -> ScrollSpeedIndicator {
-        let absVelocity = abs(verticalVelocity)
-
-        if absVelocity < 0.02 {
-            return .stationary
-        } else if absVelocity < 0.08 {
-            return .tooSlow
-        } else if absVelocity > 0.3 {
-            return .tooFast
-        } else {
-            return .perfect
-        }
-    }
-}
-
-// MARK: - Preview
 
 #Preview {
     CustomCameraView(capturedImage: .constant(nil))
