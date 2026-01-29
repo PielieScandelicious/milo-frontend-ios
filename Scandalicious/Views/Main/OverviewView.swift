@@ -1142,10 +1142,10 @@ struct OverviewView: View {
                         .padding(.vertical, 24)
 
                     case .hasData:
-                        // Modern receipt cards
+                        // Expandable receipt cards (unified component)
                         LazyVStack(spacing: 8) {
                             ForEach(sortedReceipts) { receipt in
-                                ModernReceiptCard(
+                                ExpandableReceiptCard(
                                     receipt: receipt,
                                     isExpanded: expandedReceiptId == receipt.id,
                                     onTap: {
@@ -1186,7 +1186,7 @@ struct OverviewView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
         }
         .overlay {
@@ -1797,217 +1797,8 @@ struct SyncingArrowsView: View {
     }
 }
 
-// MARK: - Modern Receipt Card
-/// A compact receipt card that expands inline to show all items
-struct ModernReceiptCard: View {
-    let receipt: APIReceipt
-    let isExpanded: Bool
-    let onTap: () -> Void
-    let onDelete: () -> Void
-
-    @State private var showDeleteConfirmation = false
-
-    private var formattedDate: String {
-        guard let date = receipt.dateParsed else { return receipt.receiptDate ?? "Unknown" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
-    }
-
-    private var formattedTime: String {
-        guard let date = receipt.dateParsed else { return "" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
-    }
-
-    private var itemCount: Int {
-        receipt.itemsCount
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Main card content - always visible
-            Button(action: onTap) {
-                HStack(spacing: 12) {
-                    // Store icon
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.white.opacity(0.08))
-                            .frame(width: 44, height: 44)
-
-                        Image(systemName: "cart.fill")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-
-                    // Store name and date
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(receipt.storeName ?? "Unknown Store")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-
-                        HStack(spacing: 6) {
-                            Text(formattedDate)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-
-                            if !formattedTime.isEmpty {
-                                Text("•")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.white.opacity(0.3))
-                                Text(formattedTime)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
-                        }
-                    }
-
-                    Spacer()
-
-                    // Total amount
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(String(format: "€%.2f", receipt.totalAmount ?? 0))
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-
-                        Text("\(itemCount) item\(itemCount == 1 ? "" : "s")")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-
-                    // Chevron indicator
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.3))
-                        .frame(width: 20)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-            }
-            .buttonStyle(ReceiptCardButtonStyle())
-
-            // Expanded content - show ALL items
-            if isExpanded {
-                VStack(spacing: 0) {
-                    // Divider
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(height: 1)
-                        .padding(.horizontal, 14)
-
-                    // All items
-                    if !receipt.transactions.isEmpty {
-                        VStack(spacing: 6) {
-                            ForEach(receipt.transactions) { item in
-                                HStack {
-                                    Text(item.itemName)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
-                                        .lineLimit(2)
-
-                                    Spacer()
-
-                                    if item.quantity > 1 {
-                                        Text("×\(item.quantity)")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.4))
-                                    }
-
-                                    Text(String(format: "€%.2f", item.itemPrice))
-                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.8))
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                        .padding(.bottom, 8)
-                    }
-
-                    // Delete button only
-                    Button {
-                        showDeleteConfirmation = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "trash")
-                                .font(.system(size: 13, weight: .medium))
-                            Text("Delete Receipt")
-                                .font(.system(size: 13, weight: .semibold))
-                        }
-                        .foregroundColor(.red.opacity(0.8))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.red.opacity(0.08))
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .background(
-            ZStack {
-                // Glass base
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.04))
-
-                // Gradient overlay
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.06),
-                                Color.white.opacity(0.02)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(isExpanded ? 0.15 : 0.1),
-                            Color.white.opacity(isExpanded ? 0.06 : 0.03)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .confirmationDialog("Delete Receipt", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
-                onDelete()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Are you sure you want to delete this receipt? This action cannot be undone.")
-        }
-    }
-}
-
-// MARK: - Receipt Card Button Style
-struct ReceiptCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.04 : 0))
-            )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
+// Note: ModernReceiptCard has been replaced with the shared ExpandableReceiptCard component
+// located in Scandalicious/Views/Components/ExpandableReceiptCard.swift
 
 // MARK: - Modern Health Score Badge
 struct ModernHealthScoreBadge: View {

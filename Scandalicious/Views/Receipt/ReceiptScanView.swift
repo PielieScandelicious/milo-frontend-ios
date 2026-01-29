@@ -36,6 +36,7 @@ struct ReceiptScanView: View {
     // Recent receipt tracking
     @State private var recentReceipt: ReceiptUploadResponse?
     @State private var showRecentReceiptDetails = false
+    @State private var isRecentReceiptExpanded = false
 
     // Total receipts count (all time)
     @State private var totalReceiptsScanned: Int = 0
@@ -451,63 +452,32 @@ struct ReceiptScanView: View {
     // MARK: - Recent Receipt Card
 
     private func recentReceiptCard(receipt: ReceiptUploadResponse) -> some View {
-        Button {
-            showRecentReceiptDetails = true
-        } label: {
-            HStack(spacing: 14) {
-                // Store icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.green.opacity(0.15))
-                        .frame(width: 48, height: 48)
-
-                    Image(systemName: "cart.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.green)
+        ExpandableReceiptCard(
+            receipt: receipt,
+            isExpanded: isRecentReceiptExpanded,
+            onTap: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    isRecentReceiptExpanded.toggle()
                 }
-
-                // Receipt info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Recent Scan")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.green)
-
-                    Text(receipt.storeName ?? "Receipt")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-
-                    HStack(spacing: 12) {
-                        if let total = receipt.totalAmount {
-                            Text(String(format: "€%.2f", total))
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
+            },
+            onDelete: {
+                Task {
+                    do {
+                        try await AnalyticsAPIService.shared.removeReceipt(receiptId: receipt.receiptId)
+                        NotificationCenter.default.post(name: .receiptDeleted, object: nil)
+                        withAnimation {
+                            recentReceipt = nil
+                            isRecentReceiptExpanded = false
                         }
-
-                        Text("\(receipt.itemsCount) items")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    } catch {
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
                     }
                 }
-
-                Spacer()
-
-                // Chevron
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.green.opacity(0.2), lineWidth: 1)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
+            },
+            accentColor: .green,
+            badgeText: "Recent Scan"
+        )
     }
 
     // MARK: - Share Hint Card

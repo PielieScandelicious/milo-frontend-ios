@@ -17,6 +17,7 @@ struct ReceiptsListView: View {
     @State private var showingReceiptDetail = false
     @State private var isDeleting = false
     @State private var deleteError: String?
+    @State private var expandedReceiptId: String?
 
     var body: some View {
         ZStack {
@@ -31,11 +32,17 @@ struct ReceiptsListView: View {
                     VStack(spacing: 0) {
                         LazyVStack(spacing: 12) {
                             ForEach(viewModel.receipts) { receipt in
-                                ReceiptRowWithDelete(
+                                ExpandableReceiptCard(
                                     receipt: receipt,
+                                    isExpanded: expandedReceiptId == receipt.receiptId,
                                     onTap: {
-                                        selectedReceipt = receipt
-                                        showingReceiptDetail = true
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                            if expandedReceiptId == receipt.receiptId {
+                                                expandedReceiptId = nil
+                                            } else {
+                                                expandedReceiptId = receipt.receiptId
+                                            }
+                                        }
                                     },
                                     onDelete: {
                                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -195,106 +202,8 @@ struct ReceiptsListView: View {
     }
 }
 
-// MARK: - Receipt Row with Delete Button
-
-struct ReceiptRowWithDelete: View {
-    let receipt: APIReceipt
-    let onTap: () -> Void
-    let onDelete: () -> Void
-
-    @State private var showingDeleteConfirmation = false
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 16) {
-                // Receipt icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.blue.opacity(0.2))
-                        .frame(width: 50, height: 50)
-
-                    Image(systemName: "doc.text.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.blue)
-                }
-
-                // Receipt details
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(receipt.formattedDate)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    HStack(spacing: 8) {
-                        Text(receipt.displayStoreName)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-
-                        Text("•")
-                            .foregroundColor(.white.opacity(0.3))
-
-                        Text("\(receipt.itemsCount) item\(receipt.itemsCount == 1 ? "" : "s")")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-
-                    if let healthScore = receipt.averageHealthScore {
-                        HStack(spacing: 4) {
-                            HealthScoreBadge(score: Int(healthScore.rounded()), size: .small, style: .subtle)
-
-                            Text(healthScore.healthScoreLabel)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(healthScore.healthScoreColor)
-                        }
-                    }
-                }
-
-                Spacer()
-
-                // Amount and delete button
-                VStack(alignment: .trailing, spacing: 8) {
-                    Text(String(format: "€%.2f", receipt.displayTotalAmount))
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-
-                    // Delete button inside card
-                    Button {
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
-                        showingDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.red.opacity(0.8))
-                            .padding(6)
-                            .background(
-                                Circle()
-                                    .fill(Color.red.opacity(0.12))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(white: 0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .alert("Delete Receipt", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                onDelete()
-            }
-        } message: {
-            Text("Are you sure you want to delete this receipt? This action cannot be undone.")
-        }
-    }
-}
+// Note: ReceiptRowWithDelete has been replaced with the shared ExpandableReceiptCard component
+// located in Scandalicious/Views/Components/ExpandableReceiptCard.swift
 
 // MARK: - Preview
 
