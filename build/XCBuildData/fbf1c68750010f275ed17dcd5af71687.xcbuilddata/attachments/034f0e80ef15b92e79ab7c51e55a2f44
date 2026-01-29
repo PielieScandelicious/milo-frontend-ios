@@ -1,4 +1,0 @@
-module FirebaseAuthInternal {
-umbrella "/Users/bmoenaert/Library/Developer/Xcode/DerivedData/Scandalicious-bloaiwcehfrydhfyzecshzjbxzcm/SourcePackages/checkouts/firebase-ios-sdk/FirebaseAuth/Sources/Public"
-export *
-}

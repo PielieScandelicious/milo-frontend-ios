@@ -1,4 +1,0 @@
-module AppAuth {
-umbrella "/Users/bmoenaert/Library/Developer/Xcode/DerivedData/Scandalicious-bloaiwcehfrydhfyzecshzjbxzcm/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuth"
-export *
-}
