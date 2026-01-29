@@ -37,7 +37,10 @@ extension APIReceipt: ReceiptDisplayable {
     // Note: displayStoreName and displayTotalAmount already exist in APIReceipt
     var displayDate: Date? { dateParsed }
     var displayDateString: String? { receiptDate }
-    var displayItemsCount: Int { itemsCount }
+    var displayItemsCount: Int {
+        // Sum quantities to get actual item count (not just line items)
+        transactions.reduce(0) { $0 + $1.quantity }
+    }
     var displayTransactions: [ReceiptItemDisplayable] { transactions }
     var displayHealthScore: Double? { averageHealthScore }
 }
@@ -61,7 +64,10 @@ extension ReceiptUploadResponse: ReceiptDisplayable {
     var displayDate: Date? { parsedDate }
     var displayDateString: String? { receiptDate }
     var displayTotalAmount: Double { totalAmount ?? 0 }
-    var displayItemsCount: Int { itemsCount }
+    var displayItemsCount: Int {
+        // Sum quantities to get actual item count (not just line items)
+        transactions.reduce(0) { $0 + $1.quantity }
+    }
     var displayTransactions: [ReceiptItemDisplayable] { transactions }
     var displayHealthScore: Double? { averageHealthScore }
 }
@@ -135,69 +141,62 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
         VStack(spacing: 0) {
             // Main card content - always visible
             Button(action: onTap) {
-                HStack(spacing: 12) {
-                    // Store icon
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(hasAccent ? accentColor.opacity(0.15) : Color.white.opacity(0.08))
-                            .frame(width: 44, height: 44)
-
-                        Image(systemName: "cart.fill")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(hasAccent ? accentColor : .white.opacity(0.6))
+                HStack(spacing: 10) {
+                    // Badge indicator (if present)
+                    if let badge = badgeText {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(accentColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(accentColor.opacity(0.15))
+                            )
                     }
 
-                    // Store name and date
-                    VStack(alignment: .leading, spacing: 4) {
-                        // Badge if present
-                        if let badge = badgeText {
-                            Text(badge)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(accentColor)
-                        }
+                    // Store name - use localized capitalized for consistent casing
+                    Text(receipt.displayStoreName.localizedCapitalized)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
 
-                        Text(receipt.displayStoreName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
+                    // Date inline
+                    Text("•")
+                        .font(.system(size: 8))
+                        .foregroundColor(.white.opacity(0.3))
 
-                        HStack(spacing: 6) {
-                            Text(formattedDate)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-
-                            if !formattedTime.isEmpty {
-                                Text("•")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.white.opacity(0.3))
-                                Text(formattedTime)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
-                        }
-                    }
+                    Text(formattedDate)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
 
                     Spacer()
 
-                    // Total amount
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(String(format: "€%.2f", receipt.displayTotalAmount))
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                    // Item count pill
+                    Text("\(itemCount)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                        )
 
-                        Text("\(itemCount) item\(itemCount == 1 ? "" : "s")")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
+                    // Total amount
+                    Text(String(format: "€%.2f", receipt.displayTotalAmount))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .frame(width: 70, alignment: .trailing)
 
                     // Chevron indicator
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.3))
-                        .frame(width: 20)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.25))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .padding(.vertical, 11)
                 .contentShape(Rectangle())
             }
             .buttonStyle(ExpandableReceiptCardButtonStyle())
