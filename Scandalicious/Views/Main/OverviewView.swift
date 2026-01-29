@@ -362,14 +362,10 @@ struct OverviewView: View {
         // Load receipts only if not already loaded for this period
         // Mark as loading IMMEDIATELY to prevent duplicate concurrent loads
         let periodToLoad = selectedPeriod
-        print("🧾 handleOnAppear: checking receipts for period '\(periodToLoad)', already loaded: \(loadedReceiptPeriods.contains(periodToLoad))")
         if !loadedReceiptPeriods.contains(periodToLoad) {
             loadedReceiptPeriods.insert(periodToLoad) // Mark immediately to prevent race conditions
-            print("🧾 handleOnAppear: starting receipts load for '\(periodToLoad)'")
             Task {
-                print("🧾 handleOnAppear Task: calling loadReceipts for '\(periodToLoad)'")
                 await receiptsViewModel.loadReceipts(period: periodToLoad, storeName: nil, reset: true)
-                print("🧾 handleOnAppear Task: loadReceipts completed, state: \(receiptsViewModel.state), receipts count: \(receiptsViewModel.receipts.count)")
             }
         }
 
