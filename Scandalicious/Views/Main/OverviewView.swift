@@ -1081,14 +1081,15 @@ struct OverviewView: View {
                 }
             }
         }
-        .alert("Delete Failed", isPresented: .constant(receiptDeleteError != nil)) {
+        .alert("Delete Failed", isPresented: Binding<Bool>(
+            get: { receiptDeleteError != nil },
+            set: { if !$0 { receiptDeleteError = nil } }
+        )) {
             Button("OK") {
                 receiptDeleteError = nil
             }
         } message: {
-            if let error = receiptDeleteError {
-                Text(error)
-            }
+            Text(receiptDeleteError ?? "An error occurred")
         }
     }
 
