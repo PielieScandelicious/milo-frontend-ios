@@ -208,6 +208,7 @@ class StoreDataManager: ObservableObject {
                         receiptCount: receiptCount,
                         storeCount: summary.stores.count,
                         transactionCount: summary.transactionCount,
+                        totalItems: existingMetadata.totalItems,
                         averageHealthScore: summary.averageHealthScore
                     )
                     print("📊 Updated periodMetadata for '\(periodKey)': €\(summary.totalSpend), \(receiptCount) receipts")

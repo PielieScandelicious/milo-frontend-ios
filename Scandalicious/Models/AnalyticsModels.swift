@@ -625,7 +625,8 @@ struct PeriodMetadata: Codable, Identifiable {
     let totalSpend: Double
     let receiptCount: Int
     let storeCount: Int
-    let transactionCount: Int
+    let transactionCount: Int       // Number of line items (rows)
+    let totalItems: Int?            // Sum of all quantities (actual items purchased)
     let averageHealthScore: Double?
 
     var id: String { period }
@@ -638,6 +639,7 @@ struct PeriodMetadata: Codable, Identifiable {
         case receiptCount = "receipt_count"
         case storeCount = "store_count"
         case transactionCount = "transaction_count"
+        case totalItems = "total_items"
         case averageHealthScore = "average_health_score"
     }
 

@@ -891,7 +891,8 @@ struct OverviewView: View {
                         totalAmount: Double(totalReceiptsForPeriod(period)),
                         size: 200,
                         currencySymbol: "",
-                        subtitle: "receipts"
+                        subtitle: "receipts",
+                        totalItems: totalItemsForPeriod(period)
                     )
                     .padding(.top, 16)
                     .padding(.bottom, 8)
@@ -1325,6 +1326,14 @@ struct OverviewView: View {
         }
         // Fallback to dataManager's health score for selected period
         return dataManager.averageHealthScore
+    }
+
+    private func totalItemsForPeriod(_ period: String) -> Int? {
+        // Get total items from period metadata (sum of all quantities purchased)
+        if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
+            return metadata.totalItems
+        }
+        return nil
     }
 
     /// Combined spending and health score card with dynamic color accent

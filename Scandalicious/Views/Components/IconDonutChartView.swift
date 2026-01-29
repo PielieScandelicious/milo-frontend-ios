@@ -32,6 +32,7 @@ struct IconDonutChartView: View {
     let size: CGFloat
     let currencySymbol: String
     let subtitle: String?
+    let totalItems: Int?
 
     /// Visual gap between segments in degrees (the actual empty space you see)
     private let visualGapDegrees: Double = 4.0
@@ -51,12 +52,13 @@ struct IconDonutChartView: View {
         size > 120
     }
 
-    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil) {
+    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
         self.size = size
         self.currencySymbol = currencySymbol
         self.subtitle = subtitle
+        self.totalItems = totalItems
     }
 
     private var strokeWidth: CGFloat {
@@ -175,22 +177,76 @@ struct IconDonutChartView: View {
     // MARK: - Center Content
 
     private var centerContent: some View {
-        VStack(spacing: 2) {
-            Text("\(currencySymbol)\(formattedTotal)")
-                .font(.system(size: size * 0.20, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-                .contentTransition(.numericText())
-                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: formattedTotal)
+        ZStack {
+            // Subtle gradient background circle
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.white.opacity(0.08),
+                            Color.white.opacity(0.02)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: size * 0.32
+                    )
+                )
+                .frame(width: size * 0.58, height: size * 0.58)
 
-            if let subtitle = subtitle, !subtitle.isEmpty {
-                Text(subtitleText)
-                    .font(.system(size: size * 0.07, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
+            // Display items count if available, otherwise show stores
+            if let items = totalItems {
+                // Items count with cart icon
+                VStack(spacing: 2) {
+                    Image(systemName: "cart.fill")
+                        .font(.system(size: size * 0.14, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.9),
+                                    Color.white.opacity(0.6)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+
+                    Text("\(items)")
+                        .font(.system(size: size * 0.12, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.85))
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: items)
+
+                    Text("items purchased")
+                        .font(.system(size: size * 0.045, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+            } else {
+                // Fallback: Store icon with store count
+                VStack(spacing: 4) {
+                    Image(systemName: "storefront.fill")
+                        .font(.system(size: size * 0.18, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.9),
+                                    Color.white.opacity(0.6)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+
+                    Text("\(data.count)")
+                        .font(.system(size: size * 0.09, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                    +
+                    Text(" stores")
+                        .font(.system(size: size * 0.055, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
             }
         }
-        .frame(maxWidth: size * 0.55) // Keep text within inner circle
+        .frame(maxWidth: size * 0.55)
     }
 
     private var subtitleText: String {
