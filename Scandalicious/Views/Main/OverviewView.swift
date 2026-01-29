@@ -894,6 +894,11 @@ struct OverviewView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 8)
 
+                // Stores section header
+                storesSectionHeader(storeCount: segments.count)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
                 // Store rows with staggered animation
                 VStack(spacing: 8) {
                     ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
@@ -988,6 +993,32 @@ struct OverviewView: View {
         }
         // Fallback: compute from segments (shouldn't happen if caching is working)
         return storeSegmentsForPeriod(period).toIconChartData()
+    }
+
+    // MARK: - Stores Section Header
+
+    private func storesSectionHeader(storeCount: Int) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "storefront.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Stores")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                Text("\(storeCount) store\(storeCount == 1 ? "" : "s")")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+
+            Spacer()
+        }
     }
 
     // MARK: - Receipts Section State

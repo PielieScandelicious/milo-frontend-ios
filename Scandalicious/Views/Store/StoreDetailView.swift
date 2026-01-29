@@ -26,6 +26,19 @@ struct StoreDetailView: View {
     @State private var isRefreshing = false
     @State private var hasInitialized = false
 
+    // Expandable receipts section
+    @StateObject private var receiptsViewModel = ReceiptsViewModel()
+    @State private var isReceiptsSectionExpanded = false
+    @State private var expandedReceiptId: String?
+    @State private var isDeletingReceipt = false
+    @State private var receiptDeleteError: String?
+
+    // Expandable category transactions
+    @StateObject private var transactionsViewModel = TransactionsViewModel()
+    @State private var expandedCategoryName: String?
+    @State private var categoryTransactions: [String: [APITransaction]] = [:]
+    @State private var loadingCategories: Set<String> = []
+
     // Accent color for the line chart - modern red
     private var chartAccentColor: Color {
         Color(red: 0.95, green: 0.25, blue: 0.3)
@@ -57,130 +70,139 @@ struct StoreDetailView: View {
     var body: some View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
-            
+
             ScrollView {
-                VStack(spacing: 24) {
-                    // Header card - clickable to view all store transactions
+                VStack(spacing: 0) {
+                    // Header card with glass-morphism - clickable to view all store transactions
                     Button {
                         showingAllTransactions = true
                     } label: {
-                        VStack(spacing: 12) {
+                        VStack(spacing: 8) {
+                            // Store icon
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 56, height: 56)
+
+                                Image(systemName: "storefront.fill")
+                                    .font(.system(size: 24, weight: .medium))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.purple, .blue],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+
                             Text(storeBreakdown.storeName)
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
+                                .padding(.top, 4)
 
                             Text(storeBreakdown.period)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
 
                             Text(String(format: "€%.0f", currentTotalSpend))
-                                .font(.system(size: 48, weight: .heavy, design: .rounded))
+                                .font(.system(size: 42, weight: .heavy, design: .rounded))
                                 .foregroundColor(.white)
-                                .padding(.top, 8)
+                                .padding(.top, 4)
 
-                            // Health Score indicator (placeholder - will show when backend provides data)
+                            // Health Score indicator
                             if let healthScore = currentHealthScore {
-                                Divider()
-                                    .background(Color.white.opacity(0.2))
-                                    .padding(.horizontal, 40)
-                                    .padding(.top, 8)
-
                                 HStack(spacing: 8) {
                                     HealthScoreBadge(score: Int(healthScore.rounded()), size: .medium, style: .subtle)
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Health Score")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.5))
-
-                                        Text(healthScore.healthScoreLabel)
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(healthScore.healthScoreColor)
-                                    }
+                                    Text(healthScore.healthScoreLabel)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(healthScore.healthScoreColor)
                                 }
-                                .padding(.top, 4)
+                                .padding(.top, 8)
                             }
+
+                            // View all transactions hint
+                            HStack(spacing: 6) {
+                                Text("View all transactions")
+                                    .font(.system(size: 12, weight: .medium))
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            .foregroundColor(.white.opacity(0.4))
+                            .padding(.top, 12)
                         }
-                        .padding(.vertical, 32)
+                        .padding(.vertical, 24)
                         .frame(maxWidth: .infinity)
                         .background(
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(Color.white.opacity(0.05))
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 24)
+                                    .fill(Color.white.opacity(0.04))
+                                RoundedRectangle(cornerRadius: 24)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.white.opacity(0.07), Color.white.opacity(0.02)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 24)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
                         )
                     }
                     .buttonStyle(StoreHeaderButtonStyle())
-                    .padding(.horizontal)
-                    
-                    // Large donut chart - tap to flip to line chart
-                    VStack(spacing: 20) {
-                        FlippableDonutChartView(
-                            title: "",
-                            subtitle: currentVisitCount == 1 ? "receipt" : "receipts",
-                            totalAmount: Double(currentVisitCount),
-                            segments: groupedChartSegments,
-                            size: 220,
-                            trends: trends,
-                            accentColor: chartAccentColor,
-                            selectedPeriod: storeBreakdown.period
-                        )
-                        .padding(.top, 20)
-                        
-                        // Legend with tap interaction
-                        VStack(spacing: 12) {
-                            ForEach(Array(groupedChartSegments.enumerated()), id: \.element.id) { _, segment in
-                                Button {
-                                    // Don't navigate for "Other" category
-                                    if segment.label != "Other" {
-                                        selectedCategory = segment.label
-                                        selectedCategoryColor = segment.color
-                                        showingCategoryTransactions = true
-                                    }
-                                } label: {
-                                    categoryRow(segment: segment, isOther: segment.label == "Other")
-                                }
-                                .buttonStyle(CategoryRowButtonStyle())
-                                .disabled(segment.label == "Other")
-                            }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+
+                    // Donut chart section
+                    FlippableDonutChartView(
+                        title: "",
+                        subtitle: currentVisitCount == 1 ? "receipt" : "receipts",
+                        totalAmount: Double(currentVisitCount),
+                        segments: groupedChartSegments,
+                        size: 200,
+                        trends: trends,
+                        accentColor: chartAccentColor,
+                        selectedPeriod: storeBreakdown.period
+                    )
+                    .padding(.top, 24)
+
+                    // Categories Section Header
+                    categoriesSectionHeader
+                        .padding(.horizontal, 16)
+                        .padding(.top, 24)
+
+                    // Expandable category rows
+                    VStack(spacing: 8) {
+                        ForEach(Array(groupedChartSegments.enumerated()), id: \.element.id) { _, segment in
+                            expandableCategoryRow(segment: segment, isOther: segment.label == "Other")
                         }
-                        .padding(.horizontal)
-
-                        // View Receipts button
-                        Button {
-                            showingReceipts = true
-                        } label: {
-                            HStack(spacing: 12) {
-                                Text("View Receipts")
-                                    .font(.system(size: 16, weight: .semibold))
-
-                                Spacer()
-
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Color.blue.opacity(0.15))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(CategoryRowButtonStyle())
-                        .padding(.horizontal)
-                        .padding(.top, 8)
                     }
-                    .padding(.bottom, 32)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                    // Expandable Receipts Section
+                    receiptsSection
+                        .padding(.horizontal, 16)
+                        .padding(.top, 24)
+
+                    // Bottom spacing
+                    Color.clear.frame(height: 32)
                 }
-                .padding(.top, 20)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -315,6 +337,418 @@ struct StoreDetailView: View {
         }
     }
 
+    // MARK: - Categories Section Header
+
+    private var categoriesSectionHeader: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "chart.pie.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Categories")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                Text("\(currentCategories.count) categories")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Expandable Receipts Section
+
+    private var receiptsSection: some View {
+        VStack(spacing: 0) {
+            // Header button with glass-morphism
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    isReceiptsSectionExpanded.toggle()
+                }
+                if isReceiptsSectionExpanded && receiptsViewModel.receipts.isEmpty {
+                    loadReceipts()
+                }
+            } label: {
+                HStack(spacing: 14) {
+                    // Receipt icon
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "doc.text.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+
+                    // Title and count
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Receipts")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                        Text("\(currentVisitCount) this period")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+
+                    Spacer()
+
+                    // Count badge
+                    if currentVisitCount > 0 {
+                        Text("\(currentVisitCount)")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                    }
+
+                    // Chevron
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                        .rotationEffect(.degrees(isReceiptsSectionExpanded ? 180 : 0))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.white.opacity(0.04))
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.07), Color.white.opacity(0.02)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.12), Color.white.opacity(0.04)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+            }
+            .buttonStyle(ReceiptsHeaderButtonStyle())
+
+            // Expanded receipts list
+            if isReceiptsSectionExpanded {
+                VStack(spacing: 8) {
+                    if receiptsViewModel.state.isLoading && receiptsViewModel.receipts.isEmpty {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                                .scaleEffect(0.8)
+                            Text("Loading receipts...")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                    } else if receiptsViewModel.receipts.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white.opacity(0.2))
+                            Text("No receipts for this store")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                    } else {
+                        LazyVStack(spacing: 8) {
+                            ForEach(sortedReceipts) { receipt in
+                                ExpandableReceiptCard(
+                                    receipt: receipt,
+                                    isExpanded: expandedReceiptId == receipt.id,
+                                    onTap: {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            if expandedReceiptId == receipt.id {
+                                                expandedReceiptId = nil
+                                            } else {
+                                                expandedReceiptId = receipt.id
+                                            }
+                                        }
+                                    },
+                                    onDelete: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            deleteReceipt(receipt)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+                .transition(.opacity)
+            }
+        }
+    }
+
+    private var sortedReceipts: [APIReceipt] {
+        receiptsViewModel.receipts.sorted { receipt1, receipt2 in
+            let date1 = receipt1.dateParsed ?? Date.distantPast
+            let date2 = receipt2.dateParsed ?? Date.distantPast
+            return date1 > date2
+        }
+    }
+
+    private func loadReceipts() {
+        Task {
+            await receiptsViewModel.loadReceipts(period: storeBreakdown.period, storeName: storeBreakdown.storeName)
+        }
+    }
+
+    private func deleteReceipt(_ receipt: APIReceipt) {
+        isDeletingReceipt = true
+        Task {
+            do {
+                try await receiptsViewModel.deleteReceipt(receipt, period: storeBreakdown.period, storeName: storeBreakdown.storeName)
+                NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } catch {
+                receiptDeleteError = error.localizedDescription
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+            isDeletingReceipt = false
+        }
+    }
+
+    // MARK: - Expandable Category Row
+
+    private func expandableCategoryRow(segment: ChartSegment, isOther: Bool) -> some View {
+        VStack(spacing: 0) {
+            // Category header button
+            Button {
+                guard !isOther else { return }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    if expandedCategoryName == segment.label {
+                        expandedCategoryName = nil
+                    } else {
+                        expandedCategoryName = segment.label
+                        loadCategoryTransactions(category: segment.label)
+                    }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    // Color accent bar on the left (matching StoreRowButton)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(isOther ? segment.color.opacity(0.5) : segment.color)
+                        .frame(width: 4, height: 32)
+
+                    Text(segment.label)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(isOther ? .white.opacity(0.5) : .white)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    // Percentage badge with colored background (matching StoreRowButton)
+                    Text("\(segment.percentage)%")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(isOther ? .white.opacity(0.4) : segment.color)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(isOther ? Color.white.opacity(0.05) : segment.color.opacity(0.15))
+                        )
+
+                    Text(String(format: "€%.0f", segment.value))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(isOther ? .white.opacity(0.5) : .white)
+                        .frame(width: 65, alignment: .trailing)
+
+                    if !isOther {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.25))
+                            .rotationEffect(.degrees(expandedCategoryName == segment.label ? 180 : 0))
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(CategoryRowButtonStyle())
+            .disabled(isOther)
+
+            // Expanded transactions list
+            if expandedCategoryName == segment.label && !isOther {
+                VStack(spacing: 0) {
+                    // Divider
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 1)
+                        .padding(.horizontal, 14)
+
+                    VStack(spacing: 6) {
+                        if loadingCategories.contains(segment.label) {
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                                    .scaleEffect(0.7)
+                                Text("Loading...")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            .padding(.vertical, 16)
+                        } else if let transactions = categoryTransactions[segment.label], !transactions.isEmpty {
+                            ForEach(transactions) { transaction in
+                                HStack(spacing: 8) {
+                                    if transaction.quantity > 1 {
+                                        Text("×\(transaction.quantity)")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.4))
+                                    }
+
+                                    Text(transaction.itemName)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .lineLimit(2)
+
+                                    Spacer()
+
+                                    if let healthScore = transaction.healthScore {
+                                        HealthScoreBadge(score: healthScore, size: .small, style: .subtle)
+                                    }
+
+                                    Text(String(format: "€%.2f", transaction.totalPrice))
+                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
+                        } else {
+                            Text("No transactions")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                                .padding(.vertical, 12)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 12)
+                }
+                .transition(.opacity)
+            }
+        }
+        .background(
+            ZStack {
+                // Base glass effect
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.04))
+
+                // Subtle gradient
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.06), Color.white.opacity(0.02)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Colored accent glow on the left (matching StoreRowButton)
+                if !isOther {
+                    HStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        segment.color.opacity(0.15),
+                                        Color.clear
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: 60)
+                        Spacer()
+                    }
+                }
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(expandedCategoryName == segment.label ? 0.15 : 0.1),
+                            Color.white.opacity(expandedCategoryName == segment.label ? 0.06 : 0.03)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+    }
+
+    private func loadCategoryTransactions(category: String) {
+        guard categoryTransactions[category] == nil else { return }
+
+        loadingCategories.insert(category)
+
+        Task {
+            do {
+                // Parse the period to get date range
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "MMMM yyyy"
+                dateFormatter.locale = Locale(identifier: "en_US")
+                dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+                guard let parsedDate = dateFormatter.date(from: storeBreakdown.period) else {
+                    loadingCategories.remove(category)
+                    return
+                }
+
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: "UTC")!
+
+                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
+                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+
+                var filters = TransactionFilters()
+                filters.startDate = startOfMonth
+                filters.endDate = endOfMonth
+                filters.storeName = storeBreakdown.storeName
+                filters.category = AnalyticsCategory.allCases.first { $0.displayName == category }
+                filters.pageSize = 100
+
+                let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
+
+                await MainActor.run {
+                    categoryTransactions[category] = response.transactions
+                    loadingCategories.remove(category)
+                }
+            } catch {
+                print("❌ Failed to load transactions for \(category): \(error)")
+                await MainActor.run {
+                    loadingCategories.remove(category)
+                }
+            }
+        }
+    }
+
     private func categoryRow(segment: ChartSegment, isOther: Bool = false) -> some View {
         HStack {
             Circle()
@@ -369,6 +803,8 @@ struct StoreHeaderButtonStyle: ButtonStyle {
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
+
+// Note: ReceiptsHeaderButtonStyle is defined in OverviewView.swift and reused here
 
 struct CategoryRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
