@@ -463,21 +463,13 @@ struct OverviewView: View {
             cacheSegmentsForPeriod(newValue)
         }
 
-        // Check if receipts for this period need to be loaded
-        // Mark as loading IMMEDIATELY to prevent duplicate concurrent loads
-        let needsReceiptsLoad = !loadedReceiptPeriods.contains(newValue)
-        if needsReceiptsLoad {
-            loadedReceiptPeriods.insert(newValue) // Mark immediately to prevent race conditions
-        }
-
         Task {
             // Prefetch insights
             await MainActor.run { prefetchInsights() }
 
-            // Only load receipts if not already cached for this period
-            if needsReceiptsLoad {
-                await receiptsViewModel.loadReceipts(period: newValue, storeName: nil, reset: true)
-            }
+            // Always reload receipts when period changes
+            // (receiptsViewModel only holds one period's data at a time)
+            await receiptsViewModel.loadReceipts(period: newValue, storeName: nil, reset: true)
 
             if !dataManager.periodMetadata.isEmpty {
                 if !dataManager.isPeriodLoaded(newValue) {
