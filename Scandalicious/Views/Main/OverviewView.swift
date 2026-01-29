@@ -913,12 +913,10 @@ struct OverviewView: View {
                 }
                 .padding(.horizontal, 16)
                 .onAppear {
-                    // Trigger staggered animation when view appears
+                    // Trigger staggered animation immediately when view appears
                     if !storeRowsAppeared {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation {
-                                storeRowsAppeared = true
-                            }
+                        withAnimation {
+                            storeRowsAppeared = true
                         }
                     }
                 }
