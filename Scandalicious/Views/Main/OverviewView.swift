@@ -1293,35 +1293,9 @@ struct OverviewView: View {
                                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
                         }
 
-                        // Health score inline - color changes based on score
+                        // Modern health score display
                         if let score = healthScore {
-                            HStack(spacing: 12) {
-                                // Health score pill with dynamic color
-                                HStack(spacing: 6) {
-                                    // Animated color dot
-                                    Circle()
-                                        .fill(accentColor)
-                                        .frame(width: 8, height: 8)
-
-                                    Text(score.formattedHealthScore)
-                                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                                        .foregroundColor(accentColor)
-
-                                    Text("health")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.5))
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Capsule()
-                                        .fill(accentColor.opacity(0.15))
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(accentColor.opacity(0.3), lineWidth: 1)
-                                )
-                            }
+                            ModernHealthScoreBadge(score: score)
                         }
 
                         // Syncing indicator or tap hint
@@ -1348,13 +1322,53 @@ struct OverviewView: View {
             .buttonStyle(TotalSpendingCardButtonStyle())
         }
         .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.white.opacity(0.05))
+            ZStack {
+                // Base layer - darker for depth
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(Color.white.opacity(0.03))
+
+                // Gradient overlay for glass effect
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.08),
+                                Color.white.opacity(0.02)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Inner glow at top
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.1),
+                                Color.clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                    )
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(accentColor.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 28)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.15),
+                            Color.white.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
+        .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
         .padding(.horizontal, 16)
     }
 
@@ -1399,41 +1413,94 @@ private struct StoreRowButton: View {
                 onSelect(breakdown)
             }
         } label: {
-            HStack {
-                Circle()
+            HStack(spacing: 12) {
+                // Color accent bar on the left
+                RoundedRectangle(cornerRadius: 2)
                     .fill(segment.color)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 4, height: 32)
 
-                Text(segment.storeName.uppercased())
-                    .font(.system(size: 14, weight: .medium))
+                // Store name
+                Text(segment.storeName)
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
 
                 Spacer()
 
+                // Percentage badge
                 Text("\(segment.percentage)%")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.5))
-                    .frame(width: 40, alignment: .trailing)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(segment.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(segment.color.opacity(0.15))
+                    )
 
+                // Amount
                 Text(String(format: "€%.0f", segment.amount))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                    .frame(width: 60, alignment: .trailing)
+                    .frame(width: 65, alignment: .trailing)
 
+                // Chevron
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.3))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.25))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.white.opacity(0.05))
+                ZStack {
+                    // Base glass effect
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.04))
+
+                    // Subtle gradient
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.06),
+                                    Color.white.opacity(0.02)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    // Colored accent glow on the left
+                    HStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        segment.color.opacity(0.15),
+                                        Color.clear
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: 60)
+                        Spacer()
+                    }
+                }
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.1),
+                                Color.white.opacity(0.03)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             )
         }
         .buttonStyle(OverviewStoreRowButtonStyle())
@@ -1825,6 +1892,123 @@ struct ReceiptCardButtonStyle: ButtonStyle {
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Modern Health Score Badge
+struct ModernHealthScoreBadge: View {
+    let score: Double
+
+    // Color based on score: red (poor) → orange → yellow → green (excellent)
+    private var scoreColor: Color {
+        switch score {
+        case 0..<3:
+            return Color(red: 0.95, green: 0.3, blue: 0.3) // Red - E
+        case 3..<5:
+            return Color(red: 1.0, green: 0.55, blue: 0.2) // Orange - D
+        case 5..<6.5:
+            return Color(red: 1.0, green: 0.8, blue: 0.2) // Yellow - C
+        case 6.5..<8:
+            return Color(red: 0.5, green: 0.85, blue: 0.4) // Light green - B
+        default:
+            return Color(red: 0.2, green: 0.8, blue: 0.4) // Green - A
+        }
+    }
+
+    // Grade letter based on score (A, B, C, D, E)
+    private var gradeLabel: String {
+        switch score {
+        case 8...:
+            return "A"
+        case 6.5..<8:
+            return "B"
+        case 5..<6.5:
+            return "C"
+        case 3..<5:
+            return "D"
+        default:
+            return "E"
+        }
+    }
+
+    private var scoreProgress: Double {
+        score / 10.0
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            // Circular progress ring with letter grade inside
+            ZStack {
+                // Background ring
+                Circle()
+                    .stroke(scoreColor.opacity(0.2), lineWidth: 3.5)
+                    .frame(width: 44, height: 44)
+
+                // Progress ring
+                Circle()
+                    .trim(from: 0, to: scoreProgress)
+                    .stroke(
+                        scoreColor,
+                        style: StrokeStyle(lineWidth: 3.5, lineCap: .round)
+                    )
+                    .frame(width: 44, height: 44)
+                    .rotationEffect(.degrees(-90))
+
+                // Letter grade in the middle of the circle
+                Text(gradeLabel)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(scoreColor)
+            }
+
+            // Score number and label in the center
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(format: "%.1f", score))
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+
+                Text("Nutri Score")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            ZStack {
+                // Glass base
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color.white.opacity(0.04))
+
+                // Gradient overlay
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                scoreColor.opacity(0.12),
+                                scoreColor.opacity(0.03)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            scoreColor.opacity(0.3),
+                            scoreColor.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
