@@ -668,25 +668,14 @@ class ReceiptStatusViewController: UIViewController {
 /// Legacy error view controller - kept for backward compatibility
 typealias ReceiptErrorViewController = ReceiptStatusViewController
 
-// MARK: - UIKit Confetti View
+// MARK: - UIKit Premium Success Animation View
 
-/// A UIKit-based confetti animation view that matches the SwiftUI CaptureSuccessOverlay confetti
+/// A UIKit-based premium success animation that matches the SwiftUI PremiumSuccessAnimation
 class UIKitConfettiView: UIView {
 
-    private let confettiColors: [UIColor] = [
-        UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0),    // Green
-        UIColor(red: 0.3, green: 0.85, blue: 0.5, alpha: 1.0),   // Light green
-        UIColor.systemYellow,
-        UIColor.systemOrange,
-        UIColor.systemPink,
-        UIColor.systemPurple,
-        UIColor.systemBlue,
-        UIColor.systemCyan,
-        UIColor.systemRed,
-        UIColor.systemMint
-    ]
-
-    private var confettiLayers: [CALayer] = []
+    private let accentColor = UIColor(red: 0.2, green: 0.8, blue: 0.4, alpha: 1.0)
+    private var animationLayers: [CALayer] = []
+    private var glowLayer: CAGradientLayer?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -701,156 +690,265 @@ class UIKitConfettiView: UIView {
     }
 
     func startConfetti() {
-        // Remove any existing confetti
-        confettiLayers.forEach { $0.removeFromSuperlayer() }
-        confettiLayers.removeAll()
+        // Remove any existing animation layers
+        animationLayers.forEach { $0.removeFromSuperlayer() }
+        animationLayers.removeAll()
+        glowLayer?.removeFromSuperlayer()
 
         // Use screen bounds as fallback if view bounds aren't ready
         let viewBounds = bounds.width > 0 ? bounds : UIScreen.main.bounds
-
-        let totalPieces = 80
         let centerX = viewBounds.width / 2
         let centerY = viewBounds.height / 2
 
-        for i in 0..<totalPieces {
-            // Calculate burst angle - distribute evenly with small variation
-            let baseAngle = (Double(i) / Double(totalPieces)) * 360.0
-            let angleVariation = Double.random(in: -8...8)
-            let angle = (baseAngle + angleVariation) * .pi / 180
+        // Create ambient glow
+        createAmbientGlow(centerX: centerX, centerY: centerY)
 
-            // Random distance for depth variation
-            let distance = CGFloat.random(in: 150...400)
+        // Create expanding rings
+        createExpandingRings(centerX: centerX, centerY: centerY)
 
-            // Calculate final position
-            let burstX = CGFloat(cos(angle)) * distance
-            let burstY = CGFloat(sin(angle)) * distance
-            let gravityOffset = CGFloat.random(in: 100...300)
-            let finalY = burstY + gravityOffset
+        // Create shimmer particles
+        createShimmerParticles(centerX: centerX, centerY: centerY)
 
-            // Create confetti piece
-            let size = CGFloat.random(in: 6...16)
-            let shapeType = Int.random(in: 0...3)
-            let pieceLayer = createConfettiPiece(size: size, shapeType: shapeType, colorIndex: i % confettiColors.count)
-            pieceLayer.position = CGPoint(x: centerX, y: centerY)
-            pieceLayer.opacity = 0
-            layer.addSublayer(pieceLayer)
-            confettiLayers.append(pieceLayer)
+        // Clean up after animations complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            self?.animationLayers.forEach { $0.removeFromSuperlayer() }
+            self?.animationLayers.removeAll()
+            self?.glowLayer?.removeFromSuperlayer()
+        }
+    }
 
-            // Animation parameters
-            let wave = i % 3
-            let waveDelay = Double(wave) * 0.05 + Double.random(in: 0...0.1)
-            let animationDuration = Double.random(in: 0.8...1.4)
-            let finalRotation = Double.random(in: 540...1080) * .pi / 180
+    private func createAmbientGlow(centerX: CGFloat, centerY: CGFloat) {
+        let glowSize: CGFloat = 400
 
-            // Pop in animation
-            let scaleIn = CAKeyframeAnimation(keyPath: "transform.scale")
-            scaleIn.values = [0, 1.1, 1.0]
-            scaleIn.keyTimes = [0, 0.6, 1.0]
-            scaleIn.duration = 0.2
-            scaleIn.beginTime = CACurrentMediaTime() + waveDelay
-            scaleIn.fillMode = .forwards
-            scaleIn.isRemovedOnCompletion = false
+        let gradientLayer = CAGradientLayer()
+        gradientLayer.type = .radial
+        gradientLayer.colors = [
+            accentColor.withAlphaComponent(0.3).cgColor,
+            accentColor.withAlphaComponent(0.1).cgColor,
+            UIColor.clear.cgColor
+        ]
+        gradientLayer.locations = [0, 0.5, 1]
+        gradientLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        gradientLayer.frame = CGRect(
+            x: centerX - glowSize / 2,
+            y: centerY - glowSize / 2,
+            width: glowSize,
+            height: glowSize
+        )
+        gradientLayer.opacity = 0
+        gradientLayer.transform = CATransform3DMakeScale(0.8, 0.8, 1)
+
+        layer.addSublayer(gradientLayer)
+        glowLayer = gradientLayer
+
+        // Animate glow in
+        let fadeIn = CABasicAnimation(keyPath: "opacity")
+        fadeIn.fromValue = 0
+        fadeIn.toValue = 1
+        fadeIn.duration = 0.6
+        fadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        fadeIn.fillMode = .forwards
+        fadeIn.isRemovedOnCompletion = false
+
+        let scaleUp = CABasicAnimation(keyPath: "transform.scale")
+        scaleUp.fromValue = 0.8
+        scaleUp.toValue = 1.2
+        scaleUp.duration = 0.6
+        scaleUp.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        scaleUp.fillMode = .forwards
+        scaleUp.isRemovedOnCompletion = false
+
+        gradientLayer.add(fadeIn, forKey: "fadeIn")
+        gradientLayer.add(scaleUp, forKey: "scaleUp")
+
+        // Fade to subtle glow
+        let fadeToSubtle = CABasicAnimation(keyPath: "opacity")
+        fadeToSubtle.fromValue = 1
+        fadeToSubtle.toValue = 0.4
+        fadeToSubtle.duration = 1.5
+        fadeToSubtle.beginTime = CACurrentMediaTime() + 0.6
+        fadeToSubtle.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        fadeToSubtle.fillMode = .forwards
+        fadeToSubtle.isRemovedOnCompletion = false
+
+        gradientLayer.add(fadeToSubtle, forKey: "fadeToSubtle")
+    }
+
+    private func createExpandingRings(centerX: CGFloat, centerY: CGFloat) {
+        for i in 0..<3 {
+            let delay = Double(i) * 0.15
+            let maxScale = 2.5 + Double(i) * 0.5
+            let duration = 1.0 + Double(i) * 0.2
+            let strokeWidth = 2.0 - Double(i) * 0.5
+
+            let ringLayer = CAShapeLayer()
+            let ringPath = UIBezierPath(
+                arcCenter: CGPoint(x: 50, y: 50),
+                radius: 50,
+                startAngle: 0,
+                endAngle: 2 * .pi,
+                clockwise: true
+            )
+            ringLayer.path = ringPath.cgPath
+            ringLayer.fillColor = UIColor.clear.cgColor
+            ringLayer.strokeColor = accentColor.cgColor
+            ringLayer.lineWidth = CGFloat(strokeWidth)
+            ringLayer.frame = CGRect(x: centerX - 50, y: centerY - 50, width: 100, height: 100)
+            ringLayer.opacity = 0
+            ringLayer.transform = CATransform3DMakeScale(0.3, 0.3, 1)
+
+            // Add gradient effect to ring
+            let gradientLayer = CAGradientLayer()
+            gradientLayer.frame = ringLayer.bounds
+            gradientLayer.colors = [
+                accentColor.withAlphaComponent(0.8).cgColor,
+                accentColor.withAlphaComponent(0.4).cgColor,
+                accentColor.withAlphaComponent(0.1).cgColor
+            ]
+            gradientLayer.startPoint = CGPoint(x: 0.5, y: 0)
+            gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
+            gradientLayer.mask = ringLayer
+
+            let containerLayer = CALayer()
+            containerLayer.frame = CGRect(x: centerX - 50, y: centerY - 50, width: 100, height: 100)
+            containerLayer.addSublayer(gradientLayer)
+            containerLayer.opacity = 0
+            containerLayer.transform = CATransform3DMakeScale(0.3, 0.3, 1)
+
+            layer.addSublayer(containerLayer)
+            animationLayers.append(containerLayer)
 
             // Fade in
             let fadeIn = CABasicAnimation(keyPath: "opacity")
             fadeIn.fromValue = 0
-            fadeIn.toValue = 1
-            fadeIn.duration = 0.1
-            fadeIn.beginTime = CACurrentMediaTime() + waveDelay
+            fadeIn.toValue = 0.8
+            fadeIn.duration = 0.3
+            fadeIn.beginTime = CACurrentMediaTime() + delay
+            fadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
             fadeIn.fillMode = .forwards
             fadeIn.isRemovedOnCompletion = false
 
-            // Position animation (burst outward with gravity)
+            // Scale up
+            let scaleUp = CABasicAnimation(keyPath: "transform.scale")
+            scaleUp.fromValue = 0.3
+            scaleUp.toValue = maxScale
+            scaleUp.duration = duration
+            scaleUp.beginTime = CACurrentMediaTime() + delay + 0.1
+            scaleUp.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            scaleUp.fillMode = .forwards
+            scaleUp.isRemovedOnCompletion = false
+
+            // Fade out
+            let fadeOut = CABasicAnimation(keyPath: "opacity")
+            fadeOut.fromValue = 0.8
+            fadeOut.toValue = 0
+            fadeOut.duration = 0.5
+            fadeOut.beginTime = CACurrentMediaTime() + delay + duration * 0.5
+            fadeOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            fadeOut.fillMode = .forwards
+            fadeOut.isRemovedOnCompletion = false
+
+            containerLayer.add(fadeIn, forKey: "fadeIn")
+            containerLayer.add(scaleUp, forKey: "scaleUp")
+            containerLayer.add(fadeOut, forKey: "fadeOut")
+        }
+    }
+
+    private func createShimmerParticles(centerX: CGFloat, centerY: CGFloat) {
+        let particleCount = 24
+
+        for i in 0..<particleCount {
+            let angle = (Double(i) / Double(particleCount)) * 2 * .pi
+            let distance = CGFloat.random(in: 80...180)
+            let size = CGFloat.random(in: 2...5)
+            let wave = i % 3
+            let delay = Double(wave) * 0.1 + Double.random(in: 0...0.2)
+            let duration = Double.random(in: 1.2...1.8)
+
+            // Create particle with radial gradient
+            let particleLayer = CAGradientLayer()
+            particleLayer.type = .radial
+            particleLayer.colors = [
+                UIColor.white.cgColor,
+                accentColor.withAlphaComponent(0.8).cgColor,
+                UIColor.clear.cgColor
+            ]
+            particleLayer.locations = [0, 0.3, 1]
+            particleLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
+            particleLayer.endPoint = CGPoint(x: 1, y: 1)
+            particleLayer.frame = CGRect(x: 0, y: 0, width: size * 2, height: size * 2)
+            particleLayer.cornerRadius = size
+
+            // Starting position (slightly inward)
+            let startDistance = distance * 0.3
+            let startX = centerX + CGFloat(cos(angle)) * startDistance - size
+            let startY = centerY + CGFloat(sin(angle)) * startDistance - size
+            particleLayer.position = CGPoint(x: startX + size, y: startY + size)
+            particleLayer.opacity = 0
+            particleLayer.transform = CATransform3DMakeScale(0, 0, 1)
+
+            layer.addSublayer(particleLayer)
+            animationLayers.append(particleLayer)
+
+            // Target position
+            let targetX = centerX + CGFloat(cos(angle)) * distance
+            let targetY = centerY + CGFloat(sin(angle)) * distance
+
+            // Fade in and scale up
+            let fadeIn = CABasicAnimation(keyPath: "opacity")
+            fadeIn.fromValue = 0
+            fadeIn.toValue = 1
+            fadeIn.duration = 0.3
+            fadeIn.beginTime = CACurrentMediaTime() + delay
+            fadeIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            fadeIn.fillMode = .forwards
+            fadeIn.isRemovedOnCompletion = false
+
+            let scaleIn = CABasicAnimation(keyPath: "transform.scale")
+            scaleIn.fromValue = 0
+            scaleIn.toValue = 1
+            scaleIn.duration = 0.3
+            scaleIn.beginTime = CACurrentMediaTime() + delay
+            scaleIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            scaleIn.fillMode = .forwards
+            scaleIn.isRemovedOnCompletion = false
+
+            // Float outward
             let positionAnimation = CABasicAnimation(keyPath: "position")
-            positionAnimation.fromValue = CGPoint(x: centerX, y: centerY)
-            positionAnimation.toValue = CGPoint(x: centerX + burstX, y: centerY + finalY)
-            positionAnimation.duration = animationDuration
-            positionAnimation.beginTime = CACurrentMediaTime() + waveDelay
+            positionAnimation.fromValue = CGPoint(x: startX + size, y: startY + size)
+            positionAnimation.toValue = CGPoint(x: targetX, y: targetY)
+            positionAnimation.duration = duration
+            positionAnimation.beginTime = CACurrentMediaTime() + delay
             positionAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
             positionAnimation.fillMode = .forwards
             positionAnimation.isRemovedOnCompletion = false
 
-            // Rotation animation
-            let rotationAnimation = CABasicAnimation(keyPath: "transform.rotation.z")
-            rotationAnimation.fromValue = 0
-            rotationAnimation.toValue = finalRotation
-            rotationAnimation.duration = animationDuration
-            rotationAnimation.beginTime = CACurrentMediaTime() + waveDelay
-            rotationAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            rotationAnimation.fillMode = .forwards
-            rotationAnimation.isRemovedOnCompletion = false
-
-            // Fade out near the end
+            // Fade out with blur effect (scale down)
             let fadeOut = CABasicAnimation(keyPath: "opacity")
             fadeOut.fromValue = 1
             fadeOut.toValue = 0
-            fadeOut.duration = 0.4
-            fadeOut.beginTime = CACurrentMediaTime() + waveDelay + animationDuration * 0.7
+            fadeOut.duration = 0.6
+            fadeOut.beginTime = CACurrentMediaTime() + delay + duration * 0.5
+            fadeOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
             fadeOut.fillMode = .forwards
             fadeOut.isRemovedOnCompletion = false
 
-            // Apply animations
-            pieceLayer.add(scaleIn, forKey: "scaleIn")
-            pieceLayer.add(fadeIn, forKey: "fadeIn")
-            pieceLayer.add(positionAnimation, forKey: "position")
-            pieceLayer.add(rotationAnimation, forKey: "rotation")
-            pieceLayer.add(fadeOut, forKey: "fadeOut")
+            let scaleOut = CABasicAnimation(keyPath: "transform.scale")
+            scaleOut.fromValue = 1
+            scaleOut.toValue = 0.5
+            scaleOut.duration = 0.6
+            scaleOut.beginTime = CACurrentMediaTime() + delay + duration * 0.5
+            scaleOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            scaleOut.fillMode = .forwards
+            scaleOut.isRemovedOnCompletion = false
+
+            particleLayer.add(fadeIn, forKey: "fadeIn")
+            particleLayer.add(scaleIn, forKey: "scaleIn")
+            particleLayer.add(positionAnimation, forKey: "position")
+            particleLayer.add(fadeOut, forKey: "fadeOut")
+            particleLayer.add(scaleOut, forKey: "scaleOut")
         }
-
-        // Clean up after animations complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.confettiLayers.forEach { $0.removeFromSuperlayer() }
-            self?.confettiLayers.removeAll()
-        }
-    }
-
-    private func createConfettiPiece(size: CGFloat, shapeType: Int, colorIndex: Int) -> CALayer {
-        let layer = CAShapeLayer()
-        layer.fillColor = confettiColors[colorIndex].cgColor
-
-        let path: UIBezierPath
-
-        switch shapeType {
-        case 0: // Circle
-            path = UIBezierPath(ovalIn: CGRect(x: -size/2, y: -size/2, width: size, height: size))
-        case 1: // Rectangle
-            path = UIBezierPath(rect: CGRect(x: -size/2, y: -size*0.3, width: size, height: size * 0.6))
-        case 2: // Triangle
-            path = UIBezierPath()
-            path.move(to: CGPoint(x: 0, y: -size/2))
-            path.addLine(to: CGPoint(x: size/2, y: size/2))
-            path.addLine(to: CGPoint(x: -size/2, y: size/2))
-            path.close()
-        default: // Star
-            path = createStarPath(size: size * 1.2)
-        }
-
-        layer.path = path.cgPath
-        return layer
-    }
-
-    private func createStarPath(size: CGFloat) -> UIBezierPath {
-        let path = UIBezierPath()
-        let outerRadius = size / 2
-        let innerRadius = outerRadius * 0.4
-        let points = 5
-
-        for i in 0..<(points * 2) {
-            let radius = i % 2 == 0 ? outerRadius : innerRadius
-            let angle = (Double(i) * .pi / Double(points)) - (.pi / 2)
-            let point = CGPoint(
-                x: CGFloat(cos(angle)) * radius,
-                y: CGFloat(sin(angle)) * radius
-            )
-
-            if i == 0 {
-                path.move(to: point)
-            } else {
-                path.addLine(to: point)
-            }
-        }
-        path.close()
-        return path
     }
 }
 

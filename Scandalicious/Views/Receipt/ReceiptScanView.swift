@@ -776,268 +776,356 @@ struct ReceiptScanView: View {
 struct CaptureSuccessOverlay: View {
     @State private var checkmarkScale: CGFloat = 0
     @State private var checkmarkOpacity: Double = 0
-    @State private var ringScale: CGFloat = 0.8
-    @State private var ringOpacity: Double = 0
+    @State private var cardScale: CGFloat = 0.8
+    @State private var cardOpacity: Double = 0
+    @State private var innerGlowOpacity: Double = 0
+    @State private var checkmarkRotation: Double = -30
+
+    private let accentColor = Color(red: 0.2, green: 0.8, blue: 0.4)
 
     var body: some View {
         ZStack {
-            // Semi-transparent background
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
+            // Semi-transparent background with subtle gradient
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.7),
+                    Color.black.opacity(0.6)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
-            // Confetti layer - always present, animates on appear
-            ConfettiView()
+            // Premium animation layer
+            PremiumSuccessAnimation()
                 .allowsHitTesting(false)
 
             // Success card
-            VStack(spacing: 20) {
-                // Animated checkmark circle
+            VStack(spacing: 24) {
+                // Animated checkmark with glow
                 ZStack {
-                    // Outer ring
+                    // Soft glow behind checkmark
                     Circle()
-                        .stroke(Color.green.opacity(0.3), lineWidth: 4)
-                        .frame(width: 80, height: 80)
-                        .scaleEffect(ringScale)
-                        .opacity(ringOpacity)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    accentColor.opacity(0.4),
+                                    accentColor.opacity(0.1),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 20,
+                                endRadius: 60
+                            )
+                        )
+                        .frame(width: 120, height: 120)
+                        .opacity(innerGlowOpacity)
+                        .blur(radius: 10)
 
-                    // Inner filled circle
+                    // Main circle with gradient
                     Circle()
-                        .fill(Color.green)
-                        .frame(width: 70, height: 70)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.25, green: 0.85, blue: 0.5),
+                                    accentColor,
+                                    Color(red: 0.15, green: 0.7, blue: 0.35)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 72, height: 72)
+                        .shadow(color: accentColor.opacity(0.5), radius: 16, y: 4)
                         .scaleEffect(checkmarkScale)
                         .opacity(checkmarkOpacity)
 
-                    // Checkmark
+                    // Checkmark icon
                     Image(systemName: "checkmark")
-                        .font(.system(size: 36, weight: .bold))
+                        .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.white)
                         .scaleEffect(checkmarkScale)
+                        .rotationEffect(.degrees(checkmarkRotation))
                         .opacity(checkmarkOpacity)
                 }
 
-                // Done text
-                Text("Done!")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                // Done text with subtle styling
+                Text("Done")
+                    .font(.system(size: 26, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
-                    .opacity(checkmarkOpacity)
+                    .opacity(cardOpacity)
             }
-            .padding(40)
+            .padding(.horizontal, 48)
+            .padding(.vertical, 44)
             .background(
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 28)
                     .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.2),
+                                        Color.white.opacity(0.05)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.25), radius: 30, y: 15)
             )
-            .scaleEffect(checkmarkScale > 0 ? 1 : 0.8)
+            .scaleEffect(cardScale)
+            .opacity(cardOpacity)
         }
         .onAppear {
-            // Animate in sequence
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+            // Card fade in
+            withAnimation(.easeOut(duration: 0.4)) {
+                cardScale = 1.0
+                cardOpacity = 1.0
+            }
+
+            // Checkmark animation with spring
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6).delay(0.15)) {
                 checkmarkScale = 1.0
                 checkmarkOpacity = 1.0
+                checkmarkRotation = 0
             }
 
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
-                ringScale = 1.2
-                ringOpacity = 1.0
+            // Inner glow fade in
+            withAnimation(.easeOut(duration: 0.6).delay(0.2)) {
+                innerGlowOpacity = 1.0
             }
 
-            // Ring pulse out
-            withAnimation(.easeOut(duration: 0.3).delay(0.3)) {
-                ringScale = 1.4
-                ringOpacity = 0
+            // Subtle glow pulse
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true).delay(0.5)) {
+                innerGlowOpacity = 0.6
             }
         }
     }
 }
 
-// MARK: - Confetti View
+// MARK: - Premium Success Animation
 
-struct ConfettiView: View {
-    @State private var confettiPieces: [ConfettiData] = []
+struct PremiumSuccessAnimation: View {
+    @State private var rings: [RingData] = []
+    @State private var particles: [ShimmerParticle] = []
+    @State private var glowOpacity: Double = 0
+    @State private var glowScale: CGFloat = 0.8
 
-    private let confettiColors: [Color] = [
-        Color.green,
-        Color(red: 0.3, green: 0.85, blue: 0.5),
-        Color.yellow,
-        Color.orange,
-        Color.pink,
-        Color.purple,
-        Color.blue,
-        Color.cyan,
-        Color.red,
-        Color.mint
-    ]
+    private let accentColor = Color(red: 0.2, green: 0.8, blue: 0.4)
+    private let secondaryColor = Color(red: 0.3, green: 0.6, blue: 0.9)
 
     var body: some View {
         GeometryReader { geometry in
+            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
+
             ZStack {
-                ForEach(confettiPieces) { piece in
-                    ConfettiPieceView(data: piece, screenSize: geometry.size)
+                // Ambient glow backdrop
+                RadialGradient(
+                    colors: [
+                        accentColor.opacity(0.3),
+                        accentColor.opacity(0.1),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: 200
+                )
+                .scaleEffect(glowScale)
+                .opacity(glowOpacity)
+                .position(center)
+                .blur(radius: 40)
+
+                // Expanding rings
+                ForEach(rings) { ring in
+                    PremiumRingView(data: ring)
+                        .position(center)
+                }
+
+                // Shimmer particles
+                ForEach(particles) { particle in
+                    ShimmerParticleView(data: particle, center: center)
                 }
             }
             .onAppear {
-                generateConfetti()
+                startAnimation(screenSize: geometry.size)
             }
         }
         .ignoresSafeArea()
     }
 
-    private func generateConfetti() {
-        var pieces: [ConfettiData] = []
-        let totalPieces = 80
+    private func startAnimation(screenSize: CGSize) {
+        // Animate glow
+        withAnimation(.easeOut(duration: 0.6)) {
+            glowOpacity = 1
+            glowScale = 1.2
+        }
 
-        // Create evenly distributed burst in all 360 degrees
-        for i in 0..<totalPieces {
-            // Distribute angles evenly with small random variation
-            let baseAngle = (Double(i) / Double(totalPieces)) * 360.0
-            let angleVariation = Double.random(in: -8...8)
-            let angle = (baseAngle + angleVariation) * .pi / 180
+        withAnimation(.easeInOut(duration: 1.5).delay(0.6)) {
+            glowOpacity = 0.4
+        }
 
-            // Random distance for depth variation
-            let distance = CGFloat.random(in: 150...400)
-
-            // Determine which "wave" this piece is in (creates layered burst effect)
-            let wave = i % 3
-            let waveDelay = Double(wave) * 0.05
-
-            pieces.append(ConfettiData(
+        // Create expanding rings with staggered timing
+        var ringData: [RingData] = []
+        for i in 0..<3 {
+            ringData.append(RingData(
                 id: i,
-                color: confettiColors[i % confettiColors.count],
-                size: CGFloat.random(in: 6...16),
-                shapeType: Int.random(in: 0...3), // Added star shape
-                angle: angle,
-                distance: distance,
-                gravityOffset: CGFloat.random(in: 100...300), // Gravity pull down
-                animationDuration: Double.random(in: 0.8...1.4),
-                finalRotation: Double.random(in: 540...1080),
-                delay: waveDelay + Double.random(in: 0...0.1)
+                delay: Double(i) * 0.15,
+                maxScale: 2.5 + Double(i) * 0.5,
+                duration: 1.0 + Double(i) * 0.2,
+                strokeWidth: 2.0 - Double(i) * 0.5
             ))
         }
+        rings = ringData
 
-        confettiPieces = pieces
+        // Create shimmer particles
+        var particleData: [ShimmerParticle] = []
+        for i in 0..<24 {
+            let angle = (Double(i) / 24.0) * 2 * .pi
+            let distance = CGFloat.random(in: 80...180)
+            let wave = i % 3
+
+            particleData.append(ShimmerParticle(
+                id: i,
+                angle: angle,
+                distance: distance,
+                size: CGFloat.random(in: 2...5),
+                delay: Double(wave) * 0.1 + Double.random(in: 0...0.2),
+                duration: Double.random(in: 1.2...1.8)
+            ))
+        }
+        particles = particleData
     }
 }
 
-// MARK: - Confetti Data
+// MARK: - Ring Data
 
-struct ConfettiData: Identifiable {
+struct RingData: Identifiable {
     let id: Int
-    let color: Color
-    let size: CGFloat
-    let shapeType: Int // 0=circle, 1=rectangle, 2=triangle, 3=star
-    let angle: Double
-    let distance: CGFloat
-    let gravityOffset: CGFloat
-    let animationDuration: Double
-    let finalRotation: Double
     let delay: Double
+    let maxScale: Double
+    let duration: Double
+    let strokeWidth: Double
 }
 
-// MARK: - Confetti Piece View
+// MARK: - Premium Ring View
 
-struct ConfettiPieceView: View {
-    let data: ConfettiData
-    let screenSize: CGSize
+struct PremiumRingView: View {
+    let data: RingData
 
-    @State private var offset: CGSize = .zero
-    @State private var rotation: Double = 0
-    @State private var opacity: Double = 1
-    @State private var scale: CGFloat = 0
+    @State private var scale: CGFloat = 0.3
+    @State private var opacity: Double = 0
+
+    private let accentColor = Color(red: 0.2, green: 0.8, blue: 0.4)
 
     var body: some View {
-        Group {
-            switch data.shapeType {
-            case 0:
-                Circle()
-                    .fill(data.color)
-                    .frame(width: data.size, height: data.size)
-            case 1:
-                Rectangle()
-                    .fill(data.color)
-                    .frame(width: data.size, height: data.size * 0.6)
-            case 2:
-                Triangle()
-                    .fill(data.color)
-                    .frame(width: data.size, height: data.size)
-            default:
-                Star()
-                    .fill(data.color)
-                    .frame(width: data.size * 1.2, height: data.size * 1.2)
-            }
-        }
-        .scaleEffect(scale)
-        .rotationEffect(.degrees(rotation))
-        .offset(offset)
-        .opacity(opacity)
-        .position(x: screenSize.width / 2, y: screenSize.height / 2)
-        .onAppear {
-            // Calculate burst direction (360 degrees around center)
-            let burstX = cos(data.angle) * data.distance
-            let burstY = sin(data.angle) * data.distance
-
-            // Add gravity effect - pieces fall down after bursting
-            let finalY = burstY + data.gravityOffset
-
-            // Pop in with scale
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.6).delay(data.delay)) {
-                scale = 1.0
-            }
-
-            // Burst outward animation - fast explosive start
-            withAnimation(.easeOut(duration: data.animationDuration).delay(data.delay)) {
-                offset = CGSize(width: burstX, height: finalY)
-                rotation = data.finalRotation
-            }
-
-            // Fade out near the end
-            withAnimation(.easeIn(duration: 0.4).delay(data.delay + data.animationDuration * 0.7)) {
-                opacity = 0
-            }
-        }
-    }
-}
-
-// MARK: - Triangle Shape
-
-struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.closeSubpath()
-        return path
-    }
-}
-
-// MARK: - Star Shape
-
-struct Star: Shape {
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let outerRadius = min(rect.width, rect.height) / 2
-        let innerRadius = outerRadius * 0.4
-        let points = 5
-
-        var path = Path()
-
-        for i in 0..<(points * 2) {
-            let angle = (Double(i) * .pi / Double(points)) - (.pi / 2)
-            let radius = i % 2 == 0 ? outerRadius : innerRadius
-            let point = CGPoint(
-                x: center.x + CGFloat(cos(angle)) * radius,
-                y: center.y + CGFloat(sin(angle)) * radius
+        Circle()
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        accentColor.opacity(0.8),
+                        accentColor.opacity(0.4),
+                        accentColor.opacity(0.1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: data.strokeWidth
             )
+            .frame(width: 100, height: 100)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.3).delay(data.delay)) {
+                    opacity = 0.8
+                    scale = 0.5
+                }
 
-            if i == 0 {
-                path.move(to: point)
-            } else {
-                path.addLine(to: point)
+                withAnimation(.easeOut(duration: data.duration).delay(data.delay + 0.1)) {
+                    scale = data.maxScale
+                }
+
+                withAnimation(.easeIn(duration: 0.5).delay(data.delay + data.duration * 0.5)) {
+                    opacity = 0
+                }
             }
-        }
+    }
+}
 
-        path.closeSubpath()
-        return path
+// MARK: - Shimmer Particle Data
+
+struct ShimmerParticle: Identifiable {
+    let id: Int
+    let angle: Double
+    let distance: CGFloat
+    let size: CGFloat
+    let delay: Double
+    let duration: Double
+}
+
+// MARK: - Shimmer Particle View
+
+struct ShimmerParticleView: View {
+    let data: ShimmerParticle
+    let center: CGPoint
+
+    @State private var offset: CGSize = .zero
+    @State private var opacity: Double = 0
+    @State private var scale: CGFloat = 0
+    @State private var blur: CGFloat = 0
+
+    private let accentColor = Color(red: 0.2, green: 0.8, blue: 0.4)
+
+    var body: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        .white,
+                        accentColor.opacity(0.8),
+                        accentColor.opacity(0)
+                    ],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: data.size
+                )
+            )
+            .frame(width: data.size * 2, height: data.size * 2)
+            .scaleEffect(scale)
+            .blur(radius: blur)
+            .opacity(opacity)
+            .offset(offset)
+            .position(center)
+            .onAppear {
+                // Calculate target position
+                let targetX = cos(data.angle) * data.distance
+                let targetY = sin(data.angle) * data.distance
+
+                // Start slightly inward
+                let startX = cos(data.angle) * (data.distance * 0.3)
+                let startY = sin(data.angle) * (data.distance * 0.3)
+                offset = CGSize(width: startX, height: startY)
+
+                // Fade in and scale up
+                withAnimation(.easeOut(duration: 0.3).delay(data.delay)) {
+                    opacity = 1
+                    scale = 1
+                }
+
+                // Float outward
+                withAnimation(.easeOut(duration: data.duration).delay(data.delay)) {
+                    offset = CGSize(width: targetX, height: targetY)
+                }
+
+                // Gentle fade and blur out
+                withAnimation(.easeIn(duration: 0.6).delay(data.delay + data.duration * 0.5)) {
+                    opacity = 0
+                    blur = 2
+                    scale = 0.5
+                }
+            }
     }
 }
 
