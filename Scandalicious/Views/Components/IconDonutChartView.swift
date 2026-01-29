@@ -144,11 +144,10 @@ struct IconDonutChartView: View {
         .frame(width: size, height: size)
         .onAppear {
             if shouldAnimate {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
-                        globalScale = 1.0
-                        globalRotation = 0
-                    }
+                // Start animation immediately for snappier feel
+                withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+                    globalScale = 1.0
+                    globalRotation = 0
                 }
             } else {
                 globalScale = 1.0
