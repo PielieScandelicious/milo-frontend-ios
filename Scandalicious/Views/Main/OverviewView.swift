@@ -74,6 +74,7 @@ struct OverviewView: View {
     @State private var cachedChartDataByPeriod: [String: [ChartData]] = [:] // Cache chart data for IconDonutChart
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
     @State private var storeRowsAppeared = false // Track staggered animation state
+    @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
     @Binding var showSignOutConfirmation: Bool
 
     // Check if the selected period is the current month
@@ -1013,102 +1014,181 @@ struct OverviewView: View {
         }
     }
 
-    // MARK: - Receipts Section (Modern inline display)
+    // MARK: - Receipts Section (Collapsible with glass design)
     private var receiptsSection: some View {
-        VStack(spacing: 16) {
-            // Section header
-            HStack {
-                Text("RECEIPTS")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white.opacity(0.5))
-                    .tracking(1.5)
-
-                Spacer()
-
-                if !receiptsViewModel.receipts.isEmpty {
-                    Text("\(receiptsViewModel.receipts.count)")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.4))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.1))
-                        )
+        VStack(spacing: 0) {
+            // Collapsible header button
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    isReceiptsSectionExpanded.toggle()
                 }
+            } label: {
+                HStack(spacing: 14) {
+                    // Receipt icon
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: "doc.text.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+
+                    // Title and count
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Receipts")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        if receiptsSectionState == .loading {
+                            Text("Loading...")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                        } else {
+                            Text("\(receiptsViewModel.receipts.count) this period")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                    }
+
+                    Spacer()
+
+                    // Count badge
+                    if !receiptsViewModel.receipts.isEmpty {
+                        Text("\(receiptsViewModel.receipts.count)")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                    }
+
+                    // Chevron
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                        .rotationEffect(.degrees(isReceiptsSectionExpanded ? 180 : 0))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    ZStack {
+                        // Glass base
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.white.opacity(0.04))
+
+                        // Gradient overlay
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.07),
+                                        Color.white.opacity(0.02)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.12),
+                                    Color.white.opacity(0.04)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
             }
+            .buttonStyle(ReceiptsHeaderButtonStyle())
             .padding(.horizontal, 16)
             .padding(.top, 24)
 
-            switch receiptsSectionState {
-            case .loading:
-                // Loading state
-                HStack(spacing: 12) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
-                        .scaleEffect(0.8)
-                    Text("Loading receipts...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
+            // Expandable content
+            if isReceiptsSectionExpanded {
+                VStack(spacing: 12) {
+                    switch receiptsSectionState {
+                    case .loading:
+                        // Loading state
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                                .scaleEffect(0.8)
+                            Text("Loading receipts...")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 30)
 
-            case .empty:
-                // Empty state
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 28))
-                        .foregroundColor(.white.opacity(0.2))
-                    Text("No receipts for this period")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
+                    case .empty:
+                        // Empty state
+                        VStack(spacing: 8) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white.opacity(0.2))
+                            Text("No receipts for this period")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
 
-            case .hasData:
-                // Modern receipt cards
-                LazyVStack(spacing: 8) {
-                    ForEach(sortedReceipts) { receipt in
-                        ModernReceiptCard(
-                            receipt: receipt,
-                            isExpanded: expandedReceiptId == receipt.id,
-                            onTap: {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                    if expandedReceiptId == receipt.id {
-                                        expandedReceiptId = nil
-                                    } else {
-                                        expandedReceiptId = receipt.id
+                    case .hasData:
+                        // Modern receipt cards
+                        LazyVStack(spacing: 8) {
+                            ForEach(sortedReceipts) { receipt in
+                                ModernReceiptCard(
+                                    receipt: receipt,
+                                    isExpanded: expandedReceiptId == receipt.id,
+                                    onTap: {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            if expandedReceiptId == receipt.id {
+                                                expandedReceiptId = nil
+                                            } else {
+                                                expandedReceiptId = receipt.id
+                                            }
+                                        }
+                                    },
+                                    onDelete: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            deleteReceiptFromOverview(receipt)
+                                        }
                                     }
-                                }
-                            },
-                            onDelete: {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    deleteReceiptFromOverview(receipt)
-                                }
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .opacity,
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
                             }
-                        )
-                        .transition(.asymmetric(
-                            insertion: .opacity,
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
-                    }
 
-                    // Load more indicator
-                    if receiptsViewModel.hasMorePages {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.5)))
-                            .scaleEffect(0.8)
-                            .padding(.vertical, 16)
-                            .onAppear {
-                                Task {
-                                    await receiptsViewModel.loadNextPage(period: selectedPeriod, storeName: nil)
-                                }
+                            // Load more indicator
+                            if receiptsViewModel.hasMorePages {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.5)))
+                                    .scaleEffect(0.8)
+                                    .padding(.vertical, 16)
+                                    .onAppear {
+                                        Task {
+                                            await receiptsViewModel.loadNextPage(period: selectedPeriod, storeName: nil)
+                                        }
+                                    }
                             }
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .overlay {
@@ -1695,6 +1775,16 @@ struct OverviewStoreRowButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Receipts Header Button Style
+struct ReceiptsHeaderButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
 // MARK: - Syncing Arrows View
 struct SyncingArrowsView: View {
     var body: some View {
@@ -1864,12 +1954,38 @@ struct ModernReceiptCard: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.05))
+            ZStack {
+                // Glass base
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.04))
+
+                // Gradient overlay
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.06),
+                                Color.white.opacity(0.02)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(isExpanded ? 0.12 : 0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(isExpanded ? 0.15 : 0.1),
+                            Color.white.opacity(isExpanded ? 0.06 : 0.03)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
         .confirmationDialog("Delete Receipt", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
@@ -1887,8 +2003,8 @@ struct ReceiptCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.03 : 0))
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.04 : 0))
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
