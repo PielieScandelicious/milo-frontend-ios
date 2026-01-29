@@ -1,4 +1,0 @@
-module GoogleUtilities_UserDefaults {
-umbrella "/Users/bmoenaert/Library/Developer/Xcode/DerivedData/Scandalicious-bloaiwcehfrydhfyzecshzjbxzcm/SourcePackages/checkouts/GoogleUtilities/GoogleUtilities/UserDefaults/Public"
-export *
-}

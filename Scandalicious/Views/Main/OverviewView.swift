@@ -1,3 +1,4 @@
+
 //
 //
 //  OverviewView.swift
@@ -7,7 +8,6 @@
 //
 
 import SwiftUI
-import UIKit
 import FirebaseAuth
 import Combine
 
@@ -25,11 +25,6 @@ enum SortOption: String, CaseIterable {
     case storeName = "Store Name"
 }
 
-// MARK: - Header Tab Options
-enum HeaderTab: String, CaseIterable {
-    case overview = "Overview"
-    case receipts = "Receipts"
-}
 
 
 
@@ -57,50 +52,28 @@ struct OverviewView: View {
         return dateFormatter.string(from: Date())
     }()
     @State private var selectedSort: SortOption = .highestSpend
-    @State private var selectedHeaderTab: HeaderTab = .overview
     @State private var showingFilterSheet = false
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var showingAllTransactions = false
     @State private var showTrendlineInOverview = false  // Toggle between pie chart and trendline
-    @State private var showingHealthScoreTransactions = false
-    @State private var showingProfileMenu = false
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
     @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
-    @State private var hasWarmedAdjacentViews = false  // Track if adjacent page views have been pre-rendered
     @State private var overviewTrends: [TrendPeriod] = []  // Trends for the overview chart
     @State private var isLoadingTrends = false
-    @State private var selectedReceiptForDetail: APIReceipt?
-    @State private var showingReceiptDetail = false
+    @State private var hasFetchedTrends = false  // Prevent duplicate trend fetches
+    @State private var hasSyncedRateLimit = false  // Prevent duplicate rate limit syncs
+    @State private var loadedReceiptPeriods: Set<String> = []  // Track which periods have loaded receipts
+    @State private var expandedReceiptId: String? // For inline receipt expansion
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
     @State private var scrollOffset: CGFloat = 0 // Track scroll for header fade effect
+    @State private var cachedAvailablePeriods: [String] = [] // Cached for performance
+    @State private var cachedSegmentsByPeriod: [String: [StoreChartSegment]] = [:] // Cache segments
+    @State private var cachedChartDataByPeriod: [String: [ChartData]] = [:] // Cache chart data for IconDonutChart
+    @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
     @Binding var showSignOutConfirmation: Bool
-
-    // Receipt limit status icon
-    private var receiptLimitIcon: String {
-        switch rateLimitManager.receiptLimitState {
-        case .normal:
-            return "checkmark.circle.fill"
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .exhausted:
-            return "xmark.circle.fill"
-        }
-    }
-
-    // Receipt limit status color
-    private var receiptLimitColor: Color {
-        switch rateLimitManager.receiptLimitState {
-        case .normal:
-            return .green
-        case .warning:
-            return .orange
-        case .exhausted:
-            return .red
-        }
-    }
 
     // Check if the selected period is the current month
     private var isCurrentPeriod: Bool {
@@ -112,11 +85,22 @@ struct OverviewView: View {
     }
 
     private var availablePeriods: [String] {
+        // Use cached version for performance - avoid computing during render
+        if !cachedAvailablePeriods.isEmpty {
+            return cachedAvailablePeriods
+        }
+        // Return just the selected period as fallback to avoid blocking render
+        // The cache will be populated by handleOnAppear's deferred Task
+        return [selectedPeriod]
+    }
+
+    /// Compute available periods from data manager - called once when data changes
+    private func computeAvailablePeriods() -> [String] {
         // Use period metadata if available (from lightweight /analytics/periods endpoint)
         if !dataManager.periodMetadata.isEmpty {
             // Period metadata is already sorted by backend (most recent first)
             // Reverse to get oldest first (left), most recent last (right) for swipe UX
-            return dataManager.periodMetadata.map { $0.period }.reversed()
+            return Array(dataManager.periodMetadata.map { $0.period }.reversed())
         }
 
         // Fallback: Use breakdowns if metadata not loaded yet
@@ -142,21 +126,12 @@ struct OverviewView: View {
         }
     }
 
-    /// Adjacent periods that need view pre-warming for smooth swiping
-    /// Returns 1 period before and 1 period after the current selection
-    private var adjacentPeriodsToWarm: [String] {
-        guard let currentIndex = availablePeriods.firstIndex(of: selectedPeriod) else { return [] }
-        var periods: [String] = []
-
-        // Previous period (older - to the left)
-        if currentIndex > 0 {
-            periods.append(availablePeriods[currentIndex - 1])
+    /// Update the cached available periods
+    private func updateAvailablePeriodsCache() {
+        let newPeriods = computeAvailablePeriods()
+        if cachedAvailablePeriods != newPeriods {
+            cachedAvailablePeriods = newPeriods
         }
-        // Next period (newer - to the right)
-        if currentIndex < availablePeriods.count - 1 {
-            periods.append(availablePeriods[currentIndex + 1])
-        }
-        return periods
     }
 
     private var currentBreakdowns: [StoreBreakdown] {
@@ -176,7 +151,24 @@ struct OverviewView: View {
 
     /// Build the cache for all available periods
     /// Called once when data loads or sort changes
+    /// Includes guard to prevent redundant rebuilds
     private func rebuildBreakdownCache() {
+        // Compute hash of current breakdowns to detect actual changes
+        let currentHash = dataManager.storeBreakdowns.hashValue
+
+        // Skip rebuild if nothing changed
+        if currentHash == lastBreakdownsHash && !cachedBreakdownsByPeriod.isEmpty {
+            // Only update displayedBreakdowns if period changed
+            if displayedBreakdownsPeriod != selectedPeriod {
+                displayedBreakdowns = cachedBreakdownsByPeriod[selectedPeriod] ?? []
+                displayedBreakdownsPeriod = selectedPeriod
+            }
+            return
+        }
+
+        // Store the new hash
+        lastBreakdownsHash = currentHash
+
         var newCache: [String: [StoreBreakdown]] = [:]
 
         // Group breakdowns by period
@@ -191,11 +183,17 @@ struct OverviewView: View {
             newCache[period] = sorted
         }
 
+        // Batch all state updates together to minimize re-renders
         cachedBreakdownsByPeriod = newCache
-
-        // Also update displayedBreakdowns for the current period
         displayedBreakdowns = newCache[selectedPeriod] ?? []
         displayedBreakdownsPeriod = selectedPeriod
+
+        // Also update available periods cache
+        updateAvailablePeriodsCache()
+
+        // Clear segment and chart data caches when breakdowns change (will be rebuilt lazily)
+        cachedSegmentsByPeriod.removeAll()
+        cachedChartDataByPeriod.removeAll()
     }
 
     /// Update cache for a specific period only
@@ -206,6 +204,9 @@ struct OverviewView: View {
         breakdowns.sort { $0.totalStoreSpend > $1.totalStoreSpend }
 
         cachedBreakdownsByPeriod[period] = breakdowns
+
+        // Invalidate segment cache for this period (will be rebuilt lazily)
+        cachedSegmentsByPeriod.removeValue(forKey: period)
 
         // Update displayedBreakdowns if this is the selected period
         if period == selectedPeriod {
@@ -229,269 +230,255 @@ struct OverviewView: View {
         dataManager.periodReceiptCounts[selectedPeriod] ?? currentBreakdowns.reduce(0) { $0 + $1.visitCount }
     }
 
-    var body: some View {
+    // MARK: - Extracted Body Components
+
+    private var mainBodyContent: some View {
         ZStack {
             appBackgroundColor.ignoresSafeArea()
 
             if let error = dataManager.error {
-                // Error state
-                VStack(spacing: 20) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.red)
-                    
-                    Text("Failed to load data")
-                        .font(.headline)
-                    
-                    Text(error)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    
-                    Button {
-                        Task {
-                            await dataManager.fetchFromBackend(for: .month, periodString: selectedPeriod)
-                        }
-                    } label: {
-                        Label("Retry", systemImage: "arrow.clockwise")
-                            .font(.headline)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundStyle(.white)
-                            .cornerRadius(10)
-                    }
-                }
-                .padding()
-                .transition(.opacity)
+                errorStateView(error: error)
             } else {
                 swipeableContentView
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(item: $selectedBreakdown) { breakdown in
-            StoreDetailView(storeBreakdown: breakdown)
-        }
-        .navigationDestination(isPresented: $showingAllTransactions) {
-            TransactionListView(
-                storeName: "All Stores",
-                period: selectedPeriod,
-                category: nil,
-                categoryColor: nil
-            )
-        }
-        .navigationDestination(isPresented: $showingHealthScoreTransactions) {
-            TransactionListView(
-                storeName: "All Stores",
-                period: selectedPeriod,
-                category: nil,
-                categoryColor: nil,
-                sortOrder: .healthScoreDescending
-            )
-        }
-        .navigationDestination(isPresented: $showingReceiptDetail) {
-            if let receipt = selectedReceiptForDetail {
-                ReceiptTransactionsView(receipt: receipt)
-            }
-        }
-        .sheet(isPresented: $showingFilterSheet) {
-            FilterSheet(
-                selectedSort: $selectedSort
-            )
-        }
-        .onAppear {
-            // Configure with transaction manager if not already configured
-            if dataManager.transactionManager == nil {
-                dataManager.configure(with: transactionManager)
-            }
-            // Build the cache for all periods on first appear
-            rebuildBreakdownCache()
+    }
 
-            // Initialize lastCheckedUploadTimestamp from persistent storage on first appear
-            // This prevents re-detecting old uploads as "new" on app launch
-            if lastCheckedUploadTimestamp == 0 {
-                let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-                if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
-                    // First try to load from persisted lastCheckedUploadTimestamp
-                    let persistedLastChecked = sharedDefaults.double(forKey: "lastCheckedUploadTimestamp")
-                    if persistedLastChecked > 0 {
-                        lastCheckedUploadTimestamp = persistedLastChecked
-                        print("📋 Restored lastCheckedUploadTimestamp from storage: \(persistedLastChecked)")
-                    } else {
-                        // Fall back to current upload timestamp to prevent detecting old uploads as new
-                        let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-                        if existingTimestamp > 0 {
-                            lastCheckedUploadTimestamp = existingTimestamp
-                            // Also persist it so future checks use this value
-                            sharedDefaults.set(existingTimestamp, forKey: "lastCheckedUploadTimestamp")
-                            print("📋 Initialized lastCheckedUploadTimestamp to current upload timestamp: \(existingTimestamp)")
-                        }
-                    }
-                }
-            }
+    private func errorStateView(error: String) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 50))
+                .foregroundStyle(.red)
 
-            // Check for Share Extension uploads when view appears
-            // This handles the case when user switches tabs
-            checkForShareExtensionUploads()
+            Text("Failed to load data")
+                .font(.headline)
 
-            // Fetch rate limit status when view appears
-            Task {
-                await rateLimitManager.syncFromBackend()
-            }
+            Text(error)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
 
-            // Fetch trends for the overview chart
-            Task {
-                await fetchOverviewTrends()
-            }
-
-            // Prefetch daily insights in background
-            prefetchInsights()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadStarted)) { _ in
-            print("📤 Received receipt upload started notification")
-            isReceiptUploading = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
-            print("📬 Received receipt upload notification - refreshing backend data")
-            isReceiptUploading = false
-            Task {
-                // Wait a moment for backend to fully process
-                try? await Task.sleep(for: .seconds(1))
-
-                // Always refresh the CURRENT month since new receipts go into the current period
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "MMMM yyyy"
-                dateFormatter.locale = Locale(identifier: "en_US")
-                let currentMonthPeriod = dateFormatter.string(from: Date())
-
-                await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
-
-                // If viewing the current month, update displayed breakdowns
-                if selectedPeriod == currentMonthPeriod {
-                    updateDisplayedBreakdowns()
-                }
-                print("✅ Backend data refreshed after receipt upload for period: \(currentMonthPeriod)")
-
-                // Also refresh rate limit status
-                await rateLimitManager.syncFromBackend()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .receiptDeleted)) { _ in
-            print("🗑️ Received receipt deleted notification - refreshing backend data")
-            Task {
-                // Wait a moment for backend to process deletion
-                try? await Task.sleep(for: .seconds(0.5))
-                await dataManager.refreshData(for: .month, periodString: selectedPeriod)
-                updateDisplayedBreakdowns()
-                print("✅ Backend data refreshed after receipt deletion for period: \(selectedPeriod)")
-
-                // Rate limit sync is already handled in ReceiptDetailsView, no need to sync again here
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
-            print("🗑️ Received receiptsDataDidChange notification - refreshing backend data")
-            Task {
-                // Wait a moment for backend to process changes
-                try? await Task.sleep(for: .seconds(0.5))
-                await dataManager.refreshData(for: .month, periodString: selectedPeriod)
-                updateDisplayedBreakdowns()
-                print("✅ Backend data refreshed after receipts data change for period: \(selectedPeriod)")
-            }
-        }
-        .onChange(of: dataManager.lastFetchDate) { _, newValue in
-            // Set green highlight whenever data is fetched (initial load, refresh, etc.)
-            if newValue != nil {
-                lastRefreshTime = Date()
-            }
-        }
-        .onChange(of: transactionManager.transactions) { oldValue, newValue in
-            // Regenerate breakdowns when transactions change
-            print("🔄 Transactions changed - regenerating breakdowns")
-            print("   Old count: \(oldValue.count), New count: \(newValue.count)")
-            dataManager.regenerateBreakdowns()
-            updateDisplayedBreakdowns()
-            
-            // Update selected period to current month if we added new transactions
-            if newValue.count > oldValue.count, let latestTransaction = newValue.first {
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "MMMM yyyy"
-                dateFormatter.locale = Locale(identifier: "en_US")
-                let newPeriod = dateFormatter.string(from: latestTransaction.date)
-                selectedPeriod = newPeriod
-                print("   📅 Switched to period: \(newPeriod)")
-            }
-        }
-        .onChange(of: selectedPeriod) { oldValue, newValue in
-            // Reset trendline toggle when changing periods (show pie chart)
-            if showTrendlineInOverview {
-                showTrendlineInOverview = false
-            }
-
-            // Always return to Overview tab when switching periods
-            if selectedHeaderTab != .overview {
-                selectedHeaderTab = .overview
-            }
-
-            // Defer non-critical work to after swipe animation completes
-            // This prevents jank during the page transition
-            Task { @MainActor in
-                // Small delay to let the swipe animation complete
-                try? await Task.sleep(for: .milliseconds(50))
-
-                updateDisplayedBreakdowns()
-                prefetchInsights()
-
-                // Lazy load store breakdowns for this period if not already loaded
-                if !dataManager.periodMetadata.isEmpty {
-                    if !dataManager.isPeriodLoaded(newValue) {
-                        await dataManager.fetchPeriodDetails(newValue)
-                        // Update cache for the newly loaded period
-                        updateCacheForPeriod(newValue)
-                    }
-
-                    // Prefetch adjacent periods for smooth swiping (2 in each direction)
-                    await prefetchAdjacentPeriods(around: newValue)
-                }
-
-                // Re-warm adjacent views for the new period after animation settles
-                // This ensures smooth swiping regardless of how far user navigated
-                hasWarmedAdjacentViews = false
-            }
-        }
-        .onChange(of: selectedSort) { oldValue, newValue in
-            // Rebuild entire cache since sorting affects all periods
-            rebuildBreakdownCache()
-        }
-        .onChange(of: selectedHeaderTab) { oldValue, newValue in
-            // Load receipts when switching to the Receipts tab
-            if newValue == .receipts {
+            Button {
                 Task {
-                    await receiptsViewModel.loadReceipts(period: selectedPeriod, storeName: nil, reset: true)
+                    await dataManager.fetchFromBackend(for: .month, periodString: selectedPeriod)
                 }
+            } label: {
+                Label("Retry", systemImage: "arrow.clockwise")
+                    .font(.headline)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundStyle(.white)
+                    .cornerRadius(10)
             }
         }
-        .onChange(of: dataManager.storeBreakdowns) { oldValue, newValue in
-            // Rebuild cache when underlying data changes
-            rebuildBreakdownCache()
-            // Prefetch insights when data changes
-            prefetchInsights()
+        .padding()
+        .transition(.opacity)
+    }
+
+    private var allTransactionsDestination: some View {
+        TransactionListView(
+            storeName: "All Stores",
+            period: selectedPeriod,
+            category: nil,
+            categoryColor: nil
+        )
+    }
+
+
+    var body: some View {
+        mainBodyContent
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    modernPeriodNavigationToolbar
+                }
+            }
+            .navigationDestination(item: $selectedBreakdown) { breakdown in
+                StoreDetailView(storeBreakdown: breakdown)
+            }
+            .navigationDestination(isPresented: $showingAllTransactions) {
+                allTransactionsDestination
+            }
+            .sheet(isPresented: $showingFilterSheet) {
+                FilterSheet(selectedSort: $selectedSort)
+            }
+            .onAppear(perform: handleOnAppear)
+            .onReceive(NotificationCenter.default.publisher(for: .receiptUploadStarted)) { _ in
+                handleReceiptUploadStarted()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
+                handleReceiptUploadSuccess()
+            }
+            .onChange(of: transactionManager.transactions) { oldValue, newValue in
+                handleTransactionsChanged(oldValue: oldValue, newValue: newValue)
+            }
+            .onChange(of: selectedPeriod) { _, newValue in
+                handlePeriodChanged(newValue: newValue)
+            }
+            .onChange(of: selectedSort) { _, _ in
+                rebuildBreakdownCache()
+            }
+            .onChange(of: dataManager.storeBreakdowns) { _, _ in
+                rebuildBreakdownCache()
+                cacheSegmentsForPeriod(selectedPeriod)
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active { checkForShareExtensionUploads() }
+            }
+    }
+
+    // MARK: - Lifecycle Handlers
+
+    private func handleOnAppear() {
+        // Configure data manager if needed
+        if dataManager.transactionManager == nil {
+            dataManager.configure(with: transactionManager)
         }
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            // Check for Share Extension uploads when app becomes active
-            print("🔄 scenePhase changed: \(oldPhase) -> \(newPhase)")
-            if newPhase == .active {
+
+        // Defer ALL heavy work to next run loop to allow smooth tab transition
+        Task {
+            // Small delay to let the tab animation complete
+            try? await Task.sleep(for: .milliseconds(100))
+
+            await MainActor.run {
+                // Update periods cache (deferred to avoid blocking initial render)
+                if cachedAvailablePeriods.isEmpty {
+                    cachedAvailablePeriods = computeAvailablePeriods()
+                }
+
+                // Build breakdown caches from preloaded data
+                rebuildBreakdownCache()
+
+                // Load share extension timestamps (UserDefaults I/O)
+                loadShareExtensionTimestamps()
+
+                // Check for share extension uploads
                 checkForShareExtensionUploads()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            // Backup: Also check when app becomes active via notification (more reliable)
-            print("🔄 App became active (UIApplication notification)")
-            checkForShareExtensionUploads()
+
+        // Load receipts only if not already loaded for this period
+        // Mark as loading IMMEDIATELY to prevent duplicate concurrent loads
+        let periodToLoad = selectedPeriod
+        if !loadedReceiptPeriods.contains(periodToLoad) {
+            loadedReceiptPeriods.insert(periodToLoad) // Mark immediately to prevent race conditions
+            Task {
+                await receiptsViewModel.loadReceipts(period: periodToLoad, storeName: nil, reset: true)
+            }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .shareExtensionUploadDetected)) { _ in
-            // Share extension upload detected (possibly from another view)
-            // Note: isReceiptUploading is managed by checkForShareExtensionUploads, don't set it here
-            print("📬 Received share extension upload notification")
+
+        // Sync rate limit only once per session
+        if !hasSyncedRateLimit {
+            Task {
+                await rateLimitManager.syncFromBackend()
+                await MainActor.run { hasSyncedRateLimit = true }
+            }
+        }
+    }
+
+    private func loadShareExtensionTimestamps() {
+        guard lastCheckedUploadTimestamp == 0 else { return }
+
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else { return }
+
+        let persistedLastChecked = sharedDefaults.double(forKey: "lastCheckedUploadTimestamp")
+        if persistedLastChecked > 0 {
+            lastCheckedUploadTimestamp = persistedLastChecked
+        } else {
+            let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
+            if existingTimestamp > 0 {
+                lastCheckedUploadTimestamp = existingTimestamp
+                sharedDefaults.set(existingTimestamp, forKey: "lastCheckedUploadTimestamp")
+            }
+        }
+    }
+
+    private func handleReceiptUploadStarted() {
+        print("📤 Received receipt upload started notification")
+        isReceiptUploading = true
+    }
+
+    private func handleReceiptUploadSuccess() {
+        print("📬 Received receipt upload notification - refreshing backend data")
+        isReceiptUploading = false
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        let currentMonthPeriod = dateFormatter.string(from: Date())
+
+        // Keep period in loadedReceiptPeriods to prevent duplicate loads
+        // The loadReceipts call with reset:true will refresh the data
+
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+
+            await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
+
+            if selectedPeriod == currentMonthPeriod {
+                updateDisplayedBreakdowns()
+                // Reload receipts for current month (reset:true will clear and reload)
+                await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
+            }
+            await rateLimitManager.syncFromBackend()
+        }
+    }
+
+    private func handleTransactionsChanged(oldValue: [Transaction], newValue: [Transaction]) {
+        // regenerateBreakdowns() will update dataManager.storeBreakdowns,
+        // which triggers onChange -> rebuildBreakdownCache() automatically
+        // So we don't need to call updateDisplayedBreakdowns() here (would be redundant)
+        dataManager.regenerateBreakdowns()
+
+        if newValue.count > oldValue.count, let latestTransaction = newValue.first {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+            selectedPeriod = dateFormatter.string(from: latestTransaction.date)
+        }
+    }
+
+    private func handlePeriodChanged(newValue: String) {
+        if showTrendlineInOverview { showTrendlineInOverview = false }
+        expandedReceiptId = nil
+
+        // Immediately update displayed breakdowns for the new period (no async delay)
+        updateDisplayedBreakdowns()
+
+        // Pre-cache segments for the new period if not already cached
+        if cachedSegmentsByPeriod[newValue] == nil {
+            cacheSegmentsForPeriod(newValue)
+        }
+
+        // Check if receipts for this period need to be loaded
+        // Mark as loading IMMEDIATELY to prevent duplicate concurrent loads
+        let needsReceiptsLoad = !loadedReceiptPeriods.contains(newValue)
+        if needsReceiptsLoad {
+            loadedReceiptPeriods.insert(newValue) // Mark immediately to prevent race conditions
+        }
+
+        Task {
+            // Prefetch insights
+            await MainActor.run { prefetchInsights() }
+
+            // Only load receipts if not already cached for this period
+            if needsReceiptsLoad {
+                await receiptsViewModel.loadReceipts(period: newValue, storeName: nil, reset: true)
+            }
+
+            if !dataManager.periodMetadata.isEmpty {
+                if !dataManager.isPeriodLoaded(newValue) {
+                    await dataManager.fetchPeriodDetails(newValue)
+                    await MainActor.run {
+                        updateCacheForPeriod(newValue)
+                        cacheSegmentsForPeriod(newValue)
+                    }
+                }
+                await prefetchAdjacentPeriods(around: newValue)
+            }
         }
     }
 
@@ -523,9 +510,9 @@ struct OverviewView: View {
 
     // MARK: - Overview Trends Fetching
 
-    /// Fetches trends data for the overview chart
+    /// Fetches trends data for the overview chart (lazy-loaded when user taps trendline)
     private func fetchOverviewTrends() async {
-        guard !isLoadingTrends else { return }
+        guard !isLoadingTrends && !hasFetchedTrends else { return }
         isLoadingTrends = true
         defer { isLoadingTrends = false }
 
@@ -533,6 +520,7 @@ struct OverviewView: View {
             let response = try await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 52)
             await MainActor.run {
                 self.overviewTrends = response.periods
+                self.hasFetchedTrends = true
             }
         } catch {
             print("Failed to fetch overview trends: \(error)")
@@ -587,6 +575,8 @@ struct OverviewView: View {
             await MainActor.run {
                 for periodString in periodsToPrefetch {
                     updateCacheForPeriod(periodString)
+                    // Pre-cache segments for smooth swiping
+                    cacheSegmentsForPeriod(periodString)
                 }
             }
         }
@@ -597,14 +587,10 @@ struct OverviewView: View {
     /// Checks if the Share Extension uploaded a receipt while the app was in the background
     private func checkForShareExtensionUploads() {
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("❌ Could not access shared UserDefaults with App Group: \(appGroupIdentifier)")
-            return
-        }
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else { return }
 
         // Check if there's a new upload timestamp
         let uploadTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-        print("📋 Share Extension check - uploadTimestamp: \(uploadTimestamp), lastChecked: \(lastCheckedUploadTimestamp)")
 
         // If there's a new upload (timestamp is newer than last checked)
         if uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0 {
@@ -694,6 +680,9 @@ struct OverviewView: View {
             isReceiptUploading = false
             isRefreshWithRetryRunning = false
 
+            // Keep period in loadedReceiptPeriods to prevent duplicate loads
+            // The loadReceipts call with reset:true will refresh the data
+
             // Notify other views that share extension sync is complete
             NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
 
@@ -704,105 +693,21 @@ struct OverviewView: View {
 
             // Update refresh time for "Updated X ago" display
             lastRefreshTime = Date()
-
-            // Add haptic feedback
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(dataChanged ? .success : .warning)
         }
-    }
-    
-    private var filterBar: some View {
-        HStack(spacing: 12) {
-            // Sort button
-            Menu {
-                ForEach(SortOption.allCases, id: \.self) { option in
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedSort = option
-                        }
-                    } label: {
-                        HStack {
-                            Text(option.rawValue)
-                            if selectedSort == option {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color(red: 0.0, green: 0.48, blue: 1.0))
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white.opacity(0.1))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                    )
-            }
-            
-            Spacer()
-            
-            // Profile button
-            Menu {
-                // User Email
-                if let user = authManager.user {
-                    Section {
-                        Text(user.email ?? "No email")
-                            .font(.headline)
-                    }
-                }
 
-                // Receipt Upload Limit
-                Section {
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts remaining")
-                            Text(rateLimitManager.resetDaysFormatted)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: receiptLimitIcon)
-                            .foregroundColor(receiptLimitColor)
-                    }
-                }
-
-                // Sign Out
-                Section {
-                    Button(role: .destructive) {
-                        showSignOutConfirmation = true
-                    } label: {
-                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-                }
-            } label: {
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color(red: 0.0, green: 0.48, blue: 1.0))
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white.opacity(0.1))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                    )
-            }
+        // Reload receipts for current month if it's the selected period
+        if selectedPeriod == currentMonthPeriod {
+            await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
         }
-        .padding(.horizontal)
     }
 
     private var swipeableContentView: some View {
         GeometryReader { geometry in
-            let gradientHeight = geometry.size.height * 0.32 + geometry.safeAreaInsets.top // 32% of screen + safe area
+            let gradientHeight = geometry.size.height * 0.38
+            let bottomSafeArea = geometry.safeAreaInsets.bottom
 
             ZStack(alignment: .top) {
-                // Full-screen gradient background that fades from purple to black (like Apple Health)
+                // Background gradient
                 LinearGradient(
                     stops: [
                         .init(color: headerPurpleColor, location: 0.0),
@@ -817,172 +722,28 @@ struct OverviewView: View {
                     endPoint: .bottom
                 )
                 .frame(height: gradientHeight)
-                .offset(y: -scrollOffset * 0.6) // Parallax effect - scrolls away slower
-                .opacity(max(0, 1.0 - scrollOffset / 200)) // Fade as scrolling
+                .offset(y: -scrollOffset * 0.6)
+                .opacity(max(0, 1.0 - scrollOffset / 200))
                 .ignoresSafeArea(edges: .top)
 
-                // Main content
-                ScrollViewReader { scrollProxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 0) {
-                            ForEach(HeaderTab.allCases, id: \.self) { tab in
-                                tabContentView(for: tab, bottomSafeArea: geometry.safeAreaInsets.bottom, screenHeight: geometry.size.height)
-                                    .frame(width: geometry.size.width)
-                                    .id(tab)
-                            }
-                        }
-                        .scrollTargetLayout()
-                    }
-                    .scrollTargetBehavior(.paging)
-                    .scrollPosition(id: Binding(
-                        get: { selectedHeaderTab },
-                        set: { newValue in
-                            if let newValue = newValue {
-                                selectedHeaderTab = newValue
-                            }
-                        }
-                    ))
-                    .onChange(of: selectedHeaderTab) { oldValue, newValue in
-                        // Programmatically scroll when button is tapped with smooth spring animation
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            scrollProxy.scrollTo(newValue, anchor: .center)
-                        }
-                    }
-                }
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    // Fixed period navigation - transparent background, sits on gradient
-                    modernPeriodNavigation
-                        .padding(.bottom, 8)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .background {
-                // Pre-warm adjacent page views to eliminate first-swipe lag
-                if !hasWarmedAdjacentViews && !adjacentPeriodsToWarm.isEmpty {
-                    AdjacentPagesWarmer(
-                        periods: adjacentPeriodsToWarm,
-                        getCachedBreakdowns: getCachedBreakdowns,
-                        healthScoreForPeriod: healthScoreForPeriod,
-                        totalSpendForPeriod: totalSpendForPeriod
-                    )
-                    .task {
-                        try? await Task.sleep(for: .milliseconds(200))
-                        hasWarmedAdjacentViews = true
-                    }
-                }
+                // Main content with vertical scroll
+                mainContentView(bottomSafeArea: bottomSafeArea)
             }
         }
-        .ignoresSafeArea(edges: .bottom) // Allow content to extend behind tab bar
+        .ignoresSafeArea(edges: .bottom)
     }
 
-    // MARK: - Header Purple Color
-    private var headerPurpleColor: Color {
-        Color(red: 0.35, green: 0.10, blue: 0.60) // Deeper, richer purple
-    }
-
-    // MARK: - Background Color
-    private var appBackgroundColor: Color {
-        Color(white: 0.05) // Match scan and milo views - almost black
-    }
-
-    // MARK: - Modern Period Navigation
-    private var modernPeriodNavigation: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                // Previous period button
-                Button {
-                    goToPreviousPeriod()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(canGoToPreviousPeriod ? .white : .white.opacity(0.3))
-                        .frame(width: 44, height: 28)
-                }
-                .disabled(!canGoToPreviousPeriod)
-
-                Spacer()
-
-                // Center: Period display
-                Text(selectedPeriod.uppercased())
-                    .font(.system(size: 16, weight: .bold, design: .default))
-                    .foregroundColor(.white)
-                    .tracking(1.5)
-                    .contentTransition(.interpolate)
-                    .animation(.easeInOut(duration: 0.2), value: selectedPeriod)
-
-                Spacer()
-
-                // Next period button
-                Button {
-                    goToNextPeriod()
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(canGoToNextPeriod ? .white : .white.opacity(0.3))
-                        .frame(width: 44, height: 28)
-                }
-                .disabled(!canGoToNextPeriod)
-            }
-            .padding(.horizontal, 8)
-
-            // Period dots indicator
-            PeriodDotsView(
-                totalCount: availablePeriods.count,
-                currentIndex: currentPeriodIndex
-            )
-        }
-    }
-
-    // MARK: - Header Tab Selector
-    private var headerTabSelector: some View {
-        HStack(spacing: 4) {
-            ForEach(HeaderTab.allCases, id: \.self) { tab in
-                Button {
-                    selectedHeaderTab = tab
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                } label: {
-                    Text(tab.rawValue)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(selectedHeaderTab == tab ? .white : .white.opacity(0.6))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(selectedHeaderTab == tab ? Color.white.opacity(0.2) : Color.clear)
-                        )
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedHeaderTab)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 4)
-        .background(
-            Capsule()
-                .fill(Color.white.opacity(0.1))
-        )
-    }
-
-    // MARK: - Tab Content View (for swipe navigation between tabs)
-    private func tabContentView(for tab: HeaderTab, bottomSafeArea: CGFloat, screenHeight: CGFloat) -> some View {
+    // MARK: - Main Content View
+    private func mainContentView(bottomSafeArea: CGFloat) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
-                // Tab selector scrolls with content
-                headerTabSelector
-                    .padding(.top, 4)
-
-                switch tab {
-                case .overview:
-                    overviewContentForPeriod(selectedPeriod)
-                case .receipts:
-                    receiptsContentForPeriod(selectedPeriod)
-                }
+                overviewContentForPeriod(selectedPeriod)
+                receiptsSection
             }
-            .padding(.top, 8)
-            .padding(.bottom, bottomSafeArea + 90) // Extra padding to clear tab bar
+            .padding(.top, 16)
+            .padding(.bottom, bottomSafeArea + 90)
             .frame(maxWidth: .infinity)
-            .contentShape(Rectangle()) // Ensure entire content area is scrollable
+            .contentShape(Rectangle())
             .background(
                 GeometryReader { proxy in
                     Color.clear
@@ -995,27 +756,102 @@ struct OverviewView: View {
         }
         .coordinateSpace(name: "scrollView")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-            scrollOffset = value
+            if abs(value - scrollOffset) > 2 {
+                scrollOffset = value
+            }
         }
     }
+
+    // MARK: - Header Purple Color
+    private var headerPurpleColor: Color {
+        Color(red: 0.35, green: 0.10, blue: 0.60) // Deeper, richer purple
+    }
+
+    // MARK: - Background Color
+    private var appBackgroundColor: Color {
+        Color(white: 0.05) // Match scan and milo views - almost black
+    }
+
+    // MARK: - Modern Period Navigation (Toolbar version with adjacent periods)
+    private var modernPeriodNavigationToolbar: some View {
+        HStack(spacing: 12) {
+            // Previous period (faded left)
+            if canGoToPreviousPeriod {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        selectedPeriod = availablePeriods[currentPeriodIndex - 1]
+                    }
+                } label: {
+                    Text(shortenedPeriod(availablePeriods[currentPeriodIndex - 1]).uppercased())
+                        .font(.system(size: 11, weight: .medium, design: .default))
+                        .foregroundColor(.white.opacity(0.4))
+                        .tracking(0.8)
+                }
+            }
+
+            // Current period (center pill)
+            Text(selectedPeriod.uppercased())
+                .font(.system(size: 13, weight: .bold, design: .default))
+                .foregroundColor(.white)
+                .tracking(1.5)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.12))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+                .contentTransition(.interpolate)
+                .animation(.easeInOut(duration: 0.25), value: selectedPeriod)
+
+            // Next period (faded right)
+            if canGoToNextPeriod {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        selectedPeriod = availablePeriods[currentPeriodIndex + 1]
+                    }
+                } label: {
+                    Text(shortenedPeriod(availablePeriods[currentPeriodIndex + 1]).uppercased())
+                        .font(.system(size: 11, weight: .medium, design: .default))
+                        .foregroundColor(.white.opacity(0.4))
+                        .tracking(0.8)
+                }
+            }
+        }
+    }
+
+    // Shorten period to "Jan 26" format
+    private func shortenedPeriod(_ period: String) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+
+        guard let date = dateFormatter.date(from: period) else { return period }
+
+        let shortFormatter = DateFormatter()
+        shortFormatter.dateFormat = "MMM yy"
+        shortFormatter.locale = Locale(identifier: "en_US")
+        return shortFormatter.string(from: date)
+    }
+
 
     // MARK: - Overview Content
     private func overviewContentForPeriod(_ period: String) -> some View {
         let breakdowns = getCachedBreakdowns(for: period)
-        let totalReceipts = totalReceiptsForPeriod(period)
         let segments = storeSegmentsForPeriod(period)
 
         // All Overview components fade in together at the same time
         return VStack(spacing: 16) {
-            totalSpendingCardForPeriod(period)
+            spendingAndHealthCardForPeriod(period)
 
-            healthScoreCardForPeriod(period)
-
-            if !breakdowns.isEmpty {
-                // Pie chart showing store breakdown
+            if !segments.isEmpty {
+                // Pie chart showing store breakdown - use cached chart data
                 IconDonutChartView(
-                    data: segments.toIconChartData(),
-                    totalAmount: Double(totalReceipts),
+                    data: chartDataForPeriod(period),
+                    totalAmount: Double(totalReceiptsForPeriod(period)),
                     size: 200,
                     currencySymbol: "",
                     subtitle: "receipts"
@@ -1023,26 +859,36 @@ struct OverviewView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 8)
 
+                // Store rows - use segment.id directly, avoid enumerated()
                 VStack(spacing: 8) {
-                    ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
-                        Button {
-                            if let breakdown = breakdowns.first(where: { $0.storeName == segment.storeName }) {
-                                selectedBreakdown = breakdown
-                            }
-                        } label: {
-                            overviewStoreRow(segment: segment)
-                        }
-                        .buttonStyle(OverviewStoreRowButtonStyle())
+                    ForEach(segments) { segment in
+                        StoreRowButton(
+                            segment: segment,
+                            breakdowns: breakdowns,
+                            onSelect: { selectedBreakdown = $0 }
+                        )
                     }
                 }
                 .padding(.horizontal, 16)
             }
         }
-        .smoothFadeIn(delay: 0.08, period: period)
     }
 
-    // MARK: - Store Segments for Period
+    // MARK: - Store Segments for Period (Cached)
     private func storeSegmentsForPeriod(_ period: String) -> [StoreChartSegment] {
+        // Return cached segments if available
+        if let cached = cachedSegmentsByPeriod[period] {
+            return cached
+        }
+
+        // Compute and cache segments
+        let segments = computeStoreSegments(for: period)
+        // Note: Can't mutate state during render, so we cache in rebuildBreakdownCache
+        return segments
+    }
+
+    /// Compute store segments for a period (expensive - cache result)
+    private func computeStoreSegments(for period: String) -> [StoreChartSegment] {
         let breakdowns = getCachedBreakdowns(for: period)
         let totalSpend = totalSpendForPeriod(period)
 
@@ -1077,88 +923,114 @@ struct OverviewView: View {
         }
     }
 
-    // MARK: - Overview Store Row
-    private func overviewStoreRow(segment: StoreChartSegment) -> some View {
-        HStack {
-            Circle()
-                .fill(segment.color)
-                .frame(width: 10, height: 10)
-
-            Text(segment.storeName.uppercased())
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
-                .lineLimit(1)
-
-            Spacer()
-
-            Text("\(segment.percentage)%")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundColor(.white.opacity(0.5))
-                .frame(width: 40, alignment: .trailing)
-
-            Text(String(format: "€%.0f", segment.amount))
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .frame(width: 60, alignment: .trailing)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.white.opacity(0.3))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+    /// Pre-compute and cache segments for a period (call after rebuilding breakdown cache)
+    private func cacheSegmentsForPeriod(_ period: String) {
+        let segments = computeStoreSegments(for: period)
+        cachedSegmentsByPeriod[period] = segments
+        // Also cache the chart data to avoid recomputing during render
+        cachedChartDataByPeriod[period] = segments.toIconChartData()
     }
 
-    // MARK: - Receipts Content
-    private func receiptsContentForPeriod(_ period: String) -> some View {
-        VStack(spacing: 12) {
-            if receiptsViewModel.state.isLoading && receiptsViewModel.receipts.isEmpty {
-                // Loading state
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
+    /// Get cached chart data for a period
+    private func chartDataForPeriod(_ period: String) -> [ChartData] {
+        if let cached = cachedChartDataByPeriod[period] {
+            return cached
+        }
+        // Fallback: compute from segments (shouldn't happen if caching is working)
+        return storeSegmentsForPeriod(period).toIconChartData()
+    }
 
-                    Text("Loading receipts...")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
+    // MARK: - Receipts Section State
+    private enum ReceiptsSectionState {
+        case loading
+        case empty
+        case hasData
+    }
+
+    private var receiptsSectionState: ReceiptsSectionState {
+        let isLoading = receiptsViewModel.state.isLoading
+        let hasLoadedSuccessfully = receiptsViewModel.state.value != nil
+        let hasError = receiptsViewModel.state.error != nil
+        let hasFinishedLoading = hasLoadedSuccessfully || hasError
+
+        if (isLoading || !hasFinishedLoading) && receiptsViewModel.receipts.isEmpty {
+            return .loading
+        } else if hasFinishedLoading && receiptsViewModel.receipts.isEmpty {
+            return .empty
+        } else {
+            return .hasData
+        }
+    }
+
+    // MARK: - Receipts Section (Modern inline display)
+    private var receiptsSection: some View {
+        VStack(spacing: 16) {
+            // Section header
+            HStack {
+                Text("RECEIPTS")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.white.opacity(0.5))
+                    .tracking(1.5)
+
+                Spacer()
+
+                if !receiptsViewModel.receipts.isEmpty {
+                    Text("\(receiptsViewModel.receipts.count)")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.4))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.1))
+                        )
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 80)
-            } else if receiptsViewModel.receipts.isEmpty {
-                // Empty state
-                VStack(spacing: 16) {
-                    Image(systemName: "doc.text.fill")
-                        .font(.system(size: 48))
-                        .foregroundColor(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 24)
 
-                    Text("No Receipts")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    Text("No receipts found for this period")
-                        .font(.system(size: 14))
+            switch receiptsSectionState {
+            case .loading:
+                // Loading state
+                HStack(spacing: 12) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                        .scaleEffect(0.8)
+                    Text("Loading receipts...")
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 60)
-            } else {
-                // Receipts list - sorted newest to oldest
-                LazyVStack(spacing: 12) {
+                .padding(.vertical, 40)
+
+            case .empty:
+                // Empty state
+                VStack(spacing: 8) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 28))
+                        .foregroundColor(.white.opacity(0.2))
+                    Text("No receipts for this period")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+
+            case .hasData:
+                // Modern receipt cards
+                LazyVStack(spacing: 8) {
                     ForEach(sortedReceipts) { receipt in
-                        ReceiptRowWithDelete(
+                        ModernReceiptCard(
                             receipt: receipt,
+                            isExpanded: expandedReceiptId == receipt.id,
                             onTap: {
-                                selectedReceiptForDetail = receipt
-                                showingReceiptDetail = true
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    if expandedReceiptId == receipt.id {
+                                        expandedReceiptId = nil
+                                    } else {
+                                        expandedReceiptId = receipt.id
+                                    }
+                                }
                             },
                             onDelete: {
                                 withAnimation(.easeInOut(duration: 0.3)) {
@@ -1175,51 +1047,49 @@ struct OverviewView: View {
                     // Load more indicator
                     if receiptsViewModel.hasMorePages {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .padding()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.5)))
+                            .scaleEffect(0.8)
+                            .padding(.vertical, 16)
                             .onAppear {
                                 Task {
-                                    await receiptsViewModel.loadNextPage(period: period, storeName: nil)
+                                    await receiptsViewModel.loadNextPage(period: selectedPeriod, storeName: nil)
                                 }
                             }
                     }
                 }
-                .animation(.easeInOut(duration: 0.3), value: receiptsViewModel.receipts.count)
                 .padding(.horizontal, 16)
             }
         }
-        .smoothFadeIn(delay: 0.1, period: period)
         .overlay {
             if isDeletingReceipt {
                 ZStack {
                     Color.black.opacity(0.4)
                         .ignoresSafeArea()
 
-                    VStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.2)
-
                         Text("Deleting...")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
                     }
-                    .padding(24)
+                    .padding(20)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(white: 0.15))
+                            .fill(Color(white: 0.12))
                     )
                 }
             }
         }
-        .alert("Delete Failed", isPresented: .constant(receiptDeleteError != nil)) {
+        .alert("Delete Failed", isPresented: Binding<Bool>(
+            get: { receiptDeleteError != nil },
+            set: { if !$0 { receiptDeleteError = nil } }
+        )) {
             Button("OK") {
                 receiptDeleteError = nil
             }
         } message: {
-            if let error = receiptDeleteError {
-                Text(error)
-            }
+            Text(receiptDeleteError ?? "An error occurred")
         }
     }
 
@@ -1240,16 +1110,8 @@ struct OverviewView: View {
         Task {
             do {
                 try await receiptsViewModel.deleteReceipt(receipt, period: selectedPeriod, storeName: nil)
-
-                // Haptic feedback for successful deletion
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
             } catch {
                 receiptDeleteError = error.localizedDescription
-
-                // Haptic feedback for failure
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.error)
             }
 
             isDeletingReceipt = false
@@ -1297,17 +1159,22 @@ struct OverviewView: View {
         return dataManager.averageHealthScore
     }
 
-    private func totalSpendingCardForPeriod(_ period: String) -> some View {
+    /// Combined spending and health score card with dynamic color accent
+    private func spendingAndHealthCardForPeriod(_ period: String) -> some View {
         let spending = totalSpendForPeriod(period)
+        let healthScore = healthScoreForPeriod(period)
+        let accentColor = healthScore?.healthScoreColor ?? Color.white.opacity(0.5)
 
-        return Button {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                showTrendlineInOverview.toggle()
-            }
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
-        } label: {
-            Group {
+        return VStack(spacing: 0) {
+            // Main content area
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showTrendlineInOverview.toggle()
+                }
+                if showTrendlineInOverview && !hasFetchedTrends {
+                    Task { await fetchOverviewTrends() }
+                }
+            } label: {
                 if showTrendlineInOverview {
                     // Trendline view
                     VStack(spacing: 8) {
@@ -1317,7 +1184,16 @@ struct OverviewView: View {
                             .textCase(.uppercase)
                             .tracking(1.2)
 
-                        if overviewTrends.isEmpty {
+                        if isLoadingTrends {
+                            VStack(spacing: 8) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                                Text("Loading trends...")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
+                            .frame(height: 160)
+                        } else if overviewTrends.isEmpty {
                             VStack(spacing: 8) {
                                 Image(systemName: "chart.line.uptrend.xyaxis")
                                     .font(.system(size: 32))
@@ -1326,13 +1202,13 @@ struct OverviewView: View {
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(.white.opacity(0.4))
                             }
-                            .frame(height: 180)
+                            .frame(height: 160)
                         } else {
                             StoreTrendLineChart(
                                 trends: overviewTrends,
-                                size: 160,
+                                size: 140,
                                 totalAmount: spending,
-                                accentColor: Color(red: 0.95, green: 0.25, blue: 0.3),
+                                accentColor: accentColor,
                                 selectedPeriod: period,
                                 isVisible: true
                             )
@@ -1349,19 +1225,53 @@ struct OverviewView: View {
                     .padding(.vertical, 16)
                     .frame(maxWidth: .infinity)
                 } else {
-                    // Total spending view
-                    VStack(spacing: 6) {
-                        Text("Total Spending")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .textCase(.uppercase)
-                            .tracking(1.2)
+                    // Total spending view with health score
+                    VStack(spacing: 16) {
+                        // Spending section
+                        VStack(spacing: 4) {
+                            Text("Total Spending")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                                .textCase(.uppercase)
+                                .tracking(1.2)
 
-                        Text(String(format: "€%.0f", spending))
-                            .font(.system(size: 40, weight: .heavy, design: .rounded))
-                            .foregroundColor(.white)
+                            Text(String(format: "€%.0f", spending))
+                                .font(.system(size: 44, weight: .heavy, design: .rounded))
+                                .foregroundColor(.white)
+                        }
 
-                        // Syncing/Synced indicator inline (only show syncing on current period)
+                        // Health score inline - color changes based on score
+                        if let score = healthScore {
+                            HStack(spacing: 12) {
+                                // Health score pill with dynamic color
+                                HStack(spacing: 6) {
+                                    // Animated color dot
+                                    Circle()
+                                        .fill(accentColor)
+                                        .frame(width: 8, height: 8)
+
+                                    Text(score.formattedHealthScore)
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundColor(accentColor)
+
+                                    Text("health")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.5))
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(accentColor.opacity(0.15))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(accentColor.opacity(0.3), lineWidth: 1)
+                                )
+                            }
+                        }
+
+                        // Syncing indicator or tap hint
                         HStack(spacing: 4) {
                             if isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
                                 SyncingArrowsView()
@@ -1376,87 +1286,21 @@ struct OverviewView: View {
                                     .font(.system(size: 12, weight: .medium))
                             }
                         }
-                        .foregroundColor(isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue : .white.opacity(0.5))
+                        .foregroundColor(isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue : .white.opacity(0.4))
                     }
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
                 }
             }
+            .buttonStyle(TotalSpendingCardButtonStyle())
         }
-        .buttonStyle(TotalSpendingCardButtonStyle())
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 24)
                 .fill(Color.white.opacity(0.05))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    private func healthScoreCardForPeriod(_ period: String) -> some View {
-        let averageScore: Double? = healthScoreForPeriod(period)
-
-        return Button {
-            showingHealthScoreTransactions = true
-        } label: {
-            HStack(spacing: 16) {
-                LiquidGaugeView(
-                    score: averageScore,
-                    size: 70,
-                    showLabel: false
-                )
-                .drawingGroup() // Pre-rasterize gauge for smoother rendering
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Health Score")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                        .textCase(.uppercase)
-                        .tracking(1.0)
-
-                    if let score = averageScore {
-                        HStack(spacing: 4) {
-                            Text(score.formattedHealthScore)
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-
-                            Text("/ 5.0")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
-                        }
-
-                        Text(score.healthScoreLabel)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(score.healthScoreColor)
-                            .lineLimit(1)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(score.healthScoreColor.opacity(0.15))
-                            )
-                    } else {
-                        Text("No Data")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-        }
-        .buttonStyle(TotalSpendingCardButtonStyle())
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(accentColor.opacity(0.2), lineWidth: 1)
         )
         .padding(.horizontal, 16)
     }
@@ -1478,8 +1322,6 @@ struct OverviewView: View {
         withAnimation {
             selectedPeriod = availablePeriods[currentPeriodIndex - 1]
         }
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
     }
 
     private func goToNextPeriod() {
@@ -1487,8 +1329,61 @@ struct OverviewView: View {
         withAnimation {
             selectedPeriod = availablePeriods[currentPeriodIndex + 1]
         }
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+    }
+}
+
+// MARK: - Store Row Button (Optimized)
+/// Extracted to its own view for better performance - avoids recreating closures on every render
+private struct StoreRowButton: View {
+    let segment: StoreChartSegment
+    let breakdowns: [StoreBreakdown]
+    let onSelect: (StoreBreakdown) -> Void
+
+    var body: some View {
+        Button {
+            // Find the matching breakdown - O(n) but only on tap, not on render
+            if let breakdown = breakdowns.first(where: { $0.storeName == segment.storeName }) {
+                onSelect(breakdown)
+            }
+        } label: {
+            HStack {
+                Circle()
+                    .fill(segment.color)
+                    .frame(width: 10, height: 10)
+
+                Text(segment.storeName.uppercased())
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Text("\(segment.percentage)%")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.5))
+                    .frame(width: 40, alignment: .trailing)
+
+                Text(String(format: "€%.0f", segment.amount))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: 60, alignment: .trailing)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(OverviewStoreRowButtonStyle())
     }
 }
 
@@ -1550,63 +1445,6 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
-// MARK: - Period-Aware Fade In Modifier
-/// Fade-in animation that plays when view appears OR when period changes.
-struct PeriodFadeInModifier: ViewModifier {
-    let delay: Double
-    let period: String
-    @State private var isVisible = false
-    @State private var animatedPeriod: String = ""
-    @State private var isOnScreen = false
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(isVisible ? 1 : 0)
-            .scaleEffect(isVisible ? 1 : 0.96)
-            .offset(y: isVisible ? 0 : 12)
-            .onChange(of: period) { oldValue, newValue in
-                // Reset and re-animate when period changes while view is on screen
-                isVisible = false
-                animatedPeriod = ""
-                if isOnScreen {
-                    triggerAnimation()
-                }
-            }
-            .onAppear {
-                isOnScreen = true
-                // Animate when view appears on screen with a new period
-                if animatedPeriod != period {
-                    triggerAnimation()
-                }
-            }
-            .onDisappear {
-                isOnScreen = false
-            }
-    }
-
-    private func triggerAnimation() {
-        guard animatedPeriod != period else { return }
-        isVisible = false
-        animatedPeriod = period
-
-        Task {
-            if delay > 0 {
-                try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
-            }
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.85)) {
-                isVisible = true
-            }
-        }
-    }
-}
-
-extension View {
-    /// Period-aware fade-in - resets when period changes, persists during tab swipes
-    func smoothFadeIn(delay: Double = 0, period: String) -> some View {
-        modifier(PeriodFadeInModifier(delay: delay, period: period))
-    }
-}
-
 // MARK: - Animated Number Text
 /// Smoothly animates number changes with a counting effect
 struct AnimatedNumberText: View {
@@ -1631,58 +1469,6 @@ struct AnimatedNumberText: View {
                     displayValue = newValue
                 }
             }
-    }
-}
-
-// MARK: - Adjacent Pages Warmer
-/// Pre-renders chart components for adjacent periods to eliminate first-swipe lag.
-/// This forces SwiftUI to create the view hierarchy and triggers Metal shader compilation
-/// before the user swipes, ensuring smooth page transitions.
-struct AdjacentPagesWarmer: View {
-    let periods: [String]
-    let getCachedBreakdowns: (String) -> [StoreBreakdown]
-    let healthScoreForPeriod: (String) -> Double?
-    let totalSpendForPeriod: (String) -> Double
-
-    var body: some View {
-        // Render chart components at full size but positioned far offscreen
-        // Full size rendering ensures Metal shaders are fully compiled
-        VStack(spacing: 0) {
-            ForEach(periods, id: \.self) { period in
-                let breakdowns = getCachedBreakdowns(period)
-                let healthScore = healthScoreForPeriod(period)
-                let totalSpend = totalSpendForPeriod(period)
-
-                // Pre-render the LiquidGaugeView (health score card)
-                LiquidGaugeView(
-                    score: healthScore,
-                    size: 70,
-                    showLabel: false
-                )
-                .drawingGroup()
-
-                // Pre-render IconDonutChartViews for store cards (limit to first 6 for performance)
-                ForEach(breakdowns.prefix(6)) { breakdown in
-                    let storeColor = Color(red: 0.95, green: 0.25, blue: 0.30) // Modern red
-                    let otherSpend = max(0, totalSpend - breakdown.totalStoreSpend)
-                    let chartData: [ChartData] = [
-                        ChartData(value: breakdown.totalStoreSpend, color: storeColor, label: breakdown.storeName),
-                        ChartData(value: otherSpend, color: Color.white.opacity(0.1), label: "Other")
-                    ]
-
-                    IconDonutChartView(
-                        data: chartData,
-                        totalAmount: breakdown.totalStoreSpend,
-                        size: 84,
-                        currencySymbol: "€"
-                    )
-                    .drawingGroup()
-                }
-            }
-        }
-        .frame(width: UIScreen.main.bounds.width)
-        .offset(x: UIScreen.main.bounds.width * 3) // Position far offscreen to the right
-        .allowsHitTesting(false)
     }
 }
 
@@ -1800,6 +1586,192 @@ struct SyncingArrowsView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .rotationEffect(.degrees(rotation))
         }
+    }
+}
+
+// MARK: - Modern Receipt Card
+/// A compact receipt card that expands inline to show all items
+struct ModernReceiptCard: View {
+    let receipt: APIReceipt
+    let isExpanded: Bool
+    let onTap: () -> Void
+    let onDelete: () -> Void
+
+    @State private var showDeleteConfirmation = false
+
+    private var formattedDate: String {
+        guard let date = receipt.dateParsed else { return receipt.receiptDate ?? "Unknown" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+
+    private var formattedTime: String {
+        guard let date = receipt.dateParsed else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
+
+    private var itemCount: Int {
+        receipt.itemsCount
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Main card content - always visible
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    // Store icon
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 44, height: 44)
+
+                        Image(systemName: "cart.fill")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+
+                    // Store name and date
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(receipt.storeName ?? "Unknown Store")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+
+                        HStack(spacing: 6) {
+                            Text(formattedDate)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+
+                            if !formattedTime.isEmpty {
+                                Text("•")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.white.opacity(0.3))
+                                Text(formattedTime)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                    }
+
+                    Spacer()
+
+                    // Total amount
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(String(format: "€%.2f", receipt.totalAmount ?? 0))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+
+                        Text("\(itemCount) item\(itemCount == 1 ? "" : "s")")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+
+                    // Chevron indicator
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.3))
+                        .frame(width: 20)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(ReceiptCardButtonStyle())
+
+            // Expanded content - show ALL items
+            if isExpanded {
+                VStack(spacing: 0) {
+                    // Divider
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 1)
+                        .padding(.horizontal, 14)
+
+                    // All items
+                    if !receipt.transactions.isEmpty {
+                        VStack(spacing: 6) {
+                            ForEach(receipt.transactions) { item in
+                                HStack {
+                                    Text(item.itemName)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .lineLimit(2)
+
+                                    Spacer()
+
+                                    if item.quantity > 1 {
+                                        Text("×\(item.quantity)")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.4))
+                                    }
+
+                                    Text(String(format: "€%.2f", item.itemPrice))
+                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                    }
+
+                    // Delete button only
+                    Button {
+                        showDeleteConfirmation = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Delete Receipt")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundColor(.red.opacity(0.8))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.red.opacity(0.08))
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.white.opacity(isExpanded ? 0.12 : 0.08), lineWidth: 1)
+        )
+        .confirmationDialog("Delete Receipt", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete this receipt? This action cannot be undone.")
+        }
+    }
+}
+
+// MARK: - Receipt Card Button Style
+struct ReceiptCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.03 : 0))
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 

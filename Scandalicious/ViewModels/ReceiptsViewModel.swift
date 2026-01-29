@@ -44,6 +44,11 @@ class ReceiptsViewModel: ObservableObject {
             filters.storeName = store
         }
 
+        // Log API call
+        let storeInfo = storeName ?? "all stores"
+        let dateRange = formatDateRange(start: startDate, end: endDate)
+        print("📥 GET /receipts - period: \(period), store: \(storeInfo), page: \(currentPage), dates: \(dateRange)")
+
         do {
             let response = try await apiService.fetchReceipts(filters: filters)
 
@@ -57,7 +62,10 @@ class ReceiptsViewModel: ObservableObject {
             hasMorePages = response.page < response.totalPages
             state = .success(receipts)
 
+            print("✅ GET /receipts - returned \(response.receipts.count) receipts (total: \(response.total), page \(response.page)/\(response.totalPages))")
+
         } catch {
+            print("❌ GET /receipts - error: \(error.localizedDescription)")
             state = .error(error.localizedDescription)
         }
     }
@@ -66,16 +74,20 @@ class ReceiptsViewModel: ObservableObject {
     func loadNextPage(period: String, storeName: String? = nil) async {
         guard hasMorePages else { return }
         currentPage += 1
+        print("📄 Loading next page of receipts (page \(currentPage))")
         await loadReceipts(period: period, storeName: storeName, reset: false)
     }
 
     /// Refresh receipts
     func refresh(period: String, storeName: String? = nil) async {
+        print("🔄 Refreshing receipts for \(period)")
         await loadReceipts(period: period, storeName: storeName, reset: true)
     }
 
     /// Delete a receipt by ID and update the list
     func deleteReceipt(_ receipt: APIReceipt, period: String, storeName: String?) async throws {
+        print("🗑️ DELETE /receipts/\(receipt.receiptId) - store: \(receipt.storeName ?? "unknown")")
+
         // Delete from server
         try await apiService.removeReceipt(receiptId: receipt.receiptId)
 
@@ -83,6 +95,8 @@ class ReceiptsViewModel: ObservableObject {
         objectWillChange.send()
         receipts.removeAll { $0.receiptId == receipt.receiptId }
         state = .success(receipts)
+
+        print("✅ Receipt deleted, remaining: \(receipts.count)")
 
         // Notify other views to refresh their data
         NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
@@ -97,6 +111,7 @@ class ReceiptsViewModel: ObservableObject {
         dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
 
         guard let date = dateFormatter.date(from: period) else {
+            print("⚠️ Failed to parse period '\(period)' - expected format 'MMMM yyyy'")
             return (nil, nil)
         }
 
@@ -112,5 +127,13 @@ class ReceiptsViewModel: ObservableObject {
         let endOfMonth = calendar.date(byAdding: endComponents, to: startOfMonth ?? date)
 
         return (startOfMonth, endOfMonth)
+    }
+
+    private func formatDateRange(start: Date?, end: Date?) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let startStr = start.map { formatter.string(from: $0) } ?? "nil"
+        let endStr = end.map { formatter.string(from: $0) } ?? "nil"
+        return "\(startStr) to \(endStr)"
     }
 }
