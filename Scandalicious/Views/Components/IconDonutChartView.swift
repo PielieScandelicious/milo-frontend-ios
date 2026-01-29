@@ -38,7 +38,7 @@ struct IconDonutChartView: View {
     /// Stroke width as proportion of size (thicker pills)
     private let strokeWidthRatio: CGFloat = 0.12
 
-    @State private var animationProgress: CGFloat = 0
+    @State private var animationTrigger: Bool = false
 
     /// Unique identifier to track data changes and trigger re-animation
     private var dataFingerprint: String {
@@ -119,45 +119,40 @@ struct IconDonutChartView: View {
 
     var body: some View {
         ZStack {
-            // Background circle (subtle)
-            Circle()
-                .stroke(Color.white.opacity(0.08), lineWidth: strokeWidth)
-                .frame(width: size - strokeWidth, height: size - strokeWidth)
-
-            // Donut segments with pill-shaped ends
-            ForEach(segments) { segment in
-                DonutArcSegment(
-                    startAngle: .degrees(segment.startAngle),
-                    endAngle: .degrees(segment.endAngle),
+            // Donut segments - each appears one by one with staggered animation
+            ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
+                ExpandingArcSegment(
+                    startAngle: segment.startAngle,
+                    endAngle: segment.endAngle,
                     color: segment.data.color,
                     lineWidth: strokeWidth,
-                    animationProgress: animationProgress
+                    frameSize: size - strokeWidth,
+                    index: index,
+                    isAnimating: animationTrigger
                 )
-                .frame(width: size - strokeWidth, height: size - strokeWidth)
             }
 
-            // Center content
+            // Center content (doesn't scale - stays in place)
             centerContent
         }
         .frame(width: size, height: size)
         .onAppear {
-            // Skip animation for small charts (store cards) to improve swipe performance
             if shouldAnimate {
-                withAnimation(.spring(response: 1.2, dampingFraction: 0.75)) {
-                    animationProgress = 1.0
+                // Trigger animation on appear
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    animationTrigger = true
                 }
             } else {
-                // Instant display for small charts
-                animationProgress = 1.0
+                animationTrigger = true
             }
         }
         .onChange(of: dataFingerprint) { _, _ in
             // Re-animate when data changes (e.g., period switch)
             if shouldAnimate {
-                // Reset progress and animate clockwise (slower, more satisfying sweep)
-                animationProgress = 0
-                withAnimation(.spring(response: 1.6, dampingFraction: 0.85)) {
-                    animationProgress = 1.0
+                // Reset and re-trigger animation
+                animationTrigger = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    animationTrigger = true
                 }
             }
         }
@@ -213,7 +208,72 @@ private struct SegmentInfo: Identifiable {
     let midAngle: Double
 }
 
-// MARK: - Donut Arc Segment
+// MARK: - Expanding Arc Segment (with staggered animation)
+
+private struct ExpandingArcSegment: View {
+    let startAngle: Double
+    let endAngle: Double
+    let color: Color
+    let lineWidth: CGFloat
+    let frameSize: CGFloat
+    let index: Int
+    let isAnimating: Bool
+
+    @State private var scale: CGFloat = 0.3
+    @State private var progress: CGFloat = 0
+    @State private var opacity: CGFloat = 0
+
+    private var delay: Double {
+        Double(index) * 0.15 // Stagger delay per segment
+    }
+
+    var body: some View {
+        let startFraction = startAngle / 360.0
+        let endFraction = endAngle / 360.0
+        let animatedEndFraction = startFraction + (endFraction - startFraction) * progress
+
+        Circle()
+            .trim(from: startFraction, to: animatedEndFraction)
+            .stroke(
+                color,
+                style: StrokeStyle(
+                    lineWidth: lineWidth,
+                    lineCap: .round
+                )
+            )
+            .frame(width: frameSize, height: frameSize)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .rotationEffect(.degrees(-90)) // Start from top
+            .onChange(of: isAnimating) { _, newValue in
+                if newValue {
+                    // Animate in with delay
+                    withAnimation(Animation.spring(response: 0.7, dampingFraction: 0.75).delay(delay)) {
+                        scale = 1.0
+                        progress = 1.0
+                        opacity = 1.0
+                    }
+                } else {
+                    // Reset immediately without animation
+                    scale = 0.3
+                    progress = 0
+                    opacity = 0
+                }
+            }
+            .onAppear {
+                if isAnimating {
+                    // If already animating on appear, trigger animation
+                    withAnimation(Animation.spring(response: 0.7, dampingFraction: 0.75).delay(delay)) {
+                        scale = 1.0
+                        progress = 1.0
+                        opacity = 1.0
+                    }
+                }
+            }
+    }
+}
+
+// MARK: - Donut Arc Segment (legacy, kept for reference)
 
 private struct DonutArcSegment: View {
     let startAngle: Angle
@@ -233,7 +293,7 @@ private struct DonutArcSegment: View {
                 color,
                 style: StrokeStyle(
                     lineWidth: lineWidth,
-                    lineCap: .round // Double-sided pill-shaped rounded ends
+                    lineCap: .round
                 )
             )
             .rotationEffect(.degrees(-90)) // Start from top

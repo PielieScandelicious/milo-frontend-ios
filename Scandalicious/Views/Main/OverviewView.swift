@@ -904,8 +904,8 @@ struct OverviewView: View {
                         .opacity(storeRowsAppeared ? 1 : 0)
                         .offset(y: storeRowsAppeared ? 0 : 15)
                         .animation(
-                            .spring(response: 0.5, dampingFraction: 0.8)
-                            .delay(Double(index) * 0.08),
+                            Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                .delay(Double(index) * 0.08),
                             value: storeRowsAppeared
                         )
                     }
@@ -1387,8 +1387,7 @@ struct OverviewView: View {
 
 // MARK: - Store Row Button (Optimized)
 /// Extracted to its own view for better performance - avoids recreating closures on every render
-private struct
-StoreRowButton: View {
+private struct StoreRowButton: View {
     let segment: StoreChartSegment
     let breakdowns: [StoreBreakdown]
     let onSelect: (StoreBreakdown) -> Void
