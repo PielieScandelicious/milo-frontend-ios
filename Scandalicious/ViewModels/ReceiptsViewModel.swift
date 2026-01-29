@@ -24,6 +24,8 @@ class ReceiptsViewModel: ObservableObject {
 
     /// Load receipts for a given period and optional store filter
     func loadReceipts(period: String, storeName: String? = nil, reset: Bool = true) async {
+        print("🧾 ReceiptsViewModel.loadReceipts: START for period '\(period)', reset: \(reset)")
+
         if reset {
             state = .loading
             receipts = []
@@ -32,6 +34,7 @@ class ReceiptsViewModel: ObservableObject {
 
         // Parse period to get date range
         let (startDate, endDate) = parsePeriod(period)
+        print("🧾 ReceiptsViewModel.loadReceipts: parsed dates - start: \(String(describing: startDate)), end: \(String(describing: endDate))")
 
         // Configure filters
         filters = ReceiptFilters()
@@ -44,8 +47,10 @@ class ReceiptsViewModel: ObservableObject {
             filters.storeName = store
         }
 
+        print("🧾 ReceiptsViewModel.loadReceipts: calling API...")
         do {
             let response = try await apiService.fetchReceipts(filters: filters)
+            print("🧾 ReceiptsViewModel.loadReceipts: API returned \(response.receipts.count) receipts")
 
             if reset {
                 receipts = response.receipts
@@ -56,8 +61,10 @@ class ReceiptsViewModel: ObservableObject {
             totalPages = response.totalPages
             hasMorePages = response.page < response.totalPages
             state = .success(receipts)
+            print("🧾 ReceiptsViewModel.loadReceipts: SUCCESS, total receipts: \(receipts.count)")
 
         } catch {
+            print("🧾 ReceiptsViewModel.loadReceipts: ERROR - \(error.localizedDescription)")
             state = .error(error.localizedDescription)
         }
     }
@@ -91,14 +98,19 @@ class ReceiptsViewModel: ObservableObject {
     // MARK: - Private Helpers
 
     private func parsePeriod(_ period: String) -> (Date?, Date?) {
+        print("🧾 parsePeriod: input period = '\(period)'")
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
 
         guard let date = dateFormatter.date(from: period) else {
+            print("🧾 parsePeriod: FAILED to parse '\(period)' with format 'MMMM yyyy'")
             return (nil, nil)
         }
+
+        print("🧾 parsePeriod: parsed date = \(date)")
 
         // Use UTC calendar to avoid timezone issues
         var calendar = Calendar(identifier: .gregorian)
@@ -111,6 +123,7 @@ class ReceiptsViewModel: ObservableObject {
         endComponents.second = -1
         let endOfMonth = calendar.date(byAdding: endComponents, to: startOfMonth ?? date)
 
+        print("🧾 parsePeriod: startOfMonth = \(String(describing: startOfMonth)), endOfMonth = \(String(describing: endOfMonth))")
         return (startOfMonth, endOfMonth)
     }
 }
