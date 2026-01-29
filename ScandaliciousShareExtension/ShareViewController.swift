@@ -301,7 +301,9 @@ class ShareViewController: UIViewController {
         // 5. Try common image UTIs directly
         else if itemProvider.hasItemConformingToTypeIdentifier("public.jpeg") ||
                 itemProvider.hasItemConformingToTypeIdentifier("public.png") ||
-                itemProvider.hasItemConformingToTypeIdentifier("public.heic") {
+                itemProvider.hasItemConformingToTypeIdentifier("public.heic") ||
+                itemProvider.hasItemConformingToTypeIdentifier("org.webmproject.webp") ||
+                itemProvider.hasItemConformingToTypeIdentifier("public.webp") {
             print("✅ Found specific image format, loading...")
             loadImageFromProvider(itemProvider)
         }
@@ -310,9 +312,13 @@ class ShareViewController: UIViewController {
             print("✅ Found UTType.data, attempting to load as image...")
             loadDataAsImage(itemProvider)
         }
+        // 7. Try to load whatever type is available as a file
+        else if let firstType = itemProvider.registeredTypeIdentifiers.first {
+            print("🔄 Trying to load '\(firstType)' as generic content...")
+            loadGenericContent(itemProvider, typeIdentifier: firstType)
+        }
         else {
-            let types = itemProvider.registeredTypeIdentifiers.joined(separator: ", ")
-            updateStatus(error: "Unsupported content type. Found: \(types)")
+            updateStatus(error: "No supported content found.\n\nSupported: images (JPG, PNG, HEIC, WebP, etc.) and PDF")
         }
     }
     
@@ -356,21 +362,44 @@ class ShareViewController: UIViewController {
     private func loadPDFFromProvider(_ itemProvider: NSItemProvider) {
         itemProvider.loadItem(forTypeIdentifier: UTType.pdf.identifier, options: nil) { [weak self] (item, error) in
             guard let self = self else { return }
-            
+
             if let error = error {
+                print("❌ Failed to load PDF: \(error)")
                 self.updateStatus(error: "Failed to load PDF: \(error.localizedDescription)")
                 return
             }
-            
-            guard let url = item as? URL else {
-                self.updateStatus(error: "Could not load PDF from file")
+
+            print("📄 PDF item type: \(type(of: item))")
+
+            // Handle PDF provided as URL
+            if let url = item as? URL {
+                print("📄 PDF provided as URL: \(url)")
+                Task {
+                    await self.uploadPDFReceipt(from: url)
+                }
                 return
             }
-            
-            // Upload PDF directly without conversion
-            Task {
-                await self.uploadPDFReceipt(from: url)
+
+            // Handle PDF provided as Data
+            if let pdfData = item as? Data {
+                print("📄 PDF provided as Data: \(pdfData.count) bytes")
+                // Save to temp file and upload
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("receipt_\(UUID().uuidString).pdf")
+                do {
+                    try pdfData.write(to: tempURL)
+                    Task {
+                        await self.uploadPDFReceipt(from: tempURL)
+                    }
+                } catch {
+                    print("❌ Failed to write temp PDF: \(error)")
+                    self.updateStatus(error: "Could not save PDF file")
+                }
+                return
             }
+
+            // Unknown format
+            print("❌ PDF provided in unknown format: \(type(of: item))")
+            self.updateStatus(error: "Could not load PDF from file")
         }
     }
     
@@ -427,22 +456,21 @@ class ShareViewController: UIViewController {
             print("📂 File URL: \(fileURL)")
             print("📂 Path extension: \(fileURL.pathExtension)")
             
-            // Check if it's an image file
-            let imageExtensions = ["jpg", "jpeg", "png", "heic", "heif", "gif", "bmp", "tiff", "tif"]
+            // Check file type and handle accordingly
             let pathExtension = fileURL.pathExtension.lowercased()
-            
+
+            // Supported image extensions (all formats UIImage can handle)
+            let imageExtensions = [
+                "jpg", "jpeg", "png", "heic", "heif", "gif", "bmp", "tiff", "tif",
+                "webp",           // WebP images
+                "ico",            // Icon files
+                "dng", "cr2", "nef", "arw", "orf", "rw2",  // RAW camera formats
+                "svg"             // SVG (limited support via UIImage)
+            ]
+
             if imageExtensions.contains(pathExtension) {
                 // Try to load as image
-                if let data = try? Data(contentsOf: fileURL),
-                   let image = UIImage(data: data) {
-                    print("✅ Loaded image from file URL")
-                    Task {
-                        await self.saveReceiptImage(image)
-                    }
-                } else {
-                    print("❌ Could not create image from file data")
-                    self.updateStatus(error: "Could not load image from file")
-                }
+                self.loadImageFromFileURL(fileURL)
             } else if pathExtension == "pdf" {
                 // Upload PDF directly without conversion
                 print("📄 Uploading PDF directly...")
@@ -450,8 +478,9 @@ class ShareViewController: UIViewController {
                     await self.uploadPDFReceipt(from: fileURL)
                 }
             } else {
-                print("❌ Unsupported file type: \(pathExtension)")
-                self.updateStatus(error: "Unsupported file type: .\(pathExtension)")
+                // For unknown extensions, try to load as image first (many image formats work)
+                print("🔄 Unknown extension '.\(pathExtension)', attempting to load as image...")
+                self.loadImageFromFileURL(fileURL, fallbackToPDF: true)
             }
         }
     }
@@ -560,6 +589,114 @@ class ShareViewController: UIViewController {
         }
     }
     
+    // MARK: - Load Generic Content (fallback for unknown types)
+    private func loadGenericContent(_ itemProvider: NSItemProvider, typeIdentifier: String) {
+        itemProvider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) { [weak self] (item, error) in
+            guard let self = self else { return }
+
+            if let error = error {
+                print("❌ Failed to load generic content: \(error)")
+                self.updateStatus(error: "Could not load file.\n\nSupported: images and PDF")
+                return
+            }
+
+            // Try to extract data from the item
+            var data: Data?
+
+            if let url = item as? URL {
+                print("📂 Generic content is a URL: \(url)")
+                data = try? Data(contentsOf: url)
+
+                // Also try loading directly via the file URL handler
+                if url.isFileURL {
+                    self.loadImageFromFileURL(url, fallbackToPDF: true)
+                    return
+                }
+            } else if let itemData = item as? Data {
+                print("📦 Generic content is Data: \(itemData.count) bytes")
+                data = itemData
+            } else if let image = item as? UIImage {
+                print("🖼️ Generic content is UIImage")
+                Task {
+                    await self.saveReceiptImage(image)
+                }
+                return
+            }
+
+            // Try to create image from data
+            if let data = data {
+                if let image = UIImage(data: data) {
+                    print("✅ Created image from generic data")
+                    Task {
+                        await self.saveReceiptImage(image)
+                    }
+                    return
+                }
+
+                // Check if it's a PDF
+                if data.count >= 4 {
+                    let header = data.prefix(4)
+                    if header.elementsEqual([0x25, 0x50, 0x44, 0x46]) {  // %PDF
+                        print("✅ Detected PDF from generic data")
+                        // Save to temp file and upload
+                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("receipt_\(UUID().uuidString).pdf")
+                        do {
+                            try data.write(to: tempURL)
+                            Task {
+                                await self.uploadPDFReceipt(from: tempURL)
+                            }
+                            return
+                        } catch {
+                            print("❌ Failed to write temp PDF: \(error)")
+                        }
+                    }
+                }
+            }
+
+            // If we got here, we couldn't handle the content
+            print("❌ Could not interpret generic content as image or PDF")
+            self.updateStatus(error: "Unsupported file type.\n\nSupported: images (JPG, PNG, HEIC, WebP, etc.) and PDF")
+        }
+    }
+
+    // MARK: - Load Image from File URL
+    private func loadImageFromFileURL(_ fileURL: URL, fallbackToPDF: Bool = false) {
+        // Try to load as image
+        if let data = try? Data(contentsOf: fileURL),
+           let image = UIImage(data: data) {
+            print("✅ Loaded image from file URL")
+            Task {
+                await self.saveReceiptImage(image)
+            }
+            return
+        }
+
+        // If image loading failed and fallback is enabled, try PDF
+        if fallbackToPDF {
+            print("🔄 Image loading failed, trying as PDF...")
+            if let pdfData = try? Data(contentsOf: fileURL),
+               pdfData.count >= 4 {
+                // Check for PDF magic bytes (%PDF)
+                let header = pdfData.prefix(4)
+                if header.elementsEqual([0x25, 0x50, 0x44, 0x46]) {  // %PDF
+                    print("✅ Detected PDF file by magic bytes")
+                    Task {
+                        await self.uploadPDFReceipt(from: fileURL)
+                    }
+                    return
+                }
+            }
+
+            // Neither image nor PDF worked
+            let ext = fileURL.pathExtension.lowercased()
+            print("❌ Could not load file as image or PDF: \(ext)")
+            self.updateStatus(error: "Unsupported file type: .\(ext)\n\nSupported: images (JPG, PNG, HEIC, WebP, etc.) and PDF")
+        } else {
+            print("❌ Could not create image from file data")
+            self.updateStatus(error: "Could not load image from file")
+        }
+    }
+
     private func convertPDFToImage(url: URL) -> UIImage? {
         print("📄 Converting PDF at: \(url.path)")
         

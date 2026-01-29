@@ -235,13 +235,34 @@ struct OverviewView: View {
     // MARK: - Extracted Body Components
 
     private var mainBodyContent: some View {
-        ZStack {
-            appBackgroundColor.ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                // Base background
+                appBackgroundColor.ignoresSafeArea()
 
-            if let error = dataManager.error {
-                errorStateView(error: error)
-            } else {
-                swipeableContentView
+                // Purple gradient - strictly in background, fades on scroll
+                LinearGradient(
+                    stops: [
+                        .init(color: headerPurpleColor, location: 0.0),
+                        .init(color: headerPurpleColor.opacity(0.7), location: 0.25),
+                        .init(color: headerPurpleColor.opacity(0.3), location: 0.5),
+                        .init(color: Color.clear, location: 0.75)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: geometry.size.height * 0.45)
+                .frame(maxWidth: .infinity)
+                .opacity(purpleGradientOpacity)
+                .animation(.linear(duration: 0.1), value: scrollOffset)
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(false)
+
+                if let error = dataManager.error {
+                    errorStateView(error: error)
+                } else {
+                    swipeableContentView
+                }
             }
         }
     }
@@ -705,34 +726,27 @@ struct OverviewView: View {
 
     private var swipeableContentView: some View {
         GeometryReader { geometry in
-            let gradientHeight = geometry.size.height * 0.38
             let bottomSafeArea = geometry.safeAreaInsets.bottom
 
-            ZStack(alignment: .top) {
-                // Background gradient
-                LinearGradient(
-                    stops: [
-                        .init(color: headerPurpleColor, location: 0.0),
-                        .init(color: headerPurpleColor.opacity(0.85), location: 0.12),
-                        .init(color: headerPurpleColor.opacity(0.6), location: 0.25),
-                        .init(color: headerPurpleColor.opacity(0.35), location: 0.4),
-                        .init(color: headerPurpleColor.opacity(0.15), location: 0.55),
-                        .init(color: headerPurpleColor.opacity(0.05), location: 0.7),
-                        .init(color: appBackgroundColor, location: 0.85)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: gradientHeight)
-                .offset(y: -scrollOffset * 0.6)
-                .opacity(max(0, 1.0 - scrollOffset / 200))
-                .ignoresSafeArea(edges: .top)
-
-                // Main content with vertical scroll
-                mainContentView(bottomSafeArea: bottomSafeArea)
-            }
+            // Main content with vertical scroll
+            mainContentView(bottomSafeArea: bottomSafeArea)
         }
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    // Computed property for smooth gradient fade based on scroll
+    private var purpleGradientOpacity: Double {
+        // Start fading immediately, fully gone by 200px scroll
+        let fadeEnd: CGFloat = 200
+
+        if scrollOffset <= 0 {
+            return 1.0
+        } else if scrollOffset >= fadeEnd {
+            return 0.0
+        } else {
+            // Linear fade for predictable behavior
+            return Double(1.0 - (scrollOffset / fadeEnd))
+        }
     }
 
     /// Swipe gesture for navigating between periods
@@ -782,9 +796,7 @@ struct OverviewView: View {
         }
         .coordinateSpace(name: "scrollView")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-            if abs(value - scrollOffset) > 2 {
-                scrollOffset = value
-            }
+            scrollOffset = max(0, value)
         }
     }
 
@@ -1442,16 +1454,16 @@ struct OverviewView: View {
         }
         .background(
             ZStack {
-                // Base layer - darker for depth
+                // Solid base layer - opaque dark background to block purple gradient
                 RoundedRectangle(cornerRadius: 28)
-                    .fill(Color.white.opacity(0.03))
+                    .fill(Color(white: 0.08))
 
-                // Gradient overlay for glass effect
+                // Subtle gradient overlay for glass effect
                 RoundedRectangle(cornerRadius: 28)
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.08),
+                                Color.white.opacity(0.06),
                                 Color.white.opacity(0.02)
                             ],
                             startPoint: .topLeading,
@@ -1464,7 +1476,7 @@ struct OverviewView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.1),
+                                Color.white.opacity(0.08),
                                 Color.clear
                             ],
                             startPoint: .top,
