@@ -35,10 +35,16 @@ struct IconDonutChartView: View {
 
     /// Visual gap between segments in degrees (the actual empty space you see)
     private let visualGapDegrees: Double = 4.0
-    /// Stroke width as proportion of size (thicker pills)
-    private let strokeWidthRatio: CGFloat = 0.12
+    /// Stroke width as proportion of size
+    private let strokeWidthRatio: CGFloat = 0.08
 
-    @State private var animationProgress: CGFloat = 0
+    @State private var globalScale: CGFloat = 0.6
+    @State private var globalRotation: Double = -90 // Quarter turn back
+
+    /// Unique identifier to track data changes and trigger re-animation
+    private var dataFingerprint: String {
+        data.map { "\($0.value)" }.joined(separator: "-")
+    }
 
     /// Skip animation for small charts (store cards) to improve swipe performance
     private var shouldAnimate: Bool {
@@ -114,36 +120,55 @@ struct IconDonutChartView: View {
 
     var body: some View {
         ZStack {
-            // Background circle (subtle)
-            Circle()
-                .stroke(Color.white.opacity(0.08), lineWidth: strokeWidth)
-                .frame(width: size - strokeWidth, height: size - strokeWidth)
-
-            // Donut segments with pill-shaped ends
-            ForEach(segments) { segment in
-                DonutArcSegment(
-                    startAngle: .degrees(segment.startAngle),
-                    endAngle: .degrees(segment.endAngle),
-                    color: segment.data.color,
-                    lineWidth: strokeWidth,
-                    animationProgress: animationProgress
-                )
-                .frame(width: size - strokeWidth, height: size - strokeWidth)
+            // All segments visible, rotate and scale together
+            ZStack {
+                ForEach(segments) { segment in
+                    Circle()
+                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                        .stroke(
+                            segment.data.color,
+                            style: StrokeStyle(
+                                lineWidth: strokeWidth,
+                                lineCap: .round
+                            )
+                        )
+                        .frame(width: size - strokeWidth, height: size - strokeWidth)
+                }
             }
+            .scaleEffect(globalScale)
+            .rotationEffect(.degrees(-90 + globalRotation)) // -90 starts from top
 
-            // Center content
+            // Center content (doesn't scale - stays in place)
             centerContent
         }
         .frame(width: size, height: size)
         .onAppear {
-            // Skip animation for small charts (store cards) to improve swipe performance
             if shouldAnimate {
-                withAnimation(.spring(response: 1.2, dampingFraction: 0.75)) {
-                    animationProgress = 1.0
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+                        globalScale = 1.0
+                        globalRotation = 0
+                    }
                 }
             } else {
-                // Instant display for small charts
-                animationProgress = 1.0
+                globalScale = 1.0
+                globalRotation = 0
+            }
+        }
+        .onChange(of: dataFingerprint) { _, _ in
+            // Re-animate when data changes (e.g., period switch)
+            if shouldAnimate {
+                // Reset to starting position
+                globalScale = 0.6
+                globalRotation = -90
+
+                // Expand and rotate to final position
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+                        globalScale = 1.0
+                        globalRotation = 0
+                    }
+                }
             }
         }
     }
@@ -157,6 +182,8 @@ struct IconDonutChartView: View {
                 .foregroundColor(.white)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: formattedTotal)
 
             if let subtitle = subtitle, !subtitle.isEmpty {
                 Text(subtitleText)
@@ -196,32 +223,6 @@ private struct SegmentInfo: Identifiable {
     let midAngle: Double
 }
 
-// MARK: - Donut Arc Segment
-
-private struct DonutArcSegment: View {
-    let startAngle: Angle
-    let endAngle: Angle
-    let color: Color
-    let lineWidth: CGFloat
-    let animationProgress: CGFloat
-
-    var body: some View {
-        let startFraction = startAngle.degrees / 360.0
-        let endFraction = endAngle.degrees / 360.0
-        let animatedEndFraction = startFraction + (endFraction - startFraction) * animationProgress
-
-        Circle()
-            .trim(from: startFraction, to: animatedEndFraction)
-            .stroke(
-                color,
-                style: StrokeStyle(
-                    lineWidth: lineWidth,
-                    lineCap: .round // Double-sided pill-shaped rounded ends
-                )
-            )
-            .rotationEffect(.degrees(-90)) // Start from top
-    }
-}
 
 // MARK: - Preview
 
