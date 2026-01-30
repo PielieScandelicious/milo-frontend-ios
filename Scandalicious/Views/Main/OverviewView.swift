@@ -246,33 +246,37 @@ struct OverviewView: View {
     private var mainBodyContent: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
-                // Base background
-                appBackgroundColor.ignoresSafeArea()
-
-                // Purple gradient - strictly in background, fades on scroll
-                LinearGradient(
-                    stops: [
-                        .init(color: headerPurpleColor, location: 0.0),
-                        .init(color: headerPurpleColor.opacity(0.7), location: 0.25),
-                        .init(color: headerPurpleColor.opacity(0.3), location: 0.5),
-                        .init(color: Color.clear, location: 0.75)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: geometry.size.height * 0.45)
-                .frame(maxWidth: .infinity)
-                .opacity(purpleGradientOpacity)
-                .animation(.linear(duration: 0.1), value: scrollOffset)
-                .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(false)
-
                 if let error = dataManager.error {
                     errorStateView(error: error)
                 } else {
                     swipeableContentView
                 }
             }
+            .background(
+                ZStack(alignment: .top) {
+                    // Base background
+                    appBackgroundColor
+
+                    // Purple gradient - strictly in background, fades on scroll
+                    LinearGradient(
+                        stops: [
+                            .init(color: headerPurpleColor, location: 0.0),
+                            .init(color: headerPurpleColor.opacity(0.7), location: 0.25),
+                            .init(color: headerPurpleColor.opacity(0.3), location: 0.5),
+                            .init(color: Color.clear, location: 0.75)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
+                    .frame(maxWidth: .infinity)
+                    .offset(y: -geometry.safeAreaInsets.top)
+                    .opacity(purpleGradientOpacity)
+                    .animation(.linear(duration: 0.1), value: scrollOffset)
+                    .allowsHitTesting(false)
+                }
+                .ignoresSafeArea()
+            )
         }
     }
 
