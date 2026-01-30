@@ -89,6 +89,10 @@ struct DateRange {
             let adjustedStart = calendar.date(byAdding: .month, value: offset, to: startOfMonth) ?? startOfMonth
             let end = calendar.date(byAdding: .month, value: 1, to: adjustedStart)?.addingTimeInterval(-1) ?? adjustedStart
             return DateRange(start: adjustedStart, end: end)
+
+        case .all:
+            // "All" periods span from distant past to today
+            return DateRange(start: Date.distantPast, end: today)
         }
     }
     

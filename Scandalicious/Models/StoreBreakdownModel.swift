@@ -141,6 +141,9 @@ class StoreDataManager: ObservableObject {
                 case .custom:
                     // Custom requires explicit dates, fall back to current month
                     filters = .thisMonth
+                case .all:
+                    // All time - no date filtering
+                    filters = AnalyticsFilters()
                 }
             }
             
@@ -863,6 +866,10 @@ class StoreDataManager: ObservableObject {
             let startOfMonth = calendar.date(from: components)!
             let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
             return (outputFormatter.string(from: startOfMonth), outputFormatter.string(from: endOfMonth))
+
+        case .all:
+            // All time - return a very wide date range
+            return ("1900-01-01", outputFormatter.string(from: Date()))
         }
     }
 

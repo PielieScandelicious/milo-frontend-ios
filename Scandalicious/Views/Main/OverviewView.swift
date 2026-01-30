@@ -79,6 +79,9 @@ struct OverviewView: View {
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
     @State private var storeRowsAppeared = false // Track staggered animation state
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
+    @State private var allTimeTotalSpend: Double = 0 // Cached all-time total spend from backend
+    @State private var allTimeTotalReceipts: Int = 0 // Cached all-time receipt count from backend
+    @State private var allTimeHealthScore: Double? = nil // Cached all-time health score from backend
     @Binding var showSignOutConfirmation: Bool
 
     // Entrance animation states
@@ -105,36 +108,51 @@ struct OverviewView: View {
         return [selectedPeriod]
     }
 
+    /// Special constant for the "All" period
+    private static let allPeriodIdentifier = "All"
+
+    /// Check if a period is the "All" period
+    private func isAllPeriod(_ period: String) -> Bool {
+        return period == Self.allPeriodIdentifier
+    }
+
     /// Compute available periods from data manager - called once when data changes
     private func computeAvailablePeriods() -> [String] {
+        var periods: [String] = []
+
         // Use period metadata if available (from lightweight /analytics/periods endpoint)
         if !dataManager.periodMetadata.isEmpty {
             // Period metadata is already sorted by backend (most recent first)
             // Reverse to get oldest first (left), most recent last (right) for swipe UX
-            return Array(dataManager.periodMetadata.map { $0.period }.reversed())
-        }
+            periods = Array(dataManager.periodMetadata.map { $0.period }.reversed())
+        } else {
+            // Fallback: Use breakdowns if metadata not loaded yet
+            let breakdownPeriods = Array(dataManager.breakdownsByPeriod().keys)
 
-        // Fallback: Use breakdowns if metadata not loaded yet
-        let periods = Array(dataManager.breakdownsByPeriod().keys)
+            // If no periods with data, show only the current month (empty state)
+            if breakdownPeriods.isEmpty {
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "MMMM yyyy"
+                dateFormatter.locale = Locale(identifier: "en_US")
+                return [dateFormatter.string(from: Date()), Self.allPeriodIdentifier]
+            }
 
-        // If no periods with data, show only the current month (empty state)
-        if periods.isEmpty {
+            // Sort periods chronologically (oldest first, most recent last/right)
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "MMMM yyyy"
             dateFormatter.locale = Locale(identifier: "en_US")
-            return [dateFormatter.string(from: Date())]
+
+            periods = breakdownPeriods.sorted { period1, period2 in
+                let date1 = dateFormatter.date(from: period1) ?? Date.distantPast
+                let date2 = dateFormatter.date(from: period2) ?? Date.distantPast
+                return date1 < date2  // Oldest first (left), most recent last (right)
+            }
         }
 
-        // Sort periods chronologically (oldest first, most recent last/right)
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
+        // Append "All" at the end (rightmost position)
+        periods.append(Self.allPeriodIdentifier)
 
-        return periods.sorted { period1, period2 in
-            let date1 = dateFormatter.date(from: period1) ?? Date.distantPast
-            let date2 = dateFormatter.date(from: period2) ?? Date.distantPast
-            return date1 < date2  // Oldest first (left), most recent last (right)
-        }
+        return periods
     }
 
     /// Update the cached available periods
@@ -157,6 +175,10 @@ struct OverviewView: View {
     /// Get cached breakdowns for a specific period
     /// This avoids recalculating on every render and ensures correct data per period
     private func getCachedBreakdowns(for period: String) -> [StoreBreakdown] {
+        // Handle "All" period
+        if isAllPeriod(period) {
+            return cachedBreakdownsByPeriod[period] ?? aggregatedBreakdownsForAllPeriods()
+        }
         return cachedBreakdownsByPeriod[period] ?? []
     }
 
@@ -194,9 +216,15 @@ struct OverviewView: View {
             newCache[period] = sorted
         }
 
+        // Preserve existing all-time backend data if available, otherwise use local aggregation
+        if let existingAllTimeData = cachedBreakdownsByPeriod[Self.allPeriodIdentifier], !existingAllTimeData.isEmpty {
+            newCache[Self.allPeriodIdentifier] = existingAllTimeData
+        }
+        // Don't set local aggregation here - let it be fetched from backend when needed
+
         // Batch all state updates together to minimize re-renders
         cachedBreakdownsByPeriod = newCache
-        displayedBreakdowns = newCache[selectedPeriod] ?? []
+        displayedBreakdowns = isAllPeriod(selectedPeriod) ? (newCache[Self.allPeriodIdentifier] ?? []) : (newCache[selectedPeriod] ?? [])
         displayedBreakdownsPeriod = selectedPeriod
 
         // Also update available periods cache
@@ -209,6 +237,18 @@ struct OverviewView: View {
 
     /// Update cache for a specific period only
     private func updateCacheForPeriod(_ period: String) {
+        // Handle "All" period specially - don't overwrite cache from filtering
+        // The "All" period data comes from fetchAllTimeData(), not from dataManager.storeBreakdowns
+        if isAllPeriod(period) {
+            // Use existing cached data or aggregated fallback
+            let breakdowns = cachedBreakdownsByPeriod[period] ?? aggregatedBreakdownsForAllPeriods()
+            if period == selectedPeriod {
+                displayedBreakdowns = breakdowns
+                displayedBreakdownsPeriod = period
+            }
+            return
+        }
+
         var breakdowns = dataManager.storeBreakdowns.filter { $0.period == period }
 
         // Always sort by highest spending for clear visual hierarchy
@@ -555,7 +595,8 @@ struct OverviewView: View {
         updateDisplayedBreakdowns()
 
         // Pre-cache segments for the new period if not already cached
-        if cachedSegmentsByPeriod[newValue] == nil {
+        // Skip for "All" period - that's handled by fetchAllTimeData after data is loaded
+        if cachedSegmentsByPeriod[newValue] == nil && !isAllPeriod(newValue) {
             cacheSegmentsForPeriod(newValue)
         }
 
@@ -567,7 +608,10 @@ struct OverviewView: View {
             // (receiptsViewModel only holds one period's data at a time)
             await receiptsViewModel.loadReceipts(period: newValue, storeName: nil, reset: true)
 
-            if !dataManager.periodMetadata.isEmpty {
+            // Handle "All" period - fetch all-time data from backend
+            if isAllPeriod(newValue) {
+                await fetchAllTimeData()
+            } else if !dataManager.periodMetadata.isEmpty {
                 if !dataManager.isPeriodLoaded(newValue) {
                     await dataManager.fetchPeriodDetails(newValue)
                     await MainActor.run {
@@ -577,6 +621,65 @@ struct OverviewView: View {
                 }
                 await prefetchAdjacentPeriods(around: newValue)
             }
+        }
+    }
+
+    // MARK: - Fetch All-Time Data
+
+    /// Fetches all-time store breakdown data from the backend
+    /// Always fetches fresh data (no caching to ensure accuracy)
+    private func fetchAllTimeData() async {
+        do {
+            // Fetch summary without date filters to get all-time data
+            var filters = AnalyticsFilters()
+            filters.period = .all  // This will omit the period parameter
+
+            print("📊 Fetching all-time store data from backend...")
+            let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+
+            print("📊 Backend response: period=\(summary.period), totalSpend=€\(summary.totalSpend), stores=\(summary.stores.count), receipts=\(summary.transactionCount)")
+
+            // Convert to StoreBreakdown array
+            let breakdowns: [StoreBreakdown] = summary.stores.map { store in
+                print("   📍 Store: \(store.storeName) - €\(store.amountSpent) (\(store.storeVisits) visits)")
+                return StoreBreakdown(
+                    storeName: store.storeName,
+                    period: Self.allPeriodIdentifier,
+                    totalStoreSpend: store.amountSpent,
+                    categories: [],  // Categories not available in summary, will be fetched in detail view
+                    visitCount: store.storeVisits,
+                    averageHealthScore: store.averageHealthScore
+                )
+            }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
+
+            print("✅ Fetched \(breakdowns.count) stores for all-time view, total: €\(summary.totalSpend)")
+
+            await MainActor.run {
+                // Store all-time totals from backend FIRST
+                allTimeTotalSpend = summary.totalSpend
+                allTimeTotalReceipts = summary.transactionCount
+                allTimeHealthScore = summary.averageHealthScore
+
+                // Cache the all-time breakdowns
+                cachedBreakdownsByPeriod[Self.allPeriodIdentifier] = breakdowns
+
+                // Clear any stale segment cache for All period
+                cachedSegmentsByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+                cachedChartDataByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+
+                // Update displayed breakdowns if still on "All" period
+                if isAllPeriod(selectedPeriod) {
+                    displayedBreakdowns = breakdowns
+                    displayedBreakdownsPeriod = Self.allPeriodIdentifier
+
+                    // Cache segments for the donut chart using the correct total
+                    cacheSegmentsForPeriod(Self.allPeriodIdentifier)
+
+                    print("📊 Updated All view: \(breakdowns.count) stores, €\(allTimeTotalSpend) total, \(cachedSegmentsByPeriod[Self.allPeriodIdentifier]?.count ?? 0) segments")
+                }
+            }
+        } catch {
+            print("❌ Failed to fetch all-time data: \(error.localizedDescription)")
         }
     }
 
@@ -949,8 +1052,13 @@ struct OverviewView: View {
         }
     }
 
-    // Shorten period to "Jan 26" format
+    // Shorten period to "Jan 26" format, or return "All" as-is
     private func shortenedPeriod(_ period: String) -> String {
+        // Handle "All" period
+        if isAllPeriod(period) {
+            return period
+        }
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US")
@@ -996,7 +1104,7 @@ struct OverviewView: View {
             // Store rows - NOT swipeable, only tappable
             if !segments.isEmpty {
                 // Stores section header
-                storesSectionHeader(storeCount: segments.count)
+                storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period))
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
@@ -1101,7 +1209,7 @@ struct OverviewView: View {
 
     // MARK: - Stores Section Header
 
-    private func storesSectionHeader(storeCount: Int) -> some View {
+    private func storesSectionHeader(storeCount: Int, isAllTime: Bool = false) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
@@ -1116,7 +1224,7 @@ struct OverviewView: View {
                 Text("Stores")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
-                Text("\(storeCount) store\(storeCount == 1 ? "" : "s")")
+                Text(isAllTime ? "\(storeCount) store\(storeCount == 1 ? "" : "s") all time" : "\(storeCount) store\(storeCount == 1 ? "" : "s")")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
             }
@@ -1179,7 +1287,7 @@ struct OverviewView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         } else {
-                            Text("\(receiptsViewModel.receipts.count) this period")
+                            Text("\(receiptsViewModel.receipts.count) \(isAllPeriod(selectedPeriod) ? "total" : "this period")")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         }
@@ -1269,7 +1377,7 @@ struct OverviewView: View {
                             Image(systemName: "doc.text")
                                 .font(.system(size: 28))
                                 .foregroundColor(.white.opacity(0.2))
-                            Text("No receipts for this period")
+                            Text(isAllPeriod(selectedPeriod) ? "No receipts yet" : "No receipts for this period")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         }
@@ -1385,6 +1493,11 @@ struct OverviewView: View {
     // Period-specific versions of the cards to ensure proper data display
     // Uses cached breakdowns for performance - avoids recalculating on every render
     private func breakdownsForPeriod(_ period: String) -> [StoreBreakdown] {
+        // Handle "All" period - aggregate all stores across all periods
+        if isAllPeriod(period) {
+            return aggregatedBreakdownsForAllPeriods()
+        }
+
         // Use cached data if available
         if let cached = cachedBreakdownsByPeriod[period], !cached.isEmpty {
             return cached
@@ -1396,7 +1509,62 @@ struct OverviewView: View {
         return breakdowns
     }
 
+    /// Aggregate store breakdowns across all periods for the "All" view
+    /// Prefers cached backend data, falls back to local aggregation
+    private func aggregatedBreakdownsForAllPeriods() -> [StoreBreakdown] {
+        // First check if we have cached all-time data from backend
+        if let cached = cachedBreakdownsByPeriod[Self.allPeriodIdentifier], !cached.isEmpty {
+            return cached
+        }
+
+        // Fallback: aggregate from loaded periods (may be incomplete)
+        // This is used while backend data is loading
+        var storeAggregates: [String: (spend: Double, visits: Int, healthScoreSum: Double, healthScoreCount: Int, categories: [Category])] = [:]
+
+        for breakdown in dataManager.storeBreakdowns {
+            let key = breakdown.storeName
+            var current = storeAggregates[key] ?? (0, 0, 0, 0, [])
+            current.spend += breakdown.totalStoreSpend
+            current.visits += breakdown.visitCount
+            if let healthScore = breakdown.averageHealthScore {
+                current.healthScoreSum += healthScore * Double(breakdown.visitCount)
+                current.healthScoreCount += breakdown.visitCount
+            }
+            // Merge categories (for simplicity, just take the first set of categories)
+            if current.categories.isEmpty {
+                current.categories = breakdown.categories
+            }
+            storeAggregates[key] = current
+        }
+
+        // Convert to StoreBreakdown array
+        var aggregated: [StoreBreakdown] = storeAggregates.map { (storeName, data) in
+            let avgHealthScore: Double? = data.healthScoreCount > 0 ? data.healthScoreSum / Double(data.healthScoreCount) : nil
+            return StoreBreakdown(
+                storeName: storeName,
+                period: Self.allPeriodIdentifier,
+                totalStoreSpend: data.spend,
+                categories: data.categories,
+                visitCount: data.visits,
+                averageHealthScore: avgHealthScore
+            )
+        }
+
+        // Sort by highest spending
+        aggregated.sort { $0.totalStoreSpend > $1.totalStoreSpend }
+        return aggregated
+    }
+
     private func totalSpendForPeriod(_ period: String) -> Double {
+        // Handle "All" period - use cached backend value
+        if isAllPeriod(period) {
+            // Return cached backend value if available
+            if allTimeTotalSpend > 0 {
+                return allTimeTotalSpend
+            }
+            // Fallback to summing period metadata
+            return dataManager.periodMetadata.reduce(0) { $0 + $1.totalSpend }
+        }
         // First check period metadata (from lightweight /analytics/periods)
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
             return metadata.totalSpend
@@ -1406,6 +1574,15 @@ struct OverviewView: View {
     }
 
     private func totalReceiptsForPeriod(_ period: String) -> Int {
+        // Handle "All" period - use cached backend value
+        if isAllPeriod(period) {
+            // Return cached backend value if available
+            if allTimeTotalReceipts > 0 {
+                return allTimeTotalReceipts
+            }
+            // Fallback to summing period metadata
+            return dataManager.periodMetadata.reduce(0) { $0 + $1.receiptCount }
+        }
         // First check period metadata (from lightweight /analytics/periods)
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
             return metadata.receiptCount
@@ -1415,6 +1592,22 @@ struct OverviewView: View {
     }
 
     private func healthScoreForPeriod(_ period: String) -> Double? {
+        // Handle "All" period - use cached backend value
+        if isAllPeriod(period) {
+            // Return cached backend value if available
+            if let score = allTimeHealthScore {
+                return score
+            }
+            // Fallback to weighted average from period metadata
+            let periodsWithScore = dataManager.periodMetadata.filter { $0.averageHealthScore != nil }
+            guard !periodsWithScore.isEmpty else { return nil }
+            let totalItems = periodsWithScore.reduce(0) { $0 + $1.receiptCount }
+            guard totalItems > 0 else { return nil }
+            let weightedSum = periodsWithScore.reduce(0.0) { sum, metadata in
+                sum + (metadata.averageHealthScore ?? 0) * Double(metadata.receiptCount)
+            }
+            return weightedSum / Double(totalItems)
+        }
         // First check period metadata (from lightweight /analytics/periods)
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
             return metadata.averageHealthScore
@@ -1424,6 +1617,11 @@ struct OverviewView: View {
     }
 
     private func totalItemsForPeriod(_ period: String) -> Int? {
+        // Handle "All" period - sum all periods
+        if isAllPeriod(period) {
+            let total = dataManager.periodMetadata.compactMap { $0.totalItems }.reduce(0, +)
+            return total > 0 ? total : nil
+        }
         // Get total items from period metadata (sum of all quantities purchased)
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
             return metadata.totalItems
@@ -1502,7 +1700,7 @@ struct OverviewView: View {
                     VStack(spacing: 16) {
                         // Spending section
                         VStack(spacing: 4) {
-                            Text("SPENT THIS MONTH")
+                            Text(isAllPeriod(period) ? "TOTAL SPENT" : "SPENT THIS MONTH")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.white.opacity(0.5))
                                 .tracking(1.2)
@@ -1522,12 +1720,12 @@ struct OverviewView: View {
 
                         // Syncing indicator or tap hint
                         HStack(spacing: 4) {
-                            if isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
+                            if !isAllPeriod(period) && isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
                                 SyncingArrowsView()
                                     .font(.system(size: 11))
                                 Text("Syncing")
                                     .font(.system(size: 12, weight: .medium))
-                            } else if showSyncedConfirmation {
+                            } else if !isAllPeriod(period) && showSyncedConfirmation {
                                 Image(systemName: "checkmark.icloud.fill")
                                     .font(.system(size: 11))
                                 Text("Synced")
@@ -1540,8 +1738,8 @@ struct OverviewView: View {
                             }
                         }
                         .foregroundColor(
-                            isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue :
-                            showSyncedConfirmation ? .green : .white.opacity(0.4)
+                            !isAllPeriod(period) && isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue :
+                            !isAllPeriod(period) && showSyncedConfirmation ? .green : .white.opacity(0.4)
                         )
                     }
                     .padding(.vertical, 24)

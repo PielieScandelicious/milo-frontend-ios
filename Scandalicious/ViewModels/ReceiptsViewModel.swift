@@ -23,6 +23,7 @@ class ReceiptsViewModel: ObservableObject {
     private var filters = ReceiptFilters()
 
     /// Load receipts for a given period and optional store filter
+    /// Pass "All" as period to load all receipts without date filtering
     func loadReceipts(period: String, storeName: String? = nil, reset: Bool = true) async {
         if reset {
             state = .loading
@@ -30,15 +31,18 @@ class ReceiptsViewModel: ObservableObject {
             currentPage = 1
         }
 
-        // Parse period to get date range
-        let (startDate, endDate) = parsePeriod(period)
-
         // Configure filters
         filters = ReceiptFilters()
-        filters.startDate = startDate
-        filters.endDate = endDate
         filters.page = currentPage
         filters.pageSize = 20
+
+        // Handle "All" period - no date filtering
+        if period != "All" {
+            // Parse period to get date range
+            let (startDate, endDate) = parsePeriod(period)
+            filters.startDate = startDate
+            filters.endDate = endDate
+        }
 
         if let store = storeName, store != "All Stores" {
             filters.storeName = store
@@ -46,7 +50,7 @@ class ReceiptsViewModel: ObservableObject {
 
         // Log API call
         let storeInfo = storeName ?? "all stores"
-        let dateRange = formatDateRange(start: startDate, end: endDate)
+        let dateRange = period == "All" ? "all time" : formatDateRange(start: filters.startDate, end: filters.endDate)
         print("📥 GET /receipts - period: \(period), store: \(storeInfo), page: \(currentPage), dates: \(dateRange)")
 
         do {

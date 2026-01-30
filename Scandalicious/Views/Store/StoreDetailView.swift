@@ -104,7 +104,7 @@ struct StoreDetailView: View {
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
-                Text(storeBreakdown.period)
+                Text(storeBreakdown.period == "All" ? "All Time" : storeBreakdown.period)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
 
@@ -279,31 +279,38 @@ struct StoreDetailView: View {
         defer { isRefreshing = false }
 
         do {
-            // Parse the period to get date range
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-            dateFormatter.timeZone = TimeZone(identifier: "UTC")
-
-            guard let parsedDate = dateFormatter.date(from: storeBreakdown.period) else {
-                print("❌ [StoreDetailView] Could not parse period: \(storeBreakdown.period)")
-                return
-            }
-
-            var calendar = Calendar(identifier: .gregorian)
-            calendar.timeZone = TimeZone(identifier: "UTC")!
-
-            let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
-            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
-
-            // Create filters for this store and period
+            // Create filters for this store
             var filters = AnalyticsFilters()
-            filters.period = .month
-            filters.startDate = startOfMonth
-            filters.endDate = endOfMonth
             filters.storeName = storeBreakdown.storeName
 
-            print("📡 [StoreDetailView] Fetching fresh data for \(storeBreakdown.storeName)")
+            // Handle "All" period - no date filtering
+            if storeBreakdown.period == "All" {
+                filters.period = .all
+                print("📡 [StoreDetailView] Fetching all-time data for \(storeBreakdown.storeName)")
+            } else {
+                // Parse the period to get date range
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "MMMM yyyy"
+                dateFormatter.locale = Locale(identifier: "en_US")
+                dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+                guard let parsedDate = dateFormatter.date(from: storeBreakdown.period) else {
+                    print("❌ [StoreDetailView] Could not parse period: \(storeBreakdown.period)")
+                    return
+                }
+
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: "UTC")!
+
+                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
+                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+
+                filters.period = .month
+                filters.startDate = startOfMonth
+                filters.endDate = endOfMonth
+                print("📡 [StoreDetailView] Fetching fresh data for \(storeBreakdown.storeName)")
+            }
+
             let storeDetails = try await AnalyticsAPIService.shared.getStoreDetails(
                 storeName: storeBreakdown.storeName,
                 filters: filters
@@ -763,29 +770,33 @@ struct StoreDetailView: View {
 
         Task {
             do {
-                // Parse the period to get date range
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "MMMM yyyy"
-                dateFormatter.locale = Locale(identifier: "en_US")
-                dateFormatter.timeZone = TimeZone(identifier: "UTC")
-
-                guard let parsedDate = dateFormatter.date(from: storeBreakdown.period) else {
-                    loadingCategories.remove(category)
-                    return
-                }
-
-                var calendar = Calendar(identifier: .gregorian)
-                calendar.timeZone = TimeZone(identifier: "UTC")!
-
-                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
-                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
-
                 var filters = TransactionFilters()
-                filters.startDate = startOfMonth
-                filters.endDate = endOfMonth
                 filters.storeName = storeBreakdown.storeName
                 filters.category = AnalyticsCategory.allCases.first { $0.displayName == category }
                 filters.pageSize = 100
+
+                // Handle "All" period - no date filtering
+                if storeBreakdown.period != "All" {
+                    // Parse the period to get date range
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "MMMM yyyy"
+                    dateFormatter.locale = Locale(identifier: "en_US")
+                    dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+                    guard let parsedDate = dateFormatter.date(from: storeBreakdown.period) else {
+                        loadingCategories.remove(category)
+                        return
+                    }
+
+                    var calendar = Calendar(identifier: .gregorian)
+                    calendar.timeZone = TimeZone(identifier: "UTC")!
+
+                    let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
+                    let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+
+                    filters.startDate = startOfMonth
+                    filters.endDate = endOfMonth
+                }
 
                 let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
 

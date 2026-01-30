@@ -14,9 +14,11 @@ enum PeriodType: String, Codable, CaseIterable {
     case month
     case year
     case custom
+    case all
 
     var displayName: String {
-        rawValue.capitalized
+        if self == .all { return "All Time" }
+        return rawValue.capitalized
     }
 }
 
@@ -445,25 +447,28 @@ struct AnalyticsFilters {
     
     func toQueryItems() -> [URLQueryItem] {
         var items: [URLQueryItem] = []
-        
-        items.append(URLQueryItem(name: "period", value: period.rawValue))
-        
+
+        // For "all" period, don't add period filter - let backend return all data
+        if period != .all {
+            items.append(URLQueryItem(name: "period", value: period.rawValue))
+        }
+
         if let startDate = startDate {
             items.append(URLQueryItem(name: "start_date", value: DateFormatter.yyyyMMdd.string(from: startDate)))
         }
-        
+
         if let endDate = endDate {
             items.append(URLQueryItem(name: "end_date", value: DateFormatter.yyyyMMdd.string(from: endDate)))
         }
-        
+
         if let storeName = storeName {
             items.append(URLQueryItem(name: "store_name", value: storeName))
         }
-        
+
         if let category = category {
             items.append(URLQueryItem(name: "category", value: category.rawValue))
         }
-        
+
         return items
     }
     
