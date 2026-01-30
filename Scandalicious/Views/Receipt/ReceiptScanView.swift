@@ -41,6 +41,12 @@ struct ReceiptScanView: View {
     // Total receipts count (all time)
     @State private var totalReceiptsScanned: Int = 0
 
+    // Total items scanned (all time)
+    @State private var totalItemsScanned: Int = 0
+
+    // Top stores stats (top 3)
+    @State private var topStores: [(name: String, visits: Int)] = []
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -78,6 +84,7 @@ struct ReceiptScanView: View {
                 }
             }
             loadTotalReceiptsCount()
+            loadAllTimeStats()
         }
         .onDisappear {
             isTabVisible = false
@@ -353,8 +360,8 @@ struct ReceiptScanView: View {
                         .padding(.top, 8)
                 }
 
-                // Total Receipts Visualization Card
-                totalReceiptsCard
+                // Stats Section
+                statsSection
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
 
@@ -380,72 +387,328 @@ struct ReceiptScanView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
     }
 
-    // MARK: - Total Receipts Card
+    // MARK: - Stats Section
 
-    private var totalReceiptsCard: some View {
-        VStack(spacing: 16) {
+    private var statsSection: some View {
+        VStack(spacing: 12) {
+            // Hero stats row: Receipts & Items
+            HStack(spacing: 12) {
+                heroReceiptsCard
+                totalItemsCard
+            }
+
+            // Top 3 Stores card
+            topStoresCard
+
+            // Remaining quota pill
+            remainingQuotaPill
+        }
+    }
+
+    // MARK: - Hero Receipts Card
+
+    private var heroReceiptsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
             // Icon
             ZStack {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
+                            colors: [deepPurple.opacity(0.3), Color.blue.opacity(0.15)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 80, height: 80)
+                    .frame(width: 38, height: 38)
 
                 Image(systemName: "doc.text.viewfinder")
-                    .font(.system(size: 36, weight: .medium))
-                    .foregroundStyle(
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+
+            Spacer()
+
+            // Value
+            Text("\(totalReceiptsScanned)")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+
+            // Label
+            Text("Receipts")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+                .textCase(.uppercase)
+                .tracking(0.5)
+                .padding(.top, 2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 125)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.04))
+
+                // Gradient accent
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
                         LinearGradient(
-                            colors: [.purple, .blue],
+                            colors: [deepPurple.opacity(0.15), Color.clear],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
             }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
 
-            // Count
-            VStack(spacing: 6) {
-                Text("\(totalReceiptsScanned)")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+    // MARK: - Total Items Card
+
+    private var totalItemsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.15))
+                    .frame(width: 38, height: 38)
+
+                Image(systemName: "shippingbox.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.orange)
+            }
+
+            Spacer()
+
+            // Value
+            Text("\(totalItemsScanned)")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+
+            // Label
+            Text("Items")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+                .textCase(.uppercase)
+                .tracking(0.5)
+                .padding(.top, 2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 125)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.04))
+
+                // Subtle gradient
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.orange.opacity(0.08), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Top Stores Card
+
+    private var topStoresCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Header
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.cyan.opacity(0.15))
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.cyan)
+                }
+
+                Text("Top Stores")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
 
-                Text("Total Receipts Scanned")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
+                Spacer()
             }
 
-            // Remaining stat (centered)
-            VStack(spacing: 4) {
-                Text("\(rateLimitManager.receiptsRemaining)")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(receiptLimitColor)
-                Text("Remaining This Month")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+            // Stores list
+            if topStores.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "storefront")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.white.opacity(0.2))
+                        Text("No stores yet")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.3))
+                    }
+                    .padding(.vertical, 20)
+                    Spacer()
+                }
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(Array(topStores.enumerated()), id: \.offset) { index, store in
+                        topStoreRow(rank: index + 1, name: store.name, visits: store.visits)
+                    }
+                }
             }
-            .padding(.top, 8)
         }
-        .padding(.vertical, 28)
-        .padding(.horizontal, 24)
-        .frame(maxWidth: .infinity)
+        .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.white.opacity(0.06))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.04))
+
+                // Subtle gradient
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.cyan.opacity(0.06), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
+                    )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Top Store Row
+
+    private func topStoreRow(rank: Int, name: String, visits: Int) -> some View {
+        HStack(spacing: 12) {
+            // Rank badge
+            ZStack {
+                Circle()
+                    .fill(rankColor(for: rank).opacity(0.15))
+                    .frame(width: 30, height: 30)
+
+                Text("\(rank)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(rankColor(for: rank))
+            }
+
+            // Store name
+            Text(name.localizedCapitalized)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+
+            Spacer()
+
+            // Visits badge
+            HStack(spacing: 4) {
+                Text("\(visits)")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(rankColor(for: rank))
+
+                Text("visits")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(rankColor(for: rank).opacity(0.1))
+            )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.03))
+        )
+    }
+
+    // MARK: - Rank Color
+
+    private func rankColor(for rank: Int) -> Color {
+        switch rank {
+        case 1: return Color(red: 1.0, green: 0.84, blue: 0.0)  // Gold
+        case 2: return Color(red: 0.75, green: 0.75, blue: 0.8) // Silver
+        case 3: return Color(red: 0.80, green: 0.50, blue: 0.2) // Bronze
+        default: return Color.cyan
+        }
+    }
+
+    // MARK: - Remaining Quota Pill
+
+    private var remainingQuotaPill: some View {
+        HStack(spacing: 12) {
+            // Progress ring
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.1), lineWidth: 3)
+                    .frame(width: 36, height: 36)
+
+                Circle()
+                    .trim(from: 0, to: CGFloat(rateLimitManager.receiptsRemaining) / CGFloat(max(rateLimitManager.receiptsLimit, 1)))
+                    .stroke(
+                        receiptLimitColor,
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                    )
+                    .frame(width: 36, height: 36)
+                    .rotationEffect(.degrees(-90))
+
+                Text("\(rateLimitManager.receiptsRemaining)")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(receiptLimitColor)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Scans Remaining")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+
+                Text("Resets monthly")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+
+            Spacer()
+
+            // Limit badge
+            Text("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit)")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(receiptLimitColor)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(receiptLimitColor.opacity(0.12))
                 )
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
         )
     }
 
@@ -548,7 +811,7 @@ struct ReceiptScanView: View {
         )
     }
 
-    // MARK: - Load Total Receipts
+    // MARK: - Load Stats
 
     private func loadTotalReceiptsCount() {
         Task {
@@ -560,6 +823,34 @@ struct ReceiptScanView: View {
                 }
             } catch {
                 print("Failed to load total receipts count: \(error)")
+            }
+        }
+    }
+
+    private func loadAllTimeStats() {
+        Task {
+            do {
+                // Fetch all-time period metadata to get total items
+                let periodsResponse = try await AnalyticsAPIService.shared.fetchPeriods(periodType: .month, numPeriods: 52)
+
+                // Sum up total items across all periods
+                let totalItems = periodsResponse.periods.compactMap { $0.totalItems }.reduce(0, +)
+
+                // Fetch summary to get top stores (all-time)
+                let summaryResponse = try await AnalyticsAPIService.shared.fetchSummary(filters: AnalyticsFilters(period: .year, numPeriods: 10))
+
+                // Get top 3 stores by visits
+                let sortedStores = summaryResponse.stores
+                    .sorted { $0.storeVisits > $1.storeVisits }
+                    .prefix(3)
+                    .map { (name: $0.storeName, visits: $0.storeVisits) }
+
+                await MainActor.run {
+                    totalItemsScanned = totalItems
+                    topStores = Array(sortedStores)
+                }
+            } catch {
+                print("Failed to load all-time stats: \(error)")
             }
         }
     }
