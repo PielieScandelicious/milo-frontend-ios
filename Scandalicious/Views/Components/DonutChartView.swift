@@ -67,6 +67,10 @@ struct DonutChartView: View {
                 animationProgress = 1.0
             }
         }
+        .onDisappear {
+            // Reset animation state so it plays again on next appearance
+            animationProgress = 0
+        }
     }
 }
 

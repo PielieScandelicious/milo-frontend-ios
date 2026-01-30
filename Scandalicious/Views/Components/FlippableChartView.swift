@@ -118,6 +118,9 @@ struct SpendingTrendLineChart: View {
                 animationProgress = 1.0
             }
         }
+        .onDisappear {
+            animationProgress = 0
+        }
     }
 
     @ViewBuilder
@@ -300,6 +303,9 @@ struct StoreTrendLineChart: View {
             withAnimation(.spring(response: 1.0, dampingFraction: 0.8).delay(0.1)) {
                 animationProgress = 1.0
             }
+        }
+        .onDisappear {
+            animationProgress = 0
         }
     }
 

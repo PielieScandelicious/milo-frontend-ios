@@ -33,13 +33,22 @@ struct ScandaLiciousAIChatView: View {
     @State private var showManageSubscription = false
     @State private var showRateLimitAlert = false
     @State private var showClearButton = false
-    @State private var inputAreaOpacity: Double = 1.0
+
+    // Entrance animation states
+    @State private var viewAppeared = false
+    @State private var contentOpacity: Double = 0
+    @State private var inputAreaOffset: CGFloat = 30
+    @State private var inputAreaOpacity: Double = 0
+    @State private var backgroundGlowOpacity: Double = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
             backgroundView
             chatContentView
+                .opacity(contentOpacity)
             floatingInputArea
+                .offset(y: inputAreaOffset)
+                .opacity(inputAreaOpacity)
         }
         .navigationTitle(viewModel.messages.isEmpty ? "" : "Milo")
         .navigationBarTitleDisplayMode(.inline)
@@ -59,11 +68,32 @@ struct ScandaLiciousAIChatView: View {
             Task {
                 await rateLimitManager.syncFromBackend()
             }
+
+            // Trigger entrance animations
+            if !viewAppeared {
+                viewAppeared = true
+
+                // All elements fade in together
+                withAnimation(.easeOut(duration: 0.4)) {
+                    backgroundGlowOpacity = 1.0
+                    contentOpacity = 1.0
+                    inputAreaOffset = 0
+                    inputAreaOpacity = 1.0
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             Task {
                 await rateLimitManager.syncFromBackend()
             }
+        }
+        .onDisappear {
+            // Reset entrance animation states for next appearance
+            viewAppeared = false
+            contentOpacity = 0
+            inputAreaOffset = 30
+            inputAreaOpacity = 0
+            backgroundGlowOpacity = 0
         }
     }
     
@@ -73,9 +103,9 @@ struct ScandaLiciousAIChatView: View {
         ZStack {
             Color.miloBackground
 
-            // Subtle purple ambient glow at top
+            // Subtle purple ambient glow at top (animated)
             RadialGradient(
-                colors: [Color.miloPurple.opacity(0.08), Color.clear],
+                colors: [Color.miloPurple.opacity(0.08 * backgroundGlowOpacity), Color.clear],
                 center: .top,
                 startRadius: 0,
                 endRadius: 400
@@ -106,10 +136,7 @@ struct ScandaLiciousAIChatView: View {
                                 MessageBubbleView(message: message)
                                     .environmentObject(viewModel)
                                     .id(message.id)
-                                    .transition(.asymmetric(
-                                        insertion: .opacity.combined(with: .move(edge: .bottom)),
-                                        removal: .opacity
-                                    ))
+                                    .transition(.opacity)
                             }
                         }
 
@@ -424,15 +451,17 @@ struct WelcomeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            // Staggered entrance animation
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+            // Reset states first for clean animation
+            logoScale = 0.8
+            logoOpacity = 0
+            textOpacity = 0
+            cardsOpacity = 0
+
+            // All elements fade in together
+            withAnimation(.easeOut(duration: 0.4)) {
                 logoScale = 1.0
                 logoOpacity = 1.0
-            }
-            withAnimation(.easeOut(duration: 0.5).delay(0.25)) {
                 textOpacity = 1.0
-            }
-            withAnimation(.easeOut(duration: 0.5).delay(0.4)) {
                 cardsOpacity = 1.0
             }
         }

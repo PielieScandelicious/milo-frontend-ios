@@ -262,6 +262,14 @@ struct IconDonutChartView: View {
                 }
             }
         }
+        .onDisappear {
+            // Reset animation state so it plays again on next appearance
+            if shouldAnimate {
+                globalScale = 0.6
+                globalRotation = -90
+                selectedSegmentIndex = nil
+            }
+        }
     }
 
     // MARK: - Center Content

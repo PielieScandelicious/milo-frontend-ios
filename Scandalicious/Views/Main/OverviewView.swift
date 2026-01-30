@@ -77,6 +77,11 @@ struct OverviewView: View {
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
     @Binding var showSignOutConfirmation: Bool
 
+    // Entrance animation states
+    @State private var viewAppeared = false
+    @State private var contentOpacity: Double = 0
+    @State private var headerOpacity: Double = 0
+
     // Check if the selected period is the current month
     private var isCurrentPeriod: Bool {
         let dateFormatter = DateFormatter()
@@ -311,11 +316,13 @@ struct OverviewView: View {
 
     var body: some View {
         mainBodyContent
+            .opacity(contentOpacity)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     modernPeriodNavigationToolbar
+                        .opacity(headerOpacity)
                 }
             }
             .navigationDestination(item: $selectedBreakdown) { breakdown in
@@ -328,6 +335,12 @@ struct OverviewView: View {
                 FilterSheet(selectedSort: $selectedSort)
             }
             .onAppear(perform: handleOnAppear)
+            .onDisappear {
+                // Reset entrance animation states for next appearance
+                viewAppeared = false
+                contentOpacity = 0
+                headerOpacity = 0
+            }
             .onReceive(NotificationCenter.default.publisher(for: .receiptUploadStarted)) { _ in
                 handleReceiptUploadStarted()
             }
@@ -361,6 +374,21 @@ struct OverviewView: View {
         // Configure data manager if needed
         if dataManager.transactionManager == nil {
             dataManager.configure(with: transactionManager)
+        }
+
+        // Trigger entrance animations
+        if !viewAppeared {
+            viewAppeared = true
+
+            // Header fades in
+            withAnimation(.easeOut(duration: 0.4).delay(0.05)) {
+                headerOpacity = 1.0
+            }
+
+            // Content fades in
+            withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
+                contentOpacity = 1.0
+            }
         }
 
         // Defer ALL heavy work to next run loop to allow smooth tab transition
