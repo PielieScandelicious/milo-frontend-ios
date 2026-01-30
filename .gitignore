@@ -1,6 +1,7 @@
 
 *.md
 xcuserdata/
+.idea/
 
 RESEARCH_AGENT_CONTEXT.txt
 build/
