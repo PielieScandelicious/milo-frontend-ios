@@ -1558,24 +1558,11 @@ struct OverviewView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.06),
+                                Color.white.opacity(0.04),
                                 Color.white.opacity(0.02)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
-                        )
-                    )
-
-                // Inner glow at top
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.08),
-                                Color.clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .center
                         )
                     )
             }
