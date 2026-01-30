@@ -212,31 +212,55 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
 
                     // All items
                     if !receipt.displayTransactions.isEmpty {
-                        VStack(spacing: 6) {
+                        VStack(spacing: 8) {
                             ForEach(Array(receipt.displayTransactions.enumerated()), id: \.offset) { _, item in
-                                HStack(spacing: 8) {
-                                    if item.displayQuantity > 1 {
-                                        Text("×\(item.displayQuantity)")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.4))
-                                    }
+                                HStack(spacing: 10) {
+                                    // Sleek Nutri-Score letter badge
+                                    Text(item.displayHealthScore.nutriScoreLetter)
+                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                        .foregroundColor(item.displayHealthScore.healthScoreColor)
+                                        .frame(width: 22, height: 22)
+                                        .background(
+                                            Circle()
+                                                .fill(item.displayHealthScore.healthScoreColor.opacity(0.15))
+                                        )
+                                        .overlay(
+                                            Circle()
+                                                .stroke(item.displayHealthScore.healthScoreColor.opacity(0.3), lineWidth: 1)
+                                        )
 
-                                    Text(item.displayItemName)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
-                                        .lineLimit(2)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            Text(item.displayItemName)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundColor(.white.opacity(0.85))
+                                                .lineLimit(1)
+
+                                            if item.displayQuantity > 1 {
+                                                Text("×\(item.displayQuantity)")
+                                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                                    .foregroundColor(.white.opacity(0.4))
+                                                    .padding(.horizontal, 5)
+                                                    .padding(.vertical, 1)
+                                                    .background(
+                                                        Capsule()
+                                                            .fill(Color.white.opacity(0.08))
+                                                    )
+                                            }
+                                        }
+                                    }
 
                                     Spacer()
 
                                     Text(String(format: "€%.2f", item.displayItemPrice))
                                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(.white.opacity(0.7))
                                 }
                             }
                         }
                         .padding(.horizontal, 14)
                         .padding(.top, 12)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 10)
                     }
 
                     // Delete button only (if delete action provided)

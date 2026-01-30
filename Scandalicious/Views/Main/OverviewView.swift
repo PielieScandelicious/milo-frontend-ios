@@ -1448,8 +1448,9 @@ struct OverviewView: View {
                         }
 
                         // Modern health score display
+                        // Note: averageHealthScore is on 0-5 scale, ModernHealthScoreBadge expects 0-10
                         if let score = healthScore {
-                            ModernHealthScoreBadge(score: score)
+                            ModernHealthScoreBadge(score: score * 2)
                         }
 
                         // Syncing indicator or tap hint

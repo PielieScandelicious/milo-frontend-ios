@@ -70,6 +70,24 @@ extension Int {
         }
     }
 
+    /// Returns the Nutri-Score letter grade (A-E) for a health score (0-5)
+    var nutriScoreLetter: String {
+        switch self {
+        case 5:
+            return "A"
+        case 4:
+            return "B"
+        case 3:
+            return "C"
+        case 2:
+            return "D"
+        case 1, 0:
+            return "E"
+        default:
+            return "-"
+        }
+    }
+
     /// Returns an SF Symbol icon for a health score (0-5)
     var healthScoreIcon: String {
         switch self {
@@ -134,6 +152,14 @@ extension Optional where Wrapped == Int {
             return "cart.fill"
         }
         return score.healthScoreIcon
+    }
+
+    /// Returns the Nutri-Score letter grade (A-E) for an optional health score
+    var nutriScoreLetter: String {
+        guard let score = self else {
+            return "-"
+        }
+        return score.nutriScoreLetter
     }
 }
 
