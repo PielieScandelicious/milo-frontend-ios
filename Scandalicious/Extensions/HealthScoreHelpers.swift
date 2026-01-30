@@ -238,6 +238,8 @@ extension Optional where Wrapped == Double {
 
 extension Array where Element == Int? {
     /// Calculate average health score, ignoring nil values (non-food items)
+    /// - Note: Prefer using backend-computed averages from `/analytics/aggregate` or other analytics endpoints
+    @available(*, deprecated, message: "Use backend-computed averageHealthScore from analytics endpoints instead")
     var averageHealthScore: Double? {
         let validScores = self.compactMap { $0 }
         guard !validScores.isEmpty else { return nil }
@@ -247,8 +249,40 @@ extension Array where Element == Int? {
 
 extension Array where Element == Int {
     /// Calculate average health score
+    /// - Note: Prefer using backend-computed averages from `/analytics/aggregate` or other analytics endpoints
+    @available(*, deprecated, message: "Use backend-computed averageHealthScore from analytics endpoints instead")
     var averageHealthScore: Double {
         guard !self.isEmpty else { return 0.0 }
         return Double(self.reduce(0, +)) / Double(self.count)
+    }
+}
+
+// MARK: - Health Score Distribution Helpers
+
+extension HealthScoreDistribution {
+    /// Get the most common health score category
+    var dominantScore: Int {
+        asArray.max(by: { $0.percentage < $1.percentage })?.score ?? 3
+    }
+
+    /// Get the percentage of healthy items (scores 4-5)
+    var healthyPercentage: Double {
+        veryHealthy5 + healthy4
+    }
+
+    /// Get the percentage of unhealthy items (scores 0-1)
+    var unhealthyPercentage: Double {
+        unhealthy1 + veryUnhealthy0
+    }
+
+    /// Get a simple rating based on distribution
+    var overallRating: String {
+        if healthyPercentage >= 50 {
+            return "Healthy"
+        } else if unhealthyPercentage >= 50 {
+            return "Unhealthy"
+        } else {
+            return "Moderate"
+        }
     }
 }

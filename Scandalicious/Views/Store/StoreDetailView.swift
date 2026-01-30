@@ -46,8 +46,16 @@ struct StoreDetailView: View {
         Color(red: 0.95, green: 0.25, blue: 0.3)
     }
 
-    // Average item price calculation
+    // Backend-provided average item price (set during refresh)
+    @State private var backendAverageItemPrice: Double?
+
+    // Average item price - prefers backend value, falls back to local calculation
     private var averageItemPrice: Double? {
+        // Use backend-computed value if available
+        if let backendPrice = backendAverageItemPrice {
+            return backendPrice
+        }
+        // Fallback: compute locally
         guard currentTotalItems > 0 else { return nil }
         return currentTotalSpend / Double(currentTotalItems)
     }
@@ -310,8 +318,8 @@ struct StoreDetailView: View {
                 )
             }
 
-            // Calculate total items from category transaction counts
-            let totalItems = storeDetails.categories.reduce(0) { $0 + $1.transactionCount }
+            // Use backend totalItems if available, otherwise calculate from category transaction counts
+            let totalItems = storeDetails.totalItems ?? storeDetails.categories.reduce(0) { $0 + $1.transactionCount }
 
             // Update state on main thread
             await MainActor.run {
@@ -320,7 +328,8 @@ struct StoreDetailView: View {
                 currentCategories = categories
                 currentHealthScore = storeDetails.averageHealthScore
                 currentTotalItems = totalItems
-                print("✅ [StoreDetailView] Updated: €\(storeDetails.totalSpend), \(storeDetails.visitCount) receipts, \(totalItems) items")
+                backendAverageItemPrice = storeDetails.averageItemPrice  // Use backend value if available
+                print("✅ [StoreDetailView] Updated: €\(storeDetails.totalSpend), \(storeDetails.visitCount) receipts, \(totalItems) items, avg price: \(storeDetails.averageItemPrice.map { String(format: "€%.2f", $0) } ?? "computed locally")")
             }
 
         } catch {

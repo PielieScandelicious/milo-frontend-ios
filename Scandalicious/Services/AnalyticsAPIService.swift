@@ -162,6 +162,30 @@ actor AnalyticsAPIService {
         )
     }
 
+    /// Fetch aggregate analytics across multiple periods
+    /// Returns totals, averages, extremes, top categories/stores, and health score distribution
+    /// - Parameter filters: Aggregate filters for period type, limits, and date range
+    func fetchAggregate(filters: AggregateFilters = AggregateFilters()) async throws -> AggregateResponse {
+        return try await performRequest(
+            endpoint: "/analytics/aggregate",
+            queryItems: filters.toQueryItems()
+        )
+    }
+
+    /// Fetch all-time statistics for the user (for scan view hero cards)
+    /// Returns total receipts, items, spend, and top stores across all time
+    /// - Parameter topStoresLimit: Number of top stores to return (default 3)
+    func fetchAllTimeStats(topStoresLimit: Int = 3) async throws -> AllTimeStatsResponse {
+        let queryItems = [
+            URLQueryItem(name: "top_stores_limit", value: String(topStoresLimit))
+        ]
+
+        return try await performRequest(
+            endpoint: "/analytics/all-time",
+            queryItems: queryItems
+        )
+    }
+
     /// Delete a receipt by ID
     /// - Parameter receiptId: The receipt ID to delete
     func deleteReceipt(receiptId: String) async throws {
@@ -494,6 +518,16 @@ extension AnalyticsAPIService {
     /// Nonisolated wrapper for fetchPeriods
     nonisolated func getPeriods(periodType: PeriodType = .month, numPeriods: Int = 52) async throws -> PeriodsResponse {
         return try await fetchPeriods(periodType: periodType, numPeriods: numPeriods)
+    }
+
+    /// Nonisolated wrapper for fetchAggregate
+    nonisolated func getAggregate(filters: AggregateFilters = AggregateFilters()) async throws -> AggregateResponse {
+        return try await fetchAggregate(filters: filters)
+    }
+
+    /// Nonisolated wrapper for fetchAllTimeStats
+    nonisolated func getAllTimeStats(topStoresLimit: Int = 3) async throws -> AllTimeStatsResponse {
+        return try await fetchAllTimeStats(topStoresLimit: topStoresLimit)
     }
 }
 

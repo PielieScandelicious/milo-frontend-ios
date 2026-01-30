@@ -815,45 +815,64 @@ struct ReceiptScanView: View {
 
     // MARK: - Load Stats
 
+    /// Load all-time stats from the new backend endpoint
+    /// Falls back to the old multi-request approach if the new endpoint isn't available yet
     private func loadTotalReceiptsCount() {
-        Task {
-            do {
-                // Get all-time receipts count by fetching with no date filter
-                let response = try await AnalyticsAPIService.shared.fetchReceipts(filters: ReceiptFilters(page: 1, pageSize: 1))
-                await MainActor.run {
-                    totalReceiptsScanned = response.total
-                }
-            } catch {
-                print("Failed to load total receipts count: \(error)")
-            }
-        }
+        // Now handled by loadAllTimeStats() via the new /analytics/all-time endpoint
+        // Keeping this method for backwards compatibility during transition
     }
 
     private func loadAllTimeStats() {
         Task {
             do {
-                // Fetch all-time period metadata to get total items
-                let periodsResponse = try await AnalyticsAPIService.shared.fetchPeriods(periodType: .month, numPeriods: 52)
-
-                // Sum up total items across all periods
-                let totalItems = periodsResponse.periods.compactMap { $0.totalItems }.reduce(0, +)
-
-                // Fetch summary to get top stores (all-time)
-                let summaryResponse = try await AnalyticsAPIService.shared.fetchSummary(filters: AnalyticsFilters(period: .year, numPeriods: 10))
-
-                // Get top 3 stores by visits
-                let sortedStores = summaryResponse.stores
-                    .sorted { $0.storeVisits > $1.storeVisits }
-                    .prefix(3)
-                    .map { (name: $0.storeName, visits: $0.storeVisits) }
+                // Try the new unified all-time stats endpoint first
+                let allTimeStats = try await AnalyticsAPIService.shared.getAllTimeStats(topStoresLimit: 3)
 
                 await MainActor.run {
-                    totalItemsScanned = totalItems
-                    topStores = Array(sortedStores)
+                    totalReceiptsScanned = allTimeStats.totalReceipts
+                    totalItemsScanned = allTimeStats.totalItems
+                    topStores = allTimeStats.top3StoresByVisits
                 }
             } catch {
-                print("Failed to load all-time stats: \(error)")
+                // Fallback to old multi-request approach if new endpoint not available
+                print("New /analytics/all-time endpoint not available, falling back to legacy approach: \(error)")
+                await loadAllTimeStatsLegacy()
             }
+        }
+    }
+
+    /// Legacy method: Load all-time stats using multiple API calls
+    /// Used as fallback when /analytics/all-time endpoint is not yet implemented
+    private func loadAllTimeStatsLegacy() async {
+        do {
+            // Get all-time receipts count by fetching with no date filter
+            async let receiptsTask = AnalyticsAPIService.shared.fetchReceipts(filters: ReceiptFilters(page: 1, pageSize: 1))
+
+            // Fetch all-time period metadata to get total items
+            async let periodsTask = AnalyticsAPIService.shared.fetchPeriods(periodType: .month, numPeriods: 52)
+
+            // Fetch summary to get top stores (all-time)
+            async let summaryTask = AnalyticsAPIService.shared.fetchSummary(filters: AnalyticsFilters(period: .year, numPeriods: 10))
+
+            // Await all in parallel
+            let (receiptsResponse, periodsResponse, summaryResponse) = try await (receiptsTask, periodsTask, summaryTask)
+
+            // Sum up total items across all periods
+            let totalItems = periodsResponse.periods.compactMap { $0.totalItems }.reduce(0, +)
+
+            // Get top 3 stores by visits
+            let sortedStores = summaryResponse.stores
+                .sorted { $0.storeVisits > $1.storeVisits }
+                .prefix(3)
+                .map { (name: $0.storeName, visits: $0.storeVisits) }
+
+            await MainActor.run {
+                totalReceiptsScanned = receiptsResponse.total
+                totalItemsScanned = totalItems
+                topStores = Array(sortedStores)
+            }
+        } catch {
+            print("Failed to load all-time stats (legacy): \(error)")
         }
     }
 

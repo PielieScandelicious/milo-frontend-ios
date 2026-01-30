@@ -311,6 +311,8 @@ struct StoreDetailsResponse: Codable {
     let visitCount: Int
     let categories: [CategoryBreakdown]
     let averageHealthScore: Double?  // Average health score for this store
+    let totalItems: Int?             // NEW: Sum of all item quantities (for average item price)
+    let averageItemPrice: Double?    // NEW: Backend-computed average item price
 
     enum CodingKeys: String, CodingKey {
         case storeName = "store_name"
@@ -321,9 +323,11 @@ struct StoreDetailsResponse: Codable {
         case visitCount = "store_visits"
         case categories
         case averageHealthScore = "average_health_score"
+        case totalItems = "total_items"
+        case averageItemPrice = "average_item_price"
     }
 
-    init(storeName: String, period: String, startDate: String, endDate: String, totalSpend: Double, visitCount: Int, categories: [CategoryBreakdown], averageHealthScore: Double? = nil) {
+    init(storeName: String, period: String, startDate: String, endDate: String, totalSpend: Double, visitCount: Int, categories: [CategoryBreakdown], averageHealthScore: Double? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil) {
         self.storeName = storeName
         self.period = period
         self.startDate = startDate
@@ -332,6 +336,8 @@ struct StoreDetailsResponse: Codable {
         self.visitCount = visitCount
         self.categories = categories
         self.averageHealthScore = averageHealthScore
+        self.totalItems = totalItems
+        self.averageItemPrice = averageItemPrice
     }
 
     var startDateParsed: Date? {
@@ -342,6 +348,21 @@ struct StoreDetailsResponse: Codable {
     var endDateParsed: Date? {
         ISO8601DateFormatter().date(from: endDate) ??
         DateFormatter.yyyyMMdd.date(from: endDate)
+    }
+
+    /// Computed total items from categories if not provided by backend (legacy fallback)
+    var computedTotalItems: Int {
+        totalItems ?? categories.reduce(0) { $0 + $1.transactionCount }
+    }
+
+    /// Computed average item price (prefers backend value, falls back to local calculation)
+    var computedAverageItemPrice: Double? {
+        if let backendPrice = averageItemPrice {
+            return backendPrice
+        }
+        let items = computedTotalItems
+        guard items > 0 else { return nil }
+        return totalSpend / Double(items)
     }
 }
 
@@ -603,6 +624,266 @@ struct ReceiptFilters {
         items.append(URLQueryItem(name: "page_size", value: String(pageSize)))
 
         return items
+    }
+}
+
+// MARK: - Aggregate Analytics Response
+
+struct AggregateResponse: Codable {
+    let periodType: String
+    let numPeriods: Int
+    let startDate: String
+    let endDate: String
+    let totals: AggregateTotals
+    let averages: AggregateAverages
+    let extremes: AggregateExtremes
+    let topCategories: [AggregateCategory]
+    let topStores: [AggregateStore]
+    let healthScoreDistribution: HealthScoreDistribution?
+
+    enum CodingKeys: String, CodingKey {
+        case periodType = "period_type"
+        case numPeriods = "num_periods"
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case totals
+        case averages
+        case extremes
+        case topCategories = "top_categories"
+        case topStores = "top_stores"
+        case healthScoreDistribution = "health_score_distribution"
+    }
+}
+
+struct AggregateTotals: Codable {
+    let totalSpend: Double
+    let totalTransactions: Int
+    let totalReceipts: Int
+    let totalItems: Int
+
+    enum CodingKeys: String, CodingKey {
+        case totalSpend = "total_spend"
+        case totalTransactions = "total_transactions"
+        case totalReceipts = "total_receipts"
+        case totalItems = "total_items"
+    }
+}
+
+struct AggregateAverages: Codable {
+    let averageSpendPerPeriod: Double
+    let averageTransactionValue: Double
+    let averageItemPrice: Double          // NEW: total_spend / total_items
+    let averageHealthScore: Double?
+    let averageReceiptsPerPeriod: Double
+    let averageTransactionsPerPeriod: Double
+    let averageItemsPerReceipt: Double    // NEW: total_items / total_receipts
+
+    enum CodingKeys: String, CodingKey {
+        case averageSpendPerPeriod = "average_spend_per_period"
+        case averageTransactionValue = "average_transaction_value"
+        case averageItemPrice = "average_item_price"
+        case averageHealthScore = "average_health_score"
+        case averageReceiptsPerPeriod = "average_receipts_per_period"
+        case averageTransactionsPerPeriod = "average_transactions_per_period"
+        case averageItemsPerReceipt = "average_items_per_receipt"
+    }
+}
+
+struct AggregateExtremes: Codable {
+    let maxSpendingPeriod: AggregatePeriodSpend?
+    let minSpendingPeriod: AggregatePeriodSpend?
+    let highestHealthScorePeriod: AggregatePeriodHealth?
+    let lowestHealthScorePeriod: AggregatePeriodHealth?
+
+    enum CodingKeys: String, CodingKey {
+        case maxSpendingPeriod = "max_spending_period"
+        case minSpendingPeriod = "min_spending_period"
+        case highestHealthScorePeriod = "highest_health_score_period"
+        case lowestHealthScorePeriod = "lowest_health_score_period"
+    }
+}
+
+struct AggregatePeriodSpend: Codable {
+    let period: String
+    let periodStart: String
+    let periodEnd: String
+    let totalSpend: Double
+
+    enum CodingKeys: String, CodingKey {
+        case period
+        case periodStart = "period_start"
+        case periodEnd = "period_end"
+        case totalSpend = "total_spend"
+    }
+}
+
+struct AggregatePeriodHealth: Codable {
+    let period: String
+    let averageHealthScore: Double
+
+    enum CodingKeys: String, CodingKey {
+        case period
+        case averageHealthScore = "average_health_score"
+    }
+}
+
+struct AggregateCategory: Codable, Identifiable {
+    let name: String
+    let totalSpent: Double
+    let percentage: Double
+    let transactionCount: Int
+    let averageHealthScore: Double?
+
+    var id: String { name }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case totalSpent = "total_spent"
+        case percentage
+        case transactionCount = "transaction_count"
+        case averageHealthScore = "average_health_score"
+    }
+}
+
+struct AggregateStore: Codable, Identifiable {
+    let storeName: String
+    let totalSpent: Double
+    let percentage: Double
+    let visitCount: Int
+    let averageHealthScore: Double?
+
+    var id: String { storeName }
+
+    enum CodingKeys: String, CodingKey {
+        case storeName = "store_name"
+        case totalSpent = "total_spent"
+        case percentage
+        case visitCount = "visit_count"
+        case averageHealthScore = "average_health_score"
+    }
+}
+
+struct HealthScoreDistribution: Codable {
+    let veryHealthy5: Double
+    let healthy4: Double
+    let moderate3: Double
+    let lessHealthy2: Double
+    let unhealthy1: Double
+    let veryUnhealthy0: Double
+
+    enum CodingKeys: String, CodingKey {
+        case veryHealthy5 = "very_healthy_5"
+        case healthy4 = "healthy_4"
+        case moderate3 = "moderate_3"
+        case lessHealthy2 = "less_healthy_2"
+        case unhealthy1 = "unhealthy_1"
+        case veryUnhealthy0 = "very_unhealthy_0"
+    }
+
+    /// Returns the distribution as an array of (score, percentage) tuples for easy iteration
+    var asArray: [(score: Int, percentage: Double)] {
+        [
+            (5, veryHealthy5),
+            (4, healthy4),
+            (3, moderate3),
+            (2, lessHealthy2),
+            (1, unhealthy1),
+            (0, veryUnhealthy0)
+        ]
+    }
+}
+
+struct AggregateFilters {
+    var periodType: PeriodType = .month
+    var numPeriods: Int = 12
+    var startDate: Date?
+    var endDate: Date?
+    var topCategoriesLimit: Int = 5
+    var topStoresLimit: Int = 5
+    var minCategoryPercentage: Double = 0
+    var allTime: Bool = false             // NEW: If true, return all-time stats (ignores date filters)
+
+    func toQueryItems() -> [URLQueryItem] {
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "period_type", value: periodType.rawValue),
+            URLQueryItem(name: "num_periods", value: String(numPeriods)),
+            URLQueryItem(name: "top_categories_limit", value: String(topCategoriesLimit)),
+            URLQueryItem(name: "top_stores_limit", value: String(topStoresLimit))
+        ]
+
+        if allTime {
+            items.append(URLQueryItem(name: "all_time", value: "true"))
+        }
+
+        if let startDate = startDate {
+            items.append(URLQueryItem(name: "start_date", value: DateFormatter.yyyyMMdd.string(from: startDate)))
+        }
+
+        if let endDate = endDate {
+            items.append(URLQueryItem(name: "end_date", value: DateFormatter.yyyyMMdd.string(from: endDate)))
+        }
+
+        if minCategoryPercentage > 0 {
+            items.append(URLQueryItem(name: "min_category_percentage", value: String(minCategoryPercentage)))
+        }
+
+        return items
+    }
+}
+
+// MARK: - All-Time Stats Response (for Scan View hero cards)
+
+struct AllTimeStatsResponse: Codable {
+    let totalReceipts: Int
+    let totalItems: Int
+    let totalSpend: Double
+    let totalTransactions: Int
+    let averageItemPrice: Double
+    let averageHealthScore: Double?
+    let topStoresByVisits: [TopStoreVisit]
+    let topStoresBySpend: [TopStoreSpend]
+    let firstReceiptDate: String?
+    let lastReceiptDate: String?
+
+    enum CodingKeys: String, CodingKey {
+        case totalReceipts = "total_receipts"
+        case totalItems = "total_items"
+        case totalSpend = "total_spend"
+        case totalTransactions = "total_transactions"
+        case averageItemPrice = "average_item_price"
+        case averageHealthScore = "average_health_score"
+        case topStoresByVisits = "top_stores_by_visits"
+        case topStoresBySpend = "top_stores_by_spend"
+        case firstReceiptDate = "first_receipt_date"
+        case lastReceiptDate = "last_receipt_date"
+    }
+}
+
+struct TopStoreVisit: Codable, Identifiable {
+    let storeName: String
+    let visitCount: Int
+    let rank: Int
+
+    var id: String { storeName }
+
+    enum CodingKeys: String, CodingKey {
+        case storeName = "store_name"
+        case visitCount = "visit_count"
+        case rank
+    }
+}
+
+struct TopStoreSpend: Codable, Identifiable {
+    let storeName: String
+    let totalSpent: Double
+    let rank: Int
+
+    var id: String { storeName }
+
+    enum CodingKeys: String, CodingKey {
+        case storeName = "store_name"
+        case totalSpent = "total_spent"
+        case rank
     }
 }
 

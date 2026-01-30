@@ -304,18 +304,24 @@ extension Array where Element == TrendPeriod {
 
 extension TrendsResponse {
     /// Get the highest spending period
+    /// - Note: Prefer using `AggregateResponse.extremes.maxSpendingPeriod` from `/analytics/aggregate` endpoint
+    @available(*, deprecated, message: "Use AggregateResponse.extremes.maxSpendingPeriod from backend instead")
     var maxSpendingPeriod: TrendPeriod? {
         periods.max(by: { $0.totalSpend < $1.totalSpend })
     }
-    
+
     /// Get the average spending across all periods
+    /// - Note: Prefer using `AggregateResponse.averages.averageSpendPerPeriod` from `/analytics/aggregate` endpoint
+    @available(*, deprecated, message: "Use AggregateResponse.averages.averageSpendPerPeriod from backend instead")
     var averageSpending: Double {
         guard !periods.isEmpty else { return 0 }
         let total = periods.reduce(0) { $0 + $1.totalSpend }
         return total / Double(periods.count)
     }
-    
+
     /// Get the total spending across all periods
+    /// - Note: Prefer using `AggregateResponse.totals.totalSpend` from `/analytics/aggregate` endpoint
+    @available(*, deprecated, message: "Use AggregateResponse.totals.totalSpend from backend instead")
     var totalSpending: Double {
         periods.reduce(0) { $0 + $1.totalSpend }
     }
@@ -323,11 +329,15 @@ extension TrendsResponse {
 
 extension CategoriesResponse {
     /// Get the top N categories by spending
+    /// - Note: Prefer using `AggregateResponse.topCategories` from `/analytics/aggregate` endpoint with `top_categories_limit` parameter
+    @available(*, deprecated, message: "Use AggregateResponse.topCategories from backend instead")
     func topCategories(limit: Int) -> [CategoryBreakdown] {
         Array(categories.sortedBySpending().prefix(limit))
     }
-    
+
     /// Get categories that represent at least X% of spending
+    /// - Note: Prefer using `AggregateResponse.topCategories` from `/analytics/aggregate` endpoint with `min_category_percentage` parameter
+    @available(*, deprecated, message: "Use AggregateResponse.topCategories with min_category_percentage filter from backend instead")
     func categoriesAbovePercentage(_ percentage: Double) -> [CategoryBreakdown] {
         categories.filter { $0.percentage >= percentage }
     }
@@ -335,14 +345,129 @@ extension CategoriesResponse {
 
 extension SummaryResponse {
     /// Get the average transaction value
+    /// - Note: Prefer using `AggregateResponse.averages.averageTransactionValue` from `/analytics/aggregate` endpoint
+    @available(*, deprecated, message: "Use AggregateResponse.averages.averageTransactionValue from backend instead")
     var averageTransactionValue: Double {
         guard transactionCount > 0 else { return 0 }
         return totalSpend / Double(transactionCount)
     }
 
     /// Get the top N stores by spending
+    /// - Note: Prefer using `AggregateResponse.topStores` from `/analytics/aggregate` endpoint with `top_stores_limit` parameter
+    @available(*, deprecated, message: "Use AggregateResponse.topStores from backend instead")
     func topStores(limit: Int) -> [APIStoreBreakdown] {
         Array(stores.sortedBySpending().prefix(limit))
+    }
+}
+
+// MARK: - Aggregate Response Helpers
+
+extension AggregateResponse {
+    /// Convenience: Total spending across all periods
+    var totalSpend: Double { totals.totalSpend }
+
+    /// Convenience: Total transaction count across all periods
+    var totalTransactions: Int { totals.totalTransactions }
+
+    /// Convenience: Total receipt count across all periods
+    var totalReceipts: Int { totals.totalReceipts }
+
+    /// Convenience: Total items (quantities summed) across all periods
+    var totalItems: Int { totals.totalItems }
+
+    /// Convenience: Average spending per period
+    var averageSpendPerPeriod: Double { averages.averageSpendPerPeriod }
+
+    /// Convenience: Average value per transaction
+    var averageTransactionValue: Double { averages.averageTransactionValue }
+
+    /// Convenience: Average price per item (total_spend / total_items)
+    var averageItemPrice: Double { averages.averageItemPrice }
+
+    /// Convenience: Average items per receipt
+    var averageItemsPerReceipt: Double { averages.averageItemsPerReceipt }
+
+    /// Convenience: Overall average health score
+    var averageHealthScore: Double? { averages.averageHealthScore }
+
+    /// Convenience: Period with maximum spending
+    var maxSpendingPeriod: AggregatePeriodSpend? { extremes.maxSpendingPeriod }
+
+    /// Convenience: Period with minimum spending
+    var minSpendingPeriod: AggregatePeriodSpend? { extremes.minSpendingPeriod }
+}
+
+// MARK: - All-Time Stats Helpers
+
+extension AllTimeStatsResponse {
+    /// Top 3 stores by visits for display in scan view
+    var top3StoresByVisits: [(name: String, visits: Int)] {
+        topStoresByVisits.prefix(3).map { ($0.storeName, $0.visitCount) }
+    }
+
+    /// Duration string showing how long the user has been tracking
+    var trackingDuration: String? {
+        guard let firstDate = firstReceiptDate,
+              let lastDate = lastReceiptDate,
+              let first = DateFormatter.yyyyMMdd.date(from: firstDate),
+              let last = DateFormatter.yyyyMMdd.date(from: lastDate) else {
+            return nil
+        }
+
+        let days = Calendar.current.dateComponents([.day], from: first, to: last).day ?? 0
+        if days < 30 {
+            return "\(days) days"
+        } else if days < 365 {
+            let months = days / 30
+            return "\(months) month\(months == 1 ? "" : "s")"
+        } else {
+            let years = days / 365
+            let remainingMonths = (days % 365) / 30
+            if remainingMonths > 0 {
+                return "\(years) year\(years == 1 ? "" : "s"), \(remainingMonths) month\(remainingMonths == 1 ? "" : "s")"
+            }
+            return "\(years) year\(years == 1 ? "" : "s")"
+        }
+    }
+}
+
+extension AggregateCategory {
+    /// Convert to CategoryBreakdown for compatibility with existing UI components
+    var asCategoryBreakdown: CategoryBreakdown {
+        CategoryBreakdown(
+            name: name,
+            spent: totalSpent,
+            percentage: percentage,
+            transactionCount: transactionCount,
+            averageHealthScore: averageHealthScore
+        )
+    }
+}
+
+extension Array where Element == AggregateCategory {
+    /// Convert array to CategoryBreakdown array for compatibility with existing UI components
+    var asCategoryBreakdowns: [CategoryBreakdown] {
+        map { $0.asCategoryBreakdown }
+    }
+}
+
+extension AggregateStore {
+    /// Convert to APIStoreBreakdown for compatibility with existing UI components
+    var asAPIStoreBreakdown: APIStoreBreakdown {
+        APIStoreBreakdown(
+            storeName: storeName,
+            amountSpent: totalSpent,
+            storeVisits: visitCount,
+            percentage: percentage,
+            averageHealthScore: averageHealthScore
+        )
+    }
+}
+
+extension Array where Element == AggregateStore {
+    /// Convert array to APIStoreBreakdown array for compatibility with existing UI components
+    var asAPIStoreBreakdowns: [APIStoreBreakdown] {
+        map { $0.asAPIStoreBreakdown }
     }
 }
 
