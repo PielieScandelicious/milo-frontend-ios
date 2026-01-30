@@ -41,6 +41,7 @@ struct IconDonutChartView: View {
 
     @State private var globalScale: CGFloat = 0.6
     @State private var globalRotation: Double = -90 // Quarter turn back
+    @State private var selectedSegmentIndex: Int? = nil
 
     /// Unique identifier to track data changes and trigger re-animation
     private var dataFingerprint: String {
@@ -120,68 +121,114 @@ struct IconDonutChartView: View {
         return segments
     }
 
+    /// Check if a segment at index is currently selected
+    private func isSelected(_ index: Int) -> Bool {
+        selectedSegmentIndex == index
+    }
+
+    /// Get the selected segment info
+    private var selectedSegment: SegmentInfo? {
+        guard let index = selectedSegmentIndex, index < segments.count else { return nil }
+        return segments[index]
+    }
+
+    /// Calculate percentage for a segment
+    private func percentage(for segment: SegmentInfo) -> Int {
+        let total = data.reduce(0) { $0 + $1.value }
+        guard total > 0 else { return 0 }
+        return Int((segment.data.value / total) * 100)
+    }
+
     var body: some View {
         ZStack {
             // All segments visible, rotate and scale together
             ZStack {
-                ForEach(segments) { segment in
-                    // Subtle outer glow for depth
-                    Circle()
-                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
-                        .stroke(
-                            segment.data.color.opacity(0.25),
-                            style: StrokeStyle(
-                                lineWidth: strokeWidth + 3,
-                                lineCap: .round
+                ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+                    // Segment group with tap gesture
+                    ZStack {
+                        // Subtle outer glow for depth (enhanced when selected)
+                        Circle()
+                            .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                            .stroke(
+                                segment.data.color.opacity(isSelected(index) ? 0.5 : 0.25),
+                                style: StrokeStyle(
+                                    lineWidth: strokeWidth + (isSelected(index) ? 6 : 3),
+                                    lineCap: .round
+                                )
                             )
-                        )
-                        .blur(radius: 2)
-                        .frame(width: size - strokeWidth, height: size - strokeWidth)
+                            .blur(radius: isSelected(index) ? 4 : 2)
+                            .frame(width: size - strokeWidth, height: size - strokeWidth)
 
-                    // Main segment with gradient
-                    Circle()
-                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    segment.data.color.opacity(1.0),
-                                    segment.data.color.opacity(0.7)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            style: StrokeStyle(
-                                lineWidth: strokeWidth,
-                                lineCap: .round
+                        // Main segment with gradient
+                        Circle()
+                            .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        segment.data.color.opacity(1.0),
+                                        segment.data.color.opacity(0.7)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                style: StrokeStyle(
+                                    lineWidth: strokeWidth,
+                                    lineCap: .round
+                                )
                             )
-                        )
-                        .frame(width: size - strokeWidth, height: size - strokeWidth)
+                            .frame(width: size - strokeWidth, height: size - strokeWidth)
 
-                    // Inner highlight for glass effect
-                    Circle()
-                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.4),
-                                    Color.white.opacity(0.0)
-                                ],
-                                startPoint: .top,
-                                endPoint: .center
-                            ),
-                            style: StrokeStyle(
-                                lineWidth: strokeWidth * 0.5,
-                                lineCap: .round
+                        // Inner highlight for glass effect
+                        Circle()
+                            .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.4),
+                                        Color.white.opacity(0.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .center
+                                ),
+                                style: StrokeStyle(
+                                    lineWidth: strokeWidth * 0.5,
+                                    lineCap: .round
+                                )
                             )
+                            .frame(width: size - strokeWidth, height: size - strokeWidth)
+                    }
+                    .scaleEffect(isSelected(index) ? 1.08 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedSegmentIndex)
+                    // Overlay invisible tap target with proper arc shape
+                    .overlay(
+                        ArcSegmentShape(
+                            startAngle: segment.startAngle,
+                            endAngle: segment.endAngle,
+                            innerRadius: (size - strokeWidth) / 2 - strokeWidth,
+                            outerRadius: (size - strokeWidth) / 2 + strokeWidth
                         )
-                        .frame(width: size - strokeWidth, height: size - strokeWidth)
+                        .fill(Color.white.opacity(0.001)) // Nearly invisible but tappable
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                if selectedSegmentIndex == index {
+                                    selectedSegmentIndex = nil
+                                } else {
+                                    selectedSegmentIndex = index
+                                }
+                            }
+                        }
+                    )
                 }
             }
             .scaleEffect(globalScale)
             .rotationEffect(.degrees(-90 + globalRotation)) // -90 starts from top
 
-            // Center content (doesn't scale - stays in place)
-            centerContent
+            // Center content - shows segment info when selected, otherwise default
+            if let selected = selectedSegment {
+                selectedSegmentContent(selected)
+            } else {
+                centerContent
+            }
         }
         .frame(width: size, height: size)
         .onAppear {
@@ -197,6 +244,9 @@ struct IconDonutChartView: View {
             }
         }
         .onChange(of: dataFingerprint) { _, _ in
+            // Clear selection when data changes
+            selectedSegmentIndex = nil
+
             // Re-animate when data changes (e.g., period switch)
             if shouldAnimate {
                 // Reset to starting position
@@ -289,6 +339,59 @@ struct IconDonutChartView: View {
         .frame(maxWidth: size * 0.55)
     }
 
+    // MARK: - Selected Segment Content
+
+    private func selectedSegmentContent(_ segment: SegmentInfo) -> some View {
+        ZStack {
+            // Background circle with segment color tint
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            segment.data.color.opacity(0.15),
+                            segment.data.color.opacity(0.05)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: size * 0.32
+                    )
+                )
+                .frame(width: size * 0.58, height: size * 0.58)
+
+            VStack(spacing: 4) {
+                // Store/category name
+                Text(segment.data.label.localizedCapitalized)
+                    .font(.system(size: size * 0.07, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                // Amount
+                Text(String(format: "€%.0f", segment.data.value))
+                    .font(.system(size: size * 0.11, weight: .heavy, design: .rounded))
+                    .foregroundColor(segment.data.color)
+
+                // Percentage
+                Text("\(percentage(for: segment))% of total")
+                    .font(.system(size: size * 0.045, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+
+                // Tap to dismiss hint
+                Text("tap to close")
+                    .font(.system(size: size * 0.035, weight: .medium))
+                    .foregroundColor(.white.opacity(0.3))
+                    .padding(.top, 4)
+            }
+        }
+        .frame(maxWidth: size * 0.55)
+        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                selectedSegmentIndex = nil
+            }
+        }
+    }
+
     private var subtitleText: String {
         guard let subtitle = subtitle else { return "" }
         // Handle singular/plural for "visits" and "receipts"
@@ -311,11 +414,47 @@ struct IconDonutChartView: View {
 // MARK: - Segment Info
 
 private struct SegmentInfo: Identifiable {
-    let id = UUID()
+    let id: UUID  // Use the ChartData's id for stability
     let data: ChartData
     let startAngle: Double
     let endAngle: Double
     let midAngle: Double
+
+    init(data: ChartData, startAngle: Double, endAngle: Double, midAngle: Double) {
+        self.id = data.id  // Use ChartData's stable id
+        self.data = data
+        self.startAngle = startAngle
+        self.endAngle = endAngle
+        self.midAngle = midAngle
+    }
+}
+
+// MARK: - Arc Segment Shape (for hit testing)
+
+private struct ArcSegmentShape: Shape {
+    let startAngle: Double
+    let endAngle: Double
+    let innerRadius: CGFloat
+    let outerRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        var path = Path()
+
+        // No offset here - the parent view already applies -90 rotation
+        let start = Angle(degrees: startAngle)
+        let end = Angle(degrees: endAngle)
+
+        // Outer arc
+        path.addArc(center: center, radius: outerRadius, startAngle: start, endAngle: end, clockwise: false)
+
+        // Inner arc (reverse direction)
+        path.addArc(center: center, radius: innerRadius, startAngle: end, endAngle: start, clockwise: true)
+
+        path.closeSubpath()
+
+        return path
+    }
 }
 
 
