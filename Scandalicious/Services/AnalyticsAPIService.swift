@@ -173,11 +173,14 @@ actor AnalyticsAPIService {
     }
 
     /// Fetch all-time statistics for the user (for scan view hero cards)
-    /// Returns total receipts, items, spend, and top stores across all time
-    /// - Parameter topStoresLimit: Number of top stores to return (default 3)
-    func fetchAllTimeStats(topStoresLimit: Int = 3) async throws -> AllTimeStatsResponse {
+    /// Returns total receipts, items, spend, top stores, and top categories across all time
+    /// - Parameters:
+    ///   - topStoresLimit: Number of top stores to return (default 3)
+    ///   - topCategoriesLimit: Number of top categories to return (default 5)
+    func fetchAllTimeStats(topStoresLimit: Int = 3, topCategoriesLimit: Int = 5) async throws -> AllTimeStatsResponse {
         let queryItems = [
-            URLQueryItem(name: "top_stores_limit", value: String(topStoresLimit))
+            URLQueryItem(name: "top_stores_limit", value: String(topStoresLimit)),
+            URLQueryItem(name: "top_categories_limit", value: String(topCategoriesLimit))
         ]
 
         return try await performRequest(
@@ -526,8 +529,8 @@ extension AnalyticsAPIService {
     }
 
     /// Nonisolated wrapper for fetchAllTimeStats
-    nonisolated func getAllTimeStats(topStoresLimit: Int = 3) async throws -> AllTimeStatsResponse {
-        return try await fetchAllTimeStats(topStoresLimit: topStoresLimit)
+    nonisolated func getAllTimeStats(topStoresLimit: Int = 3, topCategoriesLimit: Int = 5) async throws -> AllTimeStatsResponse {
+        return try await fetchAllTimeStats(topStoresLimit: topStoresLimit, topCategoriesLimit: topCategoriesLimit)
     }
 }
 

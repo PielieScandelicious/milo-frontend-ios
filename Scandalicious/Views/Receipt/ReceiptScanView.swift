@@ -47,6 +47,10 @@ struct ReceiptScanView: View {
     // Top stores stats (top 3)
     @State private var topStores: [(name: String, visits: Int)] = []
 
+    // Top categories (all time) for flippable card
+    @State private var topCategories: [TopCategory] = []
+    @State private var isTopStoresCardFlipped = false
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -435,8 +439,8 @@ struct ReceiptScanView: View {
                 .contentTransition(.numericText())
 
             // Label
-            Text("Receipts")
-                .font(.system(size: 11, weight: .semibold))
+            Text("Receipts Scanned")
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.5))
                 .textCase(.uppercase)
                 .tracking(0.5)
@@ -492,8 +496,8 @@ struct ReceiptScanView: View {
                 .contentTransition(.numericText())
 
             // Label
-            Text("Items")
-                .font(.system(size: 11, weight: .semibold))
+            Text("Items Tracked")
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.5))
                 .textCase(.uppercase)
                 .tracking(0.5)
@@ -525,9 +529,39 @@ struct ReceiptScanView: View {
         )
     }
 
-    // MARK: - Top Stores Card
+    // MARK: - Top Stores Card (Flippable)
+
+    @State private var flipDegrees: Double = 0
 
     private var topStoresCard: some View {
+        ZStack {
+            // Back side - Top Categories
+            topCategoriesCardContent
+                .opacity(isTopStoresCardFlipped ? 1 : 0)
+                .rotation3DEffect(
+                    .degrees(180),
+                    axis: (x: 0, y: 1, z: 0)
+                )
+
+            // Front side - Top Stores
+            topStoresCardContent
+                .opacity(isTopStoresCardFlipped ? 0 : 1)
+        }
+        .rotation3DEffect(
+            .degrees(flipDegrees),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 0.5
+        )
+        .onTapGesture {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                isTopStoresCardFlipped.toggle()
+                flipDegrees += 180
+            }
+        }
+    }
+
+    // Front side content - Top Stores
+    private var topStoresCardContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             // Header
             HStack(spacing: 10) {
@@ -546,6 +580,18 @@ struct ReceiptScanView: View {
                     .foregroundStyle(.white)
 
                 Spacer()
+
+                // Flip hint
+                if !topCategories.isEmpty {
+                    HStack(spacing: 4) {
+                        Text("Tap for categories")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.3))
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.3))
+                    }
+                }
             }
 
             // Stores list
@@ -594,19 +640,192 @@ struct ReceiptScanView: View {
         )
     }
 
+    // Back side content - Top Categories
+    private var topCategoriesCardContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Header
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.purple.opacity(0.15))
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: "square.grid.2x2.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.purple)
+                }
+
+                Text("Top Categories")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                // Flip hint
+                HStack(spacing: 4) {
+                    Text("Tap for stores")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.3))
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+            }
+
+            // Categories list
+            if topCategories.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.white.opacity(0.2))
+                        Text("No categories yet")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.3))
+                    }
+                    .padding(.vertical, 20)
+                    Spacer()
+                }
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(Array(topCategories.prefix(3).enumerated()), id: \.offset) { index, category in
+                        topCategoryRow(rank: index + 1, category: category)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.04))
+
+                // Subtle gradient (purple theme)
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.06), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Top Category Row
+
+    private func topCategoryRow(rank: Int, category: TopCategory) -> some View {
+        let medalColor = rankColor(for: rank)
+        let medalGradient = rankGradient(for: rank)
+
+        return HStack(spacing: 14) {
+            // Rank medal badge
+            ZStack {
+                // Medal background
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: medalGradient,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32, height: 32)
+
+                // Rank number
+                Text("\(rank)")
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+
+            // Category icon
+            Image(systemName: category.icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(medalColor)
+                .frame(width: 24)
+
+            // Category name
+            Text(category.name)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+
+            Spacer()
+
+            // Spent amount with label
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("€\(category.totalSpent, specifier: "%.0f")")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(medalColor)
+                Text("spent")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            ZStack {
+                // Base fill with medal tint
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                medalColor.opacity(0.12),
+                                medalColor.opacity(0.04)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            medalColor.opacity(0.4),
+                            medalColor.opacity(0.15)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+    }
+
     // MARK: - Top Store Row
 
     private func topStoreRow(rank: Int, name: String, visits: Int) -> some View {
-        HStack(spacing: 12) {
-            // Rank badge
-            ZStack {
-                Circle()
-                    .fill(rankColor(for: rank).opacity(0.15))
-                    .frame(width: 30, height: 30)
+        let medalColor = rankColor(for: rank)
+        let medalGradient = rankGradient(for: rank)
 
+        return HStack(spacing: 14) {
+            // Rank medal badge
+            ZStack {
+                // Medal background
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: medalGradient,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32, height: 32)
+
+                // Rank number
                 Text("\(rank)")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(rankColor(for: rank))
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
             }
 
             // Store name
@@ -617,28 +836,47 @@ struct ReceiptScanView: View {
 
             Spacer()
 
-            // Visits badge
-            HStack(spacing: 4) {
+            // Visits count with label
+            VStack(alignment: .trailing, spacing: 2) {
                 Text("\(visits)")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(rankColor(for: rank))
-
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(medalColor)
                 Text("visits")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.white.opacity(0.4))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(rankColor(for: rank).opacity(0.1))
-            )
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.03))
+            ZStack {
+                // Base fill with medal tint
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                medalColor.opacity(0.12),
+                                medalColor.opacity(0.04)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            medalColor.opacity(0.4),
+                            medalColor.opacity(0.15)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
     }
 
@@ -650,6 +888,33 @@ struct ReceiptScanView: View {
         case 2: return Color(red: 0.75, green: 0.75, blue: 0.8) // Silver
         case 3: return Color(red: 0.80, green: 0.50, blue: 0.2) // Bronze
         default: return Color.cyan
+        }
+    }
+
+    // MARK: - Rank Gradient
+
+    private func rankGradient(for rank: Int) -> [Color] {
+        switch rank {
+        case 1: // Gold - rich metallic gradient
+            return [
+                Color(red: 1.0, green: 0.88, blue: 0.35),
+                Color(red: 0.95, green: 0.75, blue: 0.0),
+                Color(red: 0.80, green: 0.60, blue: 0.0)
+            ]
+        case 2: // Silver - sleek metallic gradient
+            return [
+                Color(red: 0.85, green: 0.85, blue: 0.90),
+                Color(red: 0.70, green: 0.70, blue: 0.75),
+                Color(red: 0.55, green: 0.55, blue: 0.60)
+            ]
+        case 3: // Bronze - warm metallic gradient
+            return [
+                Color(red: 0.90, green: 0.60, blue: 0.35),
+                Color(red: 0.75, green: 0.45, blue: 0.20),
+                Color(red: 0.60, green: 0.35, blue: 0.15)
+            ]
+        default:
+            return [Color.cyan, Color.cyan.opacity(0.7)]
         }
     }
 
@@ -826,12 +1091,17 @@ struct ReceiptScanView: View {
         Task {
             do {
                 // Try the new unified all-time stats endpoint first
-                let allTimeStats = try await AnalyticsAPIService.shared.getAllTimeStats(topStoresLimit: 3)
+                // Request more stores/categories for the flippable card
+                let allTimeStats = try await AnalyticsAPIService.shared.getAllTimeStats(
+                    topStoresLimit: 5,
+                    topCategoriesLimit: 5
+                )
 
                 await MainActor.run {
                     totalReceiptsScanned = allTimeStats.totalReceipts
                     totalItemsScanned = allTimeStats.totalItems
                     topStores = allTimeStats.top3StoresByVisits
+                    topCategories = allTimeStats.topCategories ?? []
                 }
             } catch {
                 // Fallback to old multi-request approach if new endpoint not available

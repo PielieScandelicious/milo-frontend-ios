@@ -560,6 +560,122 @@ struct FlippableAllStoresChartView: View {
     }
 }
 
+// MARK: - Flippable All-Time Stores/Categories Chart View
+/// A flippable donut chart that shows All-Time Top Stores on the front
+/// and All-Time Top Categories on the back when tapped.
+struct FlippableAllTimeChartView: View {
+    let topStores: [TopStoreSpend]
+    let topCategories: [TopCategory]?
+    let totalSpend: Double
+    let totalReceipts: Int
+    let size: CGFloat
+
+    @State private var isFlipped = false
+    @State private var flipDegrees: Double = 0
+
+    private let colors: [Color] = [
+        Color(red: 0.3, green: 0.7, blue: 1.0),   // Blue
+        Color(red: 0.4, green: 0.8, blue: 0.5),   // Green
+        Color(red: 1.0, green: 0.7, blue: 0.3),   // Orange
+        Color(red: 0.9, green: 0.4, blue: 0.6),   // Pink
+        Color(red: 0.7, green: 0.5, blue: 1.0),   // Purple
+        Color(red: 0.3, green: 0.9, blue: 0.9),   // Cyan
+        Color(red: 1.0, green: 0.6, blue: 0.4),   // Coral
+        Color(red: 0.6, green: 0.9, blue: 0.4),   // Lime
+    ]
+
+    /// Convert top stores to ChartData for the donut chart
+    private var storesChartData: [ChartData] {
+        topStores.enumerated().map { index, store in
+            ChartData(
+                value: store.totalSpent,
+                color: colors[index % colors.count],
+                iconName: "storefront.fill",
+                label: store.storeName
+            )
+        }
+    }
+
+    /// Convert top categories to ChartData for the donut chart
+    private var categoriesChartData: [ChartData] {
+        guard let categories = topCategories else { return [] }
+        return categories.enumerated().map { index, category in
+            ChartData(
+                value: category.totalSpent,
+                color: colors[index % colors.count],
+                iconName: category.icon,
+                label: category.name
+            )
+        }
+    }
+
+    /// Whether categories data is available
+    private var hasCategoriesData: Bool {
+        guard let categories = topCategories else { return false }
+        return !categories.isEmpty
+    }
+
+    var body: some View {
+        ZStack {
+            // Back side - Categories Donut Chart
+            Group {
+                if hasCategoriesData {
+                    IconDonutChartView(
+                        data: categoriesChartData,
+                        totalAmount: totalSpend,
+                        size: size,
+                        currencySymbol: "€",
+                        subtitle: nil
+                    )
+                } else {
+                    // Empty state when no categories data
+                    VStack(spacing: 12) {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: size * 0.2))
+                            .foregroundColor(.white.opacity(0.3))
+
+                        Text("No category data")
+                            .font(.system(size: size * 0.08, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+
+                        Text("Tap to flip back")
+                            .font(.system(size: size * 0.06))
+                            .foregroundColor(.white.opacity(0.25))
+                    }
+                    .frame(width: size, height: size)
+                }
+            }
+            .opacity(isFlipped ? 1 : 0)
+            .rotation3DEffect(
+                .degrees(180),
+                axis: (x: 0, y: 1, z: 0)
+            )
+
+            // Front side - Stores Donut Chart
+            IconDonutChartView(
+                data: storesChartData,
+                totalAmount: Double(totalReceipts),
+                size: size,
+                currencySymbol: "",
+                subtitle: "receipts"
+            )
+            .opacity(isFlipped ? 0 : 1)
+        }
+        .contentShape(Rectangle())
+        .rotation3DEffect(
+            .degrees(flipDegrees),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: 0.5
+        )
+        .onTapGesture {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                isFlipped.toggle()
+                flipDegrees += 180
+            }
+        }
+    }
+}
+
 // MARK: - Preview
 #Preview("Flippable Chart") {
     ZStack {

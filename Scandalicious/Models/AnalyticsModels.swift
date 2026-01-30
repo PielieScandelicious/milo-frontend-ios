@@ -847,6 +847,7 @@ struct AllTimeStatsResponse: Codable {
     let averageHealthScore: Double?
     let topStoresByVisits: [TopStoreVisit]
     let topStoresBySpend: [TopStoreSpend]
+    let topCategories: [TopCategory]?
     let firstReceiptDate: String?
     let lastReceiptDate: String?
 
@@ -859,6 +860,7 @@ struct AllTimeStatsResponse: Codable {
         case averageHealthScore = "average_health_score"
         case topStoresByVisits = "top_stores_by_visits"
         case topStoresBySpend = "top_stores_by_spend"
+        case topCategories = "top_categories"
         case firstReceiptDate = "first_receipt_date"
         case lastReceiptDate = "last_receipt_date"
     }
@@ -889,6 +891,36 @@ struct TopStoreSpend: Codable, Identifiable {
         case storeName = "store_name"
         case totalSpent = "total_spent"
         case rank
+    }
+}
+
+struct TopCategory: Codable, Identifiable {
+    let name: String
+    let totalSpent: Double
+    let percentage: Double
+    let transactionCount: Int
+    let averageHealthScore: Double?
+    let rank: Int
+
+    var id: String { name }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case totalSpent = "total_spent"
+        case percentage
+        case transactionCount = "transaction_count"
+        case averageHealthScore = "average_health_score"
+        case rank
+    }
+
+    /// Get the corresponding AnalyticsCategory for icon/display
+    var analyticsCategory: AnalyticsCategory? {
+        AnalyticsCategory.allCases.first { $0.displayName == name }
+    }
+
+    /// Get the SF Symbol icon for this category
+    var icon: String {
+        analyticsCategory?.icon ?? "shippingbox.fill"
     }
 }
 
