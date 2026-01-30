@@ -95,6 +95,12 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
     /// Optional badge text (e.g., "Recent Scan")
     var badgeText: String? = nil
 
+    /// Whether to show the date in the card header
+    var showDate: Bool = true
+
+    /// Whether to show the item count badge in the card header
+    var showItemCount: Bool = true
+
     @State private var showDeleteConfirmation = false
 
     init(
@@ -103,7 +109,9 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
         onTap: @escaping () -> Void,
         onDelete: (() -> Void)? = nil,
         accentColor: Color = .white,
-        badgeText: String? = nil
+        badgeText: String? = nil,
+        showDate: Bool = true,
+        showItemCount: Bool = true
     ) {
         self.receipt = receipt
         self.isExpanded = isExpanded
@@ -111,6 +119,8 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
         self.onDelete = onDelete
         self.accentColor = accentColor
         self.badgeText = badgeText
+        self.showDate = showDate
+        self.showItemCount = showItemCount
     }
 
     private var formattedDate: String {
@@ -185,27 +195,31 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
 
-                    // Date inline
-                    Text("•")
-                        .font(.system(size: 8))
-                        .foregroundColor(.white.opacity(0.3))
+                    // Date inline (conditionally shown)
+                    if showDate {
+                        Text("•")
+                            .font(.system(size: 8))
+                            .foregroundColor(.white.opacity(0.3))
 
-                    Text(formattedDate)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
+                        Text(formattedDate)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
 
                     Spacer()
 
-                    // Item count pill
-                    Text("\(itemCount)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.6))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.08))
-                        )
+                    // Item count pill (conditionally shown)
+                    if showItemCount {
+                        Text("\(itemCount)")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.6))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                    }
 
                     // Total amount
                     Text(String(format: "€%.2f", receipt.displayTotalAmount))

@@ -739,7 +739,9 @@ struct ReceiptScanView: View {
                 }
             },
             accentColor: .green,
-            badgeText: "Recent Scan"
+            badgeText: "Recent Scan",
+            showDate: false,
+            showItemCount: false
         )
     }
 
@@ -749,7 +751,7 @@ struct ReceiptScanView: View {
         HStack(spacing: 12) {
             Image(systemName: "square.and.arrow.up.fill")
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(Color(red: 0.85, green: 0.2, blue: 0.6))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("Got a digital receipt?")
@@ -793,7 +795,7 @@ struct ReceiptScanView: View {
 
     private var syncedStatusBanner: some View {
         HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: "checkmark.icloud.fill")
                 .font(.system(size: 16, weight: .semibold))
             Text("Synced")
                 .font(.system(size: 14, weight: .semibold))

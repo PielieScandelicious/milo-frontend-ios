@@ -1524,7 +1524,7 @@ struct OverviewView: View {
                                 Text("Syncing")
                                     .font(.system(size: 12, weight: .medium))
                             } else if showSyncedConfirmation {
-                                Image(systemName: "checkmark.circle.fill")
+                                Image(systemName: "checkmark.icloud.fill")
                                     .font(.system(size: 11))
                                 Text("Synced")
                                     .font(.system(size: 12, weight: .medium))
