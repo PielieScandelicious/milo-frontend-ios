@@ -64,10 +64,40 @@ class ReceiptsViewModel: ObservableObject {
 
             print("✅ GET /receipts - returned \(response.receipts.count) receipts (total: \(response.total), page \(response.page)/\(response.totalPages))")
 
+            // Auto-load remaining pages to show all receipts at initial load
+            if reset && hasMorePages {
+                await loadAllRemainingPages(period: period, storeName: storeName)
+            }
+
         } catch {
             print("❌ GET /receipts - error: \(error.localizedDescription)")
             state = .error(error.localizedDescription)
         }
+    }
+
+    /// Load all remaining pages automatically
+    private func loadAllRemainingPages(period: String, storeName: String?) async {
+        while hasMorePages {
+            currentPage += 1
+            filters.page = currentPage
+
+            print("📄 Auto-loading page \(currentPage) of \(totalPages)")
+
+            do {
+                let response = try await apiService.fetchReceipts(filters: filters)
+                receipts.append(contentsOf: response.receipts)
+                hasMorePages = response.page < response.totalPages
+                state = .success(receipts)
+
+                print("✅ Page \(currentPage) loaded - total receipts: \(receipts.count)")
+            } catch {
+                print("❌ Failed to load page \(currentPage): \(error.localizedDescription)")
+                break
+            }
+        }
+
+        hasMorePages = false
+        print("📋 All \(receipts.count) receipts loaded")
     }
 
     /// Load next page of receipts
