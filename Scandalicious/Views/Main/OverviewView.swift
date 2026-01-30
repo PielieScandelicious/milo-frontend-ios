@@ -45,6 +45,9 @@ struct OverviewView: View {
     // Track if refreshWithRetry is currently running to prevent duplicate calls
     @State private var isRefreshWithRetryRunning = false
 
+    // Track when syncing just completed to show "Synced" confirmation
+    @State private var showSyncedConfirmation = false
+
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
@@ -479,6 +482,21 @@ struct OverviewView: View {
                 await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
             }
             await rateLimitManager.syncFromBackend()
+
+            // Show "Synced" confirmation briefly
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showSyncedConfirmation = true
+                }
+            }
+
+            // Hide "Synced" confirmation after 2 seconds
+            try? await Task.sleep(for: .seconds(2))
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showSyncedConfirmation = false
+                }
+            }
         }
     }
 
@@ -756,6 +774,11 @@ struct OverviewView: View {
             isReceiptUploading = false
             isRefreshWithRetryRunning = false
 
+            // Show "Synced" confirmation briefly
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showSyncedConfirmation = true
+            }
+
             // Keep period in loadedReceiptPeriods to prevent duplicate loads
             // The loadReceipts call with reset:true will refresh the data
 
@@ -769,6 +792,14 @@ struct OverviewView: View {
 
             // Update refresh time for "Updated X ago" display
             lastRefreshTime = Date()
+        }
+
+        // Hide "Synced" confirmation after 2 seconds
+        try? await Task.sleep(for: .seconds(2))
+        await MainActor.run {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showSyncedConfirmation = false
+            }
         }
 
         // Reload receipts for current month if it's the selected period
@@ -1490,9 +1521,13 @@ struct OverviewView: View {
                             if isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
                                 SyncingArrowsView()
                                     .font(.system(size: 11))
-                                Text("Syncing...")
+                                Text("Syncing")
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.blue)
+                            } else if showSyncedConfirmation {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 11))
+                                Text("Synced")
+                                    .font(.system(size: 12, weight: .medium))
                             } else {
                                 Image(systemName: "chart.line.uptrend.xyaxis")
                                     .font(.system(size: 11))
@@ -1500,7 +1535,10 @@ struct OverviewView: View {
                                     .font(.system(size: 12, weight: .medium))
                             }
                         }
-                        .foregroundColor(isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue : .white.opacity(0.4))
+                        .foregroundColor(
+                            isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue :
+                            showSyncedConfirmation ? .green : .white.opacity(0.4)
+                        )
                     }
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)

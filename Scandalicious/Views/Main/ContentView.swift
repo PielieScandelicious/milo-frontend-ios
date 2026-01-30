@@ -202,7 +202,7 @@ struct ScandaLiciousTab: View {
     private var syncingStatusBanner: some View {
         HStack(spacing: 6) {
             SyncingArrowsView()
-            Text("Syncing...")
+            Text("Syncing")
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.blue)

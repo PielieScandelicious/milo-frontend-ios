@@ -775,7 +775,7 @@ struct ReceiptScanView: View {
             // Spinning arrow animation
             ScanSyncingArrowView()
 
-            Text("Syncing receipt...")
+            Text("Syncing")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
         }
