@@ -143,9 +143,9 @@ struct ReceiptScanView: View {
 
                     // Hide after delay and start processing
                     Task {
-                        try? await Task.sleep(for: .seconds(1.8))
+                        try? await Task.sleep(for: .seconds(2.2))
                         await MainActor.run {
-                            withAnimation(.easeOut(duration: 0.3)) {
+                            withAnimation(.easeOut(duration: 0.4)) {
                                 showCaptureSuccess = false
                             }
                         }
@@ -1192,7 +1192,7 @@ struct CaptureSuccessOverlay: View {
             }
 
             // Subtle glow pulse
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true).delay(0.5)) {
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true).delay(0.6)) {
                 innerGlowOpacity = 0.6
             }
         }
@@ -1256,7 +1256,7 @@ struct PremiumSuccessAnimation: View {
             glowScale = 1.2
         }
 
-        withAnimation(.easeInOut(duration: 1.5).delay(0.6)) {
+        withAnimation(.easeInOut(duration: 1.6).delay(0.6)) {
             glowOpacity = 0.4
         }
 
@@ -1267,7 +1267,7 @@ struct PremiumSuccessAnimation: View {
                 id: i,
                 delay: Double(i) * 0.15,
                 maxScale: 2.5 + Double(i) * 0.5,
-                duration: 1.0 + Double(i) * 0.2,
+                duration: 1.1 + Double(i) * 0.2,
                 strokeWidth: 2.0 - Double(i) * 0.5
             ))
         }
@@ -1286,7 +1286,7 @@ struct PremiumSuccessAnimation: View {
                 distance: distance,
                 size: CGFloat.random(in: 2...5),
                 delay: Double(wave) * 0.1 + Double.random(in: 0...0.2),
-                duration: Double.random(in: 1.2...1.8)
+                duration: Double.random(in: 1.3...1.9)
             ))
         }
         particles = particleData
@@ -1340,7 +1340,7 @@ struct PremiumRingView: View {
                     scale = data.maxScale
                 }
 
-                withAnimation(.easeIn(duration: 0.5).delay(data.delay + data.duration * 0.5)) {
+                withAnimation(.easeIn(duration: 0.5).delay(data.delay + data.duration * 0.55)) {
                     opacity = 0
                 }
             }
