@@ -144,59 +144,17 @@ struct IconDonutChartView: View {
             // All segments visible, rotate and scale together
             ZStack {
                 ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
-                    // Segment group with tap gesture
-                    ZStack {
-                        // Subtle outer glow for depth (enhanced when selected)
-                        Circle()
-                            .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
-                            .stroke(
-                                segment.data.color.opacity(isSelected(index) ? 0.5 : 0.25),
-                                style: StrokeStyle(
-                                    lineWidth: strokeWidth + (isSelected(index) ? 6 : 3),
-                                    lineCap: .round
-                                )
+                    // Segment - clean, solid color
+                    Circle()
+                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                        .stroke(
+                            segment.data.color,
+                            style: StrokeStyle(
+                                lineWidth: strokeWidth,
+                                lineCap: .round
                             )
-                            .blur(radius: isSelected(index) ? 4 : 2)
-                            .frame(width: size - strokeWidth, height: size - strokeWidth)
-
-                        // Main segment with gradient
-                        Circle()
-                            .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        segment.data.color.opacity(1.0),
-                                        segment.data.color.opacity(0.7)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                style: StrokeStyle(
-                                    lineWidth: strokeWidth,
-                                    lineCap: .round
-                                )
-                            )
-                            .frame(width: size - strokeWidth, height: size - strokeWidth)
-
-                        // Inner highlight for glass effect
-                        Circle()
-                            .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.4),
-                                        Color.white.opacity(0.0)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .center
-                                ),
-                                style: StrokeStyle(
-                                    lineWidth: strokeWidth * 0.5,
-                                    lineCap: .round
-                                )
-                            )
-                            .frame(width: size - strokeWidth, height: size - strokeWidth)
-                    }
+                        )
+                        .frame(width: size - strokeWidth, height: size - strokeWidth)
                     .scaleEffect(isSelected(index) ? 1.08 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedSegmentIndex)
                     // Overlay invisible tap target with proper arc shape

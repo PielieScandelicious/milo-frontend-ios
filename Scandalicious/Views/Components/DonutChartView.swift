@@ -159,7 +159,17 @@ extension Array where Element == CategoryBreakdown {
 extension Array where Element == APIStoreBreakdown {
     func toChartSegments() -> [ChartSegment] {
         var currentAngle: Double = 0
-        let storeColors: [Color] = [.blue, .green, .orange, .purple, .pink, .cyan, .yellow, .red]
+        // Premium high-contrast store colors
+        let storeColors: [Color] = [
+            Color(red: 0.45, green: 0.35, blue: 0.95),   // Royal purple
+            Color(red: 0.15, green: 0.82, blue: 0.78),   // Bright teal
+            Color(red: 1.0, green: 0.58, blue: 0.20),    // Amber orange
+            Color(red: 0.95, green: 0.35, blue: 0.65),   // Magenta pink
+            Color(red: 0.18, green: 0.80, blue: 0.44),   // Emerald green
+            Color(red: 0.25, green: 0.72, blue: 1.0),    // Electric blue
+            Color(red: 1.0, green: 0.78, blue: 0.22),    // Golden yellow
+            Color(red: 1.0, green: 0.36, blue: 0.42),    // Coral red
+        ]
 
         return enumerated().map { index, store in
             let percentage = store.percentage / 100.0

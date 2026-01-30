@@ -13,12 +13,28 @@ struct AllStoresBreakdownView: View {
     let totalSpend: Double  // Total spend from backend (sum of item_price)
     let totalReceipts: Int  // Total receipt count from backend
     @Environment(\.dismiss) private var dismiss
-    @State private var showingAllTransactions = false
     @State private var selectedStoreName: String?
     @State private var showingStoreTransactions = false
     @State private var trends: [TrendPeriod] = []
     @State private var isLoadingTrends = false
-    
+
+    // Calculate weighted average health score across all stores
+    private var overallHealthScore: Double? {
+        let storesWithScores = breakdowns.filter { $0.averageHealthScore != nil }
+        guard !storesWithScores.isEmpty else { return nil }
+
+        // Weight by spend amount for more accurate representation
+        let totalSpendWithScores = storesWithScores.reduce(0.0) { $0 + $1.totalStoreSpend }
+        guard totalSpendWithScores > 0 else { return nil }
+
+        let weightedSum = storesWithScores.reduce(0.0) { sum, breakdown in
+            guard let score = breakdown.averageHealthScore else { return sum }
+            return sum + (score * breakdown.totalStoreSpend)
+        }
+
+        return weightedSum / totalSpendWithScores
+    }
+
     private var storeSegments: [StoreChartSegment] {
         var currentAngle: Double = 0
         let colors: [Color] = [
@@ -55,36 +71,11 @@ struct AllStoresBreakdownView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header - clickable to view all transactions
-                    Button {
-                        showingAllTransactions = true
-                    } label: {
-                        VStack(spacing: 8) {
-                            Text("Total Spend")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
-                                .textCase(.uppercase)
-                                .tracking(1.2)
-
-                            Text(String(format: "€%.0f", totalSpend))
-                                .font(.system(size: 44, weight: .heavy, design: .rounded))
-                                .foregroundColor(.white)
-
-                            Text(period)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                        }
-                        .padding(.vertical, 28)
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(StoresHeaderButtonStyle())
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.white.opacity(0.05))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    // Nutri Score Header
+                    NutriScoreHeader(
+                        healthScore: overallHealthScore,
+                        period: period,
+                        totalSpend: totalSpend
                     )
                     .padding(.horizontal)
                     
@@ -122,12 +113,6 @@ struct AllStoresBreakdownView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showingAllTransactions) {
-            ReceiptsListView(
-                period: period,
-                storeName: nil
-            )
-        }
         .navigationDestination(isPresented: $showingStoreTransactions) {
             if let storeName = selectedStoreName {
                 ReceiptsListView(
@@ -260,16 +245,6 @@ struct StoreChartSegment: Identifiable {
 }
 
 // MARK: - Button Styles
-// Note: DonutChartButtonStyle is defined in StoreDetailView.swift
-
-struct StoresHeaderButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
-}
 
 struct StoreRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -277,6 +252,91 @@ struct StoreRowButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .opacity(configuration.isPressed ? 0.8 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Nutri Score Header
+
+struct NutriScoreHeader: View {
+    let healthScore: Double?
+    let period: String
+    let totalSpend: Double
+
+    private var nutriScoreLetter: String {
+        guard let score = healthScore else { return "-" }
+        let rounded = Int(score.rounded())
+        return rounded.nutriScoreLetter
+    }
+
+    private var scoreColor: Color {
+        guard let score = healthScore else { return Color(white: 0.4) }
+        return score.healthScoreColor
+    }
+
+    private var scoreLabel: String {
+        guard let score = healthScore else { return "No Data" }
+        return score.healthScoreLabel
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            // Nutri Score Circle
+            ZStack {
+                Circle()
+                    .fill(scoreColor.opacity(0.15))
+                    .frame(width: 72, height: 72)
+
+                Circle()
+                    .stroke(scoreColor, lineWidth: 3)
+                    .frame(width: 72, height: 72)
+
+                Text(nutriScoreLetter)
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundColor(scoreColor)
+            }
+
+            // Score Details
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Nutri Score")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+                    .textCase(.uppercase)
+                    .tracking(1)
+
+                Text(scoreLabel)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+
+                if let score = healthScore {
+                    Text(String(format: "%.1f / 5", score))
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+
+            Spacer()
+
+            // Spend Summary
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(period)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+
+                Text(String(format: "€%.0f", totalSpend))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(scoreColor.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 
@@ -293,7 +353,8 @@ struct StoreRowButtonStyle: ButtonStyle {
                     categories: [
                         Category(name: "Meat & Fish", spent: 65.40, percentage: 34)
                     ],
-                    visitCount: 15
+                    visitCount: 15,
+                    averageHealthScore: 3.8
                 ),
                 StoreBreakdown(
                     storeName: "ALDI",
@@ -302,7 +363,8 @@ struct StoreRowButtonStyle: ButtonStyle {
                     categories: [
                         Category(name: "Fresh Produce", spent: 32.10, percentage: 34)
                     ],
-                    visitCount: 10
+                    visitCount: 10,
+                    averageHealthScore: 4.2
                 )
             ],
             totalSpend: 284.40,

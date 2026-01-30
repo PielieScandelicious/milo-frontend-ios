@@ -9,10 +9,11 @@ import SwiftUI
 
 struct StoreDetailView: View {
     let storeBreakdown: StoreBreakdown
+    var storeColor: Color = Color(red: 0.3, green: 0.7, blue: 1.0)  // Default to blue if not provided
     @Environment(\.dismiss) private var dismiss
     @State private var selectedCategory: String?
     @State private var selectedCategoryColor: Color?
-    @State private var showingAllTransactions = false
+    // Removed showingAllTransactions - header no longer navigates
     @State private var showingCategoryTransactions = false
     @State private var showingReceipts = false
     @State private var trends: [TrendPeriod] = []
@@ -44,6 +45,11 @@ struct StoreDetailView: View {
         Color(red: 0.95, green: 0.25, blue: 0.3)
     }
 
+    // Store accent color for header border - uses the color from donut chart segment
+    private var storeAccentColor: Color {
+        storeColor
+    }
+
     // Top 5 categories + "Other" grouping - uses refreshable currentCategories
     private var groupedChartSegments: [ChartSegment] {
         let sortedCategories = currentCategories.sorted { $0.spent > $1.spent }
@@ -67,106 +73,83 @@ struct StoreDetailView: View {
         return combinedCategories.toChartSegments()
     }
 
+    // MARK: - Store Header with Nutri Score
+
+    private var storeHeader: some View {
+        let scoreColor = currentHealthScore?.healthScoreColor ?? Color(white: 0.4)
+        let nutriLetter: String = {
+            guard let score = currentHealthScore else { return "-" }
+            return Int(score.rounded()).nutriScoreLetter
+        }()
+
+        return HStack(spacing: 0) {
+            // Left side: Store info
+            VStack(alignment: .leading, spacing: 6) {
+                Text(storeBreakdown.storeName)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+
+                Text(storeBreakdown.period)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+
+                Text(String(format: "€%.0f", currentTotalSpend))
+                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.top, 2)
+
+                Text("\(currentVisitCount) receipt\(currentVisitCount == 1 ? "" : "s")")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+
+            Spacer()
+
+            // Right side: Nutri Score
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(scoreColor.opacity(0.15))
+                        .frame(width: 64, height: 64)
+
+                    Circle()
+                        .stroke(scoreColor, lineWidth: 3)
+                        .frame(width: 64, height: 64)
+
+                    Text(nutriLetter)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(scoreColor)
+                }
+
+                if let score = currentHealthScore {
+                    Text(score.healthScoreLabel)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(scoreColor)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(storeAccentColor.opacity(0.25), lineWidth: 1)
+        )
+    }
+
     var body: some View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 0) {
-                    // Header card with glass-morphism - clickable to view all store transactions
-                    Button {
-                        showingAllTransactions = true
-                    } label: {
-                        VStack(spacing: 8) {
-                            // Store icon
-                            ZStack {
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.2)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .frame(width: 56, height: 56)
-
-                                Image(systemName: "storefront.fill")
-                                    .font(.system(size: 24, weight: .medium))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.purple, .blue],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                            }
-
-                            Text(storeBreakdown.storeName)
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                                .padding(.top, 4)
-
-                            Text(storeBreakdown.period)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-
-                            Text(String(format: "€%.0f", currentTotalSpend))
-                                .font(.system(size: 42, weight: .heavy, design: .rounded))
-                                .foregroundColor(.white)
-                                .padding(.top, 4)
-
-                            // Health Score indicator
-                            if let healthScore = currentHealthScore {
-                                HStack(spacing: 8) {
-                                    HealthScoreBadge(score: Int(healthScore.rounded()), size: .medium, style: .subtle)
-                                    Text(healthScore.healthScoreLabel)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(healthScore.healthScoreColor)
-                                }
-                                .padding(.top, 8)
-                            }
-
-                            // View all transactions hint
-                            HStack(spacing: 6) {
-                                Text("View all transactions")
-                                    .font(.system(size: 12, weight: .medium))
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .semibold))
-                            }
-                            .foregroundColor(.white.opacity(0.4))
-                            .padding(.top, 12)
-                        }
-                        .padding(.vertical, 24)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 24)
-                                    .fill(Color.white.opacity(0.04))
-                                RoundedRectangle(cornerRadius: 24)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color.white.opacity(0.07), Color.white.opacity(0.02)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                            }
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1
-                                )
-                        )
-                    }
-                    .buttonStyle(StoreHeaderButtonStyle())
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    // Sleek header card with Nutri Score
+                    storeHeader
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
 
                     // Donut chart section
                     FlippableDonutChartView(
@@ -206,14 +189,6 @@ struct StoreDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showingAllTransactions) {
-            TransactionListView(
-                storeName: storeBreakdown.storeName,
-                period: storeBreakdown.period,
-                category: nil,
-                categoryColor: nil
-            )
-        }
         .navigationDestination(isPresented: $showingCategoryTransactions) {
             TransactionListView(
                 storeName: storeBreakdown.storeName,
@@ -382,20 +357,16 @@ struct StoreDetailView: View {
                         Circle()
                             .fill(Color.white.opacity(0.08))
                             .frame(width: 40, height: 40)
+
                         Image(systemName: "doc.text.fill")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
                     }
 
-                    // Title and count
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Receipts")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                        Text("\(currentVisitCount) this period")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
+                    // Title
+                    Text("Receipts")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
 
                     Spacer()
 
@@ -421,8 +392,11 @@ struct StoreDetailView: View {
                 .padding(.vertical, 14)
                 .background(
                     ZStack {
+                        // Glass base
                         RoundedRectangle(cornerRadius: 20)
                             .fill(Color.white.opacity(0.04))
+
+                        // Gradient overlay
                         RoundedRectangle(cornerRadius: 20)
                             .fill(
                                 LinearGradient(
@@ -447,7 +421,7 @@ struct StoreDetailView: View {
             }
             .buttonStyle(ReceiptsHeaderButtonStyle())
 
-            // Expanded receipts list
+            // Expanded receipts list (no container background)
             if isReceiptsSectionExpanded {
                 VStack(spacing: 8) {
                     if receiptsViewModel.state.isLoading && receiptsViewModel.receipts.isEmpty {
@@ -498,7 +472,6 @@ struct StoreDetailView: View {
                     }
                 }
                 .padding(.top, 12)
-                .padding(.bottom, 16)
                 .transition(.opacity)
             }
         }
@@ -794,16 +767,6 @@ struct StoreDetailView: View {
 }
 
 // MARK: - Custom Button Styles
-struct StoreHeaderButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
-}
-
-// Note: ReceiptsHeaderButtonStyle is defined in OverviewView.swift and reused here
 
 struct CategoryRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -825,19 +788,22 @@ struct DonutChartButtonStyle: ButtonStyle {
 
 #Preview {
     NavigationStack {
-        StoreDetailView(storeBreakdown: StoreBreakdown(
-            storeName: "COLRUYT",
-            period: "January 2026",
-            totalStoreSpend: 189.90,
-            categories: [
-                Category(name: "Meat & Fish", spent: 65.40, percentage: 34),
-                Category(name: "Alcohol", spent: 42.50, percentage: 22),
-                Category(name: "Drinks (Soft/Soda)", spent: 28.00, percentage: 15),
-                Category(name: "Household", spent: 35.00, percentage: 18),
-                Category(name: "Snacks & Sweets", spent: 19.00, percentage: 11)
-            ],
-            visitCount: 15
-        ))
+        StoreDetailView(
+            storeBreakdown: StoreBreakdown(
+                storeName: "COLRUYT",
+                period: "January 2026",
+                totalStoreSpend: 189.90,
+                categories: [
+                    Category(name: "Meat & Fish", spent: 65.40, percentage: 34),
+                    Category(name: "Alcohol", spent: 42.50, percentage: 22),
+                    Category(name: "Drinks (Soft/Soda)", spent: 28.00, percentage: 15),
+                    Category(name: "Household", spent: 35.00, percentage: 18),
+                    Category(name: "Snacks & Sweets", spent: 19.00, percentage: 11)
+                ],
+                visitCount: 15
+            ),
+            storeColor: Color(red: 0.3, green: 0.7, blue: 1.0)  // Blue from donut chart
+        )
     }
     .preferredColorScheme(.dark)
 }

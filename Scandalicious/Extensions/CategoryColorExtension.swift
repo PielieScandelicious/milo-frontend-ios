@@ -7,108 +7,108 @@
 
 import SwiftUI
 
-// MARK: - Shared Category Color Logic
+// MARK: - Premium High-Contrast Category Colors
 extension String {
-    /// Intelligently assigns colors to categories based on their names and health characteristics
+    /// Intelligently assigns premium, high-contrast colors to categories
     var categoryColor: Color {
         let categoryName = self.lowercased()
-        
-        // Healthy categories - Green tones
+
+        // Healthy categories - Vibrant Emerald Green
         if categoryName.contains("fruit") || categoryName.contains("vegetable") ||
            categoryName.contains("salad") || categoryName.contains("greens") ||
            categoryName.contains("organic") || categoryName.contains("fresh produce") ||
            categoryName.contains("produce") {
-            return Color(red: 0.2, green: 0.8, blue: 0.4)  // Vibrant green
+            return Color(red: 0.18, green: 0.80, blue: 0.44)  // Emerald green
         }
-        
-        // Unhealthy categories - Red tones
+
+        // Unhealthy categories - Vivid Coral Red
         if categoryName.contains("snack") || categoryName.contains("sweet") ||
            categoryName.contains("candy") || categoryName.contains("chocolate") ||
            categoryName.contains("chips") || categoryName.contains("cookie") ||
            categoryName.contains("dessert") || categoryName.contains("cake") ||
            categoryName.contains("ice cream") || categoryName.contains("soda") ||
            categoryName.contains("soft") && categoryName.contains("drink") {
-            return Color(red: 1.0, green: 0.3, blue: 0.3)  // Vibrant red
+            return Color(red: 1.0, green: 0.36, blue: 0.42)  // Coral red
         }
-        
-        // Alcohol - Deep red/wine color
+
+        // Alcohol - Rich Burgundy
         if categoryName.contains("alcohol") || categoryName.contains("beer") ||
            categoryName.contains("wine") || categoryName.contains("spirit") {
-            return Color(red: 0.8, green: 0.2, blue: 0.3)  // Deep red
+            return Color(red: 0.72, green: 0.15, blue: 0.30)  // Burgundy
         }
-        
-        // Meat & Fish - Orange/salmon
+
+        // Meat & Fish - Warm Amber Orange
         if categoryName.contains("meat") || categoryName.contains("fish") ||
            categoryName.contains("poultry") || categoryName.contains("seafood") ||
            categoryName.contains("chicken") || categoryName.contains("beef") {
-            return Color(red: 1.0, green: 0.6, blue: 0.3)  // Orange/salmon
+            return Color(red: 1.0, green: 0.58, blue: 0.20)  // Amber orange
         }
-        
-        // Dairy - Light blue
+
+        // Dairy - Electric Sky Blue
         if categoryName.contains("dairy") || categoryName.contains("milk") ||
            categoryName.contains("cheese") || categoryName.contains("yogurt") ||
            categoryName.contains("egg") {
-            return Color(red: 0.4, green: 0.7, blue: 1.0)  // Light blue
+            return Color(red: 0.25, green: 0.72, blue: 1.0)  // Electric blue
         }
-        
-        // Bakery & Bread - Warm yellow/tan
+
+        // Bakery & Bread - Golden Yellow
         if categoryName.contains("bakery") || categoryName.contains("bread") ||
            categoryName.contains("pastry") || categoryName.contains("bake") {
-            return Color(red: 0.95, green: 0.8, blue: 0.4)  // Warm yellow
+            return Color(red: 1.0, green: 0.78, blue: 0.22)  // Golden yellow
         }
-        
-        // Household & Cleaning - Purple
+
+        // Household & Cleaning - Royal Purple
         if categoryName.contains("household") || categoryName.contains("cleaning") ||
            categoryName.contains("detergent") || categoryName.contains("supplies") {
-            return Color(red: 0.7, green: 0.5, blue: 1.0)  // Purple
+            return Color(red: 0.55, green: 0.35, blue: 0.95)  // Royal purple
         }
-        
-        // Personal Care - Pink
+
+        // Personal Care - Vivid Magenta Pink
         if categoryName.contains("personal") || categoryName.contains("care") ||
            categoryName.contains("hygiene") || categoryName.contains("cosmetic") ||
            categoryName.contains("beauty") {
-            return Color(red: 1.0, green: 0.6, blue: 0.8)  // Pink
+            return Color(red: 0.95, green: 0.35, blue: 0.65)  // Magenta pink
         }
-        
-        // Drinks (general, non-alcoholic) - Cyan
+
+        // Drinks (general, non-alcoholic) - Bright Teal
         if categoryName.contains("drink") || categoryName.contains("beverage") ||
            categoryName.contains("juice") || categoryName.contains("water") {
-            return Color(red: 0.3, green: 0.85, blue: 0.9)  // Cyan
+            return Color(red: 0.15, green: 0.82, blue: 0.78)  // Bright teal
         }
-        
-        // Frozen foods - Ice blue
+
+        // Frozen foods - Icy Cyan
         if categoryName.contains("frozen") {
-            return Color(red: 0.5, green: 0.8, blue: 0.95)  // Ice blue
+            return Color(red: 0.40, green: 0.85, blue: 0.98)  // Icy cyan
         }
-        
-        // Canned/Preserved - Brown
+
+        // Canned/Preserved - Rich Bronze
         if categoryName.contains("canned") || categoryName.contains("preserved") {
-            return Color(red: 0.7, green: 0.5, blue: 0.3)  // Brown
+            return Color(red: 0.80, green: 0.55, blue: 0.25)  // Bronze
         }
-        
-        // Pantry/General - Brown
+
+        // Pantry/General - Warm Copper
         if categoryName.contains("pantry") {
-            return Color(red: 0.7, green: 0.5, blue: 0.3)  // Brown
+            return Color(red: 0.85, green: 0.50, blue: 0.30)  // Copper
         }
-        
-        // Ready meals - Orange
+
+        // Ready meals - Sunset Orange
         if categoryName.contains("ready") || categoryName.contains("meal") {
-            return Color(red: 1.0, green: 0.6, blue: 0.4)  // Coral
+            return Color(red: 1.0, green: 0.50, blue: 0.30)  // Sunset orange
         }
 
-        // "Other" category (grouped smaller categories) - Neutral gray
+        // "Other" category - Soft Steel
         if categoryName == "other" {
-            return Color(red: 0.55, green: 0.55, blue: 0.6)  // Neutral gray
+            return Color(red: 0.55, green: 0.58, blue: 0.65)  // Steel gray
         }
 
-        // Default fallback colors for uncategorized items
+        // Premium fallback colors for uncategorized items
         let fallbackColors: [Color] = [
-            Color(red: 0.6, green: 0.7, blue: 0.8),   // Gray-blue
-            Color(red: 0.8, green: 0.7, blue: 0.6),   // Tan
-            Color(red: 0.7, green: 0.6, blue: 0.7),   // Mauve
-            Color(red: 0.6, green: 0.8, blue: 0.7),   // Mint
+            Color(red: 0.45, green: 0.70, blue: 0.95),   // Ocean blue
+            Color(red: 0.90, green: 0.55, blue: 0.35),   // Terracotta
+            Color(red: 0.65, green: 0.45, blue: 0.80),   // Lavender
+            Color(red: 0.35, green: 0.75, blue: 0.60),   // Jade
         ]
-        
+
         // Use hash of category name to consistently assign same color
         let hash = abs(categoryName.hashValue)
         return fallbackColors[hash % fallbackColors.count]

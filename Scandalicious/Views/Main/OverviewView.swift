@@ -55,6 +55,7 @@ struct OverviewView: View {
     @State private var showingFilterSheet = false
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
+    @State private var selectedStoreColor: Color = Color(red: 0.3, green: 0.7, blue: 1.0)
     @State private var showingAllTransactions = false
     @State private var showTrendlineInOverview = false  // Toggle between pie chart and trendline
     @State private var lastRefreshTime: Date?
@@ -326,7 +327,7 @@ struct OverviewView: View {
                 }
             }
             .navigationDestination(item: $selectedBreakdown) { breakdown in
-                StoreDetailView(storeBreakdown: breakdown)
+                StoreDetailView(storeBreakdown: breakdown, storeColor: selectedStoreColor)
             }
             .navigationDestination(isPresented: $showingAllTransactions) {
                 allTransactionsDestination
@@ -970,7 +971,10 @@ struct OverviewView: View {
                         StoreRowButton(
                             segment: segment,
                             breakdowns: breakdowns,
-                            onSelect: { selectedBreakdown = $0 }
+                            onSelect: { breakdown, color in
+                                selectedStoreColor = color
+                                selectedBreakdown = breakdown
+                            }
                         )
                         .opacity(storeRowsAppeared ? 1 : 0)
                         .offset(y: storeRowsAppeared ? 0 : 15)
@@ -1588,13 +1592,13 @@ struct OverviewView: View {
 private struct StoreRowButton: View {
     let segment: StoreChartSegment
     let breakdowns: [StoreBreakdown]
-    let onSelect: (StoreBreakdown) -> Void
+    let onSelect: (StoreBreakdown, Color) -> Void
 
     var body: some View {
         Button {
             // Find the matching breakdown - O(n) but only on tap, not on render
             if let breakdown = breakdowns.first(where: { $0.storeName == segment.storeName }) {
-                onSelect(breakdown)
+                onSelect(breakdown, segment.color)
             }
         } label: {
             HStack(spacing: 12) {
