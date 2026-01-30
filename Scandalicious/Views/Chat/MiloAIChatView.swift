@@ -2,7 +2,7 @@
 //  ScandaLiciousAIChatView.swift
 //  Scandalicious
 //
-//  ChatGPT-like Experience
+//  ChatGPT-like Experience - Redesigned
 //  Created by Gilles Moenaert on 19/01/2026.
 //
 
@@ -10,6 +10,15 @@ import SwiftUI
 import Combine
 import FirebaseAuth
 import StoreKit
+
+// MARK: - Milo Brand Colors
+private extension Color {
+    static let miloPurple = Color(red: 0.45, green: 0.15, blue: 0.85)
+    static let miloPurpleLight = Color(red: 0.55, green: 0.25, blue: 0.95)
+    static let miloBackground = Color(white: 0.05)
+    static let miloCardBackground = Color.white.opacity(0.06)
+    static let miloCardBackgroundHover = Color.white.opacity(0.10)
+}
 
 struct ScandaLiciousAIChatView: View {
     @EnvironmentObject var transactionManager: TransactionManager
@@ -24,151 +33,19 @@ struct ScandaLiciousAIChatView: View {
     @State private var showManageSubscription = false
     @State private var showRateLimitAlert = false
     @State private var showClearButton = false
+    @State private var inputAreaOpacity: Double = 1.0
 
-    
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Background
-            Color(white: 0.05)
-                .ignoresSafeArea()
-
-            // Main chat area
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        // Top spacing to lower content
-                        Color.clear
-                            .frame(height: 40)
-                        if viewModel.messages.isEmpty && showWelcome {
-                            WelcomeView(
-                                messageText: $messageText,
-                                isInputFocused: $isInputFocused,
-                                onSend: sendMessage
-                            )
-                            .padding(.horizontal)
-                            .padding(.top, 20)
-                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                        } else {
-                            // Messages - no extra padding needed
-                            ForEach(viewModel.messages) { message in
-                                MessageBubbleView(message: message)
-                                    .environmentObject(viewModel)
-                                    .id(message.id)
-                                    .transition(.opacity)
-                            }
-                        }
-                        
-                        // Bottom padding for input area
-                        Color.clear
-                            .frame(height: 100)
-                    }
-                }
-                .onChange(of: viewModel.messages.count) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        if let lastMessage = viewModel.messages.last {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
-                    // Show clear button when messages appear
-                    if !viewModel.messages.isEmpty && !showClearButton {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            showClearButton = true
-                        }
-                    }
-                }
-                .onChange(of: isInputFocused) {
-                    if isInputFocused {
-                        // Scroll to bottom when keyboard appears
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            withAnimation {
-                                if let lastMessage = viewModel.messages.last {
-                                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Floating input area
-            VStack(spacing: 0) {
-                // Gradient fade effect above input
-                LinearGradient(
-                    colors: [
-                        Color(white: 0.05).opacity(0),
-                        Color(white: 0.05).opacity(0.8),
-                        Color(white: 0.05)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 25)
-                
-                HStack(alignment: .bottom, spacing: 8) {
-                    // Message input field
-                    HStack(alignment: .bottom, spacing: 8) {
-                        TextField("Ask Milo", text: $messageText, axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .focused($isInputFocused)
-                            .lineLimit(1...6)
-                        
-                        // Send or Stop button
-                        Button {
-                            if viewModel.isLoading {
-                                viewModel.stopGeneration()
-                            } else {
-                                sendMessage()
-                            }
-                        } label: {
-                            if viewModel.isLoading {
-                                Image(systemName: "stop.circle.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundStyle(.gray)
-                            } else {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundStyle(messageText.isEmpty ? Color(.systemGray3) : .white)
-                                    .background(
-                                        Circle()
-                                            .fill(messageText.isEmpty ? Color.clear : Color.blue)
-                                            .frame(width: 28, height: 28)
-                                    )
-                            }
-                        }
-                        .disabled(messageText.isEmpty && !viewModel.isLoading)
-                        .padding(.trailing, 4)
-                        .padding(.bottom, 4)
-                    }
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
-                .background(Color(white: 0.05))
-            }
+            backgroundView
+            chatContentView
+            floatingInputArea
         }
         .navigationTitle(viewModel.messages.isEmpty ? "" : "Milo")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Clear chat button - leading (left side), only visible when chat is active
             if showClearButton {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            viewModel.clearConversation()
-                            showWelcome = true
-                            showClearButton = false
-                        }
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.red.opacity(0.8))
-                    }
-                    .buttonStyle(.plain)
-                }
+                clearButtonToolbarItem
             }
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
@@ -179,16 +56,230 @@ struct ScandaLiciousAIChatView: View {
         }
         .onAppear {
             viewModel.setTransactions(transactionManager.transactions)
-            // Sync rate limit on appear
             Task {
                 await rateLimitManager.syncFromBackend()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // Sync rate limit when app returns to foreground
             Task {
                 await rateLimitManager.syncFromBackend()
             }
+        }
+    }
+    
+    // MARK: - View Components
+    
+    private var backgroundView: some View {
+        ZStack {
+            Color.miloBackground
+
+            // Subtle purple ambient glow at top
+            RadialGradient(
+                colors: [Color.miloPurple.opacity(0.08), Color.clear],
+                center: .top,
+                startRadius: 0,
+                endRadius: 400
+            )
+        }
+        .ignoresSafeArea()
+    }
+    
+    private var chatContentView: some View {
+        ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // Top spacing
+                        Color.clear.frame(height: 20)
+
+                        if viewModel.messages.isEmpty && showWelcome {
+                            WelcomeView(
+                                messageText: $messageText,
+                                isInputFocused: $isInputFocused,
+                                onSend: sendMessage
+                            )
+                            .padding(.horizontal, 20)
+                            .padding(.top, 40)
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        } else {
+                            // Messages with refined spacing
+                            ForEach(viewModel.messages) { message in
+                                MessageBubbleView(message: message)
+                                    .environmentObject(viewModel)
+                                    .id(message.id)
+                                    .transition(.asymmetric(
+                                        insertion: .opacity.combined(with: .move(edge: .bottom)),
+                                        removal: .opacity
+                                    ))
+                            }
+                        }
+
+                        // Bottom padding for input area
+                        Color.clear.frame(height: 120)
+                    }
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .onChange(of: viewModel.messages.count) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        if let lastMessage = viewModel.messages.last {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                    if !viewModel.messages.isEmpty && !showClearButton {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showClearButton = true
+                        }
+                    }
+                }
+                .onChange(of: isInputFocused) {
+                    if isInputFocused {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                if let lastMessage = viewModel.messages.last {
+                                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                                }
+                            }
+                        }
+                    }
+                }
+        }
+    }
+    
+    private var floatingInputArea: some View {
+        VStack(spacing: 0) {
+            gradientFade
+            inputContainer
+        }
+    }
+    
+    private var gradientFade: some View {
+        LinearGradient(
+            colors: [
+                Color.miloBackground.opacity(0),
+                Color.miloBackground.opacity(0.95),
+                Color.miloBackground
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: 40)
+    }
+    
+    private var inputContainer: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            textInputField
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 24)
+        .background(Color.miloBackground)
+    }
+    
+    private var textInputField: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            TextField("Ask Milo anything...", text: $messageText, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.system(size: 16))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .focused($isInputFocused)
+                .lineLimit(1...6)
+                .tint(Color.miloPurple)
+
+            sendButton
+        }
+        .background(textInputBackground)
+        .animation(.easeInOut(duration: 0.2), value: isInputFocused)
+    }
+    
+    private var sendButton: some View {
+        Button {
+            if viewModel.isLoading {
+                viewModel.stopGeneration()
+            } else {
+                sendMessage()
+            }
+        } label: {
+            sendButtonLabel
+        }
+        .disabled(messageText.isEmpty && !viewModel.isLoading)
+        .padding(.trailing, 6)
+        .padding(.bottom, 6)
+    }
+    
+    @ViewBuilder
+    private var sendButtonLabel: some View {
+        Group {
+            if viewModel.isLoading {
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Color.gray.opacity(0.6))
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(messageText.isEmpty ? .gray : .white)
+                    .frame(width: 32, height: 32)
+                    .background(sendButtonBackground)
+                    .clipShape(Circle())
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: messageText.isEmpty)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isLoading)
+    }
+    
+    @ViewBuilder
+    private var sendButtonBackground: some View {
+        if messageText.isEmpty {
+            Color.white.opacity(0.1)
+        } else {
+            LinearGradient(
+                colors: [Color.miloPurple, Color.miloPurpleLight],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    private var textInputBackground: some View {
+        RoundedRectangle(cornerRadius: 24)
+            .fill(Color.white.opacity(0.08))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(isInputFocused ? 0.2 : 0.08),
+                                Color.white.opacity(isInputFocused ? 0.1 : 0.04)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+    }
+    
+    @ToolbarContentBuilder
+    private var clearButtonToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button {
+                // Haptic feedback
+                let impact = UIImpactFeedbackGenerator(style: .light)
+                impact.impactOccurred()
+
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    viewModel.clearConversation()
+                    showWelcome = true
+                    showClearButton = false
+                }
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.red.opacity(0.8))
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -196,24 +287,18 @@ struct ScandaLiciousAIChatView: View {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        // Check rate limit
         guard rateLimitManager.canSendMessage(for: subscriptionManager.subscriptionStatus) else {
             showRateLimitAlert = true
             return
         }
 
         messageText = ""
-
-        // Optimistically decrement the local counter
         rateLimitManager.decrementLocal()
 
-        // Smooth transition: hide welcome screen first
         if viewModel.messages.isEmpty {
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(.easeInOut(duration: 0.25)) {
                 showWelcome = false
             }
-
-            // Wait for welcome screen to fade out before sending
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 completeMessageSend(text: text)
             }
@@ -221,14 +306,13 @@ struct ScandaLiciousAIChatView: View {
             completeMessageSend(text: text)
         }
     }
-    
+
     private func completeMessageSend(text: String) {
         isInputFocused = false
-        
-        // Haptic feedback
+
         let impact = UIImpactFeedbackGenerator(style: .light)
         impact.impactOccurred()
-        
+
         Task {
             await viewModel.sendMessage(text)
         }
@@ -241,37 +325,62 @@ struct WelcomeView: View {
     @FocusState.Binding var isInputFocused: Bool
     let onSend: () -> Void
 
+    @State private var logoScale: CGFloat = 0.8
+    @State private var logoOpacity: Double = 0
+    @State private var textOpacity: Double = 0
+    @State private var cardsOpacity: Double = 0
+
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
 
-            // Hero section
-            VStack(spacing: 16) {
-                // Purple AI magic stars logo - transparent background
-                Image(systemName: "sparkles")
-                    .font(.system(size: 64, weight: .bold))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(
-                        Color(red: 0.45, green: 0.15, blue: 0.85),  // Deep vibrant purple
-                        Color(red: 0.55, green: 0.25, blue: 0.95)   // Slightly lighter purple accent
-                    )
-                    .padding(.bottom, 8)
+            // Hero section with staggered animation
+            VStack(spacing: 20) {
+                // Animated logo
+                ZStack {
+                    // Ambient glow
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.miloPurple.opacity(0.3), Color.clear],
+                                center: .center,
+                                startRadius: 20,
+                                endRadius: 60
+                            )
+                        )
+                        .frame(width: 120, height: 120)
+                        .blur(radius: 20)
 
-                Text("Milo")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    // Icon
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 52, weight: .semibold))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(
+                            Color.miloPurple,
+                            Color.miloPurpleLight
+                        )
+                }
+                .scaleEffect(logoScale)
+                .opacity(logoOpacity)
 
-                Text("Your AI shopping assistant")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.6))
+                VStack(spacing: 8) {
+                    Text("Milo")
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+
+                    Text("Your AI shopping assistant")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .opacity(textOpacity)
             }
-            .padding(.bottom, 40)
+            .padding(.bottom, 48)
 
-            // Sample prompts
-            VStack(spacing: 12) {
+            // Sample prompts with staggered animation
+            VStack(spacing: 10) {
                 SamplePromptCard(
                     icon: "leaf.fill",
-                    iconColor: .green,
+                    iconColor: Color(red: 0.2, green: 0.8, blue: 0.4),
                     title: "Analyze my diet",
                     subtitle: "Do I have enough protein?"
                 ) {
@@ -291,7 +400,7 @@ struct WelcomeView: View {
 
                 SamplePromptCard(
                     icon: "cart.fill",
-                    iconColor: .blue,
+                    iconColor: Color(red: 0.4, green: 0.7, blue: 1.0),
                     title: "Shopping habits",
                     subtitle: "Am I buying enough vegetables?"
                 ) {
@@ -300,8 +409,8 @@ struct WelcomeView: View {
                 }
 
                 SamplePromptCard(
-                    icon: "dollarsign.circle.fill",
-                    iconColor: .green,
+                    icon: "banknote.fill",
+                    iconColor: Color(red: 0.3, green: 0.85, blue: 0.6),
                     title: "Save money",
                     subtitle: "Where can I cut costs?"
                 ) {
@@ -309,10 +418,24 @@ struct WelcomeView: View {
                     onSend()
                 }
             }
+            .opacity(cardsOpacity)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            // Staggered entrance animation
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
+                logoScale = 1.0
+                logoOpacity = 1.0
+            }
+            withAnimation(.easeOut(duration: 0.5).delay(0.25)) {
+                textOpacity = 1.0
+            }
+            withAnimation(.easeOut(duration: 0.5).delay(0.4)) {
+                cardsOpacity = 1.0
+            }
+        }
     }
 }
 
@@ -322,58 +445,66 @@ struct SamplePromptCard: View {
     let title: String
     let subtitle: String
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: {
-            // Haptic feedback
             let impact = UIImpactFeedbackGenerator(style: .light)
             impact.impactOccurred()
-            
             action()
         }) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(iconColor)
-                    .frame(width: 36, height: 36)
-                    .background(iconColor.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            HStack(spacing: 14) {
+                // Icon with subtle gradient background
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(iconColor.opacity(0.15))
 
-                VStack(alignment: .leading, spacing: 3) {
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(iconColor)
+                }
+                .frame(width: 38, height: 38)
+
+                VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
 
                     Text(subtitle)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.white.opacity(0.45))
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.25))
             }
-            .padding(14)
-            .background(Color.white.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .scaleEffect(isPressed ? 0.97 : 1.0)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(isPressed ? 0.10 : 0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+            )
+            .scaleEffect(isPressed ? 0.98 : 1.0)
         }
-        .buttonStyle(ScaleButtonStyle(isPressed: $isPressed))
+        .buttonStyle(PromptCardButtonStyle(isPressed: $isPressed))
     }
 }
 
-// Custom button style for smooth press effect
-struct ScaleButtonStyle: ButtonStyle {
+struct PromptCardButtonStyle: ButtonStyle {
     @Binding var isPressed: Bool
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .onChange(of: configuration.isPressed) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                     isPressed = configuration.isPressed
                 }
             }
@@ -385,24 +516,22 @@ struct MessageBubbleView: View {
     let message: ChatMessage
     @State private var isVisible = false
     @EnvironmentObject var viewModel: ChatViewModel
-    
-    // Check if this message is currently streaming
+
     private var isStreaming: Bool {
         message.id == viewModel.streamingMessageId && viewModel.isLoading
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 if message.role == .user {
                     Spacer(minLength: 20)
                 }
-                
-                // Message content with smooth slide-in animation
+
+                // Message content
                 VStack(alignment: .leading, spacing: 0) {
                     Group {
                         if message.role == .assistant && message.content.isEmpty && message.id == viewModel.streamingMessageId && viewModel.isLoading {
-                            // Show typing indicator inline
                             TypingDotsView()
                         } else if message.role == .assistant {
                             MarkdownMessageView(content: message.content)
@@ -414,11 +543,10 @@ struct MessageBubbleView: View {
                                 .textSelection(.enabled)
                         }
                     }
-                    
-                    // Extra padding at the bottom INSIDE the bubble while streaming
+
+                    // Extra padding while streaming
                     if isStreaming && !message.content.isEmpty {
-                        Color.clear
-                            .frame(height: 150)
+                        Color.clear.frame(height: 150)
                     }
                 }
                 .opacity(isVisible ? 1.0 : 0.0)
@@ -427,7 +555,7 @@ struct MessageBubbleView: View {
                         isVisible = true
                     }
                 }
-                
+
                 if message.role == .assistant {
                     Spacer(minLength: 20)
                 }
@@ -436,8 +564,8 @@ struct MessageBubbleView: View {
             .padding(.horizontal, 20)
             .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
             .background(message.role == .assistant ? Color(.systemGray6).opacity(0.5) : Color.clear)
-            
-            // Extra padding OUTSIDE the bubble for scrolling breathing room
+
+            // Extra scroll space while streaming
             if isStreaming {
                 Color.clear
                     .frame(height: 100)
@@ -447,10 +575,10 @@ struct MessageBubbleView: View {
     }
 }
 
-// MARK: - Typing Dots (inline in message)
+// MARK: - Typing Dots
 struct TypingDotsView: View {
     @State private var animating = false
-    
+
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<3) { index in
@@ -468,27 +596,22 @@ struct TypingDotsView: View {
             }
         }
         .padding(.top, 4)
-        .onAppear {
-            animating = true
-        }
-        .onDisappear {
-            animating = false
-        }
+        .onAppear { animating = true }
+        .onDisappear { animating = false }
     }
 }
 
 // MARK: - Markdown Message View
 struct MarkdownMessageView: View {
     let content: String
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if hasMarkdownTable(content) {
                 renderContentWithTables(content)
             } else {
-                // Split by double newlines to create paragraphs
                 let paragraphs = content.components(separatedBy: "\n\n").filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                
+
                 ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
                     if let attributedString = try? AttributedString(markdown: paragraph) {
                         Text(attributedString)
@@ -506,23 +629,22 @@ struct MarkdownMessageView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    
+
     private func hasMarkdownTable(_ text: String) -> Bool {
         text.contains("|") && text.contains("---")
     }
-    
+
     @ViewBuilder
     private func renderContentWithTables(_ text: String) -> some View {
         let components = splitContentByTables(text)
-        
+
         ForEach(Array(components.enumerated()), id: \.offset) { index, component in
             if component.isTable {
                 MarkdownTableView(markdown: component.text)
                     .padding(.vertical, 4)
             } else if !component.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                // Also handle paragraphs in non-table content
                 let paragraphs = component.text.components(separatedBy: "\n\n").filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                
+
                 ForEach(Array(paragraphs.enumerated()), id: \.offset) { pIndex, paragraph in
                     if let attributedString = try? AttributedString(markdown: paragraph) {
                         Text(attributedString)
@@ -539,17 +661,17 @@ struct MarkdownMessageView: View {
             }
         }
     }
-    
+
     private func splitContentByTables(_ text: String) -> [(text: String, isTable: Bool)] {
         var result: [(String, Bool)] = []
         var currentText = ""
         var inTable = false
-        
+
         let lines = text.components(separatedBy: .newlines)
-        
+
         for line in lines {
             let isTableLine = line.contains("|")
-            
+
             if isTableLine != inTable {
                 if !currentText.isEmpty {
                     result.append((currentText, inTable))
@@ -557,14 +679,14 @@ struct MarkdownMessageView: View {
                 }
                 inTable = isTableLine
             }
-            
+
             currentText += line + "\n"
         }
-        
+
         if !currentText.isEmpty {
             result.append((currentText, inTable))
         }
-        
+
         return result
     }
 }
@@ -572,11 +694,11 @@ struct MarkdownMessageView: View {
 // MARK: - Markdown Table View
 struct MarkdownTableView: View {
     let markdown: String
-    
+
     private var parsedTable: (headers: [String], rows: [[String]]) {
         parseMarkdownTable(markdown)
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header row
@@ -593,7 +715,7 @@ struct MarkdownTableView: View {
                         )
                 }
             }
-            
+
             // Data rows
             ForEach(Array(parsedTable.rows.enumerated()), id: \.offset) { rowIndex, row in
                 HStack(spacing: 0) {
@@ -617,29 +739,27 @@ struct MarkdownTableView: View {
                 .stroke(Color(.systemGray3), lineWidth: 1)
         )
     }
-    
+
     private func parseMarkdownTable(_ markdown: String) -> (headers: [String], rows: [[String]]) {
         let lines = markdown.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty && $0.contains("|") }
-        
+
         guard lines.count >= 2 else {
             return ([], [])
         }
-        
-        // Parse header
+
         let headers = lines[0]
             .components(separatedBy: "|")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        
-        // Parse rows (skip separator line at index 1)
+
         let rows = lines.dropFirst(2).map { line in
             line.components(separatedBy: "|")
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
         }
-        
+
         return (headers, rows)
     }
 }
@@ -651,38 +771,34 @@ class ChatViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var streamingMessageId: UUID?
     @Published var displayedStreamingContent: String = ""
-    
+
     private var transactions: [Transaction] = []
     private var currentTask: Task<Void, Never>?
     private var streamingTask: Task<Void, Never>?
-    
-    // Buffer for incoming chunks
+
     private var fullStreamedContent: String = ""
-    private let chunkSize = 150 // Characters per chunk for smooth streaming with large chunks
-    private let chunkInterval: Duration = .milliseconds(120) // Delay between chunks
-    
+    private let chunkSize = 150
+    private let chunkInterval: Duration = .milliseconds(120)
+
     func setTransactions(_ transactions: [Transaction]) {
         self.transactions = transactions
     }
-    
+
     func sendMessage(_ text: String) async {
         let userMessage = ChatMessage(role: .user, content: text)
         messages.append(userMessage)
-        
+
         isLoading = true
-        
-        // Create a placeholder message for streaming
+
         let assistantMessageId = UUID()
         let assistantMessage = ChatMessage(id: assistantMessageId, role: .assistant, content: "")
         messages.append(assistantMessage)
         streamingMessageId = assistantMessageId
         displayedStreamingContent = ""
         fullStreamedContent = ""
-        
-        // Start smooth streaming display
+
         startSmoothStreaming(messageId: assistantMessageId)
-        
-        // Create a cancellable task
+
         currentTask = Task {
             do {
                 let stream = await MiloAIChatService.shared.sendMessageStreaming(
@@ -690,29 +806,24 @@ class ChatViewModel: ObservableObject {
                     transactions: transactions,
                     conversationHistory: messages.filter { $0.id != assistantMessageId }
                 )
-                
+
                 for try await chunk in stream {
-                    // Check if cancelled
                     if Task.isCancelled {
                         streamingTask?.cancel()
                         isLoading = false
                         streamingMessageId = nil
                         return
                     }
-                    
-                    // Append to the full content buffer
+
                     fullStreamedContent += chunk
                 }
-                
-                // Wait for streaming display to catch up
+
                 while displayedStreamingContent.count < fullStreamedContent.count && !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(10))
                 }
-                
-                // Cancel streaming task
+
                 streamingTask?.cancel()
-                
-                // Final update with complete message
+
                 if let index = messages.firstIndex(where: { $0.id == assistantMessageId }) {
                     messages[index] = ChatMessage(
                         id: assistantMessageId,
@@ -721,24 +832,21 @@ class ChatViewModel: ObservableObject {
                         timestamp: messages[index].timestamp
                     )
                 }
-                
+
                 streamingMessageId = nil
                 displayedStreamingContent = ""
                 fullStreamedContent = ""
-                
+
             } catch {
-                // Check if cancelled
                 if Task.isCancelled {
                     streamingTask?.cancel()
                     isLoading = false
                     streamingMessageId = nil
                     return
                 }
-                
-                // Cancel streaming
+
                 streamingTask?.cancel()
-                
-                // Replace placeholder with error message
+
                 if let index = messages.firstIndex(where: { $0.id == assistantMessageId }) {
                     messages[index] = ChatMessage(
                         id: assistantMessageId,
@@ -751,41 +859,38 @@ class ChatViewModel: ObservableObject {
                 displayedStreamingContent = ""
                 fullStreamedContent = ""
             }
-            
+
             isLoading = false
         }
-        
+
         await currentTask?.value
     }
-    
+
     private func startSmoothStreaming(messageId: UUID) {
         streamingTask?.cancel()
-        
+
         streamingTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: chunkInterval)
-                
+
                 guard !Task.isCancelled else { break }
-                
-                // Display characters in chunks progressively
+
                 if displayedStreamingContent.count < fullStreamedContent.count {
                     let targetIndex = min(
                         displayedStreamingContent.count + chunkSize,
                         fullStreamedContent.count
                     )
-                    
+
                     let endIndex = fullStreamedContent.index(
                         fullStreamedContent.startIndex,
                         offsetBy: targetIndex
                     )
-                    
+
                     let newContent = String(fullStreamedContent[..<endIndex])
-                    
-                    // Update with smooth, slower animation for cooler effect
+
                     withAnimation(.easeInOut(duration: 1.2)) {
                         displayedStreamingContent = newContent
-                        
-                        // Update the message in the array
+
                         if let index = messages.firstIndex(where: { $0.id == messageId }) {
                             messages[index] = ChatMessage(
                                 id: messageId,
@@ -799,15 +904,14 @@ class ChatViewModel: ObservableObject {
             }
         }
     }
-    
+
     func stopGeneration() {
         currentTask?.cancel()
         streamingTask?.cancel()
         currentTask = nil
         streamingTask = nil
         isLoading = false
-        
-        // If we have partial content, save it with animation
+
         if let messageId = streamingMessageId,
            let index = messages.firstIndex(where: { $0.id == messageId }),
            !displayedStreamingContent.isEmpty {
@@ -820,12 +924,12 @@ class ChatViewModel: ObservableObject {
                 )
             }
         }
-        
+
         streamingMessageId = nil
         displayedStreamingContent = ""
         fullStreamedContent = ""
     }
-    
+
     func clearConversation() {
         currentTask?.cancel()
         streamingTask?.cancel()
@@ -837,7 +941,7 @@ class ChatViewModel: ObservableObject {
         displayedStreamingContent = ""
         fullStreamedContent = ""
     }
-    
+
     func resetForNewConversation() {
         clearConversation()
     }
