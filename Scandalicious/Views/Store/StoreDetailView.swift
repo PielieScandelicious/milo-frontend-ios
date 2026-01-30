@@ -24,6 +24,7 @@ struct StoreDetailView: View {
     @State private var currentVisitCount: Int = 0
     @State private var currentCategories: [Category] = []
     @State private var currentHealthScore: Double?
+    @State private var currentTotalItems: Int = 0
     @State private var isRefreshing = false
     @State private var hasInitialized = false
 
@@ -43,6 +44,12 @@ struct StoreDetailView: View {
     // Accent color for the line chart - modern red
     private var chartAccentColor: Color {
         Color(red: 0.95, green: 0.25, blue: 0.3)
+    }
+
+    // Average item price calculation
+    private var averageItemPrice: Double? {
+        guard currentTotalItems > 0 else { return nil }
+        return currentTotalSpend / Double(currentTotalItems)
     }
 
     // Store accent color for header border - uses the color from donut chart segment
@@ -177,7 +184,8 @@ struct StoreDetailView: View {
                         size: 200,
                         trends: trends,
                         accentColor: chartAccentColor,
-                        selectedPeriod: storeBreakdown.period
+                        selectedPeriod: storeBreakdown.period,
+                        averageItemPrice: averageItemPrice
                     )
                     .padding(.top, 24)
 
@@ -230,7 +238,12 @@ struct StoreDetailView: View {
                 currentVisitCount = storeBreakdown.visitCount
                 currentCategories = storeBreakdown.categories
                 currentHealthScore = storeBreakdown.averageHealthScore
+                currentTotalItems = 0  // Will be populated when we fetch detailed data
                 hasInitialized = true
+                // Fetch detailed data to get item count
+                Task {
+                    await refreshStoreData()
+                }
             } else {
                 // Subsequent appearances (navigating back): refresh from backend
                 // This handles the case where a receipt was deleted in ReceiptsListView
@@ -297,13 +310,17 @@ struct StoreDetailView: View {
                 )
             }
 
+            // Calculate total items from category transaction counts
+            let totalItems = storeDetails.categories.reduce(0) { $0 + $1.transactionCount }
+
             // Update state on main thread
             await MainActor.run {
                 currentTotalSpend = storeDetails.totalSpend
                 currentVisitCount = storeDetails.visitCount
                 currentCategories = categories
                 currentHealthScore = storeDetails.averageHealthScore
-                print("✅ [StoreDetailView] Updated: €\(storeDetails.totalSpend), \(storeDetails.visitCount) receipts")
+                currentTotalItems = totalItems
+                print("✅ [StoreDetailView] Updated: €\(storeDetails.totalSpend), \(storeDetails.visitCount) receipts, \(totalItems) items")
             }
 
         } catch {

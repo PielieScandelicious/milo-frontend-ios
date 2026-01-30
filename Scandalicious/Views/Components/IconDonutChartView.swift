@@ -33,6 +33,7 @@ struct IconDonutChartView: View {
     let currencySymbol: String
     let subtitle: String?
     let totalItems: Int?
+    let averageItemPrice: Double?
 
     /// Visual gap between segments in degrees (the actual empty space you see)
     private let visualGapDegrees: Double = 4.0
@@ -53,13 +54,14 @@ struct IconDonutChartView: View {
         size > 120
     }
 
-    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil) {
+    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
         self.size = size
         self.currencySymbol = currencySymbol
         self.subtitle = subtitle
         self.totalItems = totalItems
+        self.averageItemPrice = averageItemPrice
     }
 
     private var strokeWidth: CGFloat {
@@ -249,8 +251,29 @@ struct IconDonutChartView: View {
                 )
                 .frame(width: size * 0.58, height: size * 0.58)
 
-            // Display items count if available, otherwise show stores
-            if let items = totalItems {
+            // Display average item price if available
+            if let avgPrice = averageItemPrice, avgPrice > 0 {
+                // Average item price display
+                VStack(spacing: 2) {
+                    Text("AVG PRICE")
+                        .font(.system(size: size * 0.045, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundColor(.white.opacity(0.4))
+                        .lineLimit(1)
+
+                    Text(String(format: "€%.2f", avgPrice))
+                        .font(.system(size: size * 0.14, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+
+                    Text("per item")
+                        .font(.system(size: size * 0.05, weight: .medium))
+                        .foregroundColor(.white.opacity(0.45))
+                        .lineLimit(1)
+                }
+            } else if let items = totalItems {
                 // Items count with cart icon
                 VStack(spacing: 2) {
                     Image(systemName: "cart.fill")
