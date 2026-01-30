@@ -35,9 +35,7 @@ struct ScandaLiciousApp: App {
                     // Show onboarding if profile is not completed
                     if authManager.isCheckingProfile {
                         // Show loading while checking profile status
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(1.5)
+                        SyncLoadingView()
                     } else if !authManager.profileCompleted {
                         // Show onboarding for first-time users
                         OnboardingView()
