@@ -554,7 +554,6 @@ struct StoreDetailView: View {
         VStack(spacing: 0) {
             // Category header button
             Button {
-                guard !isOther else { return }
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     if expandedCategoryName == segment.label {
                         expandedCategoryName = nil
@@ -593,21 +592,18 @@ struct StoreDetailView: View {
                         .foregroundColor(isOther ? .white.opacity(0.5) : .white)
                         .frame(width: 65, alignment: .trailing)
 
-                    if !isOther {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.25))
-                            .rotationEffect(.degrees(expandedCategoryName == segment.label ? 180 : 0))
-                    }
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.25))
+                        .rotationEffect(.degrees(expandedCategoryName == segment.label ? 180 : 0))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
             }
             .buttonStyle(CategoryRowButtonStyle())
-            .disabled(isOther)
 
             // Expanded transactions list
-            if expandedCategoryName == segment.label && !isOther {
+            if expandedCategoryName == segment.label {
                 VStack(spacing: 0) {
                     // Divider
                     Rectangle()
@@ -615,7 +611,7 @@ struct StoreDetailView: View {
                         .frame(height: 1)
                         .padding(.horizontal, 14)
 
-                    VStack(spacing: 6) {
+                    VStack(spacing: 8) {
                         if loadingCategories.contains(segment.label) {
                             HStack(spacing: 10) {
                                 ProgressView()
@@ -627,28 +623,62 @@ struct StoreDetailView: View {
                             }
                             .padding(.vertical, 16)
                         } else if let transactions = categoryTransactions[segment.label], !transactions.isEmpty {
-                            ForEach(transactions) { transaction in
-                                HStack(spacing: 8) {
-                                    if transaction.quantity > 1 {
-                                        Text("×\(transaction.quantity)")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.4))
-                                    }
+                            // Sort by health score (healthiest first), then alphabetically
+                            let sortedTransactions = transactions.sorted { t1, t2 in
+                                let score1 = t1.healthScore
+                                let score2 = t2.healthScore
+                                // Both have scores - sort by score descending (higher = healthier first)
+                                if let s1 = score1, let s2 = score2 {
+                                    return s1 > s2
+                                }
+                                // Item with score comes before item without score
+                                if score1 != nil && score2 == nil { return true }
+                                if score1 == nil && score2 != nil { return false }
+                                // Neither has score - sort alphabetically
+                                return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
+                            }
+                            ForEach(sortedTransactions) { transaction in
+                                HStack(spacing: 10) {
+                                    // Sleek Nutri-Score letter badge (matching receipt style)
+                                    Text(transaction.healthScore.nutriScoreLetter)
+                                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                                        .foregroundColor(transaction.healthScore.healthScoreColor)
+                                        .frame(width: 16, height: 16)
+                                        .background(
+                                            Circle()
+                                                .fill(transaction.healthScore.healthScoreColor.opacity(0.15))
+                                        )
+                                        .overlay(
+                                            Circle()
+                                                .stroke(transaction.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
+                                        )
 
-                                    Text(transaction.itemName)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.7))
-                                        .lineLimit(2)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 6) {
+                                            Text(transaction.itemName)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundColor(.white.opacity(0.85))
+                                                .lineLimit(1)
+
+                                            if transaction.quantity > 1 {
+                                                Text("×\(transaction.quantity)")
+                                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                                    .foregroundColor(.white.opacity(0.4))
+                                                    .padding(.horizontal, 5)
+                                                    .padding(.vertical, 1)
+                                                    .background(
+                                                        Capsule()
+                                                            .fill(Color.white.opacity(0.08))
+                                                    )
+                                            }
+                                        }
+                                    }
 
                                     Spacer()
 
-                                    if let healthScore = transaction.healthScore {
-                                        HealthScoreBadge(score: healthScore, size: .small, style: .subtle)
-                                    }
-
                                     Text(String(format: "€%.2f", transaction.totalPrice))
                                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(.white.opacity(0.7))
                                 }
                             }
                         } else {
@@ -659,8 +689,8 @@ struct StoreDetailView: View {
                         }
                     }
                     .padding(.horizontal, 14)
-                    .padding(.top, 10)
-                    .padding(.bottom, 12)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
                 }
                 .transition(.opacity)
             }
