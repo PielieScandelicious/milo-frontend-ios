@@ -299,30 +299,6 @@ struct IconDonutChartView: View {
                         .font(.system(size: size * 0.045, weight: .medium))
                         .foregroundColor(.white.opacity(0.4))
                 }
-            } else {
-                // Fallback: Store icon with store count
-                VStack(spacing: 4) {
-                    Image(systemName: "storefront.fill")
-                        .font(.system(size: size * 0.18, weight: .medium))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.9),
-                                    Color.white.opacity(0.6)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-
-                    Text("\(data.count)")
-                        .font(.system(size: size * 0.09, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.7))
-                    +
-                    Text(" stores")
-                        .font(.system(size: size * 0.055, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                }
             }
         }
         .frame(maxWidth: size * 0.55)
