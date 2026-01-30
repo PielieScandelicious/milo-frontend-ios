@@ -114,30 +114,32 @@ struct ScandaLiciousAIChatView: View {
         .ignoresSafeArea()
     }
     
+    @ViewBuilder
     private var chatContentView: some View {
-        ScrollViewReader { proxy in
+        if viewModel.messages.isEmpty && showWelcome {
+            // Welcome view without ScrollView for proper layout
+            WelcomeView(
+                messageText: $messageText,
+                isInputFocused: $isInputFocused,
+                onSend: sendMessage
+            )
+            .padding(.horizontal, 20)
+            .padding(.bottom, 100) // Space for input area
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        } else {
+            // Scrollable messages view
+            ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         // Top spacing
                         Color.clear.frame(height: 20)
 
-                        if viewModel.messages.isEmpty && showWelcome {
-                            WelcomeView(
-                                messageText: $messageText,
-                                isInputFocused: $isInputFocused,
-                                onSend: sendMessage
-                            )
-                            .padding(.horizontal, 20)
-                            .padding(.top, 40)
-                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                        } else {
-                            // Messages with refined spacing
-                            ForEach(viewModel.messages) { message in
-                                MessageBubbleView(message: message)
-                                    .environmentObject(viewModel)
-                                    .id(message.id)
-                                    .transition(.opacity)
-                            }
+                        // Messages with refined spacing
+                        ForEach(viewModel.messages) { message in
+                            MessageBubbleView(message: message)
+                                .environmentObject(viewModel)
+                                .id(message.id)
+                                .transition(.opacity)
                         }
 
                         // Bottom padding for input area
@@ -168,6 +170,7 @@ struct ScandaLiciousAIChatView: View {
                         }
                     }
                 }
+            }
         }
     }
     
@@ -359,10 +362,10 @@ struct WelcomeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
+            Spacer(minLength: 20)
 
             // Hero section with staggered animation
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 // Animated logo
                 ZStack {
                     // Ambient glow
@@ -371,16 +374,16 @@ struct WelcomeView: View {
                             RadialGradient(
                                 colors: [Color.miloPurple.opacity(0.3), Color.clear],
                                 center: .center,
-                                startRadius: 20,
-                                endRadius: 60
+                                startRadius: 15,
+                                endRadius: 50
                             )
                         )
-                        .frame(width: 120, height: 120)
+                        .frame(width: 100, height: 100)
                         .blur(radius: 20)
 
                     // Icon
                     Image(systemName: "sparkles")
-                        .font(.system(size: 52, weight: .semibold))
+                        .font(.system(size: 44, weight: .semibold))
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(
                             Color.miloPurple,
@@ -390,18 +393,18 @@ struct WelcomeView: View {
                 .scaleEffect(logoScale)
                 .opacity(logoOpacity)
 
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     Text("Milo")
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
 
                     Text("Your AI shopping assistant")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                 }
                 .opacity(textOpacity)
             }
-            .padding(.bottom, 48)
+            .padding(.bottom, 28)
 
             // Sample prompts with staggered animation
             VStack(spacing: 10) {
@@ -447,7 +450,7 @@ struct WelcomeView: View {
             }
             .opacity(cardsOpacity)
 
-            Spacer()
+            Spacer(minLength: 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -490,19 +493,19 @@ struct SamplePromptCard: View {
                         .fill(iconColor.opacity(0.15))
 
                     Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(iconColor)
                 }
-                .frame(width: 38, height: 38)
+                .frame(width: 42, height: 42)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
 
                     Text(subtitle)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
 
                 Spacer()
@@ -511,7 +514,7 @@ struct SamplePromptCard: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.25))
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 16)
