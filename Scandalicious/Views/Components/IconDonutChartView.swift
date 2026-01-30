@@ -10,7 +10,8 @@ import SwiftUI
 // MARK: - Data Model
 
 struct ChartData: Identifiable {
-    let id = UUID()
+    // Use label as stable ID - prevents SwiftUI animation issues when chart data is recomputed
+    var id: String { label }
     let value: Double
     let color: Color
     let iconName: String
@@ -374,14 +375,14 @@ struct IconDonutChartView: View {
 // MARK: - Segment Info
 
 private struct SegmentInfo: Identifiable {
-    let id: UUID  // Use the ChartData's id for stability
+    let id: String  // Use the ChartData's id for stability
     let data: ChartData
     let startAngle: Double
     let endAngle: Double
     let midAngle: Double
 
     init(data: ChartData, startAngle: Double, endAngle: Double, midAngle: Double) {
-        self.id = data.id  // Use ChartData's stable id
+        self.id = data.id  // Use ChartData's stable id (label-based)
         self.data = data
         self.startAngle = startAngle
         self.endAngle = endAngle

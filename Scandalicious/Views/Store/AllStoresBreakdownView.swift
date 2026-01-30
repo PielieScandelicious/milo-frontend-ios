@@ -234,7 +234,8 @@ struct AllStoresDonutChart: View {
 
 // MARK: - Store Chart Segment
 struct StoreChartSegment: Identifiable {
-    let id = UUID()
+    // Use storeName as stable ID - prevents SwiftUI duplication when segments are recomputed
+    var id: String { storeName }
     let startAngle: Angle
     let endAngle: Angle
     let color: Color

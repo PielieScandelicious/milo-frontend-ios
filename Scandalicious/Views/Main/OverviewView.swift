@@ -82,6 +82,7 @@ struct OverviewView: View {
     @State private var allTimeTotalSpend: Double = 0 // Cached all-time total spend from backend
     @State private var allTimeTotalReceipts: Int = 0 // Cached all-time receipt count from backend
     @State private var allTimeHealthScore: Double? = nil // Cached all-time health score from backend
+    @State private var isLoadingAllTimeData = false // Track if fetching all-time data for first time
     @Binding var showSignOutConfirmation: Bool
 
     // Entrance animation states
@@ -256,8 +257,11 @@ struct OverviewView: View {
 
         cachedBreakdownsByPeriod[period] = breakdowns
 
-        // Invalidate segment cache for this period (will be rebuilt lazily)
-        cachedSegmentsByPeriod.removeValue(forKey: period)
+        // Immediately rebuild segment and chart data caches for this period
+        // This ensures consistency - caches are never in an invalid state
+        let segments = computeStoreSegments(for: period)
+        cachedSegmentsByPeriod[period] = segments
+        cachedChartDataByPeriod[period] = segments.toIconChartData()
 
         // Update displayedBreakdowns if this is the selected period
         if period == selectedPeriod {
@@ -591,12 +595,38 @@ struct OverviewView: View {
             }
         }
 
+        // Clear segment caches EXCEPT for "All" period (preserve to avoid re-fetching)
+        // This prevents re-animation when returning to "All" from another period
+        let allPeriodSegments = cachedSegmentsByPeriod[Self.allPeriodIdentifier]
+        let allPeriodChartData = cachedChartDataByPeriod[Self.allPeriodIdentifier]
+
+        cachedSegmentsByPeriod.removeAll()
+        cachedChartDataByPeriod.removeAll()
+
+        // Restore "All" period cache if it existed
+        if let segments = allPeriodSegments {
+            cachedSegmentsByPeriod[Self.allPeriodIdentifier] = segments
+        }
+        if let chartData = allPeriodChartData {
+            cachedChartDataByPeriod[Self.allPeriodIdentifier] = chartData
+        }
+
+        // IMPORTANT: Set loading state BEFORE view renders when switching to "All" period
+        // This must be synchronous to prevent the chart from rendering with fallback data first
+        if isAllPeriod(newValue) {
+            let hasBackendData = cachedBreakdownsByPeriod[Self.allPeriodIdentifier] != nil &&
+                                 !(cachedBreakdownsByPeriod[Self.allPeriodIdentifier]?.isEmpty ?? true)
+            if !hasBackendData {
+                isLoadingAllTimeData = true
+            }
+        }
+
         // Immediately update displayed breakdowns for the new period (no async delay)
         updateDisplayedBreakdowns()
 
-        // Pre-cache segments for the new period if not already cached
+        // Cache segments for the new period
         // Skip for "All" period - that's handled by fetchAllTimeData after data is loaded
-        if cachedSegmentsByPeriod[newValue] == nil && !isAllPeriod(newValue) {
+        if !isAllPeriod(newValue) {
             cacheSegmentsForPeriod(newValue)
         }
 
@@ -629,6 +659,16 @@ struct OverviewView: View {
     /// Fetches all-time store breakdown data from the backend
     /// Always fetches fresh data (no caching to ensure accuracy)
     private func fetchAllTimeData() async {
+        // Only show loading if we don't have cached backend data yet
+        // This prevents showing loading indicator when refreshing existing data
+        let needsLoading = cachedBreakdownsByPeriod[Self.allPeriodIdentifier] == nil || cachedBreakdownsByPeriod[Self.allPeriodIdentifier]?.isEmpty == true
+
+        if needsLoading {
+            await MainActor.run {
+                isLoadingAllTimeData = true
+            }
+        }
+
         do {
             // Fetch summary without date filters to get all-time data
             var filters = AnalyticsFilters()
@@ -677,9 +717,15 @@ struct OverviewView: View {
 
                     print("📊 Updated All view: \(breakdowns.count) stores, €\(allTimeTotalSpend) total, \(cachedSegmentsByPeriod[Self.allPeriodIdentifier]?.count ?? 0) segments")
                 }
+
+                // Loading complete - chart can now render with backend data
+                isLoadingAllTimeData = false
             }
         } catch {
             print("❌ Failed to fetch all-time data: \(error.localizedDescription)")
+            await MainActor.run {
+                isLoadingAllTimeData = false
+            }
         }
     }
 
@@ -1077,6 +1123,10 @@ struct OverviewView: View {
         let breakdowns = getCachedBreakdowns(for: period)
         let segments = storeSegmentsForPeriod(period)
 
+        // Check if we're loading All-time data for the first time (no backend data yet)
+        // This prevents double animation: first with local data, then with backend data
+        let isWaitingForAllTimeData = isAllPeriod(period) && isLoadingAllTimeData
+
         // All Overview components fade in together at the same time
         return VStack(spacing: 16) {
             // Swipeable area: spending card + pie chart
@@ -1084,8 +1134,23 @@ struct OverviewView: View {
             VStack(spacing: 16) {
                 spendingAndHealthCardForPeriod(period)
 
-                if !segments.isEmpty {
+                if isWaitingForAllTimeData {
+                    // Show loading indicator while fetching all-time data
+                    // This prevents the chart from animating twice
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
+                            .scaleEffect(1.2)
+                        Text("Loading all-time data...")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .frame(width: 200, height: 200)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                } else if !segments.isEmpty {
                     // Pie chart showing store breakdown - use cached chart data
+                    // Use .id(period) to force chart recreation when period changes
                     IconDonutChartView(
                         data: chartDataForPeriod(period),
                         totalAmount: Double(totalReceiptsForPeriod(period)),
@@ -1094,6 +1159,7 @@ struct OverviewView: View {
                         subtitle: "receipts",
                         totalItems: totalItemsForPeriod(period)
                     )
+                    .id(period)
                     .padding(.top, 16)
                     .padding(.bottom, 8)
                 }
@@ -1102,13 +1168,16 @@ struct OverviewView: View {
             .simultaneousGesture(periodSwipeGesture)
 
             // Store rows - NOT swipeable, only tappable
-            if !segments.isEmpty {
+            // Also hide while loading all-time data to prevent showing fallback data
+            if !segments.isEmpty && !isWaitingForAllTimeData {
                 // Stores section header
                 storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period))
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
                 // Store rows with staggered animation
+                // Use .id(period) to force SwiftUI to recreate views when period changes
+                // This prevents duplicate views during period transitions
                 VStack(spacing: 8) {
                     ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                         StoreRowButton(
@@ -1128,6 +1197,7 @@ struct OverviewView: View {
                         )
                     }
                 }
+                .id(period) // Force complete view recreation when period changes
                 .padding(.horizontal, 16)
                 .onAppear {
                     // Trigger staggered animation immediately when view appears
@@ -1139,6 +1209,7 @@ struct OverviewView: View {
                 }
             }
         }
+        .id(period) // Ensure entire overview content is recreated for each period
     }
 
     // MARK: - Store Segments for Period (Cached)
@@ -1161,6 +1232,11 @@ struct OverviewView: View {
 
         guard totalSpend > 0 else { return [] }
 
+        // Deduplicate breakdowns by storeName to prevent duplicate segments
+        // Keep first occurrence (highest spend due to prior sorting)
+        var seenStores = Set<String>()
+        let uniqueBreakdowns = breakdowns.filter { seenStores.insert($0.storeName).inserted }
+
         var currentAngle: Double = 0
         let colors: [Color] = [
             Color(red: 0.3, green: 0.7, blue: 1.0),   // Blue
@@ -1173,7 +1249,7 @@ struct OverviewView: View {
             Color(red: 0.6, green: 0.9, blue: 0.4),   // Lime
         ]
 
-        return breakdowns.enumerated().map { index, breakdown in
+        return uniqueBreakdowns.enumerated().map { index, breakdown in
             let percentage = breakdown.totalStoreSpend / totalSpend
             let angleRange = 360.0 * percentage
             let segment = StoreChartSegment(
