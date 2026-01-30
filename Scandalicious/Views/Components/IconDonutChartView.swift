@@ -365,11 +365,6 @@ struct IconDonutChartView: View {
                     .font(.system(size: size * 0.045, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
 
-                // Tap to dismiss hint
-                Text("tap to close")
-                    .font(.system(size: size * 0.035, weight: .medium))
-                    .foregroundColor(.white.opacity(0.3))
-                    .padding(.top, 4)
             }
         }
         .frame(maxWidth: size * 0.55)
