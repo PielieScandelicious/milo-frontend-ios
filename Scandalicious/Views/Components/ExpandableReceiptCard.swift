@@ -137,6 +137,30 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
         accentColor != .white
     }
 
+    /// Transactions sorted by nutri score (healthy first), then alphabetically for items without scores
+    private var sortedTransactions: [ReceiptItemDisplayable] {
+        receipt.displayTransactions.sorted { item1, item2 in
+            let score1 = item1.displayHealthScore
+            let score2 = item2.displayHealthScore
+
+            // Both have scores - sort by score descending (higher = healthier first)
+            if let s1 = score1, let s2 = score2 {
+                return s1 > s2
+            }
+
+            // Item with score comes before item without score
+            if score1 != nil && score2 == nil {
+                return true
+            }
+            if score1 == nil && score2 != nil {
+                return false
+            }
+
+            // Neither has score - sort alphabetically
+            return item1.displayItemName.localizedCaseInsensitiveCompare(item2.displayItemName) == .orderedAscending
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Main card content - always visible
@@ -210,10 +234,10 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                         .frame(height: 1)
                         .padding(.horizontal, 14)
 
-                    // All items
-                    if !receipt.displayTransactions.isEmpty {
+                    // All items sorted by health score (healthy first)
+                    if !sortedTransactions.isEmpty {
                         VStack(spacing: 8) {
-                            ForEach(Array(receipt.displayTransactions.enumerated()), id: \.offset) { _, item in
+                            ForEach(Array(sortedTransactions.enumerated()), id: \.offset) { _, item in
                                 HStack(spacing: 10) {
                                     // Sleek Nutri-Score letter badge
                                     Text(item.displayHealthScore.nutriScoreLetter)

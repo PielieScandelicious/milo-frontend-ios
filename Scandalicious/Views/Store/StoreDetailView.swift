@@ -107,25 +107,42 @@ struct StoreDetailView: View {
 
             // Right side: Nutri Score
             VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(scoreColor.opacity(0.15))
-                        .frame(width: 64, height: 64)
+                if currentHealthScore != nil {
+                    // Has score - show the letter grade
+                    ZStack {
+                        Circle()
+                            .fill(scoreColor.opacity(0.15))
+                            .frame(width: 64, height: 64)
 
-                    Circle()
-                        .stroke(scoreColor, lineWidth: 3)
-                        .frame(width: 64, height: 64)
+                        Circle()
+                            .stroke(scoreColor, lineWidth: 3)
+                            .frame(width: 64, height: 64)
 
-                    Text(nutriLetter)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(scoreColor)
+                        Text(nutriLetter)
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(scoreColor)
+                    }
+                } else {
+                    // No score - show clean N/A state
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(width: 64, height: 64)
+
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            .frame(width: 64, height: 64)
+
+                        Text("N/A")
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.35))
+                    }
                 }
 
-                if let score = currentHealthScore {
-                    Text(score.healthScoreLabel)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(scoreColor)
-                }
+                Text("NUTRI SCORE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundColor(currentHealthScore != nil ? scoreColor : .white.opacity(0.35))
             }
         }
         .padding(.horizontal, 20)
@@ -423,37 +440,40 @@ struct StoreDetailView: View {
 
             // Expanded receipts list (no container background)
             if isReceiptsSectionExpanded {
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     if receiptsViewModel.state.isLoading && receiptsViewModel.receipts.isEmpty {
                         HStack(spacing: 12) {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
-                                .scaleEffect(0.8)
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.0)
                             Text("Loading receipts...")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 24)
                     } else if receiptsViewModel.receipts.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 28))
-                                .foregroundColor(.white.opacity(0.2))
-                            Text("No receipts for this store")
+                        VStack(spacing: 16) {
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.white.opacity(0.3))
+                            Text("No Receipts")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                            Text("No receipts found for this store")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
+                                .foregroundColor(.white.opacity(0.5))
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
+                        .padding(.vertical, 32)
                     } else {
-                        LazyVStack(spacing: 8) {
+                        LazyVStack(spacing: 12) {
                             ForEach(sortedReceipts) { receipt in
                                 ExpandableReceiptCard(
                                     receipt: receipt,
                                     isExpanded: expandedReceiptId == receipt.id,
                                     onTap: {
-                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                             if expandedReceiptId == receipt.id {
                                                 expandedReceiptId = nil
                                             } else {
@@ -467,8 +487,13 @@ struct StoreDetailView: View {
                                         }
                                     }
                                 )
+                                .transition(.asymmetric(
+                                    insertion: .opacity,
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
                             }
                         }
+                        .animation(.easeInOut(duration: 0.3), value: receiptsViewModel.receipts.count)
                     }
                 }
                 .padding(.top, 12)
