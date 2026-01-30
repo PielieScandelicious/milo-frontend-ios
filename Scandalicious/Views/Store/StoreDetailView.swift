@@ -106,7 +106,7 @@ struct StoreDetailView: View {
             Spacer()
 
             // Right side: Nutri Score
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 if currentHealthScore != nil {
                     // Has score - show the letter grade
                     ZStack {
