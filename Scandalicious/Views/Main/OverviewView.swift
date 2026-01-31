@@ -1509,7 +1509,8 @@ struct OverviewView: View {
                                     totalItems: nil,
                                     averageItemPrice: nil,
                                     centerIcon: "square.grid.2x2.fill",
-                                    centerLabel: "Categories"
+                                    centerLabel: "Categories",
+                                    showAllSegments: showAllRows
                                 )
                             } else if isLoadingCategoryData {
                                 VStack(spacing: 12) {
@@ -1549,7 +1550,8 @@ struct OverviewView: View {
                             totalItems: nil,
                             averageItemPrice: nil,
                             centerIcon: "storefront.fill",
-                            centerLabel: "Stores"
+                            centerLabel: "Stores",
+                            showAllSegments: showAllRows
                         )
                         .opacity(isPieChartFlipped ? 0 : 1)
                     }

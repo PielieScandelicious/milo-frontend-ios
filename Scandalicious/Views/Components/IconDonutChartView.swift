@@ -37,6 +37,7 @@ struct IconDonutChartView: View {
     let averageItemPrice: Double?
     let centerIcon: String?
     let centerLabel: String?
+    let showAllSegments: Bool
 
     /// Maximum number of segments to show before grouping into "Others"
     private let maxVisibleSegments: Int = 6
@@ -49,7 +50,6 @@ struct IconDonutChartView: View {
     @State private var globalScale: CGFloat = 0.6
     @State private var globalRotation: Double = -90 // Quarter turn back
     @State private var selectedSegmentIndex: Int? = nil
-    @State private var showAllSegments: Bool = false
 
     /// Whether the data needs grouping (more than maxVisibleSegments)
     private var needsGrouping: Bool {
@@ -94,7 +94,7 @@ struct IconDonutChartView: View {
         size > 120
     }
 
-    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil) {
+    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil, showAllSegments: Bool = true) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
         self.size = size
@@ -104,6 +104,7 @@ struct IconDonutChartView: View {
         self.averageItemPrice = averageItemPrice
         self.centerIcon = centerIcon
         self.centerLabel = centerLabel
+        self.showAllSegments = showAllSegments
     }
 
     private var strokeWidth: CGFloat {
@@ -185,83 +186,55 @@ struct IconDonutChartView: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        ZStack {
+            // All segments visible, rotate and scale together
             ZStack {
-                // All segments visible, rotate and scale together
-                ZStack {
-                    ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
-                        // Segment - clean, solid color
-                        Circle()
-                            .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
-                            .stroke(
-                                segment.data.color,
-                                style: StrokeStyle(
-                                    lineWidth: strokeWidth,
-                                    lineCap: .round
-                                )
+                ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+                    // Segment - clean, solid color
+                    Circle()
+                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                        .stroke(
+                            segment.data.color,
+                            style: StrokeStyle(
+                                lineWidth: strokeWidth,
+                                lineCap: .round
                             )
-                            .frame(width: size - strokeWidth, height: size - strokeWidth)
-                        .scaleEffect(isSelected(index) ? 1.08 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedSegmentIndex)
-                        // Overlay invisible tap target with proper arc shape
-                        .overlay(
-                            ArcSegmentShape(
-                                startAngle: segment.startAngle,
-                                endAngle: segment.endAngle,
-                                innerRadius: (size - strokeWidth) / 2 - strokeWidth,
-                                outerRadius: (size - strokeWidth) / 2 + strokeWidth
-                            )
-                            .fill(Color.white.opacity(0.001)) // Nearly invisible but tappable
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    if selectedSegmentIndex == index {
-                                        selectedSegmentIndex = nil
-                                    } else {
-                                        selectedSegmentIndex = index
-                                    }
+                        )
+                        .frame(width: size - strokeWidth, height: size - strokeWidth)
+                    .scaleEffect(isSelected(index) ? 1.08 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedSegmentIndex)
+                    // Overlay invisible tap target with proper arc shape
+                    .overlay(
+                        ArcSegmentShape(
+                            startAngle: segment.startAngle,
+                            endAngle: segment.endAngle,
+                            innerRadius: (size - strokeWidth) / 2 - strokeWidth,
+                            outerRadius: (size - strokeWidth) / 2 + strokeWidth
+                        )
+                        .fill(Color.white.opacity(0.001)) // Nearly invisible but tappable
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                if selectedSegmentIndex == index {
+                                    selectedSegmentIndex = nil
+                                } else {
+                                    selectedSegmentIndex = index
                                 }
                             }
-                        )
-                    }
-                }
-                .scaleEffect(globalScale)
-                .rotationEffect(.degrees(-90 + globalRotation)) // -90 starts from top
-
-                // Center content - shows segment info when selected, otherwise default
-                if let selected = selectedSegment {
-                    selectedSegmentContent(selected)
-                } else {
-                    centerContent
-                }
-            }
-            .frame(width: size, height: size)
-
-            // Show All / Show Less button when grouping is needed
-            if needsGrouping {
-                Button {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        showAllSegments.toggle()
-                        selectedSegmentIndex = nil
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: showAllSegments ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
-                            .font(.system(size: 14, weight: .semibold))
-
-                        Text(showAllSegments ? "Show Less" : "Show All \(data.count)")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.08))
+                        }
                     )
                 }
-                .buttonStyle(.plain)
+            }
+            .scaleEffect(globalScale)
+            .rotationEffect(.degrees(-90 + globalRotation)) // -90 starts from top
+
+            // Center content - shows segment info when selected, otherwise default
+            if let selected = selectedSegment {
+                selectedSegmentContent(selected)
+            } else {
+                centerContent
             }
         }
+        .frame(width: size, height: size)
         .onAppear {
             if shouldAnimate {
                 // Start animation immediately for snappier feel
