@@ -1171,6 +1171,9 @@ struct PieChartSummaryResponse: Codable {
     let totalSpent: Double
     let categories: [CategorySpendItem]
     let stores: [PieChartStore]
+    let totalItems: Int?
+    let averageItemPrice: Double?
+    let averageHealthScore: Double?
 
     enum CodingKeys: String, CodingKey {
         case month
@@ -1178,6 +1181,9 @@ struct PieChartSummaryResponse: Codable {
         case totalSpent = "total_spent"
         case categories
         case stores
+        case totalItems = "total_items"
+        case averageItemPrice = "average_item_price"
+        case averageHealthScore = "average_health_score"
     }
 
     init(from decoder: Decoder) throws {
@@ -1187,6 +1193,18 @@ struct PieChartSummaryResponse: Codable {
         totalSpent = try container.decode(Double.self, forKey: .totalSpent)
         categories = try container.decodeIfPresent([CategorySpendItem].self, forKey: .categories) ?? []
         stores = try container.decodeIfPresent([PieChartStore].self, forKey: .stores) ?? []
+        totalItems = try container.decodeIfPresent(Int.self, forKey: .totalItems)
+        averageItemPrice = try container.decodeIfPresent(Double.self, forKey: .averageItemPrice)
+        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
+    }
+
+    /// Computed average item price (fallback if not provided by backend)
+    var computedAverageItemPrice: Double? {
+        if let price = averageItemPrice {
+            return price
+        }
+        guard let items = totalItems, items > 0 else { return nil }
+        return totalSpent / Double(items)
     }
 }
 

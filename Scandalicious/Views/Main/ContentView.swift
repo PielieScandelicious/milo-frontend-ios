@@ -18,8 +18,9 @@ struct ContentView: View {
     
     enum Tab: Int, Hashable {
         case view = 0
-        case scan = 1
-        case dobby = 2
+        case budget = 1
+        case scan = 2
+        case dobby = 3
     }
     
     var body: some View {
@@ -30,6 +31,12 @@ struct ContentView: View {
                         Label("View", systemImage: "chart.pie.fill")
                     }
                     .tag(Tab.view)
+
+                BudgetTab()
+                    .tabItem {
+                        Label("Budget", systemImage: "creditcard.fill")
+                    }
+                    .tag(Tab.budget)
 
                 ScanTab()
                     .tabItem {
@@ -150,6 +157,16 @@ struct ViewTab: View {
                 .navigationBarTitleDisplayMode(.inline)
         }
         .id("ViewTab") // Prevent recreation
+    }
+}
+
+// MARK: - Budget Tab
+struct BudgetTab: View {
+    var body: some View {
+        NavigationStack {
+            BudgetView()
+        }
+        .id("BudgetTab") // Prevent recreation
     }
 }
 

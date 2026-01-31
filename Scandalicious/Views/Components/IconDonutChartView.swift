@@ -35,6 +35,8 @@ struct IconDonutChartView: View {
     let subtitle: String?
     let totalItems: Int?
     let averageItemPrice: Double?
+    let centerIcon: String?
+    let centerLabel: String?
 
     /// Visual gap between segments in degrees (the actual empty space you see)
     private let visualGapDegrees: Double = 4.0
@@ -55,7 +57,7 @@ struct IconDonutChartView: View {
         size > 120
     }
 
-    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil) {
+    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
         self.size = size
@@ -63,6 +65,8 @@ struct IconDonutChartView: View {
         self.subtitle = subtitle
         self.totalItems = totalItems
         self.averageItemPrice = averageItemPrice
+        self.centerIcon = centerIcon
+        self.centerLabel = centerLabel
     }
 
     private var strokeWidth: CGFloat {
@@ -252,8 +256,31 @@ struct IconDonutChartView: View {
                 )
                 .frame(width: size * 0.58, height: size * 0.58)
 
+            // Custom center icon and label (highest priority)
+            if let icon = centerIcon, let label = centerLabel {
+                VStack(spacing: 6) {
+                    // Icon with gradient styling
+                    Image(systemName: icon)
+                        .font(.system(size: size * 0.18, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.95),
+                                    Color.white.opacity(0.65)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+
+                    Text(label)
+                        .font(.system(size: size * 0.07, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.6))
+                        .tracking(0.3)
+                }
+            }
             // Display average item price if available
-            if let avgPrice = averageItemPrice, avgPrice > 0 {
+            else if let avgPrice = averageItemPrice, avgPrice > 0 {
                 // Average item price display
                 VStack(spacing: 2) {
                     Text("AVG PRICE")

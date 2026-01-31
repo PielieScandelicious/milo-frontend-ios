@@ -89,6 +89,10 @@ struct OverviewView: View {
     @State private var isLoadingYearData = false // Track if fetching year data for first time
     @State private var currentLoadingYear: String? = nil // Track which year is currently loading
     @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
+    @State private var isPieChartFlipped = false // Track if pie chart is showing categories (flipped) or stores
+    @State private var pieChartFlipDegrees: Double = 0 // Animation degrees for flip
+    @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
+    @State private var isLoadingCategoryData = false // Track if loading category data
     @Binding var showSignOutConfirmation: Bool
 
     // Entrance animation states
@@ -810,6 +814,70 @@ struct OverviewView: View {
         }
     }
 
+    // MARK: - Fetch Category Data for Pie Chart
+
+    /// Fetches category breakdown data for a given period
+    /// Used for the flippable pie chart back side
+    private func fetchCategoryData(for period: String) async {
+        // Skip for all-time or year periods
+        guard !isAllPeriod(period) && !isYearPeriod(period) else { return }
+
+        // Skip if already cached
+        guard pieChartSummaryCache[period] == nil else { return }
+
+        // Parse period string to get month/year
+        let components = parsePeriodComponents(period)
+        guard components.month > 0 && components.year > 0 else { return }
+
+        await MainActor.run {
+            isLoadingCategoryData = true
+        }
+
+        do {
+            let response = try await AnalyticsAPIService.shared.getPieChartSummary(
+                month: components.month,
+                year: components.year
+            )
+
+            await MainActor.run {
+                pieChartSummaryCache[period] = response
+                isLoadingCategoryData = false
+            }
+        } catch {
+            print("❌ Failed to fetch category data for \(period): \(error.localizedDescription)")
+            await MainActor.run {
+                isLoadingCategoryData = false
+            }
+        }
+    }
+
+    /// Get cached pie chart summary for a period
+    private func pieChartSummaryForPeriod(_ period: String) -> PieChartSummaryResponse? {
+        pieChartSummaryCache[period]
+    }
+
+    /// Get cached category data for a period, or empty array if not loaded
+    private func categoryDataForPeriod(_ period: String) -> [CategorySpendItem] {
+        pieChartSummaryCache[period]?.categories ?? []
+    }
+
+    /// Get average item price for a period
+    private func averageItemPriceForPeriod(_ period: String) -> Double? {
+        pieChartSummaryCache[period]?.computedAverageItemPrice
+    }
+
+    /// Convert CategorySpendItem array to ChartData for the donut chart
+    private func categoryChartData(for period: String) -> [ChartData] {
+        categoryDataForPeriod(period).map { category in
+            ChartData(
+                value: category.totalSpent,
+                color: category.color,
+                iconName: category.icon,
+                label: category.name
+            )
+        }
+    }
+
     // MARK: - Fetch Year Data
 
     /// Fetches year summary data from the backend
@@ -1424,84 +1492,176 @@ struct OverviewView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 8)
                 } else if !segments.isEmpty {
-                    // Pie chart showing store breakdown - use cached chart data
-                    // Use .id(period) to force chart recreation when period changes
-                    // Tappable to show category breakdown detail
-                    IconDonutChartView(
-                        data: chartDataForPeriod(period),
-                        totalAmount: Double(totalReceiptsForPeriod(period)),
-                        size: 200,
-                        currencySymbol: "",
-                        subtitle: "receipts",
-                        totalItems: totalItemsForPeriod(period)
+                    // Flippable pie chart - front shows stores, back shows categories
+                    // Tap to flip between the two views
+                    ZStack {
+                        // Back side - Category breakdown (shown when flipped)
+                        Group {
+                            if !categoryDataForPeriod(period).isEmpty {
+                                IconDonutChartView(
+                                    data: categoryChartData(for: period),
+                                    totalAmount: totalSpendForPeriod(period),
+                                    size: 200,
+                                    currencySymbol: "€",
+                                    subtitle: nil,
+                                    totalItems: nil,
+                                    averageItemPrice: nil,
+                                    centerIcon: "square.grid.2x2.fill",
+                                    centerLabel: "Categories"
+                                )
+                            } else if isLoadingCategoryData {
+                                VStack(spacing: 12) {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
+                                        .scaleEffect(1.0)
+                                    Text("Loading categories...")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.5))
+                                }
+                                .frame(width: 200, height: 200)
+                            } else {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "square.grid.2x2")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.white.opacity(0.3))
+                                    Text("No category data")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.4))
+                                    Text("Tap to flip back")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.25))
+                                }
+                                .frame(width: 200, height: 200)
+                            }
+                        }
+                        .opacity(isPieChartFlipped ? 1 : 0)
+                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+
+                        // Front side - Store breakdown (shown by default)
+                        IconDonutChartView(
+                            data: chartDataForPeriod(period),
+                            totalAmount: Double(totalReceiptsForPeriod(period)),
+                            size: 200,
+                            currencySymbol: "",
+                            subtitle: "receipts",
+                            totalItems: nil,
+                            averageItemPrice: nil,
+                            centerIcon: "storefront.fill",
+                            centerLabel: "Stores"
+                        )
+                        .opacity(isPieChartFlipped ? 0 : 1)
+                    }
+                    .rotation3DEffect(
+                        .degrees(pieChartFlipDegrees),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.5
                     )
                     .id(period)
                     .padding(.top, 16)
                     .padding(.bottom, 8)
                     .contentShape(Circle())
                     .onTapGesture {
-                        // Only show for month periods, not year or all-time
+                        // Only allow flip for month periods, not year or all-time
                         if !isAllPeriod(period) && !isYearPeriod(period) {
-                            showCategoryBreakdownSheet = true
+                            // Load category data if not already loaded
+                            if pieChartSummaryCache[period] == nil {
+                                Task {
+                                    await fetchCategoryData(for: period)
+                                }
+                            }
+                            // Flip the chart
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                isPieChartFlipped.toggle()
+                                pieChartFlipDegrees += 180
+                            }
                         }
+                    }
+                    .onChange(of: period) { _, newPeriod in
+                        // Reset flip state when period changes
+                        isPieChartFlipped = false
+                        pieChartFlipDegrees = 0
                     }
                 }
             }
             .contentShape(Rectangle())
             .simultaneousGesture(periodSwipeGesture)
 
-            // Store rows - NOT swipeable, only tappable
+            // Store/Category rows - NOT swipeable, only tappable
             // These are the legend/details for the pie chart, so they appear directly below it
+            // Show store rows when not flipped, category rows when flipped
             // Also hide while loading all-time or year data to prevent showing fallback data
-            if !segments.isEmpty && !isWaitingForAllTimeData && !isWaitingForYearData {
-                // Stores section header
-                storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+            if !isWaitingForAllTimeData && !isWaitingForYearData {
+                let categories = categoryDataForPeriod(period)
 
-                // Store rows with staggered animation
-                // Use .id(period) to force SwiftUI to recreate views when period changes
-                // This prevents duplicate views during period transitions
-                VStack(spacing: 8) {
-                    ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
-                        StoreRowButton(
-                            segment: segment,
-                            breakdowns: breakdowns,
-                            onSelect: { breakdown, color in
-                                selectedStoreColor = color
-                                selectedBreakdown = breakdown
-                            }
-                        )
-                        .opacity(storeRowsAppeared ? 1 : 0)
-                        .offset(y: storeRowsAppeared ? 0 : 15)
-                        .animation(
-                            Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                .delay(Double(index) * 0.08),
-                            value: storeRowsAppeared
-                        )
+                if isPieChartFlipped && !categories.isEmpty {
+                    // Categories section header
+                    categoriesSectionHeader(categoryCount: categories.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+
+                    // Category rows with staggered animation
+                    VStack(spacing: 8) {
+                        ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
+                            CategoryRowButton(category: category)
+                                .opacity(storeRowsAppeared ? 1 : 0)
+                                .offset(y: storeRowsAppeared ? 0 : 15)
+                                .animation(
+                                    Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                        .delay(Double(index) * 0.08),
+                                    value: storeRowsAppeared
+                                )
+                        }
                     }
-                }
-                .id(period) // Force complete view recreation when period changes
-                .padding(.horizontal, 16)
-                .onAppear {
-                    // Trigger staggered animation immediately when view appears
-                    if !storeRowsAppeared {
-                        withAnimation {
-                            storeRowsAppeared = true
+                    .id("\(period)-categories")
+                    .padding(.horizontal, 16)
+                    .onAppear {
+                        if !storeRowsAppeared {
+                            withAnimation {
+                                storeRowsAppeared = true
+                            }
+                        }
+                    }
+                } else if !isPieChartFlipped && !segments.isEmpty {
+                    // Stores section header
+                    storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+
+                    // Store rows with staggered animation
+                    // Use .id(period) to force SwiftUI to recreate views when period changes
+                    // This prevents duplicate views during period transitions
+                    VStack(spacing: 8) {
+                        ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
+                            StoreRowButton(
+                                segment: segment,
+                                breakdowns: breakdowns,
+                                onSelect: { breakdown, color in
+                                    selectedStoreColor = color
+                                    selectedBreakdown = breakdown
+                                }
+                            )
+                            .opacity(storeRowsAppeared ? 1 : 0)
+                            .offset(y: storeRowsAppeared ? 0 : 15)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.08),
+                                value: storeRowsAppeared
+                            )
+                        }
+                    }
+                    .id(period) // Force complete view recreation when period changes
+                    .padding(.horizontal, 16)
+                    .onAppear {
+                        // Trigger staggered animation immediately when view appears
+                        if !storeRowsAppeared {
+                            withAnimation {
+                                storeRowsAppeared = true
+                            }
                         }
                     }
                 }
             }
 
-            // Budget Activity Rings - show AFTER store rows for current month
-            // This makes more sense as the store rows are the legend for the pie chart
-            if !isAllPeriod(period) && !isYearPeriod(period) && isCurrentPeriod {
-                if budgetViewModel.state.hasBudget && !budgetViewModel.budgetProgressItems.isEmpty {
-                    BudgetActivityRingsGrid(items: budgetViewModel.budgetProgressItems)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                }
-            }
         }
         .id(period) // Ensure entire overview content is recreated for each period
     }
@@ -1601,6 +1761,41 @@ struct OverviewView: View {
                         return "\(storeCount) store\(storeCount == 1 ? "" : "s") this year"
                     } else {
                         return "\(storeCount) store\(storeCount == 1 ? "" : "s")"
+                    }
+                }()
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Categories Section Header
+
+    private func categoriesSectionHeader(categoryCount: Int, isAllTime: Bool = false, isYear: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Categories")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                let subtitle: String = {
+                    if isAllTime {
+                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies") all time"
+                    } else if isYear {
+                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies") this year"
+                    } else {
+                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")"
                     }
                 }()
                 Text(subtitle)
@@ -2383,6 +2578,108 @@ private struct StoreRowButton: View {
             )
         }
         .buttonStyle(OverviewStoreRowButtonStyle())
+    }
+}
+
+// MARK: - Category Row Button
+private struct CategoryRowButton: View {
+    let category: CategorySpendItem
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Color accent bar on the left
+            RoundedRectangle(cornerRadius: 2)
+                .fill(category.color)
+                .frame(width: 4, height: 32)
+
+            // Category icon
+            ZStack {
+                Circle()
+                    .fill(category.color.opacity(0.15))
+                    .frame(width: 32, height: 32)
+                Image(systemName: category.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(category.color)
+            }
+
+            // Category name
+            Text(category.name)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Spacer()
+
+            // Percentage badge
+            Text("\(Int(category.percentage))%")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(category.color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(category.color.opacity(0.15))
+                )
+
+            // Amount
+            Text(String(format: "€%.0f", category.totalSpent))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .frame(width: 65, alignment: .trailing)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            ZStack {
+                // Base glass effect
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.04))
+
+                // Subtle gradient
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.06),
+                                Color.white.opacity(0.02)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Colored accent glow on the left
+                HStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    category.color.opacity(0.15),
+                                    Color.clear
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: 80)
+                    Spacer()
+                }
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.1),
+                            Color.white.opacity(0.03)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
