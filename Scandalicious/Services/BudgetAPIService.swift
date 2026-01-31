@@ -122,6 +122,8 @@ actor BudgetAPIService {
 
         // Log AI response details
         print("🤖 [AI Budget] ✅ AI Suggestion received:")
+        print("   📅 Based on Months: \(response.basedOnMonths) (Data Collection Phase: \(response.dataCollectionPhase.title))")
+        print("   💵 Total Spend Analyzed: €\(response.totalSpendAnalyzed)")
         print("   📊 Recommended Budget: €\(response.recommendedBudget.amount) (confidence: \(response.recommendedBudget.confidence))")
         print("   📈 Health Score: \(response.budgetHealthScore)/100")
         print("   📦 Category Allocations (\(response.categoryAllocations.count) categories):")

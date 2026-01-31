@@ -212,20 +212,176 @@ struct BudgetSetupView: View {
     private func onboardingContent(_ suggestion: AIBudgetSuggestionResponse) -> some View {
         ScrollView {
             VStack(spacing: 24) {
-                AIBudgetOnboardingCard(
-                    suggestion: suggestion,
-                    onScanReceipt: {
-                        dismiss()
-                        onScanReceipt?()
-                    }
-                )
-                .padding(.horizontal, 20)
+                // Welcome header with progress
+                onboardingHeader(suggestion)
+                    .padding(.horizontal, 20)
+
+                // AI Recommended Budget - Best Effort (even with no data)
+                aiRecommendedBudgetCardForOnboarding(suggestion)
+                    .padding(.horizontal, 20)
+
+                // Scan receipt CTA
+                scanReceiptCTASection
+                    .padding(.horizontal, 20)
 
                 // Option to use suggested budget anyway
                 useAnywaySuggestionSection(suggestion)
                     .padding(.horizontal, 20)
             }
             .padding(.vertical, 16)
+        }
+    }
+
+    private func onboardingHeader(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+        HStack(spacing: 16) {
+            // Progress ring showing 0 of 3
+            DataCollectionProgressRing(
+                monthsCollected: 0,
+                targetMonths: 3,
+                size: 64,
+                showLabel: false
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Getting Started")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text("Scan receipts to personalize your budget")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12))
+
+                    Text("We've prepared a starting point for you")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.12),
+                            Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.04)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+
+    private func aiRecommendedBudgetCardForOnboarding(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.yellow.opacity(0.8))
+
+                    Text("Suggested Starting Point")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white.opacity(0.9))
+                }
+
+                Spacer()
+
+                // Preliminary badge
+                Text("Preliminary")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.4))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.06))
+                    )
+            }
+
+            // Recommended amount
+            VStack(spacing: 6) {
+                Text(String(format: "€%.0f", suggestion.recommendedBudget.amount))
+                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.7))
+
+                Text("per month")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.35))
+            }
+
+            // Reasoning
+            Text(suggestion.recommendedBudget.reasoning)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.45))
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+
+            // Note about personalization
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 11))
+                Text("This will become personalized as you scan receipts")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundColor(.white.opacity(0.35))
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
+                )
+        )
+    }
+
+    private var scanReceiptCTASection: some View {
+        VStack(spacing: 12) {
+            Button(action: {
+                dismiss()
+                onScanReceipt?()
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 18, weight: .semibold))
+
+                    Text("Scan Your First Receipt")
+                        .font(.system(size: 17, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.3, green: 0.7, blue: 1.0),
+                            Color(red: 0.25, green: 0.6, blue: 0.95)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(16)
+                .shadow(color: Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.4), radius: 12, y: 4)
+            }
+
+            Text("Start building your personalized budget profile")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.4))
         }
     }
 
@@ -358,6 +514,9 @@ struct BudgetSetupView: View {
             VStack(spacing: 24) {
                 // Header with progress
                 buildingProfileHeader(suggestion)
+
+                // AI Recommended Budget - Best Effort (prominent display)
+                aiRecommendedBudgetCardForPartialData(suggestion)
 
                 // AI Insight if available
                 if !suggestion.summary.isEmpty {
@@ -888,6 +1047,146 @@ struct BudgetSetupView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
                         .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.25), lineWidth: 1)
+                )
+        )
+    }
+
+    // MARK: - AI Recommended Budget Card for Partial Data
+
+    private func aiRecommendedBudgetCardForPartialData(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+        VStack(spacing: 16) {
+            // Header with "Best Effort" indicator
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.8))
+
+                    Text("AI Recommended Budget")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white.opacity(0.9))
+                }
+
+                Spacer()
+
+                // Best effort badge
+                HStack(spacing: 4) {
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 10))
+                    Text("Best Effort")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundColor(.white.opacity(0.5))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.08))
+                )
+            }
+
+            // Recommended amount - prominent but with muted styling
+            VStack(spacing: 8) {
+                Text(String(format: "€%.0f", suggestion.recommendedBudget.amount))
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.85))
+
+                Text("per month")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+
+            // Confidence badge
+            ConfidenceBadge(confidence: suggestion.recommendedBudget.confidence, style: .compact)
+
+            // Stats row with muted styling
+            HStack(spacing: 0) {
+                // Average Spend (if available)
+                if suggestion.totalSpendAnalyzed > 0 {
+                    VStack(spacing: 4) {
+                        Text(String(format: "€%.0f", averageSpending))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.7))
+
+                        Text("Avg Spend")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 1, height: 40)
+                }
+
+                // Potential Savings
+                let savings = averageSpending - suggestion.recommendedBudget.amount
+                VStack(spacing: 4) {
+                    Text(String(format: "€%.0f", max(0, savings)))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(savings > 0 ? Color(red: 0.3, green: 0.8, blue: 0.5).opacity(0.8) : .white.opacity(0.4))
+
+                    Text("Est. Savings")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .frame(maxWidth: .infinity)
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 1, height: 40)
+
+                // Data basis
+                VStack(spacing: 4) {
+                    Text("\(suggestion.basedOnMonths)")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.9))
+
+                    Text(suggestion.basedOnMonths == 1 ? "Month" : "Months")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.03))
+            )
+
+            // Reasoning with note about improving accuracy
+            VStack(spacing: 8) {
+                Text(suggestion.recommendedBudget.reasoning)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 10))
+                    Text("Will improve with more data")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundColor(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.8))
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.08),
+                            Color(red: 0.5, green: 0.3, blue: 0.9).opacity(0.03)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 )
         )
     }
