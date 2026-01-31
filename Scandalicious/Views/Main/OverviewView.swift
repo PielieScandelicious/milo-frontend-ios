@@ -107,6 +107,20 @@ struct OverviewView: View {
         return selectedPeriod == currentPeriod
     }
 
+    /// Check if this is a fresh new month (first 3 days with no data yet)
+    /// Used to show encouraging "new month" messaging
+    private var isNewMonthStart: Bool {
+        guard isCurrentPeriod else { return false }
+        let dayOfMonth = Calendar.current.component(.day, from: Date())
+        let hasNoData = currentBreakdowns.isEmpty && receiptsViewModel.receipts.isEmpty
+        return dayOfMonth <= 3 && hasNoData
+    }
+
+    /// Check if current period has no data (for empty state messaging)
+    private var currentPeriodHasNoData: Bool {
+        currentBreakdowns.isEmpty
+    }
+
     private var availablePeriods: [String] {
         // Use cached version for performance - avoid computing during render
         if !cachedAvailablePeriods.isEmpty {
@@ -160,11 +174,23 @@ struct OverviewView: View {
     private func computeAvailablePeriods() -> [String] {
         var monthPeriods: [String] = []
 
+        // Get the current month string (e.g., "February 2026")
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        let currentMonthString = dateFormatter.string(from: Date())
+
         // Use period metadata if available (from lightweight /analytics/periods endpoint)
         if !dataManager.periodMetadata.isEmpty {
             // Period metadata is already sorted by backend (most recent first)
             // Reverse to get oldest first (left), most recent last (right) for swipe UX
             monthPeriods = Array(dataManager.periodMetadata.map { $0.period }.reversed())
+
+            // IMPORTANT: Always include current month even if it has no data yet
+            // This handles the month transition case (e.g., Jan 31 → Feb 1)
+            if !monthPeriods.contains(currentMonthString) {
+                monthPeriods.append(currentMonthString)
+            }
         } else {
             // Fallback: Use breakdowns if metadata not loaded yet
             let breakdownPeriods = Array(dataManager.breakdownsByPeriod().keys)
@@ -192,9 +218,7 @@ struct OverviewView: View {
 
         // Extract unique years from month periods, sorted descending (most recent year first)
         var uniqueYears: Set<Int> = []
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
+        // Reuse dateFormatter from above
 
         for period in monthPeriods {
             if let date = dateFormatter.date(from: period) {
@@ -1367,22 +1391,62 @@ struct OverviewView: View {
             }
 
             // Current period (center pill)
-            Text(selectedPeriod.uppercased())
-                .font(.system(size: 13, weight: .bold, design: .default))
-                .foregroundColor(.white)
-                .tracking(1.5)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color.white.opacity(0.12))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-                .contentTransition(.interpolate)
-                .animation(.easeInOut(duration: 0.25), value: selectedPeriod)
+            HStack(spacing: 6) {
+                // Show sparkle icon for fresh new month
+                if isNewMonthStart {
+                    Image(systemName: "sparkle")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.9), .purple.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                Text(selectedPeriod.uppercased())
+                    .font(.system(size: 13, weight: .bold, design: .default))
+                    .foregroundColor(.white)
+                    .tracking(1.5)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(isNewMonthStart
+                        ? LinearGradient(
+                            colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        : LinearGradient(
+                            colors: [Color.white.opacity(0.12), Color.white.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        isNewMonthStart
+                            ? LinearGradient(
+                                colors: [Color.blue.opacity(0.4), Color.purple.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [Color.white.opacity(0.2), Color.white.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                        lineWidth: 1
+                    )
+            )
+            .contentTransition(.interpolate)
+            .animation(.easeInOut(duration: 0.25), value: selectedPeriod)
+            .animation(.easeInOut(duration: 0.3), value: isNewMonthStart)
 
             // Next period (faded right)
             if canGoToNextPeriod {
@@ -1563,6 +1627,11 @@ struct OverviewView: View {
                         pieChartFlipDegrees = 0
                         showAllRows = false
                     }
+                } else {
+                    // Empty pie chart state - show when no data for this period
+                    EmptyPieChartView(isNewMonth: isNewMonthStart && isCurrentPeriod)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
                 }
             }
             .contentShape(Rectangle())
@@ -2042,14 +2111,46 @@ struct OverviewView: View {
                         .padding(.vertical, 30)
 
                     case .empty:
-                        // Empty state
-                        VStack(spacing: 8) {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 28))
-                                .foregroundColor(.white.opacity(0.2))
-                            Text(isAllPeriod(selectedPeriod) ? "No receipts yet" : "No receipts for this period")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
+                        // Empty state - different messaging based on context
+                        VStack(spacing: 12) {
+                            if isNewMonthStart {
+                                // Fresh new month - encouraging message
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.blue.opacity(0.8), .purple.opacity(0.6)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                Text("Fresh Start!")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.8))
+                                Text("New month, new opportunities.\nScan your first receipt to get started.")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                                    .multilineTextAlignment(.center)
+                            } else if isCurrentPeriod && currentPeriodHasNoData {
+                                // Current month but no data yet (after first few days)
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white.opacity(0.2))
+                                Text("No receipts this month")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                                Text("Scan a receipt to start tracking")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.3))
+                            } else {
+                                // Past period with no data
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white.opacity(0.2))
+                                Text(isAllPeriod(selectedPeriod) ? "No receipts yet" : "No receipts for this period")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 24)
@@ -2443,6 +2544,103 @@ struct OverviewView: View {
         withAnimation {
             selectedPeriod = availablePeriods[currentPeriodIndex + 1]
         }
+    }
+}
+
+// MARK: - Empty Pie Chart View
+/// Shows an empty donut chart matching IconDonutChartView styling when there's no data for a period
+private struct EmptyPieChartView: View {
+    let isNewMonth: Bool
+
+    // Match IconDonutChartView dimensions
+    private let size: CGFloat = 200
+    private let strokeWidthRatio: CGFloat = 0.08
+
+    private var strokeWidth: CGFloat {
+        size * strokeWidthRatio  // 16pt for 200 size
+    }
+
+    private var ringDiameter: CGFloat {
+        size - strokeWidth  // 184pt
+    }
+
+    var body: some View {
+        ZStack {
+            // Empty donut ring - matches IconDonutChartView stroke style
+            Circle()
+                .stroke(
+                    isNewMonth
+                        ? LinearGradient(
+                            colors: [Color.blue.opacity(0.25), Color.purple.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        : LinearGradient(
+                            colors: [Color.white.opacity(0.12), Color.white.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                    style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
+                )
+                .frame(width: ringDiameter, height: ringDiameter)
+
+            // Center content - matches IconDonutChartView center styling exactly
+            ZStack {
+                // Subtle gradient background circle (same as IconDonutChartView)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.white.opacity(0.08),
+                                Color.white.opacity(0.02)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: size * 0.32
+                        )
+                    )
+                    .frame(width: size * 0.58, height: size * 0.58)
+
+                // Center icon and labels - same as regular chart
+                VStack(spacing: 6) {
+                    // Storefront icon with gradient (same styling as IconDonutChartView)
+                    Image(systemName: "storefront.fill")
+                        .font(.system(size: size * 0.18, weight: .semibold))
+                        .foregroundStyle(
+                            isNewMonth
+                                ? LinearGradient(
+                                    colors: [
+                                        Color.blue.opacity(0.9),
+                                        Color.purple.opacity(0.7)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                : LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.5),
+                                        Color.white.opacity(0.3)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                        )
+
+                    Text("Stores")
+                        .font(.system(size: size * 0.07, weight: .semibold))
+                        .foregroundColor(isNewMonth ? .white.opacity(0.7) : .white.opacity(0.4))
+                        .tracking(0.3)
+
+                    // Receipts count (0)
+                    Text("0 receipts")
+                        .font(.system(size: size * 0.055, weight: .medium))
+                        .foregroundColor(isNewMonth ? .white.opacity(0.5) : .white.opacity(0.3))
+                        .padding(.top, 2)
+                }
+            }
+            .frame(maxWidth: size * 0.55)
+        }
+        .frame(width: size, height: size)
     }
 }
 
