@@ -93,6 +93,8 @@ struct OverviewView: View {
     @State private var pieChartFlipDegrees: Double = 0 // Animation degrees for flip
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
+    @State private var showAllRows = false // Track if showing all store/category rows or limited
+    private let maxVisibleRows = 5 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
 
     // Entrance animation states
@@ -1569,17 +1571,19 @@ struct OverviewView: View {
                                     await fetchCategoryData(for: period)
                                 }
                             }
-                            // Flip the chart
+                            // Flip the chart and reset row expansion
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                                 isPieChartFlipped.toggle()
                                 pieChartFlipDegrees += 180
+                                showAllRows = false // Reset to collapsed state when flipping
                             }
                         }
                     }
                     .onChange(of: period) { _, newPeriod in
-                        // Reset flip state when period changes
+                        // Reset flip state and row expansion when period changes
                         isPieChartFlipped = false
                         pieChartFlipDegrees = 0
+                        showAllRows = false
                     }
                 }
             }
@@ -1594,6 +1598,10 @@ struct OverviewView: View {
                 let categories = categoryDataForPeriod(period)
 
                 if isPieChartFlipped && !categories.isEmpty {
+                    // Determine which categories to display
+                    let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
+                    let hasMoreCategories = categories.count > maxVisibleRows
+
                     // Categories section header
                     categoriesSectionHeader(categoryCount: categories.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
                         .padding(.horizontal, 16)
@@ -1601,7 +1609,7 @@ struct OverviewView: View {
 
                     // Category rows with staggered animation
                     VStack(spacing: 8) {
-                        ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
+                        ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                             CategoryRowButton(category: category)
                                 .opacity(storeRowsAppeared ? 1 : 0)
                                 .offset(y: storeRowsAppeared ? 0 : 15)
@@ -1611,8 +1619,16 @@ struct OverviewView: View {
                                     value: storeRowsAppeared
                                 )
                         }
+
+                        // Show All / Show Less button
+                        if hasMoreCategories {
+                            showAllRowsButton(
+                                isExpanded: showAllRows,
+                                totalCount: categories.count
+                            )
+                        }
                     }
-                    .id("\(period)-categories")
+                    .id("\(period)-categories-\(showAllRows)")
                     .padding(.horizontal, 16)
                     .onAppear {
                         if !storeRowsAppeared {
@@ -1622,6 +1638,10 @@ struct OverviewView: View {
                         }
                     }
                 } else if !isPieChartFlipped && !segments.isEmpty {
+                    // Determine which segments to display
+                    let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
+                    let hasMoreSegments = segments.count > maxVisibleRows
+
                     // Stores section header
                     storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
                         .padding(.horizontal, 16)
@@ -1631,7 +1651,7 @@ struct OverviewView: View {
                     // Use .id(period) to force SwiftUI to recreate views when period changes
                     // This prevents duplicate views during period transitions
                     VStack(spacing: 8) {
-                        ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
+                        ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
                             StoreRowButton(
                                 segment: segment,
                                 breakdowns: breakdowns,
@@ -1648,8 +1668,16 @@ struct OverviewView: View {
                                 value: storeRowsAppeared
                             )
                         }
+
+                        // Show All / Show Less button
+                        if hasMoreSegments {
+                            showAllRowsButton(
+                                isExpanded: showAllRows,
+                                totalCount: segments.count
+                            )
+                        }
                     }
-                    .id(period) // Force complete view recreation when period changes
+                    .id("\(period)-\(showAllRows)") // Force complete view recreation when period or expansion changes
                     .padding(.horizontal, 16)
                     .onAppear {
                         // Trigger staggered animation immediately when view appears
@@ -1805,6 +1833,42 @@ struct OverviewView: View {
 
             Spacer()
         }
+    }
+
+    // MARK: - Show All Rows Button
+
+    private func showAllRowsButton(isExpanded: Bool, totalCount: Int) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                showAllRows.toggle()
+                // Reset animation state to trigger staggered animation for new rows
+                if showAllRows {
+                    storeRowsAppeared = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation {
+                            storeRowsAppeared = true
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+
+                Text(isExpanded ? "Show Less" : "Show All \(totalCount)")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(.white.opacity(0.6))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.white.opacity(0.06))
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
     }
 
     // MARK: - Receipts Section State

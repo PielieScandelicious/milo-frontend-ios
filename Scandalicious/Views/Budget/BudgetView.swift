@@ -11,6 +11,10 @@ struct BudgetView: View {
     @StateObject private var viewModel = BudgetViewModel()
     @State private var showingDeleteConfirmation = false
     @State private var selectedCategoryItem: BudgetProgressItem?
+    @State private var showAllCategories = false
+
+    /// Maximum categories to show before grouping
+    private let maxVisibleCategories = 6
 
     var body: some View {
         ZStack {
@@ -395,6 +399,28 @@ struct BudgetView: View {
 
     // MARK: - Category Breakdown Section
 
+    /// Whether categories need grouping
+    private var needsCategoryGrouping: Bool {
+        viewModel.budgetProgressItems.count > maxVisibleCategories
+    }
+
+    /// Categories to display - either all or limited with "Others" summary
+    private var displayCategories: [BudgetProgressItem] {
+        let items = viewModel.budgetProgressItems
+        guard needsCategoryGrouping && !showAllCategories else { return items }
+
+        // Sort by spent amount descending to keep largest categories visible
+        let sortedItems = items.sorted { $0.spentAmount > $1.spentAmount }
+
+        // Return first (maxVisibleCategories) items
+        return Array(sortedItems.prefix(maxVisibleCategories))
+    }
+
+    /// Count of hidden categories
+    private var hiddenCategoryCount: Int {
+        max(0, viewModel.budgetProgressItems.count - maxVisibleCategories)
+    }
+
     private var categoryBreakdownSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
@@ -408,6 +434,19 @@ struct BudgetView: View {
                     .foregroundStyle(.white)
 
                 Spacer()
+
+                // Category count badge
+                if !viewModel.budgetProgressItems.isEmpty {
+                    Text("\(viewModel.budgetProgressItems.count)")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.1))
+                        )
+                }
             }
             .padding(.horizontal, 4)
 
@@ -420,12 +459,38 @@ struct BudgetView: View {
                     GridItem(.flexible(), spacing: 16),
                     GridItem(.flexible(), spacing: 16)
                 ], spacing: 20) {
-                    ForEach(viewModel.budgetProgressItems) { item in
+                    ForEach(displayCategories) { item in
                         CategoryBudgetRingView(item: item)
                             .onTapGesture {
                                 selectedCategoryItem = item
                             }
                     }
+                }
+
+                // Show All / Show Less button
+                if needsCategoryGrouping {
+                    Button {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            showAllCategories.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: showAllCategories ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                                .font(.system(size: 14, weight: .semibold))
+
+                            Text(showAllCategories ? "Show Less" : "Show All \(viewModel.budgetProgressItems.count)")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(0.06))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
                 }
             }
         }
