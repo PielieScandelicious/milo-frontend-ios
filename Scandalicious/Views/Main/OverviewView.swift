@@ -61,13 +61,9 @@ struct OverviewView: View {
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var selectedStoreColor: Color = Color(red: 0.3, green: 0.7, blue: 1.0)
     @State private var showingAllTransactions = false
-    @State private var showTrendlineInOverview = false  // Toggle between pie chart and trendline
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
     @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
-    @State private var overviewTrends: [TrendPeriod] = []  // Trends for the overview chart
-    @State private var isLoadingTrends = false
-    @State private var hasFetchedTrends = false  // Prevent duplicate trend fetches
     @State private var hasSyncedRateLimit = false  // Prevent duplicate rate limit syncs
     @State private var loadedReceiptPeriods: Set<String> = []  // Track which periods have loaded receipts
     @State private var expandedReceiptId: String? // For inline receipt expansion
@@ -660,7 +656,6 @@ struct OverviewView: View {
     }
 
     private func handlePeriodChanged(newValue: String) {
-        if showTrendlineInOverview { showTrendlineInOverview = false }
         expandedReceiptId = nil
 
         // Reset store rows animation for staggered re-entry
@@ -1065,25 +1060,6 @@ struct OverviewView: View {
                 period: selectedPeriod,
                 totalItems: totalVisits
             ))
-        }
-    }
-
-    // MARK: - Overview Trends Fetching
-
-    /// Fetches trends data for the overview chart (lazy-loaded when user taps trendline)
-    private func fetchOverviewTrends() async {
-        guard !isLoadingTrends && !hasFetchedTrends else { return }
-        isLoadingTrends = true
-        defer { isLoadingTrends = false }
-
-        do {
-            let response = try await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 52)
-            await MainActor.run {
-                self.overviewTrends = response.periods
-                self.hasFetchedTrends = true
-            }
-        } catch {
-            print("Failed to fetch overview trends: \(error)")
         }
     }
 
@@ -2361,118 +2337,49 @@ struct OverviewView: View {
         let accentColor = healthScore?.healthScoreColor ?? Color.white.opacity(0.5)
 
         return VStack(spacing: 0) {
-            // Main content area
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showTrendlineInOverview.toggle()
-                }
-                if showTrendlineInOverview && !hasFetchedTrends {
-                    Task { await fetchOverviewTrends() }
-                }
-            } label: {
-                if showTrendlineInOverview {
-                    // Trendline view
-                    VStack(spacing: 8) {
-                        Text("Spending Trends")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .textCase(.uppercase)
-                            .tracking(1.2)
-
-                        if isLoadingTrends {
-                            VStack(spacing: 8) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
-                                Text("Loading trends...")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                            .frame(height: 160)
-                        } else if overviewTrends.isEmpty {
-                            VStack(spacing: 8) {
-                                Image(systemName: "chart.line.uptrend.xyaxis")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(.white.opacity(0.3))
-                                Text("No trend data")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                            .frame(height: 160)
-                        } else {
-                            StoreTrendLineChart(
-                                trends: overviewTrends,
-                                size: 140,
-                                totalAmount: spending,
-                                accentColor: accentColor,
-                                selectedPeriod: period,
-                                isVisible: true
-                            )
-                        }
-
-                        HStack(spacing: 4) {
-                            Image(systemName: "eurosign.circle.fill")
-                                .font(.system(size: 11))
-                            Text("Tap for Total")
-                                .font(.system(size: 12, weight: .medium))
-                        }
+            // Total spending view with health score
+            VStack(spacing: 16) {
+                // Spending section
+                VStack(spacing: 4) {
+                    Text(isAllPeriod(period) ? "TOTAL SPENT" : "SPENT THIS MONTH")
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
+                        .tracking(1.2)
+
+                    Text(String(format: "€%.0f", spending))
+                        .font(.system(size: 44, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
+                }
+
+                // Modern health score display
+                // Note: averageHealthScore is on 0-5 scale, ModernHealthScoreBadge expects 0-10
+                if let score = healthScore {
+                    ModernHealthScoreBadge(score: score * 2)
+                }
+
+                // Syncing indicator
+                if !isAllPeriod(period) && isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
+                    HStack(spacing: 4) {
+                        SyncingArrowsView()
+                            .font(.system(size: 11))
+                        Text("Syncing")
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
-                } else {
-                    // Total spending view with health score
-                    VStack(spacing: 16) {
-                        // Spending section
-                        VStack(spacing: 4) {
-                            Text(isAllPeriod(period) ? "TOTAL SPENT" : "SPENT THIS MONTH")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                                .tracking(1.2)
-
-                            Text(String(format: "€%.0f", spending))
-                                .font(.system(size: 44, weight: .heavy, design: .rounded))
-                                .foregroundColor(.white)
-                                .contentTransition(.numericText())
-                                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
-                        }
-
-                        // Modern health score display
-                        // Note: averageHealthScore is on 0-5 scale, ModernHealthScoreBadge expects 0-10
-                        if let score = healthScore {
-                            ModernHealthScoreBadge(score: score * 2)
-                        }
-
-                        // Syncing indicator or tap hint
-                        HStack(spacing: 4) {
-                            if !isAllPeriod(period) && isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
-                                SyncingArrowsView()
-                                    .font(.system(size: 11))
-                                Text("Syncing")
-                                    .font(.system(size: 12, weight: .medium))
-                            } else if !isAllPeriod(period) && showSyncedConfirmation {
-                                Image(systemName: "checkmark.icloud.fill")
-                                    .font(.system(size: 11))
-                                Text("Synced")
-                                    .font(.system(size: 12, weight: .medium))
-                            } else {
-                                Image(systemName: "chart.line.uptrend.xyaxis")
-                                    .font(.system(size: 11))
-                                Text("Tap for Trends")
-                                    .font(.system(size: 12, weight: .medium))
-                            }
-                        }
-                        .foregroundColor(
-                            !isAllPeriod(period) && isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue :
-                            !isAllPeriod(period) && showSyncedConfirmation ? .green : .white.opacity(0.4)
-                        )
+                    .foregroundColor(.blue)
+                } else if !isAllPeriod(period) && showSyncedConfirmation {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.icloud.fill")
+                            .font(.system(size: 11))
+                        Text("Synced")
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .padding(.vertical, 24)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
+                    .foregroundColor(.green)
                 }
             }
-            .buttonStyle(TotalSpendingCardButtonStyle())
+            .padding(.vertical, 24)
+            .frame(maxWidth: .infinity)
         }
         .background(
             ZStack {

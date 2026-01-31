@@ -15,8 +15,6 @@ struct AllStoresBreakdownView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedStoreName: String?
     @State private var showingStoreTransactions = false
-    @State private var trends: [TrendPeriod] = []
-    @State private var isLoadingTrends = false
 
     // Calculate weighted average health score across all stores
     private var overallHealthScore: Double? {
@@ -86,7 +84,6 @@ struct AllStoresBreakdownView: View {
                             segments: storeSegments,
                             size: 220,
                             totalReceipts: totalReceipts,
-                            trends: trends,
                             accentColor: Color(red: 0.95, green: 0.25, blue: 0.3),
                             selectedPeriod: period
                         )
@@ -120,25 +117,6 @@ struct AllStoresBreakdownView: View {
                     storeName: storeName
                 )
             }
-        }
-        .task {
-            await fetchTrends()
-        }
-    }
-
-    private func fetchTrends() async {
-        guard !isLoadingTrends else { return }
-        isLoadingTrends = true
-        defer { isLoadingTrends = false }
-
-        do {
-            // Fetch enough periods to cover historical data (52 months = ~4 years)
-            let response = try await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 52)
-            await MainActor.run {
-                self.trends = response.periods
-            }
-        } catch {
-            print("Failed to fetch trends: \(error)")
         }
     }
 

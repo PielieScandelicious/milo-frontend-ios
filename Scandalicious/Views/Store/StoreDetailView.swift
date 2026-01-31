@@ -16,8 +16,6 @@ struct StoreDetailView: View {
     // Removed showingAllTransactions - header no longer navigates
     @State private var showingCategoryTransactions = false
     @State private var showingReceipts = false
-    @State private var trends: [TrendPeriod] = []
-    @State private var isLoadingTrends = false
 
     // Live data that can be refreshed from backend
     @State private var currentTotalSpend: Double = 0
@@ -190,7 +188,6 @@ struct StoreDetailView: View {
                         totalAmount: Double(currentVisitCount),
                         segments: groupedChartSegments,
                         size: 200,
-                        trends: trends,
                         accentColor: chartAccentColor,
                         selectedPeriod: storeBreakdown.period,
                         averageItemPrice: averageItemPrice
@@ -235,9 +232,6 @@ struct StoreDetailView: View {
                 period: storeBreakdown.period,
                 storeName: storeBreakdown.storeName
             )
-        }
-        .task {
-            await fetchTrends()
         }
         .onAppear {
             if !hasInitialized {
@@ -341,24 +335,6 @@ struct StoreDetailView: View {
 
         } catch {
             print("❌ [StoreDetailView] Failed to refresh store data: \(error.localizedDescription)")
-        }
-    }
-
-    private func fetchTrends() async {
-        guard !isLoadingTrends else { return }
-        isLoadingTrends = true
-        defer { isLoadingTrends = false }
-
-        do {
-            // Use the store-specific trends endpoint (52 months = ~4 years of history)
-            print("[StoreDetailView] Fetching trends for store: \(storeBreakdown.storeName)")
-            let response = try await AnalyticsAPIService.shared.getStoreTrends(storeName: storeBreakdown.storeName, periodType: .month, numPeriods: 52)
-            print("[StoreDetailView] Fetched \(response.periods.count) trend periods for \(storeBreakdown.storeName)")
-            await MainActor.run {
-                self.trends = response.periods
-            }
-        } catch {
-            print("[StoreDetailView] Failed to fetch trends for \(storeBreakdown.storeName): \(error)")
         }
     }
 
