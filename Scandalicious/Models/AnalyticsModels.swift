@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - Period Types
 
@@ -237,42 +238,113 @@ struct CategoryBreakdown: Codable, Identifiable {
 // MARK: - Summary Response
 
 struct SummaryResponse: Codable {
-    let period: String  // Backend returns "January 2026" format, not enum
-    let startDate: String
-    let endDate: String
+    // New format fields (month/year based)
+    let month: Int?
+    let year: Int?
+
+    // Legacy format fields
+    let period: String?  // Backend returns "January 2026" format, not enum
+    let startDate: String?
+    let endDate: String?
+    let transactionCount: Int?
+
+    // Common fields
     let totalSpend: Double
-    let transactionCount: Int
-    let stores: [APIStoreBreakdown]
-    let averageHealthScore: Double?  // Overall average health score for the period
+    let averageHealthScore: Double?
+
+    // Store breakdown (legacy format)
+    let stores: [APIStoreBreakdown]?
+
+    // Category breakdown (new format)
+    let categories: [CategorySpendItem]?
 
     enum CodingKeys: String, CodingKey {
+        case month
+        case year
         case period
         case startDate = "start_date"
         case endDate = "end_date"
-        case totalSpend = "total_spend"
+        case totalSpend = "total_spent"  // Note: backend uses "total_spent" now
         case transactionCount = "transaction_count"
         case stores
+        case categories
         case averageHealthScore = "average_health_score"
     }
 
-    init(period: String, startDate: String, endDate: String, totalSpend: Double, transactionCount: Int, stores: [APIStoreBreakdown], averageHealthScore: Double? = nil) {
+    // Custom decoder to handle both "total_spend" and "total_spent" keys
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        month = try container.decodeIfPresent(Int.self, forKey: .month)
+        year = try container.decodeIfPresent(Int.self, forKey: .year)
+        period = try container.decodeIfPresent(String.self, forKey: .period)
+        startDate = try container.decodeIfPresent(String.self, forKey: .startDate)
+        endDate = try container.decodeIfPresent(String.self, forKey: .endDate)
+        transactionCount = try container.decodeIfPresent(Int.self, forKey: .transactionCount)
+        stores = try container.decodeIfPresent([APIStoreBreakdown].self, forKey: .stores)
+        categories = try container.decodeIfPresent([CategorySpendItem].self, forKey: .categories)
+        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
+
+        // Handle both "total_spend" and "total_spent"
+        if let spend = try? container.decode(Double.self, forKey: .totalSpend) {
+            totalSpend = spend
+        } else {
+            // Try legacy key
+            let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
+            totalSpend = try legacyContainer.decodeIfPresent(Double.self, forKey: .totalSpend) ?? 0
+        }
+    }
+
+    private enum LegacyCodingKeys: String, CodingKey {
+        case totalSpend = "total_spend"
+    }
+
+    init(period: String?, startDate: String?, endDate: String?, totalSpend: Double, transactionCount: Int?, stores: [APIStoreBreakdown]?, categories: [CategorySpendItem]? = nil, averageHealthScore: Double? = nil, month: Int? = nil, year: Int? = nil) {
+        self.month = month
+        self.year = year
         self.period = period
         self.startDate = startDate
         self.endDate = endDate
         self.totalSpend = totalSpend
         self.transactionCount = transactionCount
         self.stores = stores
+        self.categories = categories
         self.averageHealthScore = averageHealthScore
     }
 
     var startDateParsed: Date? {
-        ISO8601DateFormatter().date(from: startDate) ??
+        guard let startDate = startDate else { return nil }
+        return ISO8601DateFormatter().date(from: startDate) ??
         DateFormatter.yyyyMMdd.date(from: startDate)
     }
 
     var endDateParsed: Date? {
-        ISO8601DateFormatter().date(from: endDate) ??
+        guard let endDate = endDate else { return nil }
+        return ISO8601DateFormatter().date(from: endDate) ??
         DateFormatter.yyyyMMdd.date(from: endDate)
+    }
+
+    /// Get period string (computed from month/year if not provided)
+    var periodString: String {
+        if let period = period {
+            return period
+        }
+        if let month = month, let year = year {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            var components = DateComponents()
+            components.month = month
+            components.year = year
+            if let date = Calendar.current.date(from: components) {
+                return dateFormatter.string(from: date)
+            }
+        }
+        return "Unknown"
+    }
+
+    /// Convert categories to ChartData for pie chart display
+    var categoryChartData: [ChartData] {
+        categories?.toChartData() ?? []
     }
 }
 
@@ -285,10 +357,13 @@ struct APIStoreBreakdown: Codable, Identifiable {
 
     var id: String { storeName }
 
+    // Support both old (amount_spent, store_visits) and new (total_spent, visit_count) field names
     enum CodingKeys: String, CodingKey {
         case storeName = "store_name"
         case amountSpent = "amount_spent"
+        case totalSpent = "total_spent"
         case storeVisits = "store_visits"
+        case visitCount = "visit_count"
         case percentage
         case averageHealthScore = "average_health_score"
     }
@@ -299,6 +374,35 @@ struct APIStoreBreakdown: Codable, Identifiable {
         self.storeVisits = storeVisits
         self.percentage = percentage
         self.averageHealthScore = averageHealthScore
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        storeName = try container.decode(String.self, forKey: .storeName)
+        percentage = try container.decode(Double.self, forKey: .percentage)
+        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
+
+        // Try new field names first, fall back to old field names
+        if let totalSpent = try container.decodeIfPresent(Double.self, forKey: .totalSpent) {
+            amountSpent = totalSpent
+        } else {
+            amountSpent = try container.decode(Double.self, forKey: .amountSpent)
+        }
+
+        if let visitCount = try container.decodeIfPresent(Int.self, forKey: .visitCount) {
+            storeVisits = visitCount
+        } else {
+            storeVisits = try container.decode(Int.self, forKey: .storeVisits)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(storeName, forKey: .storeName)
+        try container.encode(amountSpent, forKey: .totalSpent)
+        try container.encode(storeVisits, forKey: .visitCount)
+        try container.encode(percentage, forKey: .percentage)
+        try container.encodeIfPresent(averageHealthScore, forKey: .averageHealthScore)
     }
 }
 
@@ -1053,5 +1157,174 @@ struct PeriodMetadata: Codable, Identifiable {
 
     var endDate: Date? {
         DateFormatter.yyyyMMdd.date(from: periodEnd)
+    }
+}
+
+// MARK: - Pie Chart Summary Response (for Category and Store Spending Breakdown)
+
+/// Response from GET /api/v2/analytics/summary with month/year params
+/// Used for the interactive Pie Chart drill-down view
+/// Contains both category and store breakdowns
+struct PieChartSummaryResponse: Codable {
+    let month: Int
+    let year: Int
+    let totalSpent: Double
+    let categories: [CategorySpendItem]
+    let stores: [PieChartStore]
+
+    enum CodingKeys: String, CodingKey {
+        case month
+        case year
+        case totalSpent = "total_spent"
+        case categories
+        case stores
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        month = try container.decode(Int.self, forKey: .month)
+        year = try container.decode(Int.self, forKey: .year)
+        totalSpent = try container.decode(Double.self, forKey: .totalSpent)
+        categories = try container.decodeIfPresent([CategorySpendItem].self, forKey: .categories) ?? []
+        stores = try container.decodeIfPresent([PieChartStore].self, forKey: .stores) ?? []
+    }
+}
+
+// MARK: - Pie Chart Store (for Store Spending Breakdown)
+
+/// Represents spending at a single store for pie chart visualization
+/// Matches the stores array in PieChartSummaryResponse
+struct PieChartStore: Codable, Identifiable {
+    let storeName: String         // Store name e.g., "Colruyt"
+    let totalSpent: Double        // Amount spent at this store
+    let percentage: Double        // Percentage of total spend
+    let visitCount: Int           // Number of visits
+    let averageHealthScore: Double? // Average health score (optional)
+
+    var id: String { storeName }
+
+    enum CodingKeys: String, CodingKey {
+        case storeName = "store_name"
+        case totalSpent = "total_spent"
+        case percentage
+        case visitCount = "visit_count"
+        case averageHealthScore = "average_health_score"
+    }
+
+    // MARK: - Computed Properties
+
+    /// Generate a color based on store name hash for consistent coloring
+    var color: Color {
+        let colors: [Color] = [
+            Color(red: 0.3, green: 0.7, blue: 1.0),   // Blue
+            Color(red: 0.4, green: 0.8, blue: 0.5),   // Green
+            Color(red: 1.0, green: 0.7, blue: 0.3),   // Orange
+            Color(red: 0.9, green: 0.4, blue: 0.6),   // Pink
+            Color(red: 0.7, green: 0.5, blue: 1.0),   // Purple
+            Color(red: 0.3, green: 0.9, blue: 0.9),   // Cyan
+            Color(red: 1.0, green: 0.6, blue: 0.4),   // Coral
+            Color(red: 0.6, green: 0.9, blue: 0.4),   // Lime
+        ]
+        let index = abs(storeName.hashValue) % colors.count
+        return colors[index]
+    }
+
+    /// Formatted percentage string
+    var percentageText: String {
+        String(format: "%.1f%%", percentage)
+    }
+
+    /// Formatted amount string
+    var amountText: String {
+        String(format: "€%.2f", totalSpent)
+    }
+
+    /// Formatted visit count string
+    var visitsText: String {
+        visitCount == 1 ? "1 visit" : "\(visitCount) visits"
+    }
+}
+
+// MARK: - Category Spend Item (for Pie Chart)
+
+/// Represents spending in a single category for pie chart visualization
+/// Matches the categories array in PieChartSummaryResponse
+struct CategorySpendItem: Codable, Identifiable {
+    let categoryId: String        // Enum name e.g., "MEAT_FISH"
+    let name: String              // Display name e.g., "Meat & Fish"
+    let totalSpent: Double        // Amount spent in this category
+    let colorHex: String          // Hex color e.g., "#FF6B6B"
+    let percentage: Double        // Percentage of total spend
+    let transactionCount: Int     // Number of transactions
+    let averageHealthScore: Double? // Average health score (optional)
+
+    var id: String { categoryId }
+
+    enum CodingKeys: String, CodingKey {
+        case categoryId = "category_id"
+        case name
+        case totalSpent = "total_spent"
+        case colorHex = "color_hex"
+        case percentage
+        case transactionCount = "transaction_count"
+        case averageHealthScore = "average_health_score"
+    }
+
+    // MARK: - Computed Properties
+
+    /// Color from hex string, falls back to category-based color
+    var color: Color {
+        Color(hex: colorHex) ?? name.categoryColor
+    }
+
+    /// SF Symbol icon for this category
+    var icon: String {
+        switch categoryId {
+        case "MEAT_FISH": return "fish.fill"
+        case "ALCOHOL": return "wineglass.fill"
+        case "DRINKS_SOFT_SODA": return "cup.and.saucer.fill"
+        case "DRINKS_WATER": return "waterbottle.fill"
+        case "HOUSEHOLD": return "house.fill"
+        case "SNACKS_SWEETS": return "birthday.cake.fill"
+        case "FRESH_PRODUCE": return "leaf.fill"
+        case "DAIRY_EGGS": return "carton.fill"
+        case "READY_MEALS": return "takeoutbag.and.cup.and.straw.fill"
+        case "BAKERY": return "croissant.fill"
+        case "PANTRY": return "cabinet.fill"
+        case "PERSONAL_CARE": return "sparkles"
+        case "FROZEN": return "snowflake"
+        case "BABY_KIDS": return "figure.and.child.holdinghands"
+        case "PET_SUPPLIES": return "pawprint.fill"
+        default: return "shippingbox.fill"
+        }
+    }
+
+    /// Formatted percentage string
+    var percentageText: String {
+        String(format: "%.1f%%", percentage)
+    }
+
+    /// Formatted amount string
+    var amountText: String {
+        String(format: "€%.2f", totalSpent)
+    }
+
+    /// Convert to ChartData for IconDonutChartView
+    var toChartData: ChartData {
+        ChartData(
+            value: totalSpent,
+            color: color,
+            iconName: icon,
+            label: name
+        )
+    }
+}
+
+// MARK: - CategorySpendItem Array Extension
+
+extension Array where Element == CategorySpendItem {
+    /// Convert to ChartData array for IconDonutChartView
+    func toChartData() -> [ChartData] {
+        map { $0.toChartData }
     }
 }

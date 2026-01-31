@@ -146,24 +146,25 @@ class StoreDataManager: ObservableObject {
                     filters = AnalyticsFilters()
                 }
             }
-            
-            // Fetch summary from backend
+
+            // Fetch summary from backend (now returns both stores and categories)
             let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
-            
-            print("✅ Received \(summary.stores.count) stores from backend")
+
+            let stores = summary.stores ?? []
+            print("✅ Received \(stores.count) stores from backend")
             print("   Total spend (from backend summary): €\(summary.totalSpend)")
-            print("   Transaction count: \(summary.transactionCount)")
+            print("   Transaction count: \(summary.transactionCount ?? 0)")
 
             // Debug: Calculate sum of individual store amounts
-            let storeSum = summary.stores.reduce(0) { $0 + $1.amountSpent }
+            let storeSum = stores.reduce(0) { $0 + $1.amountSpent }
             print("   Sum of store amounts: €\(storeSum)")
             print("   ⚠️ Difference (summary - stores): €\(summary.totalSpend - storeSum)")
 
             // Debug: Print each store's amount
-            for store in summary.stores {
+            for store in stores {
                 print("   📍 \(store.storeName): €\(store.amountSpent) (\(store.percentage)%)")
             }
-            
+
             // Convert API response to StoreBreakdown format
             let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: period)
 
@@ -209,8 +210,8 @@ class StoreDataManager: ObservableObject {
                         periodEnd: existingMetadata.periodEnd,
                         totalSpend: summary.totalSpend,
                         receiptCount: receiptCount,
-                        storeCount: summary.stores.count,
-                        transactionCount: summary.transactionCount,
+                        storeCount: (summary.stores ?? []).count,
+                        transactionCount: summary.transactionCount ?? 0,
                         totalItems: existingMetadata.totalItems,
                         averageHealthScore: summary.averageHealthScore
                     )
@@ -383,7 +384,7 @@ class StoreDataManager: ObservableObject {
             // Fetch summary to get store breakdowns
             let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
 
-            print("✅ Received \(summary.stores.count) stores for \(periodString)")
+            print("✅ Received \((summary.stores ?? []).count) stores for \(periodString)")
 
             // Convert to StoreBreakdowns
             let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: .month)
@@ -489,7 +490,7 @@ class StoreDataManager: ObservableObject {
 
                 do {
                     let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
-                    print("      📥 Summary API returned: totalSpend=€\(summary.totalSpend), transactionCount=\(summary.transactionCount)")
+                    print("      📥 Summary API returned: totalSpend=€\(summary.totalSpend), transactionCount=\(summary.transactionCount ?? 0)")
 
                     // Convert to StoreBreakdowns
                     let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: .month)
@@ -565,17 +566,41 @@ class StoreDataManager: ObservableObject {
     /// Uses parallel fetching for store details to improve performance (3-5x faster)
     private func convertToStoreBreakdowns(summary: SummaryResponse, periodType: PeriodType) async -> [StoreBreakdown] {
         // Format period string (e.g., "January 2026")
-        let periodString = formatPeriod(from: summary.startDate, to: summary.endDate, period: periodType)
-        print("📅 Converting breakdowns - API dates: \(summary.startDate) to \(summary.endDate)")
+        // Use new month/year format if available, otherwise fall back to startDate/endDate
+        let periodString: String
+        if let month = summary.month, let year = summary.year {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+            var components = DateComponents()
+            components.month = month
+            components.year = year
+            if let date = Calendar.current.date(from: components) {
+                periodString = dateFormatter.string(from: date)
+            } else {
+                periodString = "\(month)/\(year)"
+            }
+        } else if let startDate = summary.startDate, let endDate = summary.endDate {
+            periodString = formatPeriod(from: startDate, to: endDate, period: periodType)
+        } else {
+            // Fallback to current month
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+            periodString = dateFormatter.string(from: Date())
+        }
+
+        let stores = summary.stores ?? []
+        print("📅 Converting breakdowns - month/year: \(summary.month ?? 0)/\(summary.year ?? 0)")
         print("📅 Generated period string: '\(periodString)'")
-        print("🚀 Fetching details for \(summary.stores.count) stores in parallel...")
+        print("🚀 Fetching details for \(stores.count) stores in parallel...")
 
         let startTime = Date()
 
         // Fetch all store details in parallel using TaskGroup
         let breakdowns = await withTaskGroup(of: StoreBreakdown.self, returning: [StoreBreakdown].self) { group in
             // Add a task for each store
-            for apiStore in summary.stores {
+            for apiStore in stores {
                 group.addTask {
                     await self.fetchStoreBreakdown(
                         apiStore: apiStore,
@@ -588,7 +613,7 @@ class StoreDataManager: ObservableObject {
 
             // Collect results as they complete
             var results: [StoreBreakdown] = []
-            results.reserveCapacity(summary.stores.count)
+            results.reserveCapacity(stores.count)
 
             for await breakdown in group {
                 results.append(breakdown)
@@ -612,10 +637,14 @@ class StoreDataManager: ObservableObject {
         summary: SummaryResponse
     ) async -> StoreBreakdown {
         do {
+            // Parse dates from summary response
+            let startDateParsed = summary.startDateParsed
+            let endDateParsed = summary.endDateParsed
+
             let filters = AnalyticsFilters(
                 period: periodType,
-                startDate: summary.startDateParsed,
-                endDate: summary.endDateParsed,
+                startDate: startDateParsed,
+                endDate: endDateParsed,
                 storeName: apiStore.storeName
             )
 

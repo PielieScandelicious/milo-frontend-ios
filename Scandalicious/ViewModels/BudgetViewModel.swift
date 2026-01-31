@@ -353,6 +353,26 @@ class BudgetViewModel: ObservableObject {
     }
 }
 
+// MARK: - Activity Rings Support
+
+extension BudgetViewModel {
+    /// Get budget progress items for activity rings display
+    var budgetProgressItems: [BudgetProgressItem] {
+        guard let progress = state.progress else { return [] }
+        return progress.categoryProgress.map { categoryProgress in
+            BudgetProgressItem(
+                categoryId: categoryProgress.analyticsCategory?.rawValue ?? categoryProgress.category.uppercased().replacingOccurrences(of: " ", with: "_").replacingOccurrences(of: "&", with: ""),
+                name: categoryProgress.category,
+                limitAmount: categoryProgress.budgetAmount,
+                spentAmount: categoryProgress.currentSpend,
+                isOverBudget: categoryProgress.isOverBudget,
+                overBudgetAmount: categoryProgress.isOverBudget ? categoryProgress.overAmount : nil,
+                isLocked: categoryProgress.isLocked
+            )
+        }
+    }
+}
+
 // MARK: - Computed Properties
 
 extension BudgetViewModel {

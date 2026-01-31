@@ -1195,7 +1195,7 @@ struct ReceiptScanView: View {
             let totalItems = periodsResponse.periods.compactMap { $0.totalItems }.reduce(0, +)
 
             // Get top 3 stores by visits
-            let sortedStores = summaryResponse.stores
+            let sortedStores = (summaryResponse.stores ?? [])
                 .sorted { $0.storeVisits > $1.storeVisits }
                 .prefix(3)
                 .map { (name: $0.storeName, visits: $0.storeVisits) }

@@ -317,26 +317,81 @@ struct BudgetProgressResponse: Codable {
             categoryProgress: categoryProgress.map { $0.toCategoryBudgetProgress() }
         )
     }
+
+    /// Convert all category progress items to BudgetProgressItem array for Activity Rings
+    func toBudgetProgressItems() -> [BudgetProgressItem] {
+        categoryProgress.map { $0.toBudgetProgressItem() }
+    }
 }
 
 struct CategoryProgressResponse: Codable {
-    let category: String
-    let budgetAmount: Double
-    let currentSpend: Double
+    // Legacy fields
+    let category: String?
+    let budgetAmount: Double?
+    let currentSpend: Double?
+
+    // New fields from updated backend
+    let categoryId: String?
+    let name: String?
+    let limitAmount: Double?
+    let spentAmount: Double?
+    let isOverBudget: Bool?
+    let overBudgetAmount: Double?
     let isLocked: Bool
 
     enum CodingKeys: String, CodingKey {
         case category
         case budgetAmount = "budget_amount"
         case currentSpend = "current_spend"
+        case categoryId = "category_id"
+        case name
+        case limitAmount = "limit_amount"
+        case spentAmount = "spent_amount"
+        case isOverBudget = "is_over_budget"
+        case overBudgetAmount = "over_budget_amount"
         case isLocked = "is_locked"
+    }
+
+    // MARK: - Computed Properties for Compatibility
+
+    /// Display name (prefers new `name` field, falls back to `category`)
+    var displayName: String {
+        name ?? category ?? "Unknown"
+    }
+
+    /// Budget limit amount (prefers new field, falls back to legacy)
+    var budget: Double {
+        limitAmount ?? budgetAmount ?? 0
+    }
+
+    /// Spent amount (prefers new field, falls back to legacy)
+    var spent: Double {
+        spentAmount ?? currentSpend ?? 0
+    }
+
+    /// Whether the category is over budget
+    var overBudget: Bool {
+        isOverBudget ?? (spent > budget)
     }
 
     func toCategoryBudgetProgress() -> CategoryBudgetProgress {
         CategoryBudgetProgress(
-            category: category,
-            budgetAmount: budgetAmount,
-            currentSpend: currentSpend,
+            category: displayName,
+            budgetAmount: budget,
+            currentSpend: spent,
+            isLocked: isLocked
+        )
+    }
+
+    /// Convert to BudgetProgressItem for Activity Rings
+    func toBudgetProgressItem() -> BudgetProgressItem {
+        BudgetProgressItem(
+            categoryId: categoryId ?? category?.uppercased().replacingOccurrences(of: " ", with: "_").replacingOccurrences(of: "&", with: "") ?? "OTHER",
+            name: displayName,
+            limitAmount: budget,
+            spentAmount: spent,
+            isOverBudget: overBudget,
+            overBudgetAmount: overBudgetAmount,
             isLocked: isLocked
         )
     }
@@ -369,6 +424,121 @@ struct UpdateBudgetRequest: Encodable {
         case categoryAllocations = "category_allocations"
         case notificationsEnabled = "notifications_enabled"
         case alertThresholds = "alert_thresholds"
+    }
+}
+
+// MARK: - Budget Progress Item (for Activity Rings)
+
+/// Represents budget progress for a single category
+/// Matches GET /api/v2/budgets/progress response per-category structure
+struct BudgetProgressItem: Codable, Identifiable {
+    let categoryId: String       // Enum name e.g., "MEAT_FISH"
+    let name: String             // Display name e.g., "Meat & Fish"
+    let limitAmount: Double      // Budget allocation
+    let spentAmount: Double      // Actual spending
+    let isOverBudget: Bool       // True if over budget
+    let overBudgetAmount: Double? // Amount over budget (null if not over)
+    let isLocked: Bool           // Whether allocation is locked
+
+    var id: String { categoryId }
+
+    enum CodingKeys: String, CodingKey {
+        case categoryId = "category_id"
+        case name
+        case limitAmount = "limit_amount"
+        case spentAmount = "spent_amount"
+        case isOverBudget = "is_over_budget"
+        case overBudgetAmount = "over_budget_amount"
+        case isLocked = "is_locked"
+    }
+
+    // MARK: - Computed Properties
+
+    /// Progress ratio (0.0 to 1.0+, can exceed 1.0 when over budget)
+    var progressRatio: Double {
+        guard limitAmount > 0 else { return 0 }
+        return spentAmount / limitAmount
+    }
+
+    /// Clamped progress for visual display (0.0 to 1.0)
+    var clampedProgress: Double {
+        min(1.0, progressRatio)
+    }
+
+    /// Amount remaining in budget
+    var remainingAmount: Double {
+        max(0, limitAmount - spentAmount)
+    }
+
+    /// Amount over budget (positive when over)
+    var overAmount: Double {
+        overBudgetAmount ?? max(0, spentAmount - limitAmount)
+    }
+
+    /// Status text for display (e.g., "€20 left" or "+€15 over")
+    var statusText: String {
+        if isOverBudget {
+            return String(format: "+€%.0f over", overAmount)
+        } else {
+            return String(format: "€%.0f left", remainingAmount)
+        }
+    }
+
+    /// Compact status text for small displays
+    var compactStatusText: String {
+        if isOverBudget {
+            return String(format: "+€%.0f", overAmount)
+        } else {
+            return String(format: "€%.0f", remainingAmount)
+        }
+    }
+
+    /// Color based on category name
+    var color: Color {
+        name.categoryColor
+    }
+
+    /// SF Symbol icon for this category
+    var icon: String {
+        // Map category ID to SF Symbol
+        switch categoryId {
+        case "MEAT_FISH": return "fish.fill"
+        case "ALCOHOL": return "wineglass.fill"
+        case "DRINKS_SOFT_SODA": return "cup.and.saucer.fill"
+        case "DRINKS_WATER": return "waterbottle.fill"
+        case "HOUSEHOLD": return "house.fill"
+        case "SNACKS_SWEETS": return "birthday.cake.fill"
+        case "FRESH_PRODUCE": return "leaf.fill"
+        case "DAIRY_EGGS": return "carton.fill"
+        case "READY_MEALS": return "takeoutbag.and.cup.and.straw.fill"
+        case "BAKERY": return "croissant.fill"
+        case "PANTRY": return "cabinet.fill"
+        case "PERSONAL_CARE": return "sparkles"
+        case "FROZEN": return "snowflake"
+        case "BABY_KIDS": return "figure.and.child.holdinghands"
+        case "PET_SUPPLIES": return "pawprint.fill"
+        default: return "shippingbox.fill"
+        }
+    }
+}
+
+// MARK: - Color Extension for Hex
+
+extension Color {
+    init?(hex: String) {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        hexSanitized = hexSanitized.hasPrefix("#") ? String(hexSanitized.dropFirst()) : hexSanitized
+
+        guard hexSanitized.count == 6 else { return nil }
+
+        var rgb: UInt64 = 0
+        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
+
+        let red = Double((rgb & 0xFF0000) >> 16) / 255.0
+        let green = Double((rgb & 0x00FF00) >> 8) / 255.0
+        let blue = Double(rgb & 0x0000FF) / 255.0
+
+        self.init(red: red, green: green, blue: blue)
     }
 }
 

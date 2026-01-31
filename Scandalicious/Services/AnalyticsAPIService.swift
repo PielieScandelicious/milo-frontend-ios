@@ -88,10 +88,22 @@ actor AnalyticsAPIService {
     
     /// Fetch summary with store breakdown
     /// - Parameter filters: Analytics filters for period and dates
+    /// Note: Backend now requires month and year parameters instead of start_date/end_date
     func fetchSummary(filters: AnalyticsFilters = AnalyticsFilters()) async throws -> SummaryResponse {
+        // Extract month and year from filters
+        let date = filters.startDate ?? Date()
+        let calendar = Calendar.current
+        let month = calendar.component(.month, from: date)
+        let year = calendar.component(.year, from: date)
+
+        let queryItems = [
+            URLQueryItem(name: "month", value: String(month)),
+            URLQueryItem(name: "year", value: String(year))
+        ]
+
         return try await performRequest(
             endpoint: "/analytics/summary",
-            queryItems: filters.toQueryItems()
+            queryItems: queryItems
         )
     }
     
@@ -203,6 +215,23 @@ actor AnalyticsAPIService {
 
         return try await performRequest(
             endpoint: "/analytics/year/\(year)",
+            queryItems: queryItems
+        )
+    }
+
+    /// Fetch pie chart summary for category spending breakdown
+    /// Returns category spending data for a specific month/year
+    /// - Parameters:
+    ///   - month: Month (1-12)
+    ///   - year: Year (2020-2100)
+    func fetchPieChartSummary(month: Int, year: Int) async throws -> PieChartSummaryResponse {
+        let queryItems = [
+            URLQueryItem(name: "month", value: String(month)),
+            URLQueryItem(name: "year", value: String(year))
+        ]
+
+        return try await performRequest(
+            endpoint: "/analytics/summary",
             queryItems: queryItems
         )
     }
@@ -615,6 +644,11 @@ extension AnalyticsAPIService {
     /// Nonisolated wrapper for fetchYearSummary
     nonisolated func getYearSummary(year: Int, includeMonthlyBreakdown: Bool = true, topCategoriesLimit: Int = 5) async throws -> YearSummaryResponse {
         return try await fetchYearSummary(year: year, includeMonthlyBreakdown: includeMonthlyBreakdown, topCategoriesLimit: topCategoriesLimit)
+    }
+
+    /// Nonisolated wrapper for fetchPieChartSummary
+    nonisolated func getPieChartSummary(month: Int, year: Int) async throws -> PieChartSummaryResponse {
+        return try await fetchPieChartSummary(month: month, year: year)
     }
 }
 

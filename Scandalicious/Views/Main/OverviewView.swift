@@ -88,6 +88,7 @@ struct OverviewView: View {
     @State private var yearSummaryCache: [String: YearSummaryResponse] = [:] // Cache year summaries by year string
     @State private var isLoadingYearData = false // Track if fetching year data for first time
     @State private var currentLoadingYear: String? = nil // Track which year is currently loading
+    @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
     @Binding var showSignOutConfirmation: Bool
 
     // Entrance animation states
@@ -135,6 +136,21 @@ struct OverviewView: View {
         dateFormatter.locale = Locale(identifier: "en_US")
         guard let date = dateFormatter.date(from: period) else { return nil }
         return Calendar.current.component(.year, from: date)
+    }
+
+    /// Parse month and year from period string (e.g., "January 2026" -> (month: 1, year: 2026))
+    private func parsePeriodComponents(_ period: String) -> (month: Int, year: Int) {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        guard let date = dateFormatter.date(from: period) else {
+            // Fallback to current date
+            let now = Date()
+            return (Calendar.current.component(.month, from: now), Calendar.current.component(.year, from: now))
+        }
+        let month = Calendar.current.component(.month, from: date)
+        let year = Calendar.current.component(.year, from: date)
+        return (month, year)
     }
 
     /// Compute available periods from data manager - called once when data changes
@@ -429,6 +445,11 @@ struct OverviewView: View {
             }
             .sheet(isPresented: $showingFilterSheet) {
                 FilterSheet(selectedSort: $selectedSort)
+            }
+            .sheet(isPresented: $showCategoryBreakdownSheet) {
+                // Parse month and year from selectedPeriod (e.g., "January 2026")
+                let components = parsePeriodComponents(selectedPeriod)
+                CategoryBreakdownDetailView(month: components.month, year: components.year)
             }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
@@ -728,35 +749,37 @@ struct OverviewView: View {
         }
 
         do {
-            // Fetch summary without date filters to get all-time data
-            var filters = AnalyticsFilters()
-            filters.period = .all  // This will omit the period parameter
+            // Fetch aggregate data with allTime=true to get all-time store data
+            var filters = AggregateFilters()
+            filters.allTime = true
+            filters.topStoresLimit = 20  // Get more stores for the pie chart
 
-            print("📊 Fetching all-time store data from backend...")
-            let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+            print("📊 Fetching all-time store data from backend (aggregate)...")
+            let aggregate = try await AnalyticsAPIService.shared.getAggregate(filters: filters)
+            let stores = aggregate.topStores
 
-            print("📊 Backend response: period=\(summary.period), totalSpend=€\(summary.totalSpend), stores=\(summary.stores.count), receipts=\(summary.transactionCount)")
+            print("📊 Backend response: totalSpend=€\(aggregate.totals.totalSpend), stores=\(stores.count), receipts=\(aggregate.totals.totalReceipts)")
 
             // Convert to StoreBreakdown array
-            let breakdowns: [StoreBreakdown] = summary.stores.map { store in
-                print("   📍 Store: \(store.storeName) - €\(store.amountSpent) (\(store.storeVisits) visits)")
+            let breakdowns: [StoreBreakdown] = stores.map { store in
+                print("   📍 Store: \(store.storeName) - €\(store.totalSpent) (\(store.visitCount) visits)")
                 return StoreBreakdown(
                     storeName: store.storeName,
                     period: Self.allPeriodIdentifier,
-                    totalStoreSpend: store.amountSpent,
-                    categories: [],  // Categories not available in summary, will be fetched in detail view
-                    visitCount: store.storeVisits,
+                    totalStoreSpend: store.totalSpent,
+                    categories: [],  // Categories not available in aggregate, will be fetched in detail view
+                    visitCount: store.visitCount,
                     averageHealthScore: store.averageHealthScore
                 )
             }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
 
-            print("✅ Fetched \(breakdowns.count) stores for all-time view, total: €\(summary.totalSpend)")
+            print("✅ Fetched \(breakdowns.count) stores for all-time view, total: €\(aggregate.totals.totalSpend)")
 
             await MainActor.run {
                 // Store all-time totals from backend FIRST
-                allTimeTotalSpend = summary.totalSpend
-                allTimeTotalReceipts = summary.transactionCount
-                allTimeHealthScore = summary.averageHealthScore
+                allTimeTotalSpend = aggregate.totals.totalSpend
+                allTimeTotalReceipts = aggregate.totals.totalReceipts
+                allTimeHealthScore = aggregate.averages.averageHealthScore
 
                 // Cache the all-time breakdowns
                 cachedBreakdownsByPeriod[Self.allPeriodIdentifier] = breakdowns
@@ -879,35 +902,47 @@ struct OverviewView: View {
             components.day = 31
             let endDate = calendar.date(from: components)!
 
-            var filters = AnalyticsFilters()
-            filters.period = .year
+            var filters = AggregateFilters()
             filters.startDate = startDate
             filters.endDate = endDate
+            filters.topStoresLimit = 20
 
-            let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+            let aggregate = try await AnalyticsAPIService.shared.getAggregate(filters: filters)
+            let aggregateStores = aggregate.topStores
+            let transactionCount = aggregate.totals.totalTransactions
 
-            // Create a pseudo YearSummaryResponse from the summary
+            // Convert AggregateStore to APIStoreBreakdown for YearSummaryResponse
+            let stores: [APIStoreBreakdown] = aggregateStores.map { store in
+                APIStoreBreakdown(
+                    storeName: store.storeName,
+                    amountSpent: store.totalSpent,
+                    storeVisits: store.visitCount,
+                    percentage: store.percentage,
+                    averageHealthScore: store.averageHealthScore
+                )
+            }
+
             let yearSummary = YearSummaryResponse(
                 year: yearInt,
                 startDate: DateFormatter.yyyyMMdd.string(from: startDate),
                 endDate: DateFormatter.yyyyMMdd.string(from: endDate),
-                totalSpend: summary.totalSpend,
-                transactionCount: summary.transactionCount,
-                receiptCount: summary.transactionCount, // Approximation
-                totalItems: summary.transactionCount,
-                averageHealthScore: summary.averageHealthScore,
-                stores: summary.stores,
+                totalSpend: aggregate.totals.totalSpend,
+                transactionCount: transactionCount,
+                receiptCount: transactionCount, // Approximation
+                totalItems: transactionCount,
+                averageHealthScore: aggregate.averages.averageHealthScore,
+                stores: stores,
                 monthlyBreakdown: nil,
                 topCategories: nil
             )
 
-            let breakdowns: [StoreBreakdown] = summary.stores.map { store in
+            let breakdowns: [StoreBreakdown] = aggregateStores.map { store in
                 StoreBreakdown(
                     storeName: store.storeName,
                     period: year,
-                    totalStoreSpend: store.amountSpent,
+                    totalStoreSpend: store.totalSpent,
                     categories: [],
-                    visitCount: store.storeVisits,
+                    visitCount: store.visitCount,
                     averageHealthScore: store.averageHealthScore
                 )
             }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
@@ -1391,6 +1426,7 @@ struct OverviewView: View {
                 } else if !segments.isEmpty {
                     // Pie chart showing store breakdown - use cached chart data
                     // Use .id(period) to force chart recreation when period changes
+                    // Tappable to show category breakdown detail
                     IconDonutChartView(
                         data: chartDataForPeriod(period),
                         totalAmount: Double(totalReceiptsForPeriod(period)),
@@ -1402,12 +1438,20 @@ struct OverviewView: View {
                     .id(period)
                     .padding(.top, 16)
                     .padding(.bottom, 8)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        // Only show for month periods, not year or all-time
+                        if !isAllPeriod(period) && !isYearPeriod(period) {
+                            showCategoryBreakdownSheet = true
+                        }
+                    }
                 }
             }
             .contentShape(Rectangle())
             .simultaneousGesture(periodSwipeGesture)
 
             // Store rows - NOT swipeable, only tappable
+            // These are the legend/details for the pie chart, so they appear directly below it
             // Also hide while loading all-time or year data to prevent showing fallback data
             if !segments.isEmpty && !isWaitingForAllTimeData && !isWaitingForYearData {
                 // Stores section header
@@ -1446,6 +1490,16 @@ struct OverviewView: View {
                             storeRowsAppeared = true
                         }
                     }
+                }
+            }
+
+            // Budget Activity Rings - show AFTER store rows for current month
+            // This makes more sense as the store rows are the legend for the pie chart
+            if !isAllPeriod(period) && !isYearPeriod(period) && isCurrentPeriod {
+                if budgetViewModel.state.hasBudget && !budgetViewModel.budgetProgressItems.isEmpty {
+                    BudgetActivityRingsGrid(items: budgetViewModel.budgetProgressItems)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
                 }
             }
         }

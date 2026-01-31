@@ -352,15 +352,15 @@ extension SummaryResponse {
     /// - Note: Prefer using `AggregateResponse.averages.averageTransactionValue` from `/analytics/aggregate` endpoint
     @available(*, deprecated, message: "Use AggregateResponse.averages.averageTransactionValue from backend instead")
     var averageTransactionValue: Double {
-        guard transactionCount > 0 else { return 0 }
-        return totalSpend / Double(transactionCount)
+        guard let count = transactionCount, count > 0 else { return 0 }
+        return totalSpend / Double(count)
     }
 
     /// Get the top N stores by spending
     /// - Note: Prefer using `AggregateResponse.topStores` from `/analytics/aggregate` endpoint with `top_stores_limit` parameter
     @available(*, deprecated, message: "Use AggregateResponse.topStores from backend instead")
     func topStores(limit: Int) -> [APIStoreBreakdown] {
-        Array(stores.sortedBySpending().prefix(limit))
+        Array((stores ?? []).sortedBySpending().prefix(limit))
     }
 }
 
