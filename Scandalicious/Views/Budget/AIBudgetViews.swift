@@ -80,7 +80,7 @@ struct AICheckInCard: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("AI Budget Coach")
+                    Text("Milo Budget Coach")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
 
@@ -503,7 +503,7 @@ struct AISuggestionView: View {
     private var recommendedBudgetSection: some View {
         VStack(spacing: 12) {
             // Label changes based on data state
-            Text(isPreliminary ? "Suggested Starting Point" : "AI Recommended Budget")
+            Text(isPreliminary ? "Suggested Starting Point" : "Milo's Recommended Budget")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white.opacity(0.5))
                 .textCase(.uppercase)
@@ -654,7 +654,7 @@ struct AISuggestionView: View {
             HStack(spacing: 6) {
                 Image(systemName: isPreliminary ? "checklist" : "sparkles")
                     .foregroundColor(isPreliminary ? Color(red: 0.3, green: 0.7, blue: 1.0) : .purple)
-                Text(isPreliminary ? "Get Started" : "AI Tips for You")
+                Text(isPreliminary ? "Get Started" : "Milo's Tips for You")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.7))
             }

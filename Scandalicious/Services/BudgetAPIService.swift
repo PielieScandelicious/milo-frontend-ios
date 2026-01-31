@@ -108,7 +108,7 @@ actor BudgetAPIService {
 
     /// Get AI-powered budget suggestion with personalized insights
     func fetchAISuggestion(basedOnMonths: Int = 3) async throws -> AIBudgetSuggestionResponse {
-        print("🤖 [AI Budget] Fetching AI suggestion for \(basedOnMonths) months...")
+        print("🤖 [Milo] Fetching AI suggestion for \(basedOnMonths) months...")
 
         let queryItems = [
             URLQueryItem(name: "months", value: String(basedOnMonths))
@@ -121,7 +121,7 @@ actor BudgetAPIService {
         )
 
         // Log AI response details
-        print("🤖 [AI Budget] ✅ AI Suggestion received:")
+        print("🤖 [Milo] ✅ AI Suggestion received:")
         print("   📅 Based on Months: \(response.basedOnMonths) (Data Collection Phase: \(response.dataCollectionPhase.title))")
         print("   💵 Total Spend Analyzed: €\(response.totalSpendAnalyzed)")
         print("   📊 Recommended Budget: €\(response.recommendedBudget.amount) (confidence: \(response.recommendedBudget.confidence))")
@@ -139,14 +139,14 @@ actor BudgetAPIService {
 
     /// Get weekly AI check-in with budget progress analysis
     func fetchAICheckIn() async throws -> AICheckInResponse {
-        print("🤖 [AI Budget] Fetching AI check-in...")
+        print("🤖 [Milo] Fetching AI check-in...")
 
         let response: AICheckInResponse = try await performRequest(
             endpoint: "/budgets/ai-check-in",
             method: "GET"
         )
 
-        print("🤖 [AI Budget] ✅ AI Check-in received:")
+        print("🤖 [Milo] ✅ AI Check-in received:")
         print("   👋 Greeting: \(response.greeting)")
         print("   📊 Status: \(response.statusSummary.headline)")
         print("   💵 Daily Budget Remaining: €\(response.dailyBudgetRemaining)")
@@ -156,7 +156,7 @@ actor BudgetAPIService {
 
     /// Analyze a receipt for budget impact
     func fetchAIReceiptAnalysis(receiptId: String) async throws -> AIReceiptAnalysisResponse {
-        print("🤖 [AI Budget] Analyzing receipt \(receiptId) for budget impact...")
+        print("🤖 [Milo] Analyzing receipt \(receiptId) for budget impact...")
 
         let response: AIReceiptAnalysisResponse = try await performRequestWithBody(
             endpoint: "/budgets/ai-analyze-receipt",
@@ -164,7 +164,7 @@ actor BudgetAPIService {
             body: ["receipt_id": receiptId]
         )
 
-        print("🤖 [AI Budget] ✅ Receipt analysis received:")
+        print("🤖 [Milo] ✅ Receipt analysis received:")
         print("   \(response.emoji) Status: \(response.status)")
         print("   📝 Summary: \(response.impactSummary)")
         if let tip = response.quickTip {
@@ -176,7 +176,7 @@ actor BudgetAPIService {
 
     /// Get AI-generated monthly budget report
     func fetchAIMonthlyReport(month: String) async throws -> AIMonthlyReportResponse {
-        print("🤖 [AI Budget] Fetching AI monthly report for \(month)...")
+        print("🤖 [Milo] Fetching AI monthly report for \(month)...")
 
         let queryItems = [
             URLQueryItem(name: "month", value: month)
@@ -188,7 +188,7 @@ actor BudgetAPIService {
             queryItems: queryItems
         )
 
-        print("🤖 [AI Budget] ✅ Monthly report received:")
+        print("🤖 [Milo] ✅ Monthly report received:")
         print("   📊 Grade: \(response.grade) (Score: \(response.score))")
         print("   📝 Headline: \(response.headline)")
         print("   ✅ Wins: \(response.wins.count)")

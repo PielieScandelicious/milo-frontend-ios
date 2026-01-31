@@ -194,7 +194,7 @@ struct BudgetSetupView: View {
             }
 
             VStack(spacing: 8) {
-                Text("AI Analyzing Your Spending")
+                Text("Milo is Analyzing Your Spending")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
 
@@ -655,7 +655,7 @@ struct BudgetSetupView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
 
-                    Text("AI Category Budgets")
+                    Text("Milo's Category Budgets")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -928,7 +928,7 @@ struct BudgetSetupView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
 
-                    Text("AI Recommended Budget")
+                    Text("Milo's Recommended Budget")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -1062,7 +1062,7 @@ struct BudgetSetupView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.8))
 
-                    Text("AI Recommended Budget")
+                    Text("Milo's Recommended Budget")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white.opacity(0.9))
                 }
@@ -1282,7 +1282,7 @@ struct BudgetSetupView: View {
 
             // Summary Text
             VStack(alignment: .leading, spacing: 6) {
-                Text("AI Insight")
+                Text("Milo's Insight")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
                     .textCase(.uppercase)
@@ -1542,7 +1542,7 @@ struct BudgetSetupView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
 
-                    Text("AI Category Budgets")
+                    Text("Milo's Category Budgets")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -1646,7 +1646,7 @@ struct BudgetSetupView: View {
                     .font(.system(size: 14))
                     .foregroundColor(.yellow)
 
-                Text("AI Tips")
+                Text("Milo's Tips")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
             }

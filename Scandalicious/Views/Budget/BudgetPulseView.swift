@@ -100,7 +100,7 @@ struct BudgetPulseView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Set a Monthly Budget")
+                    Text("Set Smart Budget")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
 
@@ -279,7 +279,7 @@ struct BudgetPulseView: View {
                         Image(systemName: "sparkles")
                             .font(.system(size: 13, weight: .semibold))
 
-                        Text("Get AI Insight")
+                        Text("Get Milo's Insight")
                             .font(.system(size: 14, weight: .semibold))
                     }
                     .foregroundColor(.white)
