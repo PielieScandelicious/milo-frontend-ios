@@ -109,16 +109,23 @@ struct OverviewView: View {
 
     /// Check if this is a fresh new month (first 3 days with no data yet)
     /// Used to show encouraging "new month" messaging
+    /// Only depends on currentBreakdowns (stable/cached) to avoid flickering from async receipts loading
     private var isNewMonthStart: Bool {
         guard isCurrentPeriod else { return false }
         let dayOfMonth = Calendar.current.component(.day, from: Date())
-        let hasNoData = currentBreakdowns.isEmpty && receiptsViewModel.receipts.isEmpty
-        return dayOfMonth <= 3 && hasNoData
+        // Only check breakdowns (stable), not receipts (async) to prevent flickering
+        return dayOfMonth <= 3 && currentBreakdowns.isEmpty
     }
 
     /// Check if current period has no data (for empty state messaging)
     private var currentPeriodHasNoData: Bool {
         currentBreakdowns.isEmpty
+    }
+
+    /// Check if the selected period has no store data (for showing empty chart)
+    private func periodHasNoStoreData(_ period: String) -> Bool {
+        let segments = storeSegmentsForPeriod(period)
+        return segments.isEmpty
     }
 
     private var availablePeriods: [String] {
@@ -1628,10 +1635,53 @@ struct OverviewView: View {
                         showAllRows = false
                     }
                 } else {
-                    // Empty pie chart state - show when no data for this period
-                    EmptyPieChartView(isNewMonth: isNewMonthStart && isCurrentPeriod)
-                        .padding(.top, 16)
-                        .padding(.bottom, 8)
+                    // Empty pie chart state - flippable between stores and categories
+                    let isNewMonth = isNewMonthStart && isCurrentPeriod
+
+                    ZStack {
+                        // Back side - Empty Categories view
+                        EmptyPieChartView(
+                            isNewMonth: isNewMonth,
+                            icon: "square.grid.2x2.fill",
+                            label: "Categories",
+                            countLabel: "0 categories"
+                        )
+                        .opacity(isPieChartFlipped ? 1 : 0)
+                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+
+                        // Front side - Empty Stores view
+                        EmptyPieChartView(
+                            isNewMonth: isNewMonth,
+                            icon: "storefront.fill",
+                            label: "Stores",
+                            countLabel: "0 receipts"
+                        )
+                        .opacity(isPieChartFlipped ? 0 : 1)
+                    }
+                    .rotation3DEffect(
+                        .degrees(pieChartFlipDegrees),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.5
+                    )
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        // Allow flip for empty month periods too
+                        if !isAllPeriod(period) && !isYearPeriod(period) {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                isPieChartFlipped.toggle()
+                                pieChartFlipDegrees += 180
+                                showAllRows = false
+                            }
+                        }
+                    }
+                    .onChange(of: period) { _, _ in
+                        // Reset flip state when period changes
+                        isPieChartFlipped = false
+                        pieChartFlipDegrees = 0
+                        showAllRows = false
+                    }
                 }
             }
             .contentShape(Rectangle())
@@ -1734,11 +1784,67 @@ struct OverviewView: View {
                             }
                         }
                     }
+                } else if isPieChartFlipped && categories.isEmpty {
+                    // Empty categories state - shown when flipped but no category data
+                    emptyRowsSection(
+                        icon: "square.grid.2x2",
+                        title: "Categories",
+                        subtitle: "No category data yet",
+                        isNewMonth: isNewMonthStart && isCurrentPeriod
+                    )
+                } else if !isPieChartFlipped && segments.isEmpty {
+                    // Empty stores state - shown when no store data
+                    emptyRowsSection(
+                        icon: "storefront",
+                        title: "Stores",
+                        subtitle: "No stores visited yet",
+                        isNewMonth: isNewMonthStart && isCurrentPeriod
+                    )
                 }
             }
 
         }
         .id(period) // Ensure entire overview content is recreated for each period
+    }
+
+    /// Empty rows section for when there's no data
+    private func emptyRowsSection(icon: String, title: String, subtitle: String, isNewMonth: Bool) -> some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(isNewMonth
+                            ? LinearGradient(
+                                colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [Color.white.opacity(0.08), Color.white.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isNewMonth ? .blue.opacity(0.7) : .white.opacity(0.4))
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(isNewMonth ? .white.opacity(0.8) : .white.opacity(0.5))
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(isNewMonth ? .white.opacity(0.5) : .white.opacity(0.3))
+                }
+
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
     // MARK: - Store Segments for Period (Cached)
@@ -2549,8 +2655,12 @@ struct OverviewView: View {
 
 // MARK: - Empty Pie Chart View
 /// Shows an empty donut chart matching IconDonutChartView styling when there's no data for a period
+/// Supports customizable icon/label for both Stores and Categories views
 private struct EmptyPieChartView: View {
     let isNewMonth: Bool
+    let icon: String
+    let label: String
+    let countLabel: String
 
     // Match IconDonutChartView dimensions
     private let size: CGFloat = 200
@@ -2601,10 +2711,10 @@ private struct EmptyPieChartView: View {
                     )
                     .frame(width: size * 0.58, height: size * 0.58)
 
-                // Center icon and labels - same as regular chart
+                // Center icon and labels - customizable for stores/categories
                 VStack(spacing: 6) {
-                    // Storefront icon with gradient (same styling as IconDonutChartView)
-                    Image(systemName: "storefront.fill")
+                    // Icon with gradient (same styling as IconDonutChartView)
+                    Image(systemName: icon)
                         .font(.system(size: size * 0.18, weight: .semibold))
                         .foregroundStyle(
                             isNewMonth
@@ -2626,13 +2736,13 @@ private struct EmptyPieChartView: View {
                                 )
                         )
 
-                    Text("Stores")
+                    Text(label)
                         .font(.system(size: size * 0.07, weight: .semibold))
                         .foregroundColor(isNewMonth ? .white.opacity(0.7) : .white.opacity(0.4))
                         .tracking(0.3)
 
-                    // Receipts count (0)
-                    Text("0 receipts")
+                    // Count label
+                    Text(countLabel)
                         .font(.system(size: size * 0.055, weight: .medium))
                         .foregroundColor(isNewMonth ? .white.opacity(0.5) : .white.opacity(0.3))
                         .padding(.top, 2)
