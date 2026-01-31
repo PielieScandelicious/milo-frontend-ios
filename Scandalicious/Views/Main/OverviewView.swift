@@ -1710,6 +1710,9 @@ struct OverviewView: View {
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             deleteReceiptFromOverview(receipt)
                                         }
+                                    },
+                                    onDeleteItem: { receiptId, itemId in
+                                        deleteReceiptItemFromOverview(receiptId: receiptId, itemId: itemId)
                                     }
                                 )
                                 .transition(.asymmetric(
@@ -1793,6 +1796,18 @@ struct OverviewView: View {
             }
 
             isDeletingReceipt = false
+        }
+    }
+
+    /// Delete a line item from a receipt in the overview
+    private func deleteReceiptItemFromOverview(receiptId: String, itemId: String) {
+        Task {
+            do {
+                try await receiptsViewModel.deleteReceiptItem(receiptId: receiptId, itemId: itemId)
+            } catch {
+                receiptDeleteError = error.localizedDescription
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
     }
 

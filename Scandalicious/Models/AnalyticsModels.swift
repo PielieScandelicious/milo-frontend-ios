@@ -553,6 +553,17 @@ struct APIReceipt: Codable, Identifiable {
         case transactions
     }
 
+    /// Manual initializer for creating updated copies
+    init(receiptId: String, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, averageHealthScore: Double?, transactions: [APIReceiptItem]) {
+        self.receiptId = receiptId
+        self.storeName = storeName
+        self.receiptDate = receiptDate
+        self.totalAmount = totalAmount
+        self.itemsCount = itemsCount
+        self.averageHealthScore = averageHealthScore
+        self.transactions = transactions
+    }
+
     var dateParsed: Date? {
         guard let receiptDate = receiptDate else { return nil }
         return DateFormatter.yyyyMMdd.date(from: receiptDate)
@@ -575,6 +586,7 @@ struct APIReceipt: Codable, Identifiable {
 }
 
 struct APIReceiptItem: Codable, Identifiable {
+    let itemId: String?  // Unique backend ID for deletion
     let itemName: String
     let itemPrice: Double
     let quantity: Int
@@ -582,9 +594,10 @@ struct APIReceiptItem: Codable, Identifiable {
     let category: String
     let healthScore: Int?
 
-    var id: String { "\(itemName)-\(itemPrice)-\(quantity)" }
+    var id: String { itemId ?? "\(itemName)-\(itemPrice)-\(quantity)" }
 
     enum CodingKeys: String, CodingKey {
+        case itemId = "item_id"
         case itemName = "item_name"
         case itemPrice = "item_price"
         case quantity
@@ -600,6 +613,17 @@ struct APIReceiptItem: Codable, Identifiable {
     var categoryDisplayName: String {
         // Category comes as display name from backend (e.g., "Dairy & Eggs")
         category
+    }
+
+    /// Manual initializer for creating instances (e.g., previews)
+    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, healthScore: Int?) {
+        self.itemId = itemId
+        self.itemName = itemName
+        self.itemPrice = itemPrice
+        self.quantity = quantity
+        self.unitPrice = unitPrice
+        self.category = category
+        self.healthScore = healthScore
     }
 }
 

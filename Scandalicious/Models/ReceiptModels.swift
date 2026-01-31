@@ -105,6 +105,7 @@ enum ReceiptStatus: String, Codable, Sendable {
 // MARK: - Receipt Transaction
 
 struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
+    let itemId: String?  // Backend item ID for deletion (may be nil for older responses)
     let itemName: String
     let itemPrice: Double
     let quantity: Int
@@ -116,6 +117,7 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
 
     enum CodingKeys: String, CodingKey {
+        case itemId = "item_id"
         case itemName = "item_name"
         case itemPrice = "item_price"
         case quantity
@@ -125,7 +127,8 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     }
 
     // Custom initializer to generate UUID
-    init(itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: ReceiptCategory, healthScore: Int? = nil) {
+    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: ReceiptCategory, healthScore: Int? = nil) {
+        self.itemId = itemId
         self.itemName = itemName
         self.itemPrice = itemPrice
         self.quantity = quantity
@@ -138,6 +141,7 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     // Decode initializer
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        itemId = try container.decodeIfPresent(String.self, forKey: .itemId)
         itemName = try container.decode(String.self, forKey: .itemName)
         itemPrice = try container.decode(Double.self, forKey: .itemPrice)
         quantity = try container.decode(Int.self, forKey: .quantity)
@@ -151,6 +155,7 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     // Encode function (ID is not encoded, will be regenerated on decode)
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(itemId, forKey: .itemId)
         try container.encode(itemName, forKey: .itemName)
         try container.encode(itemPrice, forKey: .itemPrice)
         try container.encode(quantity, forKey: .quantity)

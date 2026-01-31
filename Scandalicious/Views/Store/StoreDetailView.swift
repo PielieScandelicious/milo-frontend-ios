@@ -518,6 +518,9 @@ struct StoreDetailView: View {
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             deleteReceipt(receipt)
                                         }
+                                    },
+                                    onDeleteItem: { receiptId, itemId in
+                                        deleteReceiptItem(receiptId: receiptId, itemId: itemId)
                                     }
                                 )
                                 .transition(.asymmetric(
@@ -561,6 +564,17 @@ struct StoreDetailView: View {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
             isDeletingReceipt = false
+        }
+    }
+
+    private func deleteReceiptItem(receiptId: String, itemId: String) {
+        Task {
+            do {
+                try await receiptsViewModel.deleteReceiptItem(receiptId: receiptId, itemId: itemId)
+            } catch {
+                receiptDeleteError = error.localizedDescription
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
     }
 

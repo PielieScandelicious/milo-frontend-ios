@@ -255,6 +255,62 @@ actor AnalyticsAPIService {
         }
     }
 
+    /// Delete a specific line item from a receipt
+    /// - Parameters:
+    ///   - receiptId: The receipt ID containing the item
+    ///   - itemId: The item ID to delete
+    func deleteReceiptItem(receiptId: String, itemId: String) async throws -> DeleteReceiptItemResponse {
+        let endpoint = "/receipts/\(receiptId)/items/\(itemId)"
+
+        // Build URL
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            throw AnalyticsAPIError.invalidURL
+        }
+
+        print("🗑️ API Delete Item Request: DELETE \(url.absoluteString)")
+
+        // Get auth token
+        let token = try await getAuthToken()
+
+        // Create request
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 30
+
+        // Perform request
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AnalyticsAPIError.invalidResponse
+        }
+
+        print("📥 Delete item response: HTTP \(httpResponse.statusCode)")
+
+        switch httpResponse.statusCode {
+        case 200...299:
+            print("✅ Receipt item deleted successfully")
+            do {
+                let decodedResponse = try decoder.decode(DeleteReceiptItemResponse.self, from: data)
+                return decodedResponse
+            } catch {
+                // If response can't be decoded, return a default success response
+                return DeleteReceiptItemResponse(success: true, message: "Item deleted successfully", updatedTotalAmount: nil, updatedItemsCount: nil, updatedAverageHealthScore: nil, receiptDeleted: nil)
+            }
+
+        case 401:
+            throw AnalyticsAPIError.unauthorized
+
+        case 404:
+            throw AnalyticsAPIError.notFound
+
+        default:
+            let errorMessage = parseErrorMessage(from: data) ?? "Delete item failed: \(httpResponse.statusCode)"
+            throw AnalyticsAPIError.serverError(errorMessage)
+        }
+    }
+
     /// Delete transactions for a specific store within a time period
     /// - Parameters:
     ///   - storeName: Name of the store
@@ -531,6 +587,11 @@ extension AnalyticsAPIService {
         return try await deleteReceipt(receiptId: receiptId)
     }
 
+    /// Nonisolated wrapper for deleteReceiptItem
+    nonisolated func removeReceiptItem(receiptId: String, itemId: String) async throws -> DeleteReceiptItemResponse {
+        return try await deleteReceiptItem(receiptId: receiptId, itemId: itemId)
+    }
+
     /// Nonisolated wrapper for fetchReceipts
     nonisolated func getReceipts(filters: ReceiptFilters = ReceiptFilters()) async throws -> ReceiptsListResponse {
         return try await fetchReceipts(filters: filters)
@@ -575,5 +636,23 @@ struct DeleteTransactionsResponse: Decodable {
         case success
         case deletedCount = "deleted_count"
         case message
+    }
+}
+
+struct DeleteReceiptItemResponse: Decodable {
+    let success: Bool
+    let message: String
+    let updatedTotalAmount: Double?
+    let updatedItemsCount: Int?
+    let updatedAverageHealthScore: Double?
+    let receiptDeleted: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case success
+        case message
+        case updatedTotalAmount = "updated_total_amount"
+        case updatedItemsCount = "updated_items_count"
+        case updatedAverageHealthScore = "updated_average_health_score"
+        case receiptDeleted = "receipt_deleted"
     }
 }

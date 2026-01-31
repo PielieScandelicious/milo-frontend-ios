@@ -16,6 +16,7 @@ struct ReceiptsListView: View {
     @State private var selectedReceipt: APIReceipt?
     @State private var showingReceiptDetail = false
     @State private var isDeleting = false
+    @State private var isDeletingItem = false
     @State private var deleteError: String?
     @State private var expandedReceiptId: String?
 
@@ -48,6 +49,9 @@ struct ReceiptsListView: View {
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             deleteReceipt(receipt)
                                         }
+                                    },
+                                    onDeleteItem: { receiptId, itemId in
+                                        deleteReceiptItem(receiptId: receiptId, itemId: itemId)
                                     }
                                 )
                                 .transition(.asymmetric(
@@ -163,6 +167,24 @@ struct ReceiptsListView: View {
             }
 
             isDeleting = false
+        }
+    }
+
+    // MARK: - Delete Receipt Item
+
+    private func deleteReceiptItem(receiptId: String, itemId: String) {
+        Task {
+            do {
+                try await viewModel.deleteReceiptItem(receiptId: receiptId, itemId: itemId)
+
+                // Haptic feedback already handled in the component
+            } catch {
+                deleteError = error.localizedDescription
+
+                // Haptic feedback for failure
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.error)
+            }
         }
     }
 

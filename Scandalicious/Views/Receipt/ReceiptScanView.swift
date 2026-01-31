@@ -364,16 +364,10 @@ struct ReceiptScanView: View {
                         .padding(.top, 8)
                 }
 
-                // Stats Section
+                // Stats Section (includes Recent Scan card between Top Stores and Scans Remaining)
                 statsSection
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
-
-                // Recent Receipt Card (if exists)
-                if let receipt = recentReceipt {
-                    recentReceiptCard(receipt: receipt)
-                        .padding(.horizontal, 20)
-                }
 
                 // Share tip card
                 shareHintCard
@@ -403,6 +397,11 @@ struct ReceiptScanView: View {
 
             // Top 3 Stores card
             topStoresCard
+
+            // Recent Receipt Card (if exists) - positioned between Top Stores and Scans Remaining
+            if let receipt = recentReceipt {
+                recentReceiptCard(receipt: receipt)
+            }
 
             // Remaining quota pill
             remainingQuotaPill
@@ -1003,11 +1002,76 @@ struct ReceiptScanView: View {
                     }
                 }
             },
+            onDeleteItem: { receiptId, itemId in
+                deleteRecentReceiptItem(receiptId: receiptId, itemId: itemId)
+            },
             accentColor: .green,
             badgeText: "Recent Scan",
             showDate: false,
             showItemCount: false
         )
+    }
+
+    // MARK: - Delete Recent Receipt Item
+
+    private func deleteRecentReceiptItem(receiptId: String, itemId: String) {
+        Task {
+            do {
+                let response = try await AnalyticsAPIService.shared.removeReceiptItem(receiptId: receiptId, itemId: itemId)
+
+                await MainActor.run {
+                    // Check if backend indicates the entire receipt was deleted
+                    if response.receiptDeleted == true {
+                        withAnimation {
+                            recentReceipt = nil
+                            isRecentReceiptExpanded = false
+                        }
+                        NotificationCenter.default.post(name: .receiptDeleted, object: nil)
+                    } else if var receipt = recentReceipt {
+                        // Remove the item from local state
+                        let updatedTransactions = receipt.transactions.filter { $0.itemId != itemId }
+
+                        if updatedTransactions.isEmpty {
+                            // No items left, remove the receipt
+                            withAnimation {
+                                recentReceipt = nil
+                                isRecentReceiptExpanded = false
+                            }
+                            NotificationCenter.default.post(name: .receiptDeleted, object: nil)
+                        } else {
+                            // Update receipt with remaining items
+                            let newTotal = response.updatedTotalAmount ?? updatedTransactions.reduce(0) { $0 + $1.itemPrice }
+                            let newHealthScore = response.updatedAverageHealthScore ?? {
+                                let scores = updatedTransactions.compactMap { $0.healthScore }
+                                guard !scores.isEmpty else { return nil as Double? }
+                                return Double(scores.reduce(0, +)) / Double(scores.count)
+                            }()
+
+                            withAnimation {
+                                recentReceipt = ReceiptUploadResponse(
+                                    receiptId: receipt.receiptId,
+                                    status: receipt.status,
+                                    storeName: receipt.storeName,
+                                    receiptDate: receipt.receiptDate,
+                                    totalAmount: newTotal,
+                                    itemsCount: response.updatedItemsCount ?? updatedTransactions.count,
+                                    transactions: updatedTransactions,
+                                    warnings: receipt.warnings,
+                                    averageHealthScore: newHealthScore,
+                                    isDuplicate: receipt.isDuplicate,
+                                    duplicateScore: receipt.duplicateScore
+                                )
+                            }
+                        }
+
+                        // Notify other views to refresh
+                        NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
+                    }
+                }
+            } catch {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
     }
 
     // MARK: - Share Hint Card

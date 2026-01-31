@@ -136,6 +136,68 @@ class ReceiptsViewModel: ObservableObject {
         NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
     }
 
+    /// Delete a specific line item from a receipt
+    func deleteReceiptItem(receiptId: String, itemId: String) async throws {
+        print("🗑️ DELETE /receipts/\(receiptId)/items/\(itemId)")
+
+        // Find the receipt and item for logging
+        if let receipt = receipts.first(where: { $0.receiptId == receiptId }),
+           let item = receipt.transactions.first(where: { $0.itemId == itemId }) {
+            print("  → Deleting item: \(item.itemName) (€\(String(format: "%.2f", item.itemPrice)))")
+        }
+
+        // Delete from server
+        let response = try await apiService.removeReceiptItem(receiptId: receiptId, itemId: itemId)
+
+        // Update local array - find and modify the receipt
+        objectWillChange.send()
+
+        if let receiptIndex = receipts.firstIndex(where: { $0.receiptId == receiptId }) {
+            let receipt = receipts[receiptIndex]
+
+            // Check if backend indicates the receipt was deleted (last item removed)
+            if response.receiptDeleted == true {
+                receipts.remove(at: receiptIndex)
+                print("✅ Receipt removed by backend (no items remaining)")
+            } else {
+                // Remove the item from the receipt's transactions
+                let updatedTransactions = receipt.transactions.filter { $0.itemId != itemId }
+
+                // Create updated receipt with new transactions and backend-provided values
+                let updatedReceipt = APIReceipt(
+                    receiptId: receipt.receiptId,
+                    storeName: receipt.storeName,
+                    receiptDate: receipt.receiptDate,
+                    totalAmount: response.updatedTotalAmount ?? receipt.totalAmount,
+                    itemsCount: response.updatedItemsCount ?? updatedTransactions.count,
+                    averageHealthScore: response.updatedAverageHealthScore ?? calculateAverageHealthScore(for: updatedTransactions),
+                    transactions: updatedTransactions
+                )
+
+                // If no items left locally, remove the receipt
+                if updatedTransactions.isEmpty {
+                    receipts.remove(at: receiptIndex)
+                    print("✅ Receipt removed (no items remaining)")
+                } else {
+                    receipts[receiptIndex] = updatedReceipt
+                    print("✅ Item deleted, remaining items in receipt: \(updatedTransactions.count)")
+                }
+            }
+
+            state = .success(receipts)
+        }
+
+        // Notify other views to refresh their data
+        NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
+    }
+
+    /// Calculate average health score for a list of items
+    private func calculateAverageHealthScore(for items: [APIReceiptItem]) -> Double? {
+        let scores = items.compactMap { $0.healthScore }
+        guard !scores.isEmpty else { return nil }
+        return Double(scores.reduce(0, +)) / Double(scores.count)
+    }
+
     // MARK: - Private Helpers
 
     /// Check if a period is a year period (e.g., "2025", "2024")
