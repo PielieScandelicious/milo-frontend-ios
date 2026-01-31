@@ -1643,8 +1643,7 @@ struct OverviewView: View {
                         EmptyPieChartView(
                             isNewMonth: isNewMonth,
                             icon: "square.grid.2x2.fill",
-                            label: "Categories",
-                            countLabel: "0 categories"
+                            label: "Categories"
                         )
                         .opacity(isPieChartFlipped ? 1 : 0)
                         .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
@@ -1653,8 +1652,7 @@ struct OverviewView: View {
                         EmptyPieChartView(
                             isNewMonth: isNewMonth,
                             icon: "storefront.fill",
-                            label: "Stores",
-                            countLabel: "0 receipts"
+                            label: "Stores"
                         )
                         .opacity(isPieChartFlipped ? 0 : 1)
                     }
@@ -2660,7 +2658,6 @@ private struct EmptyPieChartView: View {
     let isNewMonth: Bool
     let icon: String
     let label: String
-    let countLabel: String
 
     // Match IconDonutChartView dimensions
     private let size: CGFloat = 200
@@ -2711,8 +2708,8 @@ private struct EmptyPieChartView: View {
                     )
                     .frame(width: size * 0.58, height: size * 0.58)
 
-                // Center icon and labels - customizable for stores/categories
-                VStack(spacing: 6) {
+                // Center icon and label - clean and simple, matches IconDonutChartView
+                VStack(spacing: 8) {
                     // Icon with gradient (same styling as IconDonutChartView)
                     Image(systemName: icon)
                         .font(.system(size: size * 0.18, weight: .semibold))
@@ -2736,16 +2733,11 @@ private struct EmptyPieChartView: View {
                                 )
                         )
 
+                    // Label (e.g., "Stores" or "Categories")
                     Text(label)
-                        .font(.system(size: size * 0.07, weight: .semibold))
-                        .foregroundColor(isNewMonth ? .white.opacity(0.7) : .white.opacity(0.4))
-                        .tracking(0.3)
-
-                    // Count label
-                    Text(countLabel)
-                        .font(.system(size: size * 0.055, weight: .medium))
-                        .foregroundColor(isNewMonth ? .white.opacity(0.5) : .white.opacity(0.3))
-                        .padding(.top, 2)
+                        .font(.system(size: size * 0.08, weight: .semibold))
+                        .foregroundColor(isNewMonth ? .white.opacity(0.6) : .white.opacity(0.4))
+                        .tracking(0.5)
                 }
             }
             .frame(maxWidth: size * 0.55)

@@ -295,9 +295,9 @@ struct IconDonutChartView: View {
                 )
                 .frame(width: size * 0.58, height: size * 0.58)
 
-            // Custom center icon and label (highest priority)
+            // Custom center icon and label - clean and simple
             if let icon = centerIcon, let label = centerLabel {
-                VStack(spacing: 6) {
+                VStack(spacing: 8) {
                     // Icon with gradient styling
                     Image(systemName: icon)
                         .font(.system(size: size * 0.18, weight: .semibold))
@@ -312,10 +312,11 @@ struct IconDonutChartView: View {
                             )
                         )
 
+                    // Label (e.g., "Stores" or "Categories")
                     Text(label)
-                        .font(.system(size: size * 0.07, weight: .semibold))
+                        .font(.system(size: size * 0.08, weight: .semibold))
                         .foregroundColor(.white.opacity(0.6))
-                        .tracking(0.3)
+                        .tracking(0.5)
                 }
             }
             // Display average item price if available
