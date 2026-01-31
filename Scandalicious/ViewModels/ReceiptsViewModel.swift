@@ -138,20 +138,46 @@ class ReceiptsViewModel: ObservableObject {
 
     // MARK: - Private Helpers
 
+    /// Check if a period is a year period (e.g., "2025", "2024")
+    private func isYearPeriod(_ period: String) -> Bool {
+        return period.count == 4 && period.allSatisfy { $0.isNumber }
+    }
+
     private func parsePeriod(_ period: String) -> (Date?, Date?) {
+        // Use UTC calendar to avoid timezone issues
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
+        // Handle year periods (e.g., "2025")
+        if isYearPeriod(period), let year = Int(period) {
+            var startComponents = DateComponents()
+            startComponents.year = year
+            startComponents.month = 1
+            startComponents.day = 1
+            let startOfYear = calendar.date(from: startComponents)
+
+            var endComponents = DateComponents()
+            endComponents.year = year
+            endComponents.month = 12
+            endComponents.day = 31
+            endComponents.hour = 23
+            endComponents.minute = 59
+            endComponents.second = 59
+            let endOfYear = calendar.date(from: endComponents)
+
+            return (startOfYear, endOfYear)
+        }
+
+        // Handle month periods (e.g., "January 2026")
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
 
         guard let date = dateFormatter.date(from: period) else {
-            print("⚠️ Failed to parse period '\(period)' - expected format 'MMMM yyyy'")
+            print("⚠️ Failed to parse period '\(period)' - expected format 'MMMM yyyy' or 'yyyy'")
             return (nil, nil)
         }
-
-        // Use UTC calendar to avoid timezone issues
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
 
         let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: date))
 

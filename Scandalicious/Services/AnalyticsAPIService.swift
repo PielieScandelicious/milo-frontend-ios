@@ -189,6 +189,24 @@ actor AnalyticsAPIService {
         )
     }
 
+    /// Fetch year summary statistics
+    /// Returns total spend, stores breakdown, and monthly breakdown for a specific year
+    /// - Parameters:
+    ///   - year: The year to fetch data for (e.g., 2025)
+    ///   - includeMonthlyBreakdown: Whether to include monthly spend breakdown (default true)
+    ///   - topCategoriesLimit: Number of top categories to return (default 5)
+    func fetchYearSummary(year: Int, includeMonthlyBreakdown: Bool = true, topCategoriesLimit: Int = 5) async throws -> YearSummaryResponse {
+        var queryItems = [
+            URLQueryItem(name: "include_monthly_breakdown", value: String(includeMonthlyBreakdown)),
+            URLQueryItem(name: "top_categories_limit", value: String(topCategoriesLimit))
+        ]
+
+        return try await performRequest(
+            endpoint: "/analytics/year/\(year)",
+            queryItems: queryItems
+        )
+    }
+
     /// Delete a receipt by ID
     /// - Parameter receiptId: The receipt ID to delete
     func deleteReceipt(receiptId: String) async throws {
@@ -531,6 +549,11 @@ extension AnalyticsAPIService {
     /// Nonisolated wrapper for fetchAllTimeStats
     nonisolated func getAllTimeStats(topStoresLimit: Int = 3, topCategoriesLimit: Int = 5) async throws -> AllTimeStatsResponse {
         return try await fetchAllTimeStats(topStoresLimit: topStoresLimit, topCategoriesLimit: topCategoriesLimit)
+    }
+
+    /// Nonisolated wrapper for fetchYearSummary
+    nonisolated func getYearSummary(year: Int, includeMonthlyBreakdown: Bool = true, topCategoriesLimit: Int = 5) async throws -> YearSummaryResponse {
+        return try await fetchYearSummary(year: year, includeMonthlyBreakdown: includeMonthlyBreakdown, topCategoriesLimit: topCategoriesLimit)
     }
 }
 

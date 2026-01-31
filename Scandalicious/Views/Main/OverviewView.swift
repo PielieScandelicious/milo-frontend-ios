@@ -83,6 +83,10 @@ struct OverviewView: View {
     @State private var allTimeTotalReceipts: Int = 0 // Cached all-time receipt count from backend
     @State private var allTimeHealthScore: Double? = nil // Cached all-time health score from backend
     @State private var isLoadingAllTimeData = false // Track if fetching all-time data for first time
+    // Year period data
+    @State private var yearSummaryCache: [String: YearSummaryResponse] = [:] // Cache year summaries by year string
+    @State private var isLoadingYearData = false // Track if fetching year data for first time
+    @State private var currentLoadingYear: String? = nil // Track which year is currently loading
     @Binding var showSignOutConfirmation: Bool
 
     // Entrance animation states
@@ -117,15 +121,31 @@ struct OverviewView: View {
         return period == Self.allPeriodIdentifier
     }
 
+    /// Check if a period is a year period (e.g., "2025", "2024")
+    private func isYearPeriod(_ period: String) -> Bool {
+        // Year periods are exactly 4 digits
+        return period.count == 4 && period.allSatisfy { $0.isNumber }
+    }
+
+    /// Get the year from a month period string (e.g., "January 2026" -> 2026)
+    private func yearFromPeriod(_ period: String) -> Int? {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        guard let date = dateFormatter.date(from: period) else { return nil }
+        return Calendar.current.component(.year, from: date)
+    }
+
     /// Compute available periods from data manager - called once when data changes
+    /// Order: [older months] -> [current month] -> [years descending] -> [All]
     private func computeAvailablePeriods() -> [String] {
-        var periods: [String] = []
+        var monthPeriods: [String] = []
 
         // Use period metadata if available (from lightweight /analytics/periods endpoint)
         if !dataManager.periodMetadata.isEmpty {
             // Period metadata is already sorted by backend (most recent first)
             // Reverse to get oldest first (left), most recent last (right) for swipe UX
-            periods = Array(dataManager.periodMetadata.map { $0.period }.reversed())
+            monthPeriods = Array(dataManager.periodMetadata.map { $0.period }.reversed())
         } else {
             // Fallback: Use breakdowns if metadata not loaded yet
             let breakdownPeriods = Array(dataManager.breakdownsByPeriod().keys)
@@ -135,7 +155,8 @@ struct OverviewView: View {
                 let dateFormatter = DateFormatter()
                 dateFormatter.dateFormat = "MMMM yyyy"
                 dateFormatter.locale = Locale(identifier: "en_US")
-                return [dateFormatter.string(from: Date()), Self.allPeriodIdentifier]
+                let currentYear = Calendar.current.component(.year, from: Date())
+                return [dateFormatter.string(from: Date()), "\(currentYear)", Self.allPeriodIdentifier]
             }
 
             // Sort periods chronologically (oldest first, most recent last/right)
@@ -143,17 +164,39 @@ struct OverviewView: View {
             dateFormatter.dateFormat = "MMMM yyyy"
             dateFormatter.locale = Locale(identifier: "en_US")
 
-            periods = breakdownPeriods.sorted { period1, period2 in
+            monthPeriods = breakdownPeriods.sorted { period1, period2 in
                 let date1 = dateFormatter.date(from: period1) ?? Date.distantPast
                 let date2 = dateFormatter.date(from: period2) ?? Date.distantPast
                 return date1 < date2  // Oldest first (left), most recent last (right)
             }
         }
 
-        // Append "All" at the end (rightmost position)
-        periods.append(Self.allPeriodIdentifier)
+        // Extract unique years from month periods, sorted descending (most recent year first)
+        var uniqueYears: Set<Int> = []
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
 
-        return periods
+        for period in monthPeriods {
+            if let date = dateFormatter.date(from: period) {
+                let year = Calendar.current.component(.year, from: date)
+                uniqueYears.insert(year)
+            }
+        }
+
+        // Add current year if not already present (for empty state or new users)
+        let currentYear = Calendar.current.component(.year, from: Date())
+        uniqueYears.insert(currentYear)
+
+        // Sort years descending (most recent first after months)
+        let yearPeriods = uniqueYears.sorted(by: >).map { String($0) }
+
+        // Build final order: [months chronologically] + [years descending] + [All]
+        var result = monthPeriods
+        result.append(contentsOf: yearPeriods)
+        result.append(Self.allPeriodIdentifier)
+
+        return result
     }
 
     /// Update the cached available periods
@@ -611,7 +654,7 @@ struct OverviewView: View {
             cachedChartDataByPeriod[Self.allPeriodIdentifier] = chartData
         }
 
-        // IMPORTANT: Set loading state BEFORE view renders when switching to "All" period
+        // IMPORTANT: Set loading state BEFORE view renders when switching to "All" or Year period
         // This must be synchronous to prevent the chart from rendering with fallback data first
         if isAllPeriod(newValue) {
             let hasBackendData = cachedBreakdownsByPeriod[Self.allPeriodIdentifier] != nil &&
@@ -619,14 +662,20 @@ struct OverviewView: View {
             if !hasBackendData {
                 isLoadingAllTimeData = true
             }
+        } else if isYearPeriod(newValue) {
+            let hasCachedYear = yearSummaryCache[newValue] != nil
+            if !hasCachedYear {
+                isLoadingYearData = true
+                currentLoadingYear = newValue
+            }
         }
 
         // Immediately update displayed breakdowns for the new period (no async delay)
         updateDisplayedBreakdowns()
 
         // Cache segments for the new period
-        // Skip for "All" period - that's handled by fetchAllTimeData after data is loaded
-        if !isAllPeriod(newValue) {
+        // Skip for "All" and Year periods - those are handled by their respective fetch functions
+        if !isAllPeriod(newValue) && !isYearPeriod(newValue) {
             cacheSegmentsForPeriod(newValue)
         }
 
@@ -641,6 +690,9 @@ struct OverviewView: View {
             // Handle "All" period - fetch all-time data from backend
             if isAllPeriod(newValue) {
                 await fetchAllTimeData()
+            } else if isYearPeriod(newValue) {
+                // Handle Year period - fetch year summary from backend
+                await fetchYearData(year: newValue)
             } else if !dataManager.periodMetadata.isEmpty {
                 if !dataManager.isPeriodLoaded(newValue) {
                     await dataManager.fetchPeriodDetails(newValue)
@@ -725,6 +777,156 @@ struct OverviewView: View {
             print("❌ Failed to fetch all-time data: \(error.localizedDescription)")
             await MainActor.run {
                 isLoadingAllTimeData = false
+            }
+        }
+    }
+
+    // MARK: - Fetch Year Data
+
+    /// Fetches year summary data from the backend
+    /// - Parameter year: The year string (e.g., "2025")
+    private func fetchYearData(year: String) async {
+        guard let yearInt = Int(year) else { return }
+
+        // Only show loading if we don't have cached data yet
+        let needsLoading = yearSummaryCache[year] == nil
+
+        if needsLoading {
+            await MainActor.run {
+                isLoadingYearData = true
+                currentLoadingYear = year
+            }
+        }
+
+        do {
+            print("📊 Fetching year summary for \(year) from backend...")
+
+            // First try the dedicated year endpoint
+            let yearSummary = try await AnalyticsAPIService.shared.getYearSummary(year: yearInt)
+
+            print("📊 Year \(year) response: totalSpend=€\(yearSummary.totalSpend), stores=\(yearSummary.stores.count), receipts=\(yearSummary.receiptCount)")
+
+            // Convert to StoreBreakdown array for consistent handling
+            let breakdowns: [StoreBreakdown] = yearSummary.stores.map { store in
+                print("   📍 Store: \(store.storeName) - €\(store.amountSpent) (\(store.storeVisits) visits)")
+                return StoreBreakdown(
+                    storeName: store.storeName,
+                    period: year,
+                    totalStoreSpend: store.amountSpent,
+                    categories: [],
+                    visitCount: store.storeVisits,
+                    averageHealthScore: store.averageHealthScore
+                )
+            }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
+
+            print("✅ Fetched \(breakdowns.count) stores for year \(year), total: €\(yearSummary.totalSpend)")
+
+            await MainActor.run {
+                // Cache the year summary
+                yearSummaryCache[year] = yearSummary
+
+                // Cache the breakdowns
+                cachedBreakdownsByPeriod[year] = breakdowns
+
+                // Clear any stale segment cache for this year
+                cachedSegmentsByPeriod.removeValue(forKey: year)
+                cachedChartDataByPeriod.removeValue(forKey: year)
+
+                // Update displayed breakdowns if still on this year period
+                if selectedPeriod == year {
+                    displayedBreakdowns = breakdowns
+                    displayedBreakdownsPeriod = year
+
+                    // Cache segments for the donut chart
+                    cacheSegmentsForPeriod(year)
+
+                    print("📊 Updated year \(year) view: \(breakdowns.count) stores, €\(yearSummary.totalSpend) total")
+                }
+
+                // Loading complete
+                isLoadingYearData = false
+                currentLoadingYear = nil
+            }
+        } catch {
+            print("⚠️ Year endpoint not available, falling back to summary endpoint: \(error.localizedDescription)")
+
+            // Fallback: Use the summary endpoint with year date range
+            await fetchYearDataFallback(year: year, yearInt: yearInt)
+        }
+    }
+
+    /// Fallback method to fetch year data using the summary endpoint with date range
+    private func fetchYearDataFallback(year: String, yearInt: Int) async {
+        do {
+            // Create date range for the year
+            var calendar = Calendar.current
+            calendar.timeZone = TimeZone(identifier: "UTC")!
+
+            var components = DateComponents()
+            components.year = yearInt
+            components.month = 1
+            components.day = 1
+            let startDate = calendar.date(from: components)!
+
+            components.year = yearInt
+            components.month = 12
+            components.day = 31
+            let endDate = calendar.date(from: components)!
+
+            var filters = AnalyticsFilters()
+            filters.period = .year
+            filters.startDate = startDate
+            filters.endDate = endDate
+
+            let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+
+            // Create a pseudo YearSummaryResponse from the summary
+            let yearSummary = YearSummaryResponse(
+                year: yearInt,
+                startDate: DateFormatter.yyyyMMdd.string(from: startDate),
+                endDate: DateFormatter.yyyyMMdd.string(from: endDate),
+                totalSpend: summary.totalSpend,
+                transactionCount: summary.transactionCount,
+                receiptCount: summary.transactionCount, // Approximation
+                totalItems: summary.transactionCount,
+                averageHealthScore: summary.averageHealthScore,
+                stores: summary.stores,
+                monthlyBreakdown: nil,
+                topCategories: nil
+            )
+
+            let breakdowns: [StoreBreakdown] = summary.stores.map { store in
+                StoreBreakdown(
+                    storeName: store.storeName,
+                    period: year,
+                    totalStoreSpend: store.amountSpent,
+                    categories: [],
+                    visitCount: store.storeVisits,
+                    averageHealthScore: store.averageHealthScore
+                )
+            }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
+
+            await MainActor.run {
+                yearSummaryCache[year] = yearSummary
+                cachedBreakdownsByPeriod[year] = breakdowns
+
+                cachedSegmentsByPeriod.removeValue(forKey: year)
+                cachedChartDataByPeriod.removeValue(forKey: year)
+
+                if selectedPeriod == year {
+                    displayedBreakdowns = breakdowns
+                    displayedBreakdownsPeriod = year
+                    cacheSegmentsForPeriod(year)
+                }
+
+                isLoadingYearData = false
+                currentLoadingYear = nil
+            }
+        } catch {
+            print("❌ Failed to fetch year data: \(error.localizedDescription)")
+            await MainActor.run {
+                isLoadingYearData = false
+                currentLoadingYear = nil
             }
         }
     }
@@ -1098,10 +1300,15 @@ struct OverviewView: View {
         }
     }
 
-    // Shorten period to "Jan 26" format, or return "All" as-is
+    // Shorten period to "Jan 26" format, or return "All" / year as-is
     private func shortenedPeriod(_ period: String) -> String {
         // Handle "All" period
         if isAllPeriod(period) {
+            return period
+        }
+
+        // Handle year periods (e.g., "2025") - return as-is
+        if isYearPeriod(period) {
             return period
         }
 
@@ -1123,9 +1330,10 @@ struct OverviewView: View {
         let breakdowns = getCachedBreakdowns(for: period)
         let segments = storeSegmentsForPeriod(period)
 
-        // Check if we're loading All-time data for the first time (no backend data yet)
+        // Check if we're loading All-time or Year data for the first time (no backend data yet)
         // This prevents double animation: first with local data, then with backend data
         let isWaitingForAllTimeData = isAllPeriod(period) && isLoadingAllTimeData
+        let isWaitingForYearData = isYearPeriod(period) && isLoadingYearData && currentLoadingYear == period
 
         // All Overview components fade in together at the same time
         return VStack(spacing: 16) {
@@ -1142,6 +1350,19 @@ struct OverviewView: View {
                             .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
                             .scaleEffect(1.2)
                         Text("Loading all-time data...")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .frame(width: 200, height: 200)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                } else if isWaitingForYearData {
+                    // Show loading indicator while fetching year data
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
+                            .scaleEffect(1.2)
+                        Text("Loading \(period) data...")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.5))
                     }
@@ -1168,10 +1389,10 @@ struct OverviewView: View {
             .simultaneousGesture(periodSwipeGesture)
 
             // Store rows - NOT swipeable, only tappable
-            // Also hide while loading all-time data to prevent showing fallback data
-            if !segments.isEmpty && !isWaitingForAllTimeData {
+            // Also hide while loading all-time or year data to prevent showing fallback data
+            if !segments.isEmpty && !isWaitingForAllTimeData && !isWaitingForYearData {
                 // Stores section header
-                storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period))
+                storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
@@ -1285,7 +1506,7 @@ struct OverviewView: View {
 
     // MARK: - Stores Section Header
 
-    private func storesSectionHeader(storeCount: Int, isAllTime: Bool = false) -> some View {
+    private func storesSectionHeader(storeCount: Int, isAllTime: Bool = false, isYear: Bool = false) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
@@ -1300,7 +1521,16 @@ struct OverviewView: View {
                 Text("Stores")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
-                Text(isAllTime ? "\(storeCount) store\(storeCount == 1 ? "" : "s") all time" : "\(storeCount) store\(storeCount == 1 ? "" : "s")")
+                let subtitle: String = {
+                    if isAllTime {
+                        return "\(storeCount) store\(storeCount == 1 ? "" : "s") all time"
+                    } else if isYear {
+                        return "\(storeCount) store\(storeCount == 1 ? "" : "s") this year"
+                    } else {
+                        return "\(storeCount) store\(storeCount == 1 ? "" : "s")"
+                    }
+                }()
+                Text(subtitle)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
             }
@@ -1641,6 +1871,10 @@ struct OverviewView: View {
             // Fallback to summing period metadata
             return dataManager.periodMetadata.reduce(0) { $0 + $1.totalSpend }
         }
+        // Handle year periods - use cached year summary
+        if isYearPeriod(period), let yearSummary = yearSummaryCache[period] {
+            return yearSummary.totalSpend
+        }
         // First check period metadata (from lightweight /analytics/periods)
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
             return metadata.totalSpend
@@ -1658,6 +1892,10 @@ struct OverviewView: View {
             }
             // Fallback to summing period metadata
             return dataManager.periodMetadata.reduce(0) { $0 + $1.receiptCount }
+        }
+        // Handle year periods - use cached year summary
+        if isYearPeriod(period), let yearSummary = yearSummaryCache[period] {
+            return yearSummary.receiptCount
         }
         // First check period metadata (from lightweight /analytics/periods)
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
@@ -1684,6 +1922,10 @@ struct OverviewView: View {
             }
             return weightedSum / Double(totalItems)
         }
+        // Handle year periods - use cached year summary
+        if isYearPeriod(period), let yearSummary = yearSummaryCache[period] {
+            return yearSummary.averageHealthScore
+        }
         // First check period metadata (from lightweight /analytics/periods)
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
             return metadata.averageHealthScore
@@ -1697,6 +1939,10 @@ struct OverviewView: View {
         if isAllPeriod(period) {
             let total = dataManager.periodMetadata.compactMap { $0.totalItems }.reduce(0, +)
             return total > 0 ? total : nil
+        }
+        // Handle year periods - use cached year summary
+        if isYearPeriod(period), let yearSummary = yearSummaryCache[period] {
+            return yearSummary.totalItems > 0 ? yearSummary.totalItems : nil
         }
         // Get total items from period metadata (sum of all quantities purchased)
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {

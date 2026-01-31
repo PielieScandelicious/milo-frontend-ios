@@ -924,6 +924,68 @@ struct TopCategory: Codable, Identifiable {
     }
 }
 
+// MARK: - Year Summary Response (for Year views in Overview)
+
+struct YearSummaryResponse: Codable {
+    let year: Int
+    let startDate: String
+    let endDate: String
+    let totalSpend: Double
+    let transactionCount: Int
+    let receiptCount: Int
+    let totalItems: Int
+    let averageHealthScore: Double?
+    let stores: [APIStoreBreakdown]
+    let monthlyBreakdown: [MonthlySpend]?
+    let topCategories: [CategoryBreakdown]?
+
+    enum CodingKeys: String, CodingKey {
+        case year
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case totalSpend = "total_spend"
+        case transactionCount = "transaction_count"
+        case receiptCount = "receipt_count"
+        case totalItems = "total_items"
+        case averageHealthScore = "average_health_score"
+        case stores
+        case monthlyBreakdown = "monthly_breakdown"
+        case topCategories = "top_categories"
+    }
+
+    init(year: Int, startDate: String, endDate: String, totalSpend: Double, transactionCount: Int, receiptCount: Int, totalItems: Int, averageHealthScore: Double?, stores: [APIStoreBreakdown], monthlyBreakdown: [MonthlySpend]? = nil, topCategories: [CategoryBreakdown]? = nil) {
+        self.year = year
+        self.startDate = startDate
+        self.endDate = endDate
+        self.totalSpend = totalSpend
+        self.transactionCount = transactionCount
+        self.receiptCount = receiptCount
+        self.totalItems = totalItems
+        self.averageHealthScore = averageHealthScore
+        self.stores = stores
+        self.monthlyBreakdown = monthlyBreakdown
+        self.topCategories = topCategories
+    }
+}
+
+struct MonthlySpend: Codable, Identifiable {
+    let month: String           // e.g., "January"
+    let monthNumber: Int        // 1-12
+    let totalSpend: Double
+    let receiptCount: Int
+    let averageHealthScore: Double?
+
+    var id: Int { monthNumber }
+
+    enum CodingKeys: String, CodingKey {
+        case month
+        case monthNumber = "month_number"
+        case totalSpend = "total_spend"
+        case receiptCount = "receipt_count"
+        case averageHealthScore = "average_health_score"
+    }
+}
+
 // MARK: - Periods Response (Lightweight period metadata for fast loading)
 
 struct PeriodsResponse: Codable {
