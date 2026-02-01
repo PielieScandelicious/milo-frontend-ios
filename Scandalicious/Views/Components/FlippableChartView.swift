@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-
 // MARK: - Flippable Donut Chart View
 struct FlippableDonutChartView: View {
     let title: String

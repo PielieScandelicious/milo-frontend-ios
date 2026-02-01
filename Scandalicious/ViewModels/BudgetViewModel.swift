@@ -92,6 +92,9 @@ class BudgetViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        // Initialize periods synchronously so UI can render immediately
+        initializePeriodsSync()
+
         // Listen for data changes that might affect budget progress
         notificationObserver = NotificationCenter.default.addObserver(
             forName: .receiptsDataDidChange,
@@ -104,6 +107,21 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
+    /// Initialize periods synchronously (called from init)
+    private func initializePeriodsSync() {
+        var periods: [String] = []
+        let now = Date()
+
+        for i in (0...5).reversed() {
+            if let date = Calendar.current.date(byAdding: .month, value: -i, to: now) {
+                periods.append(displayFormatter.string(from: date))
+            }
+        }
+
+        availablePeriods = periods
+        selectedPeriod = displayFormatter.string(from: now)
+    }
+
     deinit {
         if let observer = notificationObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -112,16 +130,11 @@ class BudgetViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Initialize available periods and load budget
+    /// Load budget for the current selected period
     func loadBudget() async {
-        // Initialize periods if empty
+        // Periods are initialized in init(), but double-check
         if availablePeriods.isEmpty {
-            initializePeriods()
-        }
-
-        // Set selected period to current month if not set
-        if selectedPeriod.isEmpty {
-            selectedPeriod = displayFormatter.string(from: Date())
+            initializePeriodsSync()
         }
 
         await loadBudgetForPeriod(selectedPeriod)
@@ -205,20 +218,6 @@ class BudgetViewModel: ObservableObject {
     }
 
     // MARK: - Period Helpers
-
-    /// Initialize available periods (last 6 months + current)
-    private func initializePeriods() {
-        var periods: [String] = []
-        let now = Date()
-
-        for i in (0...5).reversed() {
-            if let date = Calendar.current.date(byAdding: .month, value: -i, to: now) {
-                periods.append(displayFormatter.string(from: date))
-            }
-        }
-
-        availablePeriods = periods
-    }
 
     /// Convert display format ("January 2026") to API format ("2026-01")
     private func convertToAPIFormat(_ displayPeriod: String) -> String {

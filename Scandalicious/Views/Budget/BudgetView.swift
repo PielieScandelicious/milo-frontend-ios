@@ -81,10 +81,10 @@ struct BudgetView: View {
                 .padding(.bottom, 100)
             }
         }
-        .navigationTitle("Budget")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
-            // Period selector in center
+            // Period selector in center (replaces title)
             ToolbarItem(placement: .principal) {
                 periodNavigationToolbar
             }
@@ -141,6 +141,15 @@ struct BudgetView: View {
     // MARK: - Period Navigation
 
     private var periodNavigationToolbar: some View {
+        Group {
+            // Only show toolbar when periods are loaded
+            if !viewModel.selectedPeriod.isEmpty {
+                periodNavigationContent
+            }
+        }
+    }
+
+    private var periodNavigationContent: some View {
         HStack(spacing: 12) {
             // Previous period (faded left)
             if canGoToPreviousPeriod {
