@@ -542,6 +542,37 @@ extension Color {
     }
 }
 
+// MARK: - Last Month Summary
+
+struct LastMonthSummary {
+    let month: String              // "January 2026"
+    let totalSpent: Double
+    let budgetAmount: Double
+    let grade: String              // "A", "B", etc.
+    let score: Int                 // 0-100
+    let headline: String
+    let wasUnderBudget: Bool
+    let difference: Double         // Amount under/over
+
+    var gradeColor: Color {
+        switch grade.uppercased() {
+        case "A+", "A": return Color(red: 0.2, green: 0.8, blue: 0.5)
+        case "A-", "B+", "B": return Color(red: 0.3, green: 0.75, blue: 0.45)
+        case "B-", "C+", "C": return Color(red: 1.0, green: 0.75, blue: 0.3)
+        case "C-", "D+", "D": return Color(red: 1.0, green: 0.55, blue: 0.3)
+        default: return Color(red: 1.0, green: 0.4, blue: 0.4)
+        }
+    }
+
+    var statusText: String {
+        if wasUnderBudget {
+            return String(format: "€%.0f under budget", difference)
+        } else {
+            return String(format: "€%.0f over budget", difference)
+        }
+    }
+}
+
 // MARK: - Budget Notification
 
 extension Notification.Name {

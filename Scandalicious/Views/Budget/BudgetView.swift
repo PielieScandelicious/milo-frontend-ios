@@ -12,9 +12,45 @@ struct BudgetView: View {
     @State private var showingDeleteConfirmation = false
     @State private var selectedCategoryItem: BudgetProgressItem?
     @State private var showAllCategories = false
+    @State private var showLastMonthSummary = false
 
     /// Maximum categories to show before grouping
     private let maxVisibleCategories = 6
+
+    // Date formatter for display
+    private let displayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f
+    }()
+
+    /// Check if the selected period is the current month
+    private var isCurrentMonth: Bool {
+        viewModel.selectedPeriod == displayFormatter.string(from: Date())
+    }
+
+    /// Shortened period format for adjacent periods (e.g., "Jan 26")
+    private func shortenedPeriod(_ period: String) -> String {
+        guard let date = displayFormatter.date(from: period) else { return period }
+        let shortFormatter = DateFormatter()
+        shortFormatter.dateFormat = "MMM yy"
+        return shortFormatter.string(from: date)
+    }
+
+    /// Current period index in available periods
+    private var currentPeriodIndex: Int {
+        viewModel.availablePeriods.firstIndex(of: viewModel.selectedPeriod) ?? 0
+    }
+
+    /// Can navigate to previous (older) period
+    private var canGoToPreviousPeriod: Bool {
+        currentPeriodIndex > 0
+    }
+
+    /// Can navigate to next (newer) period
+    private var canGoToNextPeriod: Bool {
+        currentPeriodIndex < viewModel.availablePeriods.count - 1
+    }
 
     var body: some View {
         ZStack {
@@ -30,7 +66,12 @@ struct BudgetView: View {
                     case .noBudget:
                         noBudgetView
                     case .active(let progress):
-                        activeBudgetView(progress: progress)
+                        // Show fresh start view for new month with minimal spending
+                        if viewModel.isNewMonthWithMinimalSpending {
+                            freshStartView(progress: progress)
+                        } else {
+                            activeBudgetView(progress: progress)
+                        }
                     case .error(let message):
                         errorView(message: message)
                     }
@@ -43,6 +84,11 @@ struct BudgetView: View {
         .navigationTitle("Budget")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            // Period selector in center
+            ToolbarItem(placement: .principal) {
+                periodNavigationToolbar
+            }
+
             if viewModel.state.hasBudget {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -71,6 +117,11 @@ struct BudgetView: View {
         .sheet(item: $selectedCategoryItem) { item in
             CategoryBudgetDetailSheet(item: item)
         }
+        .sheet(isPresented: $showLastMonthSummary) {
+            if let summary = viewModel.lastMonthSummary {
+                LastMonthDetailSheet(summary: summary, viewModel: viewModel)
+            }
+        }
         .confirmationDialog("Delete Budget", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 Task {
@@ -84,6 +135,133 @@ struct BudgetView: View {
         .task {
             await viewModel.loadBudget()
         }
+        .gesture(periodSwipeGesture)
+    }
+
+    // MARK: - Period Navigation
+
+    private var periodNavigationToolbar: some View {
+        HStack(spacing: 12) {
+            // Previous period (faded left)
+            if canGoToPreviousPeriod {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        let newPeriod = viewModel.availablePeriods[currentPeriodIndex - 1]
+                        Task {
+                            await viewModel.selectPeriod(newPeriod)
+                        }
+                    }
+                } label: {
+                    Text(shortenedPeriod(viewModel.availablePeriods[currentPeriodIndex - 1]).uppercased())
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                        .tracking(0.8)
+                }
+            }
+
+            // Current period (center pill)
+            HStack(spacing: 6) {
+                // Show sparkle icon for fresh new month
+                if viewModel.isNewMonthStart && isCurrentMonth {
+                    Image(systemName: "sparkle")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.9), .purple.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                Text(viewModel.selectedPeriod.uppercased())
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .tracking(1.5)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(viewModel.isNewMonthStart && isCurrentMonth
+                        ? LinearGradient(
+                            colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        : LinearGradient(
+                            colors: [Color.white.opacity(0.12), Color.white.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        viewModel.isNewMonthStart && isCurrentMonth
+                            ? LinearGradient(
+                                colors: [Color.blue.opacity(0.4), Color.purple.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [Color.white.opacity(0.2), Color.white.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                        lineWidth: 1
+                    )
+            )
+            .contentTransition(.interpolate)
+            .animation(.easeInOut(duration: 0.25), value: viewModel.selectedPeriod)
+
+            // Next period (faded right)
+            if canGoToNextPeriod {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        let newPeriod = viewModel.availablePeriods[currentPeriodIndex + 1]
+                        Task {
+                            await viewModel.selectPeriod(newPeriod)
+                        }
+                    }
+                } label: {
+                    Text(shortenedPeriod(viewModel.availablePeriods[currentPeriodIndex + 1]).uppercased())
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                        .tracking(0.8)
+                }
+            }
+        }
+    }
+
+    /// Swipe gesture for navigating between periods
+    private var periodSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 30, coordinateSpace: .local)
+            .onEnded { value in
+                let horizontalAmount = value.translation.width
+                let verticalAmount = abs(value.translation.height)
+
+                // Require horizontal to be at least 2x vertical movement
+                guard abs(horizontalAmount) > verticalAmount * 2 else { return }
+                guard abs(horizontalAmount) > 50 else { return }
+
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    if horizontalAmount > 0 && canGoToPreviousPeriod {
+                        // Swipe right -> go to previous (older) period
+                        let newPeriod = viewModel.availablePeriods[currentPeriodIndex - 1]
+                        Task {
+                            await viewModel.selectPeriod(newPeriod)
+                        }
+                    } else if horizontalAmount < 0 && canGoToNextPeriod {
+                        // Swipe left -> go to next (newer) period
+                        let newPeriod = viewModel.availablePeriods[currentPeriodIndex + 1]
+                        Task {
+                            await viewModel.selectPeriod(newPeriod)
+                        }
+                    }
+                }
+            }
     }
 
     // MARK: - Loading View
@@ -103,6 +281,226 @@ struct BudgetView: View {
 
             Spacer()
         }
+    }
+
+    // MARK: - Fresh Start View (New Month)
+
+    private func freshStartView(progress: BudgetProgress) -> some View {
+        VStack(spacing: 24) {
+            // Fresh Start Hero
+            VStack(spacing: 20) {
+                // Animated sparkle icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.blue.opacity(0.2),
+                                    Color.purple.opacity(0.15)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 120, height: 120)
+
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 50, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.blue, Color.purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(spacing: 8) {
+                    Text("Fresh Start!")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Text("A new month begins. Your budget is ready.")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(.top, 20)
+
+            // Budget Target Card
+            VStack(spacing: 16) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("This Month's Budget")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .textCase(.uppercase)
+
+                        Text(String(format: "€%.0f", progress.budget.monthlyAmount))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Daily Target")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .textCase(.uppercase)
+
+                        Text(String(format: "€%.0f", progress.dailyBudgetRemaining))
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.2)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+            )
+
+            // Last Month Summary Card (if available)
+            if let summary = viewModel.lastMonthSummary {
+                lastMonthSummaryCard(summary: summary)
+            } else if viewModel.isLoadingLastMonth {
+                // Loading state for last month
+                HStack {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.5)))
+
+                    Text("Loading last month...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            }
+
+            // Encouragement text
+            VStack(spacing: 8) {
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.green.opacity(0.8))
+
+                Text("Start fresh and stay on track!")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            .padding(.top, 20)
+        }
+    }
+
+    // MARK: - Last Month Summary Card
+
+    private func lastMonthSummaryCard(summary: LastMonthSummary) -> some View {
+        Button {
+            showLastMonthSummary = true
+        } label: {
+            VStack(spacing: 16) {
+                // Header
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("How did last month go?")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .textCase(.uppercase)
+
+                        Text(summary.month)
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+
+                    Spacer()
+
+                    // Grade badge
+                    ZStack {
+                        Circle()
+                            .fill(summary.gradeColor.opacity(0.15))
+                            .frame(width: 50, height: 50)
+
+                        Circle()
+                            .stroke(summary.gradeColor, lineWidth: 2)
+                            .frame(width: 50, height: 50)
+
+                        Text(summary.grade)
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundStyle(summary.gradeColor)
+                    }
+                }
+
+                // Stats row
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Spent")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.4))
+
+                        Text(String(format: "€%.0f", summary.totalSpent))
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Budget")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.4))
+
+                        Text(String(format: "€%.0f", summary.budgetAmount))
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+
+                    Spacer()
+
+                    // Under/over badge
+                    Text(summary.statusText)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(summary.wasUnderBudget ? Color(red: 0.2, green: 0.8, blue: 0.4) : Color.red)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule()
+                                .fill((summary.wasUnderBudget ? Color(red: 0.2, green: 0.8, blue: 0.4) : Color.red).opacity(0.15))
+                        )
+                }
+
+                // Tap to see more
+                HStack {
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("View Details")
+                            .font(.system(size: 12, weight: .medium))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(.white.opacity(0.4))
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - No Budget View
@@ -243,11 +641,23 @@ struct BudgetView: View {
 
     private func activeBudgetView(progress: BudgetProgress) -> some View {
         VStack(spacing: 20) {
+            // Historical period banner (when viewing past months)
+            if !isCurrentMonth {
+                historicalPeriodBanner
+            }
+
             // Main budget overview card
             mainBudgetCard(progress: progress)
 
-            // Pace indicator
-            paceIndicatorCard(progress: progress)
+            // Pace indicator (only show for current month)
+            if isCurrentMonth {
+                paceIndicatorCard(progress: progress)
+            }
+
+            // Last month summary (compact version for active view, only on current month)
+            if isCurrentMonth, let summary = viewModel.lastMonthSummary {
+                lastMonthCompactCard(summary: summary)
+            }
 
             // Category breakdown
             categoryBreakdownSection
@@ -255,6 +665,101 @@ struct BudgetView: View {
             // Quick stats
             quickStatsCard(progress: progress)
         }
+    }
+
+    // MARK: - Historical Period Banner
+
+    private var historicalPeriodBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white.opacity(0.6))
+
+            Text("Viewing \(viewModel.selectedPeriod)")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white.opacity(0.7))
+
+            Spacer()
+
+            // Jump to current month button
+            Button {
+                let currentMonth = displayFormatter.string(from: Date())
+                Task {
+                    await viewModel.selectPeriod(currentMonth)
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Current")
+                        .font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(.blue)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color.blue.opacity(0.15))
+                )
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Last Month Compact Card (for Active Budget View)
+
+    private func lastMonthCompactCard(summary: LastMonthSummary) -> some View {
+        Button {
+            showLastMonthSummary = true
+        } label: {
+            HStack(spacing: 12) {
+                // Grade badge
+                ZStack {
+                    Circle()
+                        .fill(summary.gradeColor.opacity(0.15))
+                        .frame(width: 44, height: 44)
+
+                    Text(summary.grade)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(summary.gradeColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Last Month")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .textCase(.uppercase)
+
+                    Text(summary.statusText)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(summary.wasUnderBudget ? Color(red: 0.2, green: 0.8, blue: 0.4) : .red)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Main Budget Card
@@ -824,6 +1329,163 @@ private struct CategoryBudgetDetailSheet: View {
                 .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundStyle(valueColor)
         }
+    }
+}
+
+// MARK: - Last Month Detail Sheet
+
+private struct LastMonthDetailSheet: View {
+    let summary: LastMonthSummary
+    @ObservedObject var viewModel: BudgetViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(white: 0.05).ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Grade Hero
+                        VStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(summary.gradeColor.opacity(0.15))
+                                    .frame(width: 120, height: 120)
+
+                                Circle()
+                                    .stroke(summary.gradeColor, lineWidth: 4)
+                                    .frame(width: 120, height: 120)
+
+                                VStack(spacing: 4) {
+                                    Text(summary.grade)
+                                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                                        .foregroundStyle(summary.gradeColor)
+
+                                    Text("\(summary.score)/100")
+                                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                                        .foregroundStyle(.white.opacity(0.5))
+                                }
+                            }
+
+                            Text(summary.headline)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                        }
+                        .padding(.top, 20)
+
+                        // Spending Overview
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Spending Overview")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.6))
+                                    .textCase(.uppercase)
+
+                                Spacer()
+                            }
+
+                            HStack(spacing: 20) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Total Spent")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(.white.opacity(0.5))
+
+                                    Text(String(format: "€%.0f", summary.totalSpent))
+                                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.white)
+                                }
+
+                                Spacer()
+
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text("Budget")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(.white.opacity(0.5))
+
+                                    Text(String(format: "€%.0f", summary.budgetAmount))
+                                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+
+                            // Result badge
+                            HStack {
+                                Image(systemName: summary.wasUnderBudget ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(summary.wasUnderBudget ? Color(red: 0.2, green: 0.8, blue: 0.4) : .red)
+
+                                Text(summary.statusText)
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundStyle(summary.wasUnderBudget ? Color(red: 0.2, green: 0.8, blue: 0.4) : .red)
+
+                                Spacer()
+                            }
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill((summary.wasUnderBudget ? Color(red: 0.2, green: 0.8, blue: 0.4) : Color.red).opacity(0.1))
+                            )
+                        }
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.05))
+                        )
+
+                        // AI Report Button
+                        Button {
+                            Task {
+                                let formatter = DateFormatter()
+                                formatter.dateFormat = "MMMM yyyy"
+                                if let date = formatter.date(from: summary.month) {
+                                    let apiFormatter = DateFormatter()
+                                    apiFormatter.dateFormat = "yyyy-MM"
+                                    await viewModel.loadAIMonthlyReport(month: apiFormatter.string(from: date))
+                                }
+                                viewModel.showingAIMonthlyReport = true
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 18, weight: .semibold))
+
+                                Text("View Full AI Report")
+                                    .font(.system(size: 16, weight: .bold))
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.purple.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 40)
+                }
+            }
+            .navigationTitle(summary.month)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
 }
 

@@ -42,6 +42,14 @@ class BudgetViewModel: ObservableObject {
 
     @Published var state: BudgetState = .idle
 
+    // Period selection state
+    @Published var selectedPeriod: String = ""  // "January 2026" format
+    @Published var availablePeriods: [String] = []
+
+    // Last month summary state
+    @Published var lastMonthSummary: LastMonthSummary?
+    @Published var isLoadingLastMonth = false
+
     // Setup flow state
     @Published var setupBudgetAmount: Double = 0
     @Published var showingSetupSheet = false
@@ -68,6 +76,19 @@ class BudgetViewModel: ObservableObject {
     private let apiService = BudgetAPIService.shared
     private var notificationObserver: NSObjectProtocol?
 
+    // Date formatters
+    private let displayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f
+    }()
+
+    private let apiFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+
     // MARK: - Initialization
 
     init() {
@@ -91,12 +112,35 @@ class BudgetViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Load the user's budget and current progress
+    /// Initialize available periods and load budget
     func loadBudget() async {
+        // Initialize periods if empty
+        if availablePeriods.isEmpty {
+            initializePeriods()
+        }
+
+        // Set selected period to current month if not set
+        if selectedPeriod.isEmpty {
+            selectedPeriod = displayFormatter.string(from: Date())
+        }
+
+        await loadBudgetForPeriod(selectedPeriod)
+
+        // Load last month summary in background
+        Task {
+            await loadLastMonthSummary()
+        }
+    }
+
+    /// Load budget for a specific period
+    func loadBudgetForPeriod(_ period: String) async {
         state = .loading
 
+        // Convert display format to API format
+        let monthString = convertToAPIFormat(period)
+
         do {
-            let progressResponse = try await apiService.getBudgetProgress()
+            let progressResponse = try await apiService.getBudgetProgress(month: monthString)
             state = .active(progressResponse.toBudgetProgress())
         } catch let error as BudgetAPIError {
             switch error {
@@ -108,6 +152,100 @@ class BudgetViewModel: ObservableObject {
         } catch {
             state = .error(error.localizedDescription)
         }
+    }
+
+    /// Switch to a different period
+    func selectPeriod(_ period: String) async {
+        guard period != selectedPeriod else { return }
+        selectedPeriod = period
+        await loadBudgetForPeriod(period)
+    }
+
+    /// Load last month's summary for the "How did last month go?" card
+    func loadLastMonthSummary() async {
+        // Get last month
+        guard let lastMonth = Calendar.current.date(byAdding: .month, value: -1, to: Date()) else { return }
+        let lastMonthAPI = apiFormatter.string(from: lastMonth)
+        let lastMonthDisplay = displayFormatter.string(from: lastMonth)
+
+        isLoadingLastMonth = true
+
+        do {
+            let report = try await apiService.getAIMonthlyReport(month: lastMonthAPI)
+
+            // Try to get last month's budget progress too
+            var totalSpent: Double = 0
+            var budgetAmount: Double = 0
+
+            if let progress = try? await apiService.getBudgetProgress(month: lastMonthAPI) {
+                totalSpent = progress.currentSpend
+                budgetAmount = progress.budget.monthlyAmount
+            }
+
+            let wasUnder = totalSpent <= budgetAmount
+            let difference = abs(budgetAmount - totalSpent)
+
+            lastMonthSummary = LastMonthSummary(
+                month: lastMonthDisplay,
+                totalSpent: totalSpent,
+                budgetAmount: budgetAmount,
+                grade: report.grade,
+                score: report.score,
+                headline: report.headline,
+                wasUnderBudget: wasUnder,
+                difference: difference
+            )
+        } catch {
+            // Silently fail - last month summary is optional
+            print("⚠️ Could not load last month summary: \(error.localizedDescription)")
+            lastMonthSummary = nil
+        }
+
+        isLoadingLastMonth = false
+    }
+
+    // MARK: - Period Helpers
+
+    /// Initialize available periods (last 6 months + current)
+    private func initializePeriods() {
+        var periods: [String] = []
+        let now = Date()
+
+        for i in (0...5).reversed() {
+            if let date = Calendar.current.date(byAdding: .month, value: -i, to: now) {
+                periods.append(displayFormatter.string(from: date))
+            }
+        }
+
+        availablePeriods = periods
+    }
+
+    /// Convert display format ("January 2026") to API format ("2026-01")
+    private func convertToAPIFormat(_ displayPeriod: String) -> String {
+        if let date = displayFormatter.date(from: displayPeriod) {
+            return apiFormatter.string(from: date)
+        }
+        // Fallback to current month
+        return apiFormatter.string(from: Date())
+    }
+
+    /// Check if the selected period is the current month
+    var isCurrentMonth: Bool {
+        selectedPeriod == displayFormatter.string(from: Date())
+    }
+
+    /// Check if it's the start of a new month (day 1-3)
+    var isNewMonthStart: Bool {
+        guard isCurrentMonth else { return false }
+        let day = Calendar.current.component(.day, from: Date())
+        return day <= 3
+    }
+
+    /// Check if current period has minimal spending (new month scenario)
+    var isNewMonthWithMinimalSpending: Bool {
+        guard isNewMonthStart else { return false }
+        guard let progress = state.progress else { return true }
+        return progress.currentSpend < 50  // Less than €50 spent
     }
 
     /// Refresh just the progress (when spending changes)
