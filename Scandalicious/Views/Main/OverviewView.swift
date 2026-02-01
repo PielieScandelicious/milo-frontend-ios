@@ -752,15 +752,20 @@ struct OverviewView: View {
             } else if isYearPeriod(newValue) {
                 // Handle Year period - fetch year summary from backend
                 await fetchYearData(year: newValue)
-            } else if !dataManager.periodMetadata.isEmpty {
-                if !dataManager.isPeriodLoaded(newValue) {
-                    await dataManager.fetchPeriodDetails(newValue)
-                    await MainActor.run {
-                        updateCacheForPeriod(newValue)
-                        cacheSegmentsForPeriod(newValue)
+            } else {
+                // Load budget data for the selected month period
+                await budgetViewModel.selectPeriod(newValue)
+
+                if !dataManager.periodMetadata.isEmpty {
+                    if !dataManager.isPeriodLoaded(newValue) {
+                        await dataManager.fetchPeriodDetails(newValue)
+                        await MainActor.run {
+                            updateCacheForPeriod(newValue)
+                            cacheSegmentsForPeriod(newValue)
+                        }
                     }
+                    await prefetchAdjacentPeriods(around: newValue)
                 }
-                await prefetchAdjacentPeriods(around: newValue)
             }
         }
     }
@@ -1334,17 +1339,16 @@ struct OverviewView: View {
     private func mainContentView(bottomSafeArea: CGFloat) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
-                // Budget widget - show for all month periods
-                // Full widget for current month, compact indicator for past months
+                // Budget insight card - unified view for all month periods
+                // Shows current progress for current month, final results for past months
                 if !isAllPeriod(selectedPeriod) && !isYearPeriod(selectedPeriod) {
-                    if isCurrentPeriod {
-                        BudgetPulseView(viewModel: budgetViewModel)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    } else {
-                        // Show compact budget indicator for past months
-                        pastMonthBudgetIndicator
-                    }
+                    BudgetInsightCard(
+                        viewModel: budgetViewModel,
+                        period: selectedPeriod,
+                        isCurrentPeriod: isCurrentPeriod
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
                 }
 
                 overviewContentForPeriod(selectedPeriod)
@@ -2041,60 +2045,6 @@ struct OverviewView: View {
             return .empty
         } else {
             return .hasData
-        }
-    }
-
-    // MARK: - Past Month Budget Indicator
-    private var pastMonthBudgetIndicator: some View {
-        Group {
-            if let progress = budgetViewModel.state.progress {
-                HStack(spacing: 12) {
-                    // Mini budget ring
-                    MiniBudgetRing(
-                        spendRatio: progress.spendRatio,
-                        paceStatus: progress.paceStatus,
-                        size: 36
-                    )
-
-                    // Budget summary
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            Text(String(format: "€%.0f", progress.currentSpend))
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-
-                            Text("of")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
-
-                            Text(String(format: "€%.0f", progress.budget.monthlyAmount))
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-
-                        HStack(spacing: 4) {
-                            Image(systemName: progress.paceStatus.icon)
-                                .font(.system(size: 10, weight: .semibold))
-                            Text(progress.paceStatus.displayText)
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundColor(progress.paceStatus.color)
-                    }
-
-                    Spacer()
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.white.opacity(0.05))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-                .padding(.horizontal, 16)
-                .padding(.bottom, 4)
-            }
         }
     }
 
