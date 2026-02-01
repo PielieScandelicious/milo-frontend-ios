@@ -50,7 +50,15 @@ struct ScandaLiciousApp: App {
             .environmentObject(authManager)
             .environmentObject(subscriptionManager)
             .onOpenURL { url in
-                GIDSignIn.sharedInstance.handle(url)
+                // Handle Google Sign-In OAuth callback
+                if GIDSignIn.sharedInstance.handle(url) {
+                    return
+                }
+
+                // Handle banking deep links (milo://banking/callback or milo://banking/error)
+                if url.scheme == "milo" {
+                    handleBankingDeepLink(url)
+                }
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 // Refresh token when app becomes active
@@ -82,6 +90,82 @@ struct ScandaLiciousApp: App {
                 }
                 hasCheckedSubscription = true
             }
+        }
+    }
+
+    // MARK: - Banking Deep Link Handling
+
+    private func handleBankingDeepLink(_ url: URL) {
+        guard let host = url.host else {
+            print("🏦 [DeepLink] No host in URL: \(url)")
+            return
+        }
+
+        print("🏦 [DeepLink] Handling banking deep link: \(url)")
+
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            print("🏦 [DeepLink] Failed to parse URL components")
+            return
+        }
+
+        let queryItems = components.queryItems ?? []
+        let path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        switch host {
+        case "banking":
+            handleBankingPath(path: path, queryItems: queryItems)
+        default:
+            print("🏦 [DeepLink] Unknown host: \(host)")
+        }
+    }
+
+    private func handleBankingPath(path: String, queryItems: [URLQueryItem]) {
+        switch path {
+        case "callback":
+            // Success callback: milo://banking/callback?connection_id=xxx&status=success&accounts=2
+            let connectionId = queryItems.first { $0.name == "connection_id" }?.value
+            let status = queryItems.first { $0.name == "status" }?.value
+            let accountsCount = Int(queryItems.first { $0.name == "accounts" }?.value ?? "0") ?? 0
+
+            print("🏦 [DeepLink] Callback received - connection: \(connectionId ?? "nil"), status: \(status ?? "nil"), accounts: \(accountsCount)")
+
+            let result = BankingCallbackResult(
+                connectionId: connectionId,
+                status: status == "success" ? .success : .error,
+                accountCount: accountsCount,
+                errorMessage: nil
+            )
+
+            NotificationCenter.default.post(
+                name: .bankConnectionCompleted,
+                object: nil,
+                userInfo: ["result": result]
+            )
+
+        case "error":
+            // Error callback: milo://banking/error?error=authorization_failed&message=User%20cancelled
+            let error = queryItems.first { $0.name == "error" }?.value ?? "unknown_error"
+            let message = queryItems.first { $0.name == "message" }?.value?.removingPercentEncoding
+
+            print("🏦 [DeepLink] Error received - error: \(error), message: \(message ?? "nil")")
+
+            let callbackStatus: BankingCallbackResult.CallbackStatus = error == "user_cancelled" ? .cancelled : .error
+
+            let result = BankingCallbackResult(
+                connectionId: nil,
+                status: callbackStatus,
+                accountCount: 0,
+                errorMessage: message ?? error
+            )
+
+            NotificationCenter.default.post(
+                name: .bankConnectionFailed,
+                object: nil,
+                userInfo: ["result": result]
+            )
+
+        default:
+            print("🏦 [DeepLink] Unknown banking path: \(path)")
         }
     }
 }

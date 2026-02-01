@@ -31,7 +31,8 @@ enum AppConfiguration {
     static var profileEndpoint: String { "\(apiBase)/profile" }
     static var transactionsEndpoint: String { "\(apiBase)/transactions" }
     static var receiptsEndpoint: String { "\(apiBase)/receipts" }
-    
+    static var bankingEndpoint: String { "\(apiBase)/banking" }
+
     // Helper to log current configuration
     static func logConfiguration() {
         print("🔧 App Environment: \(environment)")
