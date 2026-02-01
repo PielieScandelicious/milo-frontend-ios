@@ -97,10 +97,17 @@ actor BudgetAPIService {
     }
 
     /// Get current budget progress (spending vs budget)
-    func fetchBudgetProgress() async throws -> BudgetProgressResponse {
+    /// - Parameter month: Optional month in "yyyy-MM" format. If nil, returns current month.
+    func fetchBudgetProgress(month: String? = nil) async throws -> BudgetProgressResponse {
+        var queryItems: [URLQueryItem] = []
+        if let month = month {
+            queryItems.append(URLQueryItem(name: "month", value: month))
+        }
+
         return try await performRequest(
             endpoint: "/budgets/progress",
-            method: "GET"
+            method: "GET",
+            queryItems: queryItems
         )
     }
 
@@ -413,8 +420,8 @@ extension BudgetAPIService {
         return try await deleteBudget()
     }
 
-    nonisolated func getBudgetProgress() async throws -> BudgetProgressResponse {
-        return try await fetchBudgetProgress()
+    nonisolated func getBudgetProgress(month: String? = nil) async throws -> BudgetProgressResponse {
+        return try await fetchBudgetProgress(month: month)
     }
 
     // MARK: - AI Nonisolated Methods (All budget suggestions are AI-powered)

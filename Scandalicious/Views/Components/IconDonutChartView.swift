@@ -35,6 +35,12 @@ struct IconDonutChartView: View {
     let subtitle: String?
     let totalItems: Int?
     let averageItemPrice: Double?
+    let centerIcon: String?
+    let centerLabel: String?
+    let showAllSegments: Bool
+
+    /// Maximum number of segments to show before grouping into "Others"
+    private let maxVisibleSegments: Int = 6
 
     /// Visual gap between segments in degrees (the actual empty space you see)
     private let visualGapDegrees: Double = 4.0
@@ -45,9 +51,42 @@ struct IconDonutChartView: View {
     @State private var globalRotation: Double = -90 // Quarter turn back
     @State private var selectedSegmentIndex: Int? = nil
 
+    /// Whether the data needs grouping (more than maxVisibleSegments)
+    private var needsGrouping: Bool {
+        data.count > maxVisibleSegments
+    }
+
+    /// Data to display - either original or grouped with "Others"
+    private var displayData: [ChartData] {
+        guard needsGrouping && !showAllSegments else { return data }
+
+        // Sort by value descending to keep the largest segments
+        let sortedData = data.sorted { $0.value > $1.value }
+
+        // Take first (maxVisibleSegments - 1) to leave room for "Others"
+        let visibleCount = maxVisibleSegments - 1
+        let visibleSegments = Array(sortedData.prefix(visibleCount))
+
+        // Sum up the remaining segments into "Others"
+        let othersSegments = Array(sortedData.dropFirst(visibleCount))
+        let othersValue = othersSegments.reduce(0) { $0 + $1.value }
+        let othersCount = othersSegments.count
+
+        // Create "Others" segment with a gray color
+        let othersSegment = ChartData(
+            value: othersValue,
+            color: Color(white: 0.5),
+            iconName: "ellipsis.circle.fill",
+            label: "\(othersCount) Others"
+        )
+
+        return visibleSegments + [othersSegment]
+    }
+
     /// Unique identifier to track data changes and trigger re-animation
     private var dataFingerprint: String {
-        data.map { "\($0.value)" }.joined(separator: "-")
+        let baseFingerprint = displayData.map { "\($0.value)" }.joined(separator: "-")
+        return "\(baseFingerprint)-\(showAllSegments)"
     }
 
     /// Skip animation for small charts (store cards) to improve swipe performance
@@ -55,7 +94,7 @@ struct IconDonutChartView: View {
         size > 120
     }
 
-    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil) {
+    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil, showAllSegments: Bool = true) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
         self.size = size
@@ -63,6 +102,9 @@ struct IconDonutChartView: View {
         self.subtitle = subtitle
         self.totalItems = totalItems
         self.averageItemPrice = averageItemPrice
+        self.centerIcon = centerIcon
+        self.centerLabel = centerLabel
+        self.showAllSegments = showAllSegments
     }
 
     private var strokeWidth: CGFloat {
@@ -91,19 +133,20 @@ struct IconDonutChartView: View {
 
     /// Calculate segments with gaps that account for round cap extensions
     private var segments: [SegmentInfo] {
-        guard !data.isEmpty else { return [] }
+        let chartData = displayData
+        guard !chartData.isEmpty else { return [] }
 
-        let totalValue = data.reduce(0) { $0 + $1.value }
+        let totalValue = chartData.reduce(0) { $0 + $1.value }
         guard totalValue > 0 else { return [] }
 
         // Total gap space needed (accounting for cap extensions)
-        let totalGapDegrees = effectiveGapDegrees * Double(data.count)
+        let totalGapDegrees = effectiveGapDegrees * Double(chartData.count)
         let availableDegrees = 360.0 - totalGapDegrees
 
         var segments: [SegmentInfo] = []
         var currentAngle: Double = 0 // Start from top (will rotate by -90 in view)
 
-        for item in data {
+        for item in chartData {
             let proportion = item.value / totalValue
             let segmentDegrees = availableDegrees * proportion
 
@@ -137,7 +180,7 @@ struct IconDonutChartView: View {
 
     /// Calculate percentage for a segment
     private func percentage(for segment: SegmentInfo) -> Int {
-        let total = data.reduce(0) { $0 + $1.value }
+        let total = displayData.reduce(0) { $0 + $1.value }
         guard total > 0 else { return 0 }
         return Int((segment.data.value / total) * 100)
     }
@@ -252,8 +295,32 @@ struct IconDonutChartView: View {
                 )
                 .frame(width: size * 0.58, height: size * 0.58)
 
+            // Custom center icon and label - clean and simple
+            if let icon = centerIcon, let label = centerLabel {
+                VStack(spacing: 8) {
+                    // Icon with gradient styling
+                    Image(systemName: icon)
+                        .font(.system(size: size * 0.18, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.95),
+                                    Color.white.opacity(0.65)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+
+                    // Label (e.g., "Stores" or "Categories")
+                    Text(label)
+                        .font(.system(size: size * 0.08, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.6))
+                        .tracking(0.5)
+                }
+            }
             // Display average item price if available
-            if let avgPrice = averageItemPrice, avgPrice > 0 {
+            else if let avgPrice = averageItemPrice, avgPrice > 0 {
                 // Average item price display
                 VStack(spacing: 2) {
                     Text("AVG PRICE")

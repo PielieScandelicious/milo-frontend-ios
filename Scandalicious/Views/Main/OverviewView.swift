@@ -61,13 +61,9 @@ struct OverviewView: View {
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var selectedStoreColor: Color = Color(red: 0.3, green: 0.7, blue: 1.0)
     @State private var showingAllTransactions = false
-    @State private var showTrendlineInOverview = false  // Toggle between pie chart and trendline
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
     @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
-    @State private var overviewTrends: [TrendPeriod] = []  // Trends for the overview chart
-    @State private var isLoadingTrends = false
-    @State private var hasFetchedTrends = false  // Prevent duplicate trend fetches
     @State private var hasSyncedRateLimit = false  // Prevent duplicate rate limit syncs
     @State private var loadedReceiptPeriods: Set<String> = []  // Track which periods have loaded receipts
     @State private var expandedReceiptId: String? // For inline receipt expansion
@@ -88,6 +84,13 @@ struct OverviewView: View {
     @State private var yearSummaryCache: [String: YearSummaryResponse] = [:] // Cache year summaries by year string
     @State private var isLoadingYearData = false // Track if fetching year data for first time
     @State private var currentLoadingYear: String? = nil // Track which year is currently loading
+    @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
+    @State private var isPieChartFlipped = false // Track if pie chart is showing categories (flipped) or stores
+    @State private var pieChartFlipDegrees: Double = 0 // Animation degrees for flip
+    @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
+    @State private var isLoadingCategoryData = false // Track if loading category data
+    @State private var showAllRows = false // Track if showing all store/category rows or limited
+    private let maxVisibleRows = 5 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
 
     // Entrance animation states
@@ -102,6 +105,27 @@ struct OverviewView: View {
         dateFormatter.locale = Locale(identifier: "en_US")
         let currentPeriod = dateFormatter.string(from: Date())
         return selectedPeriod == currentPeriod
+    }
+
+    /// Check if this is a fresh new month (first 3 days with no data yet)
+    /// Used to show encouraging "new month" messaging
+    /// Only depends on currentBreakdowns (stable/cached) to avoid flickering from async receipts loading
+    private var isNewMonthStart: Bool {
+        guard isCurrentPeriod else { return false }
+        let dayOfMonth = Calendar.current.component(.day, from: Date())
+        // Only check breakdowns (stable), not receipts (async) to prevent flickering
+        return dayOfMonth <= 3 && currentBreakdowns.isEmpty
+    }
+
+    /// Check if current period has no data (for empty state messaging)
+    private var currentPeriodHasNoData: Bool {
+        currentBreakdowns.isEmpty
+    }
+
+    /// Check if the selected period has no store data (for showing empty chart)
+    private func periodHasNoStoreData(_ period: String) -> Bool {
+        let segments = storeSegmentsForPeriod(period)
+        return segments.isEmpty
     }
 
     private var availablePeriods: [String] {
@@ -137,16 +161,43 @@ struct OverviewView: View {
         return Calendar.current.component(.year, from: date)
     }
 
+    /// Parse month and year from period string (e.g., "January 2026" -> (month: 1, year: 2026))
+    private func parsePeriodComponents(_ period: String) -> (month: Int, year: Int) {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        guard let date = dateFormatter.date(from: period) else {
+            // Fallback to current date
+            let now = Date()
+            return (Calendar.current.component(.month, from: now), Calendar.current.component(.year, from: now))
+        }
+        let month = Calendar.current.component(.month, from: date)
+        let year = Calendar.current.component(.year, from: date)
+        return (month, year)
+    }
+
     /// Compute available periods from data manager - called once when data changes
     /// Order: [older months] -> [current month] -> [years descending] -> [All]
     private func computeAvailablePeriods() -> [String] {
         var monthPeriods: [String] = []
+
+        // Get the current month string (e.g., "February 2026")
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        let currentMonthString = dateFormatter.string(from: Date())
 
         // Use period metadata if available (from lightweight /analytics/periods endpoint)
         if !dataManager.periodMetadata.isEmpty {
             // Period metadata is already sorted by backend (most recent first)
             // Reverse to get oldest first (left), most recent last (right) for swipe UX
             monthPeriods = Array(dataManager.periodMetadata.map { $0.period }.reversed())
+
+            // IMPORTANT: Always include current month even if it has no data yet
+            // This handles the month transition case (e.g., Jan 31 → Feb 1)
+            if !monthPeriods.contains(currentMonthString) {
+                monthPeriods.append(currentMonthString)
+            }
         } else {
             // Fallback: Use breakdowns if metadata not loaded yet
             let breakdownPeriods = Array(dataManager.breakdownsByPeriod().keys)
@@ -174,9 +225,7 @@ struct OverviewView: View {
 
         // Extract unique years from month periods, sorted descending (most recent year first)
         var uniqueYears: Set<Int> = []
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
+        // Reuse dateFormatter from above
 
         for period in monthPeriods {
             if let date = dateFormatter.date(from: period) {
@@ -430,6 +479,11 @@ struct OverviewView: View {
             .sheet(isPresented: $showingFilterSheet) {
                 FilterSheet(selectedSort: $selectedSort)
             }
+            .sheet(isPresented: $showCategoryBreakdownSheet) {
+                // Parse month and year from selectedPeriod (e.g., "January 2026")
+                let components = parsePeriodComponents(selectedPeriod)
+                CategoryBreakdownDetailView(month: components.month, year: components.year)
+            }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
                 // Reset entrance animation states for next appearance
@@ -633,7 +687,6 @@ struct OverviewView: View {
     }
 
     private func handlePeriodChanged(newValue: String) {
-        if showTrendlineInOverview { showTrendlineInOverview = false }
         expandedReceiptId = nil
 
         // Reset store rows animation for staggered re-entry
@@ -699,15 +752,20 @@ struct OverviewView: View {
             } else if isYearPeriod(newValue) {
                 // Handle Year period - fetch year summary from backend
                 await fetchYearData(year: newValue)
-            } else if !dataManager.periodMetadata.isEmpty {
-                if !dataManager.isPeriodLoaded(newValue) {
-                    await dataManager.fetchPeriodDetails(newValue)
-                    await MainActor.run {
-                        updateCacheForPeriod(newValue)
-                        cacheSegmentsForPeriod(newValue)
+            } else {
+                // Load budget data for the selected month period
+                await budgetViewModel.selectPeriod(newValue)
+
+                if !dataManager.periodMetadata.isEmpty {
+                    if !dataManager.isPeriodLoaded(newValue) {
+                        await dataManager.fetchPeriodDetails(newValue)
+                        await MainActor.run {
+                            updateCacheForPeriod(newValue)
+                            cacheSegmentsForPeriod(newValue)
+                        }
                     }
+                    await prefetchAdjacentPeriods(around: newValue)
                 }
-                await prefetchAdjacentPeriods(around: newValue)
             }
         }
     }
@@ -728,35 +786,37 @@ struct OverviewView: View {
         }
 
         do {
-            // Fetch summary without date filters to get all-time data
-            var filters = AnalyticsFilters()
-            filters.period = .all  // This will omit the period parameter
+            // Fetch aggregate data with allTime=true to get all-time store data
+            var filters = AggregateFilters()
+            filters.allTime = true
+            filters.topStoresLimit = 20  // Get more stores for the pie chart
 
-            print("📊 Fetching all-time store data from backend...")
-            let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+            print("📊 Fetching all-time store data from backend (aggregate)...")
+            let aggregate = try await AnalyticsAPIService.shared.getAggregate(filters: filters)
+            let stores = aggregate.topStores
 
-            print("📊 Backend response: period=\(summary.period), totalSpend=€\(summary.totalSpend), stores=\(summary.stores.count), receipts=\(summary.transactionCount)")
+            print("📊 Backend response: totalSpend=€\(aggregate.totals.totalSpend), stores=\(stores.count), receipts=\(aggregate.totals.totalReceipts)")
 
             // Convert to StoreBreakdown array
-            let breakdowns: [StoreBreakdown] = summary.stores.map { store in
-                print("   📍 Store: \(store.storeName) - €\(store.amountSpent) (\(store.storeVisits) visits)")
+            let breakdowns: [StoreBreakdown] = stores.map { store in
+                print("   📍 Store: \(store.storeName) - €\(store.totalSpent) (\(store.visitCount) visits)")
                 return StoreBreakdown(
                     storeName: store.storeName,
                     period: Self.allPeriodIdentifier,
-                    totalStoreSpend: store.amountSpent,
-                    categories: [],  // Categories not available in summary, will be fetched in detail view
-                    visitCount: store.storeVisits,
+                    totalStoreSpend: store.totalSpent,
+                    categories: [],  // Categories not available in aggregate, will be fetched in detail view
+                    visitCount: store.visitCount,
                     averageHealthScore: store.averageHealthScore
                 )
             }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
 
-            print("✅ Fetched \(breakdowns.count) stores for all-time view, total: €\(summary.totalSpend)")
+            print("✅ Fetched \(breakdowns.count) stores for all-time view, total: €\(aggregate.totals.totalSpend)")
 
             await MainActor.run {
                 // Store all-time totals from backend FIRST
-                allTimeTotalSpend = summary.totalSpend
-                allTimeTotalReceipts = summary.transactionCount
-                allTimeHealthScore = summary.averageHealthScore
+                allTimeTotalSpend = aggregate.totals.totalSpend
+                allTimeTotalReceipts = aggregate.totals.totalReceipts
+                allTimeHealthScore = aggregate.averages.averageHealthScore
 
                 // Cache the all-time breakdowns
                 cachedBreakdownsByPeriod[Self.allPeriodIdentifier] = breakdowns
@@ -784,6 +844,70 @@ struct OverviewView: View {
             await MainActor.run {
                 isLoadingAllTimeData = false
             }
+        }
+    }
+
+    // MARK: - Fetch Category Data for Pie Chart
+
+    /// Fetches category breakdown data for a given period
+    /// Used for the flippable pie chart back side
+    private func fetchCategoryData(for period: String) async {
+        // Skip for all-time or year periods
+        guard !isAllPeriod(period) && !isYearPeriod(period) else { return }
+
+        // Skip if already cached
+        guard pieChartSummaryCache[period] == nil else { return }
+
+        // Parse period string to get month/year
+        let components = parsePeriodComponents(period)
+        guard components.month > 0 && components.year > 0 else { return }
+
+        await MainActor.run {
+            isLoadingCategoryData = true
+        }
+
+        do {
+            let response = try await AnalyticsAPIService.shared.getPieChartSummary(
+                month: components.month,
+                year: components.year
+            )
+
+            await MainActor.run {
+                pieChartSummaryCache[period] = response
+                isLoadingCategoryData = false
+            }
+        } catch {
+            print("❌ Failed to fetch category data for \(period): \(error.localizedDescription)")
+            await MainActor.run {
+                isLoadingCategoryData = false
+            }
+        }
+    }
+
+    /// Get cached pie chart summary for a period
+    private func pieChartSummaryForPeriod(_ period: String) -> PieChartSummaryResponse? {
+        pieChartSummaryCache[period]
+    }
+
+    /// Get cached category data for a period, or empty array if not loaded
+    private func categoryDataForPeriod(_ period: String) -> [CategorySpendItem] {
+        pieChartSummaryCache[period]?.categories ?? []
+    }
+
+    /// Get average item price for a period
+    private func averageItemPriceForPeriod(_ period: String) -> Double? {
+        pieChartSummaryCache[period]?.computedAverageItemPrice
+    }
+
+    /// Convert CategorySpendItem array to ChartData for the donut chart
+    private func categoryChartData(for period: String) -> [ChartData] {
+        categoryDataForPeriod(period).map { category in
+            ChartData(
+                value: category.totalSpent,
+                color: category.color,
+                iconName: category.icon,
+                label: category.name
+            )
         }
     }
 
@@ -879,35 +1003,47 @@ struct OverviewView: View {
             components.day = 31
             let endDate = calendar.date(from: components)!
 
-            var filters = AnalyticsFilters()
-            filters.period = .year
+            var filters = AggregateFilters()
             filters.startDate = startDate
             filters.endDate = endDate
+            filters.topStoresLimit = 20
 
-            let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
+            let aggregate = try await AnalyticsAPIService.shared.getAggregate(filters: filters)
+            let aggregateStores = aggregate.topStores
+            let transactionCount = aggregate.totals.totalTransactions
 
-            // Create a pseudo YearSummaryResponse from the summary
+            // Convert AggregateStore to APIStoreBreakdown for YearSummaryResponse
+            let stores: [APIStoreBreakdown] = aggregateStores.map { store in
+                APIStoreBreakdown(
+                    storeName: store.storeName,
+                    amountSpent: store.totalSpent,
+                    storeVisits: store.visitCount,
+                    percentage: store.percentage,
+                    averageHealthScore: store.averageHealthScore
+                )
+            }
+
             let yearSummary = YearSummaryResponse(
                 year: yearInt,
                 startDate: DateFormatter.yyyyMMdd.string(from: startDate),
                 endDate: DateFormatter.yyyyMMdd.string(from: endDate),
-                totalSpend: summary.totalSpend,
-                transactionCount: summary.transactionCount,
-                receiptCount: summary.transactionCount, // Approximation
-                totalItems: summary.transactionCount,
-                averageHealthScore: summary.averageHealthScore,
-                stores: summary.stores,
+                totalSpend: aggregate.totals.totalSpend,
+                transactionCount: transactionCount,
+                receiptCount: transactionCount, // Approximation
+                totalItems: transactionCount,
+                averageHealthScore: aggregate.averages.averageHealthScore,
+                stores: stores,
                 monthlyBreakdown: nil,
                 topCategories: nil
             )
 
-            let breakdowns: [StoreBreakdown] = summary.stores.map { store in
+            let breakdowns: [StoreBreakdown] = aggregateStores.map { store in
                 StoreBreakdown(
                     storeName: store.storeName,
                     period: year,
-                    totalStoreSpend: store.amountSpent,
+                    totalStoreSpend: store.totalSpent,
                     categories: [],
-                    visitCount: store.storeVisits,
+                    visitCount: store.visitCount,
                     averageHealthScore: store.averageHealthScore
                 )
             }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
@@ -960,25 +1096,6 @@ struct OverviewView: View {
                 period: selectedPeriod,
                 totalItems: totalVisits
             ))
-        }
-    }
-
-    // MARK: - Overview Trends Fetching
-
-    /// Fetches trends data for the overview chart (lazy-loaded when user taps trendline)
-    private func fetchOverviewTrends() async {
-        guard !isLoadingTrends && !hasFetchedTrends else { return }
-        isLoadingTrends = true
-        defer { isLoadingTrends = false }
-
-        do {
-            let response = try await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 52)
-            await MainActor.run {
-                self.overviewTrends = response.periods
-                self.hasFetchedTrends = true
-            }
-        } catch {
-            print("Failed to fetch overview trends: \(error)")
         }
     }
 
@@ -1222,19 +1339,6 @@ struct OverviewView: View {
     private func mainContentView(bottomSafeArea: CGFloat) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
-                // Budget widget - show for all month periods
-                // Full widget for current month, compact indicator for past months
-                if !isAllPeriod(selectedPeriod) && !isYearPeriod(selectedPeriod) {
-                    if isCurrentPeriod {
-                        BudgetPulseView(viewModel: budgetViewModel)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    } else {
-                        // Show compact budget indicator for past months
-                        pastMonthBudgetIndicator
-                    }
-                }
-
                 overviewContentForPeriod(selectedPeriod)
                 receiptsSection
             }
@@ -1286,22 +1390,62 @@ struct OverviewView: View {
             }
 
             // Current period (center pill)
-            Text(selectedPeriod.uppercased())
-                .font(.system(size: 13, weight: .bold, design: .default))
-                .foregroundColor(.white)
-                .tracking(1.5)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color.white.opacity(0.12))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-                .contentTransition(.interpolate)
-                .animation(.easeInOut(duration: 0.25), value: selectedPeriod)
+            HStack(spacing: 6) {
+                // Show sparkle icon for fresh new month
+                if isNewMonthStart {
+                    Image(systemName: "sparkle")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.9), .purple.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                Text(selectedPeriod.uppercased())
+                    .font(.system(size: 13, weight: .bold, design: .default))
+                    .foregroundColor(.white)
+                    .tracking(1.5)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(isNewMonthStart
+                        ? LinearGradient(
+                            colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        : LinearGradient(
+                            colors: [Color.white.opacity(0.12), Color.white.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        isNewMonthStart
+                            ? LinearGradient(
+                                colors: [Color.blue.opacity(0.4), Color.purple.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [Color.white.opacity(0.2), Color.white.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                        lineWidth: 1
+                    )
+            )
+            .contentTransition(.interpolate)
+            .animation(.easeInOut(duration: 0.25), value: selectedPeriod)
+            .animation(.easeInOut(duration: 0.3), value: isNewMonthStart)
 
             // Next period (faded right)
             if canGoToNextPeriod {
@@ -1359,6 +1503,12 @@ struct OverviewView: View {
             // Swipeable area: spending card + pie chart
             // Both swipe (change period) and tap (toggle trendline) work simultaneously
             VStack(spacing: 16) {
+                // Budget widget - only show for month periods (not year or all-time)
+                if !isAllPeriod(period) && !isYearPeriod(period) {
+                    BudgetPulseView(viewModel: budgetViewModel)
+                        .padding(.horizontal, 16)
+                }
+
                 spendingAndHealthCardForPeriod(period)
 
                 if isWaitingForAllTimeData {
@@ -1389,67 +1539,308 @@ struct OverviewView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 8)
                 } else if !segments.isEmpty {
-                    // Pie chart showing store breakdown - use cached chart data
-                    // Use .id(period) to force chart recreation when period changes
-                    IconDonutChartView(
-                        data: chartDataForPeriod(period),
-                        totalAmount: Double(totalReceiptsForPeriod(period)),
-                        size: 200,
-                        currencySymbol: "",
-                        subtitle: "receipts",
-                        totalItems: totalItemsForPeriod(period)
+                    // Flippable pie chart - front shows stores, back shows categories
+                    // Tap to flip between the two views
+                    ZStack {
+                        // Back side - Category breakdown (shown when flipped)
+                        Group {
+                            if !categoryDataForPeriod(period).isEmpty {
+                                IconDonutChartView(
+                                    data: categoryChartData(for: period),
+                                    totalAmount: totalSpendForPeriod(period),
+                                    size: 200,
+                                    currencySymbol: "€",
+                                    subtitle: nil,
+                                    totalItems: nil,
+                                    averageItemPrice: nil,
+                                    centerIcon: "square.grid.2x2.fill",
+                                    centerLabel: "Categories",
+                                    showAllSegments: showAllRows
+                                )
+                            } else if isLoadingCategoryData {
+                                VStack(spacing: 12) {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
+                                        .scaleEffect(1.0)
+                                    Text("Loading categories...")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.5))
+                                }
+                                .frame(width: 200, height: 200)
+                            } else {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "square.grid.2x2")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.white.opacity(0.3))
+                                    Text("No category data")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.4))
+                                    Text("Tap to flip back")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.25))
+                                }
+                                .frame(width: 200, height: 200)
+                            }
+                        }
+                        .opacity(isPieChartFlipped ? 1 : 0)
+                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+
+                        // Front side - Store breakdown (shown by default)
+                        IconDonutChartView(
+                            data: chartDataForPeriod(period),
+                            totalAmount: Double(totalReceiptsForPeriod(period)),
+                            size: 200,
+                            currencySymbol: "",
+                            subtitle: "receipts",
+                            totalItems: nil,
+                            averageItemPrice: nil,
+                            centerIcon: "storefront.fill",
+                            centerLabel: "Stores",
+                            showAllSegments: showAllRows
+                        )
+                        .opacity(isPieChartFlipped ? 0 : 1)
+                    }
+                    .rotation3DEffect(
+                        .degrees(pieChartFlipDegrees),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.5
                     )
                     .id(period)
                     .padding(.top, 16)
                     .padding(.bottom, 8)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        // Only allow flip for month periods, not year or all-time
+                        if !isAllPeriod(period) && !isYearPeriod(period) {
+                            // Load category data if not already loaded
+                            if pieChartSummaryCache[period] == nil {
+                                Task {
+                                    await fetchCategoryData(for: period)
+                                }
+                            }
+                            // Flip the chart and reset row expansion
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                isPieChartFlipped.toggle()
+                                pieChartFlipDegrees += 180
+                                showAllRows = false // Reset to collapsed state when flipping
+                            }
+                        }
+                    }
+                    .onChange(of: period) { _, newPeriod in
+                        // Reset flip state and row expansion when period changes
+                        isPieChartFlipped = false
+                        pieChartFlipDegrees = 0
+                        showAllRows = false
+                    }
+                } else {
+                    // Empty pie chart state - flippable between stores and categories
+                    let isNewMonth = isNewMonthStart && isCurrentPeriod
+
+                    ZStack {
+                        // Back side - Empty Categories view
+                        EmptyPieChartView(
+                            isNewMonth: isNewMonth,
+                            icon: "square.grid.2x2.fill",
+                            label: "Categories"
+                        )
+                        .opacity(isPieChartFlipped ? 1 : 0)
+                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+
+                        // Front side - Empty Stores view
+                        EmptyPieChartView(
+                            isNewMonth: isNewMonth,
+                            icon: "storefront.fill",
+                            label: "Stores"
+                        )
+                        .opacity(isPieChartFlipped ? 0 : 1)
+                    }
+                    .rotation3DEffect(
+                        .degrees(pieChartFlipDegrees),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.5
+                    )
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        // Allow flip for empty month periods too
+                        if !isAllPeriod(period) && !isYearPeriod(period) {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                isPieChartFlipped.toggle()
+                                pieChartFlipDegrees += 180
+                                showAllRows = false
+                            }
+                        }
+                    }
+                    .onChange(of: period) { _, _ in
+                        // Reset flip state when period changes
+                        isPieChartFlipped = false
+                        pieChartFlipDegrees = 0
+                        showAllRows = false
+                    }
                 }
             }
             .contentShape(Rectangle())
             .simultaneousGesture(periodSwipeGesture)
 
-            // Store rows - NOT swipeable, only tappable
+            // Store/Category rows - NOT swipeable, only tappable
+            // These are the legend/details for the pie chart, so they appear directly below it
+            // Show store rows when not flipped, category rows when flipped
             // Also hide while loading all-time or year data to prevent showing fallback data
-            if !segments.isEmpty && !isWaitingForAllTimeData && !isWaitingForYearData {
-                // Stores section header
-                storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+            if !isWaitingForAllTimeData && !isWaitingForYearData {
+                let categories = categoryDataForPeriod(period)
 
-                // Store rows with staggered animation
-                // Use .id(period) to force SwiftUI to recreate views when period changes
-                // This prevents duplicate views during period transitions
-                VStack(spacing: 8) {
-                    ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
-                        StoreRowButton(
-                            segment: segment,
-                            breakdowns: breakdowns,
-                            onSelect: { breakdown, color in
-                                selectedStoreColor = color
-                                selectedBreakdown = breakdown
-                            }
-                        )
-                        .opacity(storeRowsAppeared ? 1 : 0)
-                        .offset(y: storeRowsAppeared ? 0 : 15)
-                        .animation(
-                            Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                .delay(Double(index) * 0.08),
-                            value: storeRowsAppeared
-                        )
-                    }
-                }
-                .id(period) // Force complete view recreation when period changes
-                .padding(.horizontal, 16)
-                .onAppear {
-                    // Trigger staggered animation immediately when view appears
-                    if !storeRowsAppeared {
-                        withAnimation {
-                            storeRowsAppeared = true
+                if isPieChartFlipped && !categories.isEmpty {
+                    // Determine which categories to display
+                    let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
+                    let hasMoreCategories = categories.count > maxVisibleRows
+
+                    // Categories section header
+                    categoriesSectionHeader(categoryCount: categories.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+
+                    // Category rows with staggered animation
+                    VStack(spacing: 8) {
+                        ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
+                            CategoryRowButton(category: category)
+                                .opacity(storeRowsAppeared ? 1 : 0)
+                                .offset(y: storeRowsAppeared ? 0 : 15)
+                                .animation(
+                                    Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                        .delay(Double(index) * 0.08),
+                                    value: storeRowsAppeared
+                                )
+                        }
+
+                        // Show All / Show Less button
+                        if hasMoreCategories {
+                            showAllRowsButton(
+                                isExpanded: showAllRows,
+                                totalCount: categories.count
+                            )
                         }
                     }
+                    .id("\(period)-categories-\(showAllRows)")
+                    .padding(.horizontal, 16)
+                    .onAppear {
+                        if !storeRowsAppeared {
+                            withAnimation {
+                                storeRowsAppeared = true
+                            }
+                        }
+                    }
+                } else if !isPieChartFlipped && !segments.isEmpty {
+                    // Determine which segments to display
+                    let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
+                    let hasMoreSegments = segments.count > maxVisibleRows
+
+                    // Stores section header
+                    storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+
+                    // Store rows with staggered animation
+                    // Use .id(period) to force SwiftUI to recreate views when period changes
+                    // This prevents duplicate views during period transitions
+                    VStack(spacing: 8) {
+                        ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
+                            StoreRowButton(
+                                segment: segment,
+                                breakdowns: breakdowns,
+                                onSelect: { breakdown, color in
+                                    selectedStoreColor = color
+                                    selectedBreakdown = breakdown
+                                }
+                            )
+                            .opacity(storeRowsAppeared ? 1 : 0)
+                            .offset(y: storeRowsAppeared ? 0 : 15)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.08),
+                                value: storeRowsAppeared
+                            )
+                        }
+
+                        // Show All / Show Less button
+                        if hasMoreSegments {
+                            showAllRowsButton(
+                                isExpanded: showAllRows,
+                                totalCount: segments.count
+                            )
+                        }
+                    }
+                    .id("\(period)-\(showAllRows)") // Force complete view recreation when period or expansion changes
+                    .padding(.horizontal, 16)
+                    .onAppear {
+                        // Trigger staggered animation immediately when view appears
+                        if !storeRowsAppeared {
+                            withAnimation {
+                                storeRowsAppeared = true
+                            }
+                        }
+                    }
+                } else if isPieChartFlipped && categories.isEmpty {
+                    // Empty categories state - shown when flipped but no category data
+                    emptyRowsSection(
+                        icon: "square.grid.2x2",
+                        title: "Categories",
+                        subtitle: "No category data yet",
+                        isNewMonth: isNewMonthStart && isCurrentPeriod
+                    )
+                } else if !isPieChartFlipped && segments.isEmpty {
+                    // Empty stores state - shown when no store data
+                    emptyRowsSection(
+                        icon: "storefront",
+                        title: "Stores",
+                        subtitle: "No stores visited yet",
+                        isNewMonth: isNewMonthStart && isCurrentPeriod
+                    )
                 }
             }
+
         }
         .id(period) // Ensure entire overview content is recreated for each period
+    }
+
+    /// Empty rows section for when there's no data
+    private func emptyRowsSection(icon: String, title: String, subtitle: String, isNewMonth: Bool) -> some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(isNewMonth
+                            ? LinearGradient(
+                                colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [Color.white.opacity(0.08), Color.white.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isNewMonth ? .blue.opacity(0.7) : .white.opacity(0.4))
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(isNewMonth ? .white.opacity(0.8) : .white.opacity(0.5))
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(isNewMonth ? .white.opacity(0.5) : .white.opacity(0.3))
+                }
+
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
     // MARK: - Store Segments for Period (Cached)
@@ -1558,6 +1949,77 @@ struct OverviewView: View {
         }
     }
 
+    // MARK: - Categories Section Header
+
+    private func categoriesSectionHeader(categoryCount: Int, isAllTime: Bool = false, isYear: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Categories")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                let subtitle: String = {
+                    if isAllTime {
+                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies") all time"
+                    } else if isYear {
+                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies") this year"
+                    } else {
+                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")"
+                    }
+                }()
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Show All Rows Button
+
+    private func showAllRowsButton(isExpanded: Bool, totalCount: Int) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                showAllRows.toggle()
+                // Reset animation state to trigger staggered animation for new rows
+                if showAllRows {
+                    storeRowsAppeared = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation {
+                            storeRowsAppeared = true
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+
+                Text(isExpanded ? "Show Less" : "Show All \(totalCount)")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(.white.opacity(0.6))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.white.opacity(0.06))
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+    }
+
     // MARK: - Receipts Section State
     private enum ReceiptsSectionState {
         case loading
@@ -1577,60 +2039,6 @@ struct OverviewView: View {
             return .empty
         } else {
             return .hasData
-        }
-    }
-
-    // MARK: - Past Month Budget Indicator
-    private var pastMonthBudgetIndicator: some View {
-        Group {
-            if let progress = budgetViewModel.state.progress {
-                HStack(spacing: 12) {
-                    // Mini budget ring
-                    MiniBudgetRing(
-                        spendRatio: progress.spendRatio,
-                        paceStatus: progress.paceStatus,
-                        size: 36
-                    )
-
-                    // Budget summary
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            Text(String(format: "€%.0f", progress.currentSpend))
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-
-                            Text("of")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
-
-                            Text(String(format: "€%.0f", progress.budget.monthlyAmount))
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-
-                        HStack(spacing: 4) {
-                            Image(systemName: progress.paceStatus.icon)
-                                .font(.system(size: 10, weight: .semibold))
-                            Text(progress.paceStatus.displayText)
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundColor(progress.paceStatus.color)
-                    }
-
-                    Spacer()
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.white.opacity(0.05))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-                .padding(.horizontal, 16)
-                .padding(.bottom, 4)
-            }
         }
     }
 
@@ -1751,14 +2159,46 @@ struct OverviewView: View {
                         .padding(.vertical, 30)
 
                     case .empty:
-                        // Empty state
-                        VStack(spacing: 8) {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 28))
-                                .foregroundColor(.white.opacity(0.2))
-                            Text(isAllPeriod(selectedPeriod) ? "No receipts yet" : "No receipts for this period")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
+                        // Empty state - different messaging based on context
+                        VStack(spacing: 12) {
+                            if isNewMonthStart {
+                                // Fresh new month - encouraging message
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.blue.opacity(0.8), .purple.opacity(0.6)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                Text("Fresh Start!")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.8))
+                                Text("New month, new opportunities.\nScan your first receipt to get started.")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                                    .multilineTextAlignment(.center)
+                            } else if isCurrentPeriod && currentPeriodHasNoData {
+                                // Current month but no data yet (after first few days)
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white.opacity(0.2))
+                                Text("No receipts this month")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                                Text("Scan a receipt to start tracking")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.3))
+                            } else {
+                                // Past period with no data
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white.opacity(0.2))
+                                Text(isAllPeriod(selectedPeriod) ? "No receipts yet" : "No receipts for this period")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 24)
@@ -2046,118 +2486,49 @@ struct OverviewView: View {
         let accentColor = healthScore?.healthScoreColor ?? Color.white.opacity(0.5)
 
         return VStack(spacing: 0) {
-            // Main content area
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showTrendlineInOverview.toggle()
-                }
-                if showTrendlineInOverview && !hasFetchedTrends {
-                    Task { await fetchOverviewTrends() }
-                }
-            } label: {
-                if showTrendlineInOverview {
-                    // Trendline view
-                    VStack(spacing: 8) {
-                        Text("Spending Trends")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .textCase(.uppercase)
-                            .tracking(1.2)
-
-                        if isLoadingTrends {
-                            VStack(spacing: 8) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
-                                Text("Loading trends...")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                            .frame(height: 160)
-                        } else if overviewTrends.isEmpty {
-                            VStack(spacing: 8) {
-                                Image(systemName: "chart.line.uptrend.xyaxis")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(.white.opacity(0.3))
-                                Text("No trend data")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                            .frame(height: 160)
-                        } else {
-                            StoreTrendLineChart(
-                                trends: overviewTrends,
-                                size: 140,
-                                totalAmount: spending,
-                                accentColor: accentColor,
-                                selectedPeriod: period,
-                                isVisible: true
-                            )
-                        }
-
-                        HStack(spacing: 4) {
-                            Image(systemName: "eurosign.circle.fill")
-                                .font(.system(size: 11))
-                            Text("Tap for Total")
-                                .font(.system(size: 12, weight: .medium))
-                        }
+            // Total spending view with health score
+            VStack(spacing: 16) {
+                // Spending section
+                VStack(spacing: 4) {
+                    Text(isAllPeriod(period) ? "TOTAL SPENT" : "SPENT THIS MONTH")
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
+                        .tracking(1.2)
+
+                    Text(String(format: "€%.0f", spending))
+                        .font(.system(size: 44, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
+                }
+
+                // Modern health score display
+                // Note: averageHealthScore is on 0-5 scale, ModernHealthScoreBadge expects 0-10
+                if let score = healthScore {
+                    ModernHealthScoreBadge(score: score * 2)
+                }
+
+                // Syncing indicator
+                if !isAllPeriod(period) && isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
+                    HStack(spacing: 4) {
+                        SyncingArrowsView()
+                            .font(.system(size: 11))
+                        Text("Syncing")
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
-                } else {
-                    // Total spending view with health score
-                    VStack(spacing: 16) {
-                        // Spending section
-                        VStack(spacing: 4) {
-                            Text(isAllPeriod(period) ? "TOTAL SPENT" : "SPENT THIS MONTH")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                                .tracking(1.2)
-
-                            Text(String(format: "€%.0f", spending))
-                                .font(.system(size: 44, weight: .heavy, design: .rounded))
-                                .foregroundColor(.white)
-                                .contentTransition(.numericText())
-                                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
-                        }
-
-                        // Modern health score display
-                        // Note: averageHealthScore is on 0-5 scale, ModernHealthScoreBadge expects 0-10
-                        if let score = healthScore {
-                            ModernHealthScoreBadge(score: score * 2)
-                        }
-
-                        // Syncing indicator or tap hint
-                        HStack(spacing: 4) {
-                            if !isAllPeriod(period) && isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
-                                SyncingArrowsView()
-                                    .font(.system(size: 11))
-                                Text("Syncing")
-                                    .font(.system(size: 12, weight: .medium))
-                            } else if !isAllPeriod(period) && showSyncedConfirmation {
-                                Image(systemName: "checkmark.icloud.fill")
-                                    .font(.system(size: 11))
-                                Text("Synced")
-                                    .font(.system(size: 12, weight: .medium))
-                            } else {
-                                Image(systemName: "chart.line.uptrend.xyaxis")
-                                    .font(.system(size: 11))
-                                Text("Tap for Trends")
-                                    .font(.system(size: 12, weight: .medium))
-                            }
-                        }
-                        .foregroundColor(
-                            !isAllPeriod(period) && isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) ? .blue :
-                            !isAllPeriod(period) && showSyncedConfirmation ? .green : .white.opacity(0.4)
-                        )
+                    .foregroundColor(.blue)
+                } else if !isAllPeriod(period) && showSyncedConfirmation {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.icloud.fill")
+                            .font(.system(size: 11))
+                        Text("Synced")
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .padding(.vertical, 24)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Rectangle())
+                    .foregroundColor(.green)
                 }
             }
-            .buttonStyle(TotalSpendingCardButtonStyle())
+            .padding(.vertical, 24)
+            .frame(maxWidth: .infinity)
         }
         .background(
             ZStack {
@@ -2221,6 +2592,101 @@ struct OverviewView: View {
         withAnimation {
             selectedPeriod = availablePeriods[currentPeriodIndex + 1]
         }
+    }
+}
+
+// MARK: - Empty Pie Chart View
+/// Shows an empty donut chart matching IconDonutChartView styling when there's no data for a period
+/// Supports customizable icon/label for both Stores and Categories views
+private struct EmptyPieChartView: View {
+    let isNewMonth: Bool
+    let icon: String
+    let label: String
+
+    // Match IconDonutChartView dimensions
+    private let size: CGFloat = 200
+    private let strokeWidthRatio: CGFloat = 0.08
+
+    private var strokeWidth: CGFloat {
+        size * strokeWidthRatio  // 16pt for 200 size
+    }
+
+    private var ringDiameter: CGFloat {
+        size - strokeWidth  // 184pt
+    }
+
+    var body: some View {
+        ZStack {
+            // Empty donut ring - matches IconDonutChartView stroke style
+            Circle()
+                .stroke(
+                    isNewMonth
+                        ? LinearGradient(
+                            colors: [Color.blue.opacity(0.25), Color.purple.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        : LinearGradient(
+                            colors: [Color.white.opacity(0.12), Color.white.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                    style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
+                )
+                .frame(width: ringDiameter, height: ringDiameter)
+
+            // Center content - matches IconDonutChartView center styling exactly
+            ZStack {
+                // Subtle gradient background circle (same as IconDonutChartView)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.white.opacity(0.08),
+                                Color.white.opacity(0.02)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: size * 0.32
+                        )
+                    )
+                    .frame(width: size * 0.58, height: size * 0.58)
+
+                // Center icon and label - clean and simple, matches IconDonutChartView
+                VStack(spacing: 8) {
+                    // Icon with gradient (same styling as IconDonutChartView)
+                    Image(systemName: icon)
+                        .font(.system(size: size * 0.18, weight: .semibold))
+                        .foregroundStyle(
+                            isNewMonth
+                                ? LinearGradient(
+                                    colors: [
+                                        Color.blue.opacity(0.9),
+                                        Color.purple.opacity(0.7)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                : LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.5),
+                                        Color.white.opacity(0.3)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                        )
+
+                    // Label (e.g., "Stores" or "Categories")
+                    Text(label)
+                        .font(.system(size: size * 0.08, weight: .semibold))
+                        .foregroundColor(isNewMonth ? .white.opacity(0.6) : .white.opacity(0.4))
+                        .tracking(0.5)
+                }
+            }
+            .frame(maxWidth: size * 0.55)
+        }
+        .frame(width: size, height: size)
     }
 }
 
@@ -2329,6 +2795,108 @@ private struct StoreRowButton: View {
             )
         }
         .buttonStyle(OverviewStoreRowButtonStyle())
+    }
+}
+
+// MARK: - Category Row Button
+private struct CategoryRowButton: View {
+    let category: CategorySpendItem
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Color accent bar on the left
+            RoundedRectangle(cornerRadius: 2)
+                .fill(category.color)
+                .frame(width: 4, height: 32)
+
+            // Category icon
+            ZStack {
+                Circle()
+                    .fill(category.color.opacity(0.15))
+                    .frame(width: 32, height: 32)
+                Image(systemName: category.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(category.color)
+            }
+
+            // Category name
+            Text(category.name)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Spacer()
+
+            // Percentage badge
+            Text("\(Int(category.percentage))%")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(category.color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(category.color.opacity(0.15))
+                )
+
+            // Amount
+            Text(String(format: "€%.0f", category.totalSpent))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .frame(width: 65, alignment: .trailing)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            ZStack {
+                // Base glass effect
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.04))
+
+                // Subtle gradient
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.06),
+                                Color.white.opacity(0.02)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Colored accent glow on the left
+                HStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    category.color.opacity(0.15),
+                                    Color.clear
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: 80)
+                    Spacer()
+                }
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.1),
+                            Color.white.opacity(0.03)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 }
 
