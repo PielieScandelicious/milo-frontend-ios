@@ -46,6 +46,11 @@ class BudgetViewModel: ObservableObject {
     @Published var selectedPeriod: String = ""  // "January 2026" format
     @Published var availablePeriods: [String] = []
 
+    // Past month report state (for viewing historical budget performance)
+    @Published var pastMonthReport: AIMonthlyReportResponse?
+    @Published var isLoadingPastMonth = false
+    @Published var pastMonthError: String?
+
     // Last month summary state
     @Published var lastMonthSummary: LastMonthSummary?
     @Published var isLoadingLastMonth = false
@@ -147,13 +152,26 @@ class BudgetViewModel: ObservableObject {
 
     /// Load budget for a specific period
     func loadBudgetForPeriod(_ period: String) async {
-        state = .loading
+        // Check if this is the current month or a past month
+        let currentMonthString = displayFormatter.string(from: Date())
 
-        // Convert display format to API format
-        let monthString = convertToAPIFormat(period)
+        if period == currentMonthString {
+            // Current month: Load real-time budget progress
+            await loadCurrentMonthProgress()
+        } else {
+            // Past month: Load AI monthly report
+            await loadPastMonthReport(period: period)
+        }
+    }
+
+    /// Load current month's budget progress (real-time tracking)
+    private func loadCurrentMonthProgress() async {
+        state = .loading
+        pastMonthReport = nil
+        pastMonthError = nil
 
         do {
-            let progressResponse = try await apiService.getBudgetProgress(month: monthString)
+            let progressResponse = try await apiService.getBudgetProgress()
             state = .active(progressResponse.toBudgetProgress())
         } catch let error as BudgetAPIError {
             switch error {
@@ -165,6 +183,62 @@ class BudgetViewModel: ObservableObject {
         } catch {
             state = .error(error.localizedDescription)
         }
+    }
+
+    /// Load past month's AI report (historical performance)
+    private func loadPastMonthReport(period: String) async {
+        isLoadingPastMonth = true
+        pastMonthError = nil
+        state = .loading
+
+        let monthString = convertToAPIFormat(period)
+
+        do {
+            let report = try await apiService.getAIMonthlyReport(month: monthString)
+            pastMonthReport = report
+
+            // Create a synthetic BudgetProgress for consistent UI handling
+            // This allows the UI to use the same state pattern
+            let syntheticBudget = UserBudget(
+                id: "historical",
+                userId: "",
+                monthlyAmount: report.budgetAmount,
+                categoryAllocations: nil,
+                notificationsEnabled: false,
+                alertThresholds: []
+            )
+
+            // Get days in that month
+            if let date = displayFormatter.date(from: period) {
+                let calendar = Calendar.current
+                let daysInMonth = calendar.range(of: .day, in: .month, for: date)?.count ?? 30
+
+                let syntheticProgress = BudgetProgress(
+                    budget: syntheticBudget,
+                    currentSpend: report.totalSpent,
+                    daysElapsed: daysInMonth,
+                    daysInMonth: daysInMonth,
+                    categoryProgress: report.categoryGrades.map { grade in
+                        CategoryBudgetProgress(
+                            category: grade.category,
+                            budgetAmount: grade.budget ?? 0,
+                            currentSpend: grade.spent,
+                            isLocked: false
+                        )
+                    }
+                )
+                state = .active(syntheticProgress)
+            } else {
+                state = .noBudget
+            }
+        } catch {
+            pastMonthError = error.localizedDescription
+            pastMonthReport = nil
+            state = .noBudget  // Show no budget state for past months without data
+            print("⚠️ Could not load past month report: \(error.localizedDescription)")
+        }
+
+        isLoadingPastMonth = false
     }
 
     /// Switch to a different period

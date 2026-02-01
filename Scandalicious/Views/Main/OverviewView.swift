@@ -1339,18 +1339,6 @@ struct OverviewView: View {
     private func mainContentView(bottomSafeArea: CGFloat) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
-                // Budget insight card - unified view for all month periods
-                // Shows current progress for current month, final results for past months
-                if !isAllPeriod(selectedPeriod) && !isYearPeriod(selectedPeriod) {
-                    BudgetInsightCard(
-                        viewModel: budgetViewModel,
-                        period: selectedPeriod,
-                        isCurrentPeriod: isCurrentPeriod
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                }
-
                 overviewContentForPeriod(selectedPeriod)
                 receiptsSection
             }
@@ -1515,6 +1503,12 @@ struct OverviewView: View {
             // Swipeable area: spending card + pie chart
             // Both swipe (change period) and tap (toggle trendline) work simultaneously
             VStack(spacing: 16) {
+                // Budget widget - only show for month periods (not year or all-time)
+                if !isAllPeriod(period) && !isYearPeriod(period) {
+                    BudgetPulseView(viewModel: budgetViewModel)
+                        .padding(.horizontal, 16)
+                }
+
                 spendingAndHealthCardForPeriod(period)
 
                 if isWaitingForAllTimeData {
