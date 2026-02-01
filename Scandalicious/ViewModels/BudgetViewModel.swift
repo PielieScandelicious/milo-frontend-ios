@@ -76,6 +76,12 @@ class BudgetViewModel: ObservableObject {
     @Published var showingAICheckIn = false
     @Published var showingAIMonthlyReport = false
 
+    // MARK: - Budget History State
+
+    @Published var budgetHistory: [BudgetHistory] = []
+    @Published var isLoadingHistory = false
+    @Published var historyError: String?
+
     // MARK: - Private Properties
 
     private let apiService = BudgetAPIService.shared
@@ -142,11 +148,17 @@ class BudgetViewModel: ObservableObject {
             initializePeriodsSync()
         }
 
+        // Check for smart budget auto-rollover first (only for current month)
+        if isCurrentMonth {
+            await checkAndPerformAutoRollover()
+        }
+
         await loadBudgetForPeriod(selectedPeriod)
 
-        // Load last month summary in background
+        // Load last month summary and budget history in background
         Task {
             await loadLastMonthSummary()
+            await loadBudgetHistory()
         }
     }
 
@@ -342,8 +354,45 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Smart Budget Auto-Rollover
+
+    /// Check if a smart budget should be auto-created for the current month
+    /// This is called when loading the budget to ensure smart budgets carry over
+    private func checkAndPerformAutoRollover() async {
+        do {
+            // Call the backend to check and perform auto-rollover
+            // The backend will handle the logic of checking if:
+            // 1. There's no budget for current month
+            // 2. Previous month had a smart budget (isSmartBudget = true)
+            // 3. Previous month's budget wasn't deleted
+            try await apiService.performAutoRollover()
+            print("🔄 [Budget] Auto-rollover check completed successfully")
+        } catch {
+            // Silently fail - auto-rollover is optional
+            print("⚠️ [Budget] Auto-rollover check failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Load budget history for all past months
+    func loadBudgetHistory() async {
+        isLoadingHistory = true
+        historyError = nil
+
+        do {
+            let response = try await apiService.getBudgetHistory()
+            budgetHistory = response.budgetHistory
+            print("📚 [Budget] Loaded \(budgetHistory.count) historical budget entries")
+        } catch {
+            historyError = error.localizedDescription
+            print("⚠️ [Budget] Failed to load budget history: \(error.localizedDescription)")
+        }
+
+        isLoadingHistory = false
+    }
+
     /// Create a new budget (always uses AI-calculated allocations)
-    func createBudget(amount: Double, categoryAllocations: [CategoryAllocation]? = nil) async -> Bool {
+    /// Smart budget is enabled by default, which means it will automatically roll over to next month
+    func createBudget(amount: Double, categoryAllocations: [CategoryAllocation]? = nil, isSmartBudget: Bool = true) async -> Bool {
         isSaving = true
         saveError = nil
 
@@ -351,7 +400,8 @@ class BudgetViewModel: ObservableObject {
             monthlyAmount: amount,
             categoryAllocations: categoryAllocations,
             notificationsEnabled: true,
-            alertThresholds: [0.5, 0.75, 0.9]
+            alertThresholds: [0.5, 0.75, 0.9],
+            isSmartBudget: isSmartBudget
         )
 
         do {
@@ -377,7 +427,8 @@ class BudgetViewModel: ObservableObject {
             monthlyAmount: amount,
             categoryAllocations: nil,
             notificationsEnabled: nil,
-            alertThresholds: nil
+            alertThresholds: nil,
+            isSmartBudget: nil
         )
 
         do {
@@ -402,7 +453,36 @@ class BudgetViewModel: ObservableObject {
             monthlyAmount: nil,
             categoryAllocations: allocations,
             notificationsEnabled: nil,
-            alertThresholds: nil
+            alertThresholds: nil,
+            isSmartBudget: nil
+        )
+
+        do {
+            let _ = try await apiService.modifyBudget(request: request)
+            await loadBudget()
+            NotificationCenter.default.post(name: .budgetUpdated, object: nil)
+            isSaving = false
+            return true
+        } catch {
+            saveError = error.localizedDescription
+            isSaving = false
+            return false
+        }
+    }
+
+    /// Toggle smart budget on/off
+    /// When enabled, budget automatically rolls over to next month
+    /// When disabled, budget will not be created for next month unless manually set
+    func toggleSmartBudget(enabled: Bool) async -> Bool {
+        isSaving = true
+        saveError = nil
+
+        let request = UpdateBudgetRequest(
+            monthlyAmount: nil,
+            categoryAllocations: nil,
+            notificationsEnabled: nil,
+            alertThresholds: nil,
+            isSmartBudget: enabled
         )
 
         do {

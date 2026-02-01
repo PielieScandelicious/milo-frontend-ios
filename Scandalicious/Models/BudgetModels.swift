@@ -17,6 +17,7 @@ struct UserBudget: Codable, Identifiable {
     let categoryAllocations: [CategoryAllocation]?
     let notificationsEnabled: Bool
     let alertThresholds: [Double]  // e.g., [0.5, 0.75, 0.9]
+    let isSmartBudget: Bool  // If true, automatically rolls over to next month
     let createdAt: String
     let updatedAt: String
 
@@ -27,17 +28,19 @@ struct UserBudget: Codable, Identifiable {
         case categoryAllocations = "category_allocations"
         case notificationsEnabled = "notifications_enabled"
         case alertThresholds = "alert_thresholds"
+        case isSmartBudget = "is_smart_budget"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
 
-    init(id: String, userId: String, monthlyAmount: Double, categoryAllocations: [CategoryAllocation]? = nil, notificationsEnabled: Bool = true, alertThresholds: [Double] = [0.5, 0.75, 0.9], createdAt: String = "", updatedAt: String = "") {
+    init(id: String, userId: String, monthlyAmount: Double, categoryAllocations: [CategoryAllocation]? = nil, notificationsEnabled: Bool = true, alertThresholds: [Double] = [0.5, 0.75, 0.9], isSmartBudget: Bool = true, createdAt: String = "", updatedAt: String = "") {
         self.id = id
         self.userId = userId
         self.monthlyAmount = monthlyAmount
         self.categoryAllocations = categoryAllocations
         self.notificationsEnabled = notificationsEnabled
         self.alertThresholds = alertThresholds
+        self.isSmartBudget = isSmartBudget
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -404,12 +407,14 @@ struct CreateBudgetRequest: Encodable {
     let categoryAllocations: [CategoryAllocation]?
     let notificationsEnabled: Bool
     let alertThresholds: [Double]
+    let isSmartBudget: Bool
 
     enum CodingKeys: String, CodingKey {
         case monthlyAmount = "monthly_amount"
         case categoryAllocations = "category_allocations"
         case notificationsEnabled = "notifications_enabled"
         case alertThresholds = "alert_thresholds"
+        case isSmartBudget = "is_smart_budget"
     }
 }
 
@@ -418,12 +423,14 @@ struct UpdateBudgetRequest: Encodable {
     let categoryAllocations: [CategoryAllocation]?
     let notificationsEnabled: Bool?
     let alertThresholds: [Double]?
+    let isSmartBudget: Bool?
 
     enum CodingKeys: String, CodingKey {
         case monthlyAmount = "monthly_amount"
         case categoryAllocations = "category_allocations"
         case notificationsEnabled = "notifications_enabled"
         case alertThresholds = "alert_thresholds"
+        case isSmartBudget = "is_smart_budget"
     }
 }
 
@@ -570,6 +577,55 @@ struct LastMonthSummary {
         } else {
             return String(format: "€%.0f over budget", difference)
         }
+    }
+}
+
+// MARK: - Budget History
+
+struct BudgetHistory: Codable, Identifiable {
+    let id: String
+    let userId: String
+    let monthlyAmount: Double
+    let categoryAllocations: [CategoryAllocation]?
+    let month: String  // "2026-01" format
+    let wasSmartBudget: Bool
+    let wasDeleted: Bool
+    let createdAt: String
+
+    var id_computed: String { id }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case monthlyAmount = "monthly_amount"
+        case categoryAllocations = "category_allocations"
+        case month
+        case wasSmartBudget = "was_smart_budget"
+        case wasDeleted = "was_deleted"
+        case createdAt = "created_at"
+    }
+
+    /// Display format for month (e.g., "January 2026")
+    var displayMonth: String {
+        let components = month.split(separator: "-")
+        guard components.count == 2,
+              let year = components.last,
+              let monthNum = Int(components.first ?? "0"),
+              monthNum >= 1 && monthNum <= 12 else {
+            return month
+        }
+
+        let monthNames = ["January", "February", "March", "April", "May", "June",
+                         "July", "August", "September", "October", "November", "December"]
+        return "\(monthNames[monthNum - 1]) \(year)"
+    }
+}
+
+struct BudgetHistoryResponse: Codable {
+    let budgetHistory: [BudgetHistory]
+
+    enum CodingKeys: String, CodingKey {
+        case budgetHistory = "budget_history"
     }
 }
 

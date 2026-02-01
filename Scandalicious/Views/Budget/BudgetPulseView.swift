@@ -122,10 +122,141 @@ struct BudgetPulseView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             } else {
-                // Past month without budget: Show nothing
-                EmptyView()
+                // Past month: Show budget history if available
+                pastMonthBudgetHistoryView
             }
         }
+    }
+
+    // MARK: - Past Month Budget History View
+
+    private var pastMonthBudgetHistoryView: some View {
+        Group {
+            if let history = pastMonthHistoryForSelectedPeriod {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Header with month
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(history.displayMonth)
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+
+                            if history.wasSmartBudget {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text("Smart Budget")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                            }
+                        }
+
+                        Spacer()
+
+                        if history.wasDeleted {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash.fill")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text("Deleted")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.3))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(red: 1.0, green: 0.55, blue: 0.3).opacity(0.15))
+                            .cornerRadius(6)
+                        }
+                    }
+
+                    Divider()
+                        .background(.white.opacity(0.1))
+
+                    // Budget amount
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Monthly Budget")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+
+                        Text(String(format: "€%.0f", history.monthlyAmount))
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+
+                    // Category allocations (if available)
+                    if let allocations = history.categoryAllocations, !allocations.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Category Allocations")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.5))
+
+                            VStack(spacing: 4) {
+                                ForEach(allocations.prefix(4)) { allocation in
+                                    HStack {
+                                        Circle()
+                                            .fill(allocation.category.categoryColor)
+                                            .frame(width: 6, height: 6)
+
+                                        Text(allocation.category)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.8))
+
+                                        Spacer()
+
+                                        Text(String(format: "€%.0f", allocation.amount))
+                                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                            .foregroundColor(.white)
+
+                                        if allocation.isLocked {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: 9, weight: .semibold))
+                                                .foregroundColor(.white.opacity(0.4))
+                                        }
+                                    }
+                                }
+
+                                if allocations.count > 4 {
+                                    Text("+ \(allocations.count - 4) more")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            } else {
+                // No budget history for this month
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.exclamationmark")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white.opacity(0.3))
+
+                    Text("No budget was set for this month")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+
+                    Spacer()
+                }
+                .padding(16)
+            }
+        }
+    }
+
+    // Helper to get budget history for selected period
+    private var pastMonthHistoryForSelectedPeriod: BudgetHistory? {
+        // Convert selected period to "yyyy-MM" format
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        guard let date = dateFormatter.date(from: viewModel.selectedPeriod) else {
+            return nil
+        }
+
+        let monthFormatter = DateFormatter()
+        monthFormatter.dateFormat = "yyyy-MM"
+        let monthString = monthFormatter.string(from: date)
+
+        return viewModel.budgetHistory.first { $0.month == monthString }
     }
 
     // MARK: - Active Budget View

@@ -204,6 +204,33 @@ actor BudgetAPIService {
         return response
     }
 
+    // MARK: - Budget History Endpoints
+
+    /// Get budget history for all past months
+    func fetchBudgetHistory() async throws -> BudgetHistoryResponse {
+        print("📚 [Budget] Fetching budget history...")
+
+        let response: BudgetHistoryResponse = try await performRequest(
+            endpoint: "/budgets/history",
+            method: "GET"
+        )
+
+        print("📚 [Budget] ✅ Budget history received: \(response.budgetHistory.count) entries")
+        return response
+    }
+
+    /// Check if a budget should be auto-created for the current month based on smart budget settings
+    func checkAutoRollover() async throws {
+        print("🔄 [Budget] Checking for smart budget auto-rollover...")
+
+        let _: EmptyResponse = try await performRequest(
+            endpoint: "/budgets/auto-rollover",
+            method: "POST"
+        )
+
+        print("🔄 [Budget] ✅ Auto-rollover check completed")
+    }
+
     // MARK: - Helper Methods
 
     private func performRequest<T: Decodable>(
@@ -440,6 +467,16 @@ extension BudgetAPIService {
 
     nonisolated func getAIMonthlyReport(month: String) async throws -> AIMonthlyReportResponse {
         return try await fetchAIMonthlyReport(month: month)
+    }
+
+    // MARK: - Budget History Nonisolated Methods
+
+    nonisolated func getBudgetHistory() async throws -> BudgetHistoryResponse {
+        return try await fetchBudgetHistory()
+    }
+
+    nonisolated func performAutoRollover() async throws {
+        return try await checkAutoRollover()
     }
 }
 
