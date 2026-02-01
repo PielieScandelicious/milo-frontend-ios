@@ -87,37 +87,45 @@ struct BudgetPulseView: View {
     // MARK: - No Budget View
 
     private var noBudgetView: some View {
-        Button(action: { viewModel.startSetup() }) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 44, height: 44)
+        Group {
+            if viewModel.isCurrentMonth {
+                // Current month: Show setup button
+                Button(action: { viewModel.startSetup() }) {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.1))
+                                .frame(width: 44, height: 44)
 
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Set Smart Budget")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            Text("Track your spending and stay on track")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .padding(16)
                 }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Set Smart Budget")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    Text("Track your spending and stay on track")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.4))
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                // Past month without budget: Show nothing
+                EmptyView()
             }
-            .padding(16)
         }
-        .buttonStyle(PlainButtonStyle())
     }
 
     // MARK: - Active Budget View

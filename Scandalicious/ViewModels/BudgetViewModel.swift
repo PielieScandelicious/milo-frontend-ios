@@ -197,6 +197,14 @@ class BudgetViewModel: ObservableObject {
             let report = try await apiService.getAIMonthlyReport(month: monthString)
             pastMonthReport = report
 
+            // Check if budget was actually set (budget amount > 0)
+            // A budget of 0 means no budget was set for that month
+            guard report.budgetAmount > 0 else {
+                state = .noBudget
+                isLoadingPastMonth = false
+                return
+            }
+
             // Create a synthetic BudgetProgress for consistent UI handling
             // This allows the UI to use the same state pattern
             let syntheticBudget = UserBudget(
