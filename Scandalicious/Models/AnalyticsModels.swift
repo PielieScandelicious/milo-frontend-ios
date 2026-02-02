@@ -636,6 +636,13 @@ struct ReceiptsListResponse: Codable {
     }
 }
 
+// MARK: - Receipt Source (matches backend ReceiptSource enum)
+
+enum APIReceiptSource: String, Codable {
+    case receiptUpload = "receipt_upload"
+    case bankImport = "bank_import"
+}
+
 struct APIReceipt: Codable, Identifiable {
     let receiptId: String
     let storeName: String?
@@ -643,6 +650,7 @@ struct APIReceipt: Codable, Identifiable {
     let totalAmount: Double?
     let itemsCount: Int
     let averageHealthScore: Double?
+    let source: APIReceiptSource  // receipt_upload or bank_import
     let transactions: [APIReceiptItem]
 
     var id: String { receiptId }
@@ -654,18 +662,39 @@ struct APIReceipt: Codable, Identifiable {
         case totalAmount = "total_amount"
         case itemsCount = "items_count"
         case averageHealthScore = "average_health_score"
+        case source
         case transactions
     }
 
     /// Manual initializer for creating updated copies
-    init(receiptId: String, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, averageHealthScore: Double?, transactions: [APIReceiptItem]) {
+    init(receiptId: String, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, averageHealthScore: Double?, source: APIReceiptSource = .receiptUpload, transactions: [APIReceiptItem]) {
         self.receiptId = receiptId
         self.storeName = storeName
         self.receiptDate = receiptDate
         self.totalAmount = totalAmount
         self.itemsCount = itemsCount
         self.averageHealthScore = averageHealthScore
+        self.source = source
         self.transactions = transactions
+    }
+
+    /// Custom decoder for backwards compatibility (handles missing source field)
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        receiptId = try container.decode(String.self, forKey: .receiptId)
+        storeName = try container.decodeIfPresent(String.self, forKey: .storeName)
+        receiptDate = try container.decodeIfPresent(String.self, forKey: .receiptDate)
+        totalAmount = try container.decodeIfPresent(Double.self, forKey: .totalAmount)
+        itemsCount = try container.decode(Int.self, forKey: .itemsCount)
+        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
+        // Default to receiptUpload for backwards compatibility
+        source = try container.decodeIfPresent(APIReceiptSource.self, forKey: .source) ?? .receiptUpload
+        transactions = try container.decode([APIReceiptItem].self, forKey: .transactions)
+    }
+
+    /// Whether this is a bank-imported transaction (vs scanned receipt)
+    var isBankImport: Bool {
+        source == .bankImport
     }
 
     var dateParsed: Date? {

@@ -77,6 +77,7 @@ struct OverviewView: View {
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
     @State private var storeRowsAppeared = false // Track staggered animation state
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
+    @State private var isTransactionsSectionExpanded = false // Track bank transactions section expansion
     @State private var allTimeTotalSpend: Double = 0 // Cached all-time total spend from backend
     @State private var allTimeTotalReceipts: Int = 0 // Cached all-time receipt count from backend
     @State private var allTimeHealthScore: Double? = nil // Cached all-time health score from backend
@@ -1345,6 +1346,7 @@ struct OverviewView: View {
             VStack(spacing: 12) {
                 overviewContentForPeriod(selectedPeriod)
                 receiptsSection
+                transactionsSection
             }
             .padding(.top, 16)
             .padding(.bottom, bottomSafeArea + 90)
@@ -2024,22 +2026,39 @@ struct OverviewView: View {
         .padding(.top, 4)
     }
 
-    // MARK: - Receipts Section State
-    private enum ReceiptsSectionState {
+    // MARK: - Section State Enum (used for both Receipts and Transactions)
+    private enum SectionState {
         case loading
         case empty
         case hasData
     }
 
-    private var receiptsSectionState: ReceiptsSectionState {
+    // MARK: - Receipts Section State (scanned receipts only)
+    private var receiptsSectionState: SectionState {
         let isLoading = receiptsViewModel.state.isLoading
         let hasLoadedSuccessfully = receiptsViewModel.state.value != nil
         let hasError = receiptsViewModel.state.error != nil
         let hasFinishedLoading = hasLoadedSuccessfully || hasError
 
-        if (isLoading || !hasFinishedLoading) && receiptsViewModel.receipts.isEmpty {
+        if (isLoading || !hasFinishedLoading) && scannedReceipts.isEmpty {
             return .loading
-        } else if hasFinishedLoading && receiptsViewModel.receipts.isEmpty {
+        } else if hasFinishedLoading && scannedReceipts.isEmpty {
+            return .empty
+        } else {
+            return .hasData
+        }
+    }
+
+    // MARK: - Transactions Section State (bank imports only)
+    private var transactionsSectionState: SectionState {
+        let isLoading = receiptsViewModel.state.isLoading
+        let hasLoadedSuccessfully = receiptsViewModel.state.value != nil
+        let hasError = receiptsViewModel.state.error != nil
+        let hasFinishedLoading = hasLoadedSuccessfully || hasError
+
+        if (isLoading || !hasFinishedLoading) && bankTransactions.isEmpty {
+            return .loading
+        } else if hasFinishedLoading && bankTransactions.isEmpty {
             return .empty
         } else {
             return .hasData
@@ -2078,7 +2097,7 @@ struct OverviewView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         } else {
-                            Text("\(receiptsViewModel.receipts.count) \(isAllPeriod(selectedPeriod) ? "total" : "this period")")
+                            Text("\(scannedReceipts.count) \(isAllPeriod(selectedPeriod) ? "total" : "this period")")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         }
@@ -2087,8 +2106,8 @@ struct OverviewView: View {
                     Spacer()
 
                     // Count badge
-                    if !receiptsViewModel.receipts.isEmpty {
-                        Text("\(receiptsViewModel.receipts.count)")
+                    if !scannedReceipts.isEmpty {
+                        Text("\(scannedReceipts.count)")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .frame(width: 32, height: 32)
@@ -2208,9 +2227,9 @@ struct OverviewView: View {
                         .padding(.vertical, 24)
 
                     case .hasData:
-                        // Expandable receipt cards (unified component)
+                        // Expandable receipt cards (scanned receipts only)
                         LazyVStack(spacing: 8) {
-                            ForEach(sortedReceipts) { receipt in
+                            ForEach(scannedReceipts) { receipt in
                                 ExpandableReceiptCard(
                                     receipt: receipt,
                                     isExpanded: expandedReceiptId == receipt.id,
@@ -2294,6 +2313,165 @@ struct OverviewView: View {
         }
     }
 
+    // MARK: - Transactions Section (Collapsible with glass design - Bank Imports)
+    private var transactionsSection: some View {
+        VStack(spacing: 0) {
+            // Collapsible header button
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    isTransactionsSectionExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 14) {
+                    // Bank icon
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue.opacity(0.15))
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: "building.columns.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.blue.opacity(0.8))
+                    }
+
+                    // Title and count
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Transactions")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        if transactionsSectionState == .loading {
+                            Text("Loading...")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                        } else {
+                            Text("\(bankTransactions.count) \(isAllPeriod(selectedPeriod) ? "total" : "this period")")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                    }
+
+                    Spacer()
+
+                    // Count badge
+                    if !bankTransactions.isEmpty {
+                        Text("\(bankTransactions.count)")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(Color.blue.opacity(0.2))
+                            )
+                    }
+
+                    // Chevron
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                        .rotationEffect(.degrees(isTransactionsSectionExpanded ? 180 : 0))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    ZStack {
+                        // Glass base
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.white.opacity(0.04))
+
+                        // Gradient overlay with subtle blue tint
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.blue.opacity(0.08),
+                                        Color.white.opacity(0.02)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.blue.opacity(0.2),
+                                    Color.white.opacity(0.04)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+            }
+            .buttonStyle(ReceiptsHeaderButtonStyle())
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+
+            // Expandable content
+            if isTransactionsSectionExpanded {
+                VStack(spacing: 12) {
+                    switch transactionsSectionState {
+                    case .loading:
+                        // Loading state
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                                .scaleEffect(0.8)
+                            Text("Loading transactions...")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 30)
+
+                    case .empty:
+                        // Empty state
+                        VStack(spacing: 12) {
+                            Image(systemName: "building.columns")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white.opacity(0.2))
+                            Text(isAllPeriod(selectedPeriod) ? "No bank transactions yet" : "No transactions for this period")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+                            Text("Import transactions from your bank")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.3))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+
+                    case .hasData:
+                        // Bank transaction cards (non-expandable)
+                        LazyVStack(spacing: 8) {
+                            ForEach(bankTransactions) { transaction in
+                                BankTransactionCard(
+                                    receipt: transaction,
+                                    onDelete: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            deleteReceiptFromOverview(transaction)
+                                        }
+                                    }
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .opacity,
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .transition(.opacity)
+            }
+        }
+    }
+
     /// Receipts sorted from newest to oldest
     private var sortedReceipts: [APIReceipt] {
         receiptsViewModel.receipts.sorted { receipt1, receipt2 in
@@ -2302,6 +2480,16 @@ struct OverviewView: View {
             let date2 = receipt2.dateParsed ?? Date.distantPast
             return date1 > date2
         }
+    }
+
+    /// Scanned receipts only (excludes bank imports)
+    private var scannedReceipts: [APIReceipt] {
+        sortedReceipts.filter { $0.source == .receiptUpload }
+    }
+
+    /// Bank-imported transactions only
+    private var bankTransactions: [APIReceipt] {
+        sortedReceipts.filter { $0.source == .bankImport }
     }
 
     /// Delete a receipt from the overview
