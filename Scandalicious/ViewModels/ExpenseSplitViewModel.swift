@@ -38,10 +38,40 @@ class ExpenseSplitViewModel: ObservableObject {
 
     private let receipt: ReceiptUploadResponse
 
+    /// Stable transaction ID mapping - maps transaction to a stable identifier
+    /// This is needed because transaction.id is regenerated on each decode
+    private var stableTransactionIds: [Int: String] = [:]
+
     // MARK: - Initialization
 
     init(receipt: ReceiptUploadResponse) {
         self.receipt = receipt
+        buildStableTransactionIds()
+    }
+
+    /// Build stable transaction IDs that persist across receipt re-decodes
+    /// Uses itemId when available, otherwise creates a deterministic ID based on position
+    private func buildStableTransactionIds() {
+        for (index, transaction) in receipt.transactions.enumerated() {
+            // Use itemId if available (backend's stable ID), otherwise use index-based ID
+            let stableId = transaction.itemId ?? "local-item-\(index)"
+            stableTransactionIds[index] = stableId
+        }
+    }
+
+    /// Get stable transaction ID for a transaction at given index
+    func getStableTransactionId(at index: Int) -> String? {
+        return stableTransactionIds[index]
+    }
+
+    /// Get stable transaction ID for a transaction
+    func getStableTransactionId(for transaction: ReceiptTransaction) -> String {
+        // Find the transaction in the array and get its stable ID
+        if let index = receipt.transactions.firstIndex(where: { $0.id == transaction.id }) {
+            return stableTransactionIds[index] ?? transaction.itemId ?? transaction.id.uuidString
+        }
+        // Fallback to itemId or UUID (should rarely happen)
+        return transaction.itemId ?? transaction.id.uuidString
     }
 
     // MARK: - Computed Properties
@@ -59,7 +89,7 @@ class ExpenseSplitViewModel: ObservableObject {
             let participantIdLower = participant.id.uuidString.lowercased()
 
             for transaction in receipt.transactions {
-                guard let transactionId = transaction.itemId ?? transaction.id.uuidString as String? else { continue }
+                let transactionId = getStableTransactionId(for: transaction)
 
                 let assignedParticipants = assignments[transactionId] ?? Set()
                 // Compare with lowercase normalization
@@ -96,7 +126,7 @@ class ExpenseSplitViewModel: ObservableObject {
     /// Check if all items are assigned to at least one person
     var allItemsAssigned: Bool {
         for transaction in receipt.transactions {
-            let transactionId = transaction.itemId ?? transaction.id.uuidString
+            let transactionId = getStableTransactionId(for: transaction)
             let assignedParticipants = assignments[transactionId] ?? Set()
             if assignedParticipants.isEmpty {
                 return false
@@ -124,7 +154,7 @@ class ExpenseSplitViewModel: ObservableObject {
             // Add to all existing assignments (use lowercase for consistency)
             let participantIdLower = participant.id.uuidString.lowercased()
             for transaction in receipt.transactions {
-                let transactionId = transaction.itemId ?? transaction.id.uuidString
+                let transactionId = getStableTransactionId(for: transaction)
                 if assignments[transactionId] == nil {
                     assignments[transactionId] = Set()
                 }
@@ -144,7 +174,7 @@ class ExpenseSplitViewModel: ObservableObject {
         // Auto-assign new participant to all items (use lowercase for consistency)
         let participantIdLower = participant.id.uuidString.lowercased()
         for transaction in receipt.transactions {
-            let transactionId = transaction.itemId ?? transaction.id.uuidString
+            let transactionId = getStableTransactionId(for: transaction)
             if assignments[transactionId] == nil {
                 assignments[transactionId] = Set()
             }
@@ -192,7 +222,7 @@ class ExpenseSplitViewModel: ObservableObject {
         let allParticipantIds = Set(participants.map { $0.id.uuidString.lowercased() })
 
         for transaction in receipt.transactions {
-            let transactionId = transaction.itemId ?? transaction.id.uuidString
+            let transactionId = getStableTransactionId(for: transaction)
             assignments[transactionId] = allParticipantIds
         }
     }

@@ -203,15 +203,16 @@ struct SplitExpenseView: View {
         ScrollView {
             LazyVStack(spacing: 8) {
                 ForEach(receipt.transactions) { transaction in
+                    let stableTransactionId = viewModel.getStableTransactionId(for: transaction)
                     SplitItemRow(
                         transaction: transaction,
                         participants: viewModel.participants,
                         selectedParticipantIds: viewModel.getAssignedParticipantIds(
-                            for: transaction.itemId ?? transaction.id.uuidString
+                            for: stableTransactionId
                         ),
                         onToggle: { participant in
                             viewModel.toggleAssignment(
-                                transactionId: transaction.itemId ?? transaction.id.uuidString,
+                                transactionId: stableTransactionId,
                                 participantId: participant.id.uuidString
                             )
                         }
