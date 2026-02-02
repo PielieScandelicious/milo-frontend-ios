@@ -130,10 +130,11 @@ class BankingViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
-        setupDeepLinkObserver()
+        setupNotificationObservers()
     }
 
-    private func setupDeepLinkObserver() {
+    private func setupNotificationObservers() {
+        // Deep link callbacks
         NotificationCenter.default.publisher(for: .bankConnectionCompleted)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] notification in
@@ -151,6 +152,44 @@ class BankingViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        // Auto-sync notification - new transactions found
+        NotificationCenter.default.publisher(for: .bankTransactionsPendingReview)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                self?.handleAutoSyncNotification(notification)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Handle notification when auto-sync finds new transactions
+    private func handleAutoSyncNotification(_ notification: Notification) {
+        let newCount = notification.userInfo?["newTransactions"] as? Int ?? 0
+        let totalPending = notification.userInfo?["totalPending"] as? Int ?? 0
+        let shouldNavigate = notification.userInfo?["shouldNavigate"] as? Bool ?? false
+
+        print("🔄 [Banking] Auto-sync notification received: \(newCount) new, \(totalPending) pending")
+        print("🔄 [Banking]   - hasShownNotificationForCurrentBatch: \(hasShownNotificationForCurrentBatch)")
+        print("🔄 [Banking]   - showPendingTransactionsNotification: \(showPendingTransactionsNotification)")
+
+        // Update pending count
+        pendingTransactionsTotal = totalPending
+
+        // Show notification banner if there are pending transactions and we have new ones
+        // Always show when auto-sync finds new transactions (newCount > 0)
+        if totalPending > 0 && (newCount > 0 || !hasShownNotificationForCurrentBatch) {
+            print("🔄 [Banking] ✅ Showing notification banner for \(totalPending) pending transactions")
+            showPendingTransactionsNotification = true
+            hasShownNotificationForCurrentBatch = true
+        }
+
+        // If tapped from push notification with review action, navigate directly
+        if shouldNavigate && totalPending > 0 {
+            showingTransactionReview = true
+            Task {
+                await loadPendingTransactions()
+            }
+        }
     }
 
     // MARK: - Bank List Methods
@@ -326,16 +365,18 @@ class BankingViewModel: ObservableObject {
             // Reload accounts to get updated balance
             await loadAccounts()
 
-            // Reset notification state so pending transactions notification shows after manual sync
-            print("🏦 [Sync] Resetting hasShownNotificationForCurrentBatch from \(hasShownNotificationForCurrentBatch) to false")
-            hasShownNotificationForCurrentBatch = false
-
-            // Reload pending transactions (notification will show if any pending)
+            // Reload pending transactions
             print("🏦 [Sync] About to load pending transactions...")
             await loadPendingTransactions()
-            print("🏦 [Sync] After loadPendingTransactions: showNotification=\(showPendingTransactionsNotification), total=\(pendingTransactionsTotal)")
+            print("🏦 [Sync] After loadPendingTransactions: total=\(pendingTransactionsTotal)")
 
+            // Show notification banner if there are new transactions
             if result.newTransactions > 0 {
+                print("🏦 [Sync] ✅ Showing notification for \(result.newTransactions) new transactions")
+                hasShownNotificationForCurrentBatch = false  // Reset so notification shows
+                showPendingTransactionsNotification = true
+                hasShownNotificationForCurrentBatch = true
+
                 // Haptic feedback for new transactions
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.success)
@@ -389,30 +430,15 @@ class BankingViewModel: ObservableObject {
         do {
             let response = try await apiService.getPendingTransactions()
             pendingTransactionsState = .success(response.transactions)
-            let previousTotal = pendingTransactionsTotal
             pendingTransactionsTotal = response.total
 
-            print("🏦 [Transactions] Loaded \(response.total) pending transactions (was: \(previousTotal))")
+            print("🏦 [Transactions] Loaded \(response.total) pending transactions")
 
             // Select all by default for easier bulk import
             selectedTransactionIds = Set(response.transactions.map { $0.id })
 
-            // Show notification if there are pending transactions and we haven't shown it yet
-            // or if there are new transactions since last check
-            let shouldShowNotification = response.total > 0 && (!hasShownNotificationForCurrentBatch || response.total > previousTotal)
-            print("🏦 [Notification] shouldShow=\(shouldShowNotification)")
-            print("🏦 [Notification]   - total>0: \(response.total > 0) (total=\(response.total))")
-            print("🏦 [Notification]   - !hasShown: \(!hasShownNotificationForCurrentBatch) (hasShown=\(hasShownNotificationForCurrentBatch))")
-            print("🏦 [Notification]   - total>prev: \(response.total > previousTotal) (prev=\(previousTotal))")
-
-            if shouldShowNotification {
-                print("🏦 [Notification] ✅ Setting showPendingTransactionsNotification = true")
-                showPendingTransactionsNotification = true
-                hasShownNotificationForCurrentBatch = true
-                print("🏦 [Notification] ✅ Notification should now be visible for \(response.total) transactions")
-            } else {
-                print("🏦 [Notification] ❌ NOT showing notification")
-            }
+            // Note: Notification banner is triggered by BackgroundSyncManager via .bankTransactionsPendingReview
+            // notification, not here. This keeps loadPendingTransactions focused on data loading only.
         } catch {
             print("🏦 [Transactions] ❌ Error loading: \(error.localizedDescription)")
             pendingTransactionsState = .error(error.localizedDescription)
@@ -639,10 +665,9 @@ class BankingViewModel: ObservableObject {
         await loadConnections()
         await loadAccounts()
 
-        // Auto-sync accounts to fetch latest transactions from bank
+        // Load pending transactions to show notification if any
+        // Note: Auto-sync is handled by BackgroundSyncManager on app launch/foreground
         if hasConnections {
-            print("🏦 [Initial Load] Auto-syncing accounts to fetch latest transactions...")
-            await syncAllAccounts()
             await loadPendingTransactions()
         }
     }
@@ -652,6 +677,27 @@ class BankingViewModel: ObservableObject {
         await loadAccounts()
         if hasConnections {
             await loadPendingTransactions()
+        }
+    }
+
+    /// Trigger a manual sync of all accounts
+    /// Call this when user explicitly requests a refresh
+    func manualSyncAllAccounts() async {
+        print("🏦 [Banking] Manual sync requested")
+
+        // Reset notification state so we show banner after sync
+        hasShownNotificationForCurrentBatch = false
+
+        await loadConnections()
+        await loadAccounts()
+
+        if hasConnections {
+            await syncAllAccounts()
+            await loadPendingTransactions()
+
+            // Haptic feedback
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
         }
     }
 

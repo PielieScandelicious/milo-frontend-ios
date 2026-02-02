@@ -9,6 +9,7 @@ import SwiftUI
 import FirebaseCore
 import GoogleSignIn
 import StoreKit
+import UserNotifications
 
 @main
 struct ScandaLiciousApp: App {
@@ -16,6 +17,11 @@ struct ScandaLiciousApp: App {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var hasCheckedSubscription = false
+    @State private var hasPerformedInitialSync = false
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    /// Background sync manager singleton (not observable, uses NotificationCenter)
+    private var backgroundSyncManager: BackgroundSyncManager { BackgroundSyncManager.shared }
 
     init() {
         // Configure Firebase FIRST
@@ -61,14 +67,7 @@ struct ScandaLiciousApp: App {
                 }
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
-                // Refresh token when app becomes active
-                if newPhase == .active {
-                    authManager.refreshTokenInSharedStorage()
-                    // Silently refresh subscription status
-                    Task {
-                        await subscriptionManager.updateSubscriptionStatus()
-                    }
-                }
+                handleScenePhaseChange(from: oldPhase, to: newPhase)
             }
             .onChange(of: authManager.isAuthenticated) { wasAuthenticated, isAuthenticated in
                 // When auth state changes, refresh subscription status silently
@@ -167,6 +166,133 @@ struct ScandaLiciousApp: App {
         default:
             print("🏦 [DeepLink] Unknown banking path: \(path)")
         }
+    }
+
+    // MARK: - Scene Phase Handling
+
+    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
+        switch newPhase {
+        case .active:
+            // Refresh token when app becomes active
+            authManager.refreshTokenInSharedStorage()
+
+            // Silently refresh subscription status
+            Task {
+                await subscriptionManager.updateSubscriptionStatus()
+            }
+
+            // Auto-sync bank transactions when app becomes active
+            if authManager.isAuthenticated && authManager.profileCompleted {
+                Task {
+                    await performAutoSync()
+                }
+            }
+
+            // Clear badge when app opens
+            backgroundSyncManager.clearBadge()
+
+        case .background:
+            // Schedule background refresh when app goes to background
+            if authManager.isAuthenticated {
+                backgroundSyncManager.scheduleBackgroundRefresh()
+                print("🔄 [App] Scheduled background sync on entering background")
+            }
+
+        case .inactive:
+            break
+
+        @unknown default:
+            break
+        }
+    }
+
+    /// Perform auto-sync of bank transactions
+    private func performAutoSync() async {
+        // Skip if we've already done initial sync this session and it's been less than 5 minutes
+        if hasPerformedInitialSync && !backgroundSyncManager.shouldRefresh {
+            print("🔄 [App] Skipping auto-sync (recently synced)")
+            return
+        }
+
+        print("🔄 [App] Performing auto-sync...")
+        let result = await backgroundSyncManager.performForegroundSync()
+
+        hasPerformedInitialSync = true
+
+        if result.success {
+            print("🔄 [App] Auto-sync complete: \(result.newTransactions) new, \(result.totalPending) pending")
+        } else if let error = result.error {
+            print("🔄 [App] Auto-sync failed: \(error)")
+        }
+    }
+}
+
+// MARK: - App Delegate
+
+/// AppDelegate for registering background tasks early in app lifecycle
+class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        // Register background tasks
+        BackgroundSyncManager.shared.registerBackgroundTasks()
+
+        // Configure notification categories
+        BackgroundSyncManager.shared.configureNotificationCategories()
+
+        // Set notification delegate
+        UNUserNotificationCenter.current().delegate = self
+
+        // Request notification permissions
+        Task {
+            _ = await BackgroundSyncManager.shared.requestNotificationPermissions()
+        }
+
+        print("🚀 [App] AppDelegate initialized with background sync support")
+        return true
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    /// Handle notification when app is in foreground
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Show notification even when app is in foreground
+        completionHandler([.banner, .sound, .badge])
+    }
+
+    /// Handle notification tap
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+
+        if let type = userInfo["type"] as? String, type == "bank_transactions" {
+            // Post notification for app to navigate to banking/review
+            NotificationCenter.default.post(
+                name: .bankTransactionsPendingReview,
+                object: nil,
+                userInfo: userInfo
+            )
+
+            // If review action tapped, signal immediate navigation
+            if response.actionIdentifier == "REVIEW_ACTION" {
+                NotificationCenter.default.post(
+                    name: .bankTransactionsPendingReview,
+                    object: nil,
+                    userInfo: ["shouldNavigate": true]
+                )
+            }
+        }
+
+        completionHandler()
     }
 }
 

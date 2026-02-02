@@ -139,12 +139,14 @@ actor BankingAPIService {
     }
 
     /// Sync transactions for an account
+    /// Note: Uses longer timeout (120s) as sync involves external bank API calls
     func syncAccount(accountId: String) async throws -> BankAccountSyncResponse {
         print("🏦 [Banking] Syncing account: \(accountId)")
 
         let response: BankAccountSyncResponse = try await performRequest(
             endpoint: "/bank-accounts/\(accountId)/sync",
-            method: "POST"
+            method: "POST",
+            timeout: 120  // Extended timeout for bank API calls
         )
 
         print("🏦 [Banking] ✅ Synced \(response.transactionsFetched) transactions, \(response.newTransactions) new")
@@ -203,7 +205,8 @@ actor BankingAPIService {
     private func performRequest<T: Decodable>(
         endpoint: String,
         method: String,
-        queryItems: [URLQueryItem] = []
+        queryItems: [URLQueryItem] = [],
+        timeout: TimeInterval = 30
     ) async throws -> T {
         guard var urlComponents = URLComponents(string: "\(baseURL)\(endpoint)") else {
             throw BankingAPIError.invalidURL
@@ -225,7 +228,7 @@ actor BankingAPIService {
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 30
+        request.timeoutInterval = timeout
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

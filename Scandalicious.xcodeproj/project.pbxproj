@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		11CFBA3192F5CFD303C404AB /* ScandaliciousUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC4A3BC7B3DFD07799C3FCD2 /* ScandaliciousUITestsLaunchTests.swift */; };
 		294129322F1FC66500EAB7CE /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 294129312F1FC66500EAB7CE /* GoogleService-Info.plist */; };
 		295F4B8D2F1FC95E003FD5BA /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B8C2F1FC95E003FD5BA /* FirebaseAuth */; };
 		295F4B8F2F1FC95E003FD5BA /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B8E2F1FC95E003FD5BA /* FirebaseCore */; };
@@ -16,6 +17,9 @@
 		2999B8C82F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		29CD76132F2028B1003DD40E /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 29CD76122F2028B1003DD40E /* FirebaseAuth */; };
 		29CD76152F2028B1003DD40E /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 29CD76142F2028B1003DD40E /* FirebaseCore */; };
+		3580E9029461F5F72450FE7C /* ScandaliciousUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0163F9C385F7C611E0FF9C /* ScandaliciousUITests.swift */; };
+		9024A6327ED52732AFD4DE1E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 97BB9B7A43681459F8DD3463 /* Foundation.framework */; };
+		F349F6F825F5685A30B91F4D /* FullFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F8C6127F7B75C7A9D007673 /* FullFlowUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,6 +29,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 2999B8BD2F1DA4F9002ACAF3;
 			remoteInfo = "Dobby Share Extension";
+		};
+		4E9EF55E1574C5D91BDF689E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 294D4FB52F1D695B001B9193 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 294D4FBC2F1D695B001B9193;
+			remoteInfo = Scandalicious;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -43,11 +54,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1F0163F9C385F7C611E0FF9C /* ScandaliciousUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScandaliciousUITests.swift; sourceTree = "<group>"; };
 		294129312F1FC66500EAB7CE /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		294D4FBD2F1D695B001B9193 /* Scandalicious.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Scandalicious.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-additions.plist"; sourceTree = "<group>"; };
 		2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Scandalicious Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		29B5D5842F1FEBA2000C48B2 /* Scandalicious-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Scandalicious-Info.plist"; sourceTree = "<group>"; };
+		2B7864759B203A58E66CDB1C /* ScandaliciousUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ScandaliciousUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F8C6127F7B75C7A9D007673 /* FullFlowUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FullFlowUITests.swift; sourceTree = "<group>"; };
+		97BB9B7A43681459F8DD3463 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		BC4A3BC7B3DFD07799C3FCD2 /* ScandaliciousUITestsLaunchTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScandaliciousUITestsLaunchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -111,6 +127,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		29DB7038246E6B2EE2F6414A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9024A6327ED52732AFD4DE1E /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -123,6 +147,8 @@
 				294D4FBE2F1D695B001B9193 /* Products */,
 				2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */,
 				294129312F1FC66500EAB7CE /* GoogleService-Info.plist */,
+				885AD0B855ED1D8557490D41 /* Frameworks */,
+				5B7A64A85AB4FC5E31EB0E56 /* ScandaliciousUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -131,8 +157,35 @@
 			children = (
 				294D4FBD2F1D695B001B9193 /* Scandalicious.app */,
 				2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */,
+				2B7864759B203A58E66CDB1C /* ScandaliciousUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		5B7A64A85AB4FC5E31EB0E56 /* ScandaliciousUITests */ = {
+			isa = PBXGroup;
+			children = (
+				1F0163F9C385F7C611E0FF9C /* ScandaliciousUITests.swift */,
+				BC4A3BC7B3DFD07799C3FCD2 /* ScandaliciousUITestsLaunchTests.swift */,
+				4F8C6127F7B75C7A9D007673 /* FullFlowUITests.swift */,
+			);
+			path = ScandaliciousUITests;
+			sourceTree = "<group>";
+		};
+		885AD0B855ED1D8557490D41 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B02E86EF43BF7FD5C170E7FA /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B02E86EF43BF7FD5C170E7FA /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				97BB9B7A43681459F8DD3463 /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -190,6 +243,24 @@
 			productReference = 2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		544236DA7CEFDCCDD4F6D154 /* ScandaliciousUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E44D3C2787BC487CDEDD8818 /* Build configuration list for PBXNativeTarget "ScandaliciousUITests" */;
+			buildPhases = (
+				6B8E5E023AB2F03D2A247364 /* Sources */,
+				29DB7038246E6B2EE2F6414A /* Frameworks */,
+				0DE542AA2CB2D44375139B83 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CF95D84A843EB604BB689E90 /* PBXTargetDependency */,
+			);
+			name = ScandaliciousUITests;
+			productName = ScandaliciousUITests;
+			productReference = 2B7864759B203A58E66CDB1C /* ScandaliciousUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -228,11 +299,19 @@
 			targets = (
 				294D4FBC2F1D695B001B9193 /* Scandalicious */,
 				2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */,
+				544236DA7CEFDCCDD4F6D154 /* ScandaliciousUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		0DE542AA2CB2D44375139B83 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		294D4FBB2F1D695B001B9193 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -266,6 +345,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6B8E5E023AB2F03D2A247364 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3580E9029461F5F72450FE7C /* ScandaliciousUITests.swift in Sources */,
+				11CFBA3192F5CFD303C404AB /* ScandaliciousUITestsLaunchTests.swift in Sources */,
+				F349F6F825F5685A30B91F4D /* FullFlowUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -273,6 +362,12 @@
 			isa = PBXTargetDependency;
 			target = 2999B8BD2F1DA4F9002ACAF3 /* Scandalicious Share Extension */;
 			targetProxy = 2999B8C62F1DA4F9002ACAF3 /* PBXContainerItemProxy */;
+		};
+		CF95D84A843EB604BB689E90 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = Scandalicious;
+			target = 294D4FBC2F1D695B001B9193 /* Scandalicious */;
+			targetProxy = 4E9EF55E1574C5D91BDF689E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -537,6 +632,41 @@
 			};
 			name = Release;
 		};
+		73E1E4893AF25B687FA4DF5F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9A8M33Z82L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Scandalicious;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		9FD7E4FCF2DB519191BB3CAB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 9A8M33Z82L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deepmaind.scandalicious.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = Scandalicious;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -563,6 +693,15 @@
 			buildConfigurations = (
 				2999B8CB2F1DA4F9002ACAF3 /* Debug */,
 				2999B8CC2F1DA4F9002ACAF3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E44D3C2787BC487CDEDD8818 /* Build configuration list for PBXNativeTarget "ScandaliciousUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				73E1E4893AF25B687FA4DF5F /* Release */,
+				9FD7E4FCF2DB519191BB3CAB /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
