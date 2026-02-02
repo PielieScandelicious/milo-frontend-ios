@@ -69,6 +69,7 @@ struct OverviewView: View {
     @State private var expandedReceiptId: String? // For inline receipt expansion
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
+    @State private var receiptToSplit: APIReceipt? // For expense split
     @State private var scrollOffset: CGFloat = 0 // Track scroll for header fade effect
     @State private var cachedAvailablePeriods: [String] = [] // Cached for performance
     @State private var cachedSegmentsByPeriod: [String: [StoreChartSegment]] = [:] // Cache segments
@@ -483,6 +484,9 @@ struct OverviewView: View {
                 // Parse month and year from selectedPeriod (e.g., "January 2026")
                 let components = parsePeriodComponents(selectedPeriod)
                 CategoryBreakdownDetailView(month: components.month, year: components.year)
+            }
+            .sheet(item: $receiptToSplit) { receipt in
+                SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
             }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
@@ -2226,6 +2230,9 @@ struct OverviewView: View {
                                     },
                                     onDeleteItem: { receiptId, itemId in
                                         deleteReceiptItemFromOverview(receiptId: receiptId, itemId: itemId)
+                                    },
+                                    onSplit: {
+                                        receiptToSplit = receipt
                                     }
                                 )
                                 .transition(.asymmetric(

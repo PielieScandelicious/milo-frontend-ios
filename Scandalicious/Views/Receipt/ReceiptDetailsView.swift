@@ -15,6 +15,7 @@ struct ReceiptDetailsView: View {
     @State private var isDeleting = false
     @State private var deleteError: String?
     @State private var showDeleteError = false
+    @State private var showSplitView = false
 
     var body: some View {
         NavigationStack {
@@ -30,6 +31,11 @@ struct ReceiptDetailsView: View {
 
                     // Items List (hide for duplicates since they weren't saved)
                     if !receipt.isDuplicate {
+                        // Split with Friends Button
+                        if !receipt.transactions.isEmpty {
+                            splitButton
+                        }
+
                         itemsSection
 
                         // Delete Button
@@ -45,6 +51,9 @@ struct ReceiptDetailsView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(deleteError ?? "An unknown error occurred")
+            }
+            .sheet(isPresented: $showSplitView) {
+                SplitExpenseView(receipt: receipt)
             }
             .onAppear {
                 print("📋 ReceiptDetailsView appeared")
@@ -184,7 +193,41 @@ struct ReceiptDetailsView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
-    
+
+    // MARK: - Split Button
+
+    private var splitButton: some View {
+        Button {
+            showSplitView = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "person.2.fill")
+                    .font(.title3)
+                    .foregroundStyle(.blue)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Split with Friends")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text("Divide this receipt among friends")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Items Section
     
     private var itemsSection: some View {

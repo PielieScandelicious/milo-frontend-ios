@@ -731,6 +731,41 @@ struct APIReceiptItem: Codable, Identifiable {
     }
 }
 
+// MARK: - APIReceipt to ReceiptUploadResponse Conversion
+
+extension APIReceipt {
+    /// Convert APIReceipt to ReceiptUploadResponse for use with SplitExpenseView
+    func toReceiptUploadResponse() -> ReceiptUploadResponse {
+        let convertedTransactions = transactions.map { item -> ReceiptTransaction in
+            // Map category string to ReceiptCategory enum
+            let category = ReceiptCategory.allCases.first { $0.displayName == item.category }
+                ?? ReceiptCategory.other
+
+            return ReceiptTransaction(
+                itemId: item.itemId,
+                itemName: item.itemName,
+                itemPrice: item.itemPrice,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                category: category,
+                healthScore: item.healthScore
+            )
+        }
+
+        return ReceiptUploadResponse(
+            receiptId: receiptId,
+            status: .success,
+            storeName: storeName,
+            receiptDate: receiptDate,
+            totalAmount: totalAmount,
+            itemsCount: itemsCount,
+            transactions: convertedTransactions,
+            warnings: [],
+            averageHealthScore: averageHealthScore
+        )
+    }
+}
+
 struct ReceiptFilters {
     var startDate: Date?
     var endDate: Date?

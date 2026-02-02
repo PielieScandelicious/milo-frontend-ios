@@ -33,6 +33,9 @@ struct StoreDetailView: View {
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
 
+    // Split expense
+    @State private var receiptToSplit: APIReceipt?
+
     // Expandable category transactions
     @StateObject private var transactionsViewModel = TransactionsViewModel()
     @State private var expandedCategoryName: String?
@@ -232,6 +235,9 @@ struct StoreDetailView: View {
                 period: storeBreakdown.period,
                 storeName: storeBreakdown.storeName
             )
+        }
+        .sheet(item: $receiptToSplit) { receipt in
+            SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
         }
         .onAppear {
             if !hasInitialized {
@@ -497,6 +503,9 @@ struct StoreDetailView: View {
                                     },
                                     onDeleteItem: { receiptId, itemId in
                                         deleteReceiptItem(receiptId: receiptId, itemId: itemId)
+                                    },
+                                    onSplit: {
+                                        receiptToSplit = receipt
                                     }
                                 )
                                 .transition(.asymmetric(

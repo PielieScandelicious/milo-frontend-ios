@@ -94,6 +94,8 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
     let onDelete: (() -> Void)?
     /// Callback when a line item is deleted - receives (receiptId, itemId)
     let onDeleteItem: ((String, String) -> Void)?
+    /// Callback when split with friends is tapped
+    let onSplit: (() -> Void)?
 
     /// Optional accent color for the card (e.g., green for "Recent Scan")
     var accentColor: Color = .white
@@ -112,12 +114,19 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
     @State private var isEditMode = false
     @State private var itemToDelete: (id: String, name: String)?
 
+    /// Refresh trigger to force view update when split is saved
+    @State private var splitRefreshTrigger = UUID()
+
+    /// Observe split cache for updates
+    @ObservedObject private var splitCache = SplitCacheManager.shared
+
     init(
         receipt: Receipt,
         isExpanded: Bool,
         onTap: @escaping () -> Void,
         onDelete: (() -> Void)? = nil,
         onDeleteItem: ((String, String) -> Void)? = nil,
+        onSplit: (() -> Void)? = nil,
         accentColor: Color = .white,
         badgeText: String? = nil,
         showDate: Bool = true,
@@ -128,10 +137,21 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
         self.onTap = onTap
         self.onDelete = onDelete
         self.onDeleteItem = onDeleteItem
+        self.onSplit = onSplit
         self.accentColor = accentColor
         self.badgeText = badgeText
         self.showDate = showDate
         self.showItemCount = showItemCount
+    }
+
+    /// Get cached split data for this receipt
+    private var splitData: CachedSplitData? {
+        splitCache.getSplit(for: receipt.displayId)
+    }
+
+    /// Check if receipt has been split with friends
+    private var hasSplit: Bool {
+        splitData != nil
     }
 
     private var formattedDate: String {
@@ -224,6 +244,19 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
 
                     Spacer()
 
+                    // Split indicator (show if receipt has been split)
+                    if hasSplit {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.blue.opacity(0.8))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(Color.blue.opacity(0.15))
+                            )
+                    }
+
                     // Item count pill (conditionally shown)
                     if showItemCount {
                         Text("\(itemCount)")
@@ -272,10 +305,18 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                                 let canDelete = itemId != nil && onDeleteItem != nil
                                 let isDeleting = itemId.map { deletingItemIds.contains($0) } ?? false
 
+                                // Get split participants for this item
+                                let splitParticipants: [SplitParticipantInfo] = {
+                                    guard let itemId = item.deletableItemId,
+                                          let split = splitData else { return [] }
+                                    return split.participantsForTransaction(itemId)
+                                }()
+
                                 EditableLineItemRow(
                                     item: item,
                                     isEditMode: isEditMode,
                                     canDelete: canDelete && !isDeleting,
+                                    splitParticipants: splitParticipants,
                                     onDelete: {
                                         if let itemId = itemId {
                                             // Show confirmation dialog
@@ -302,61 +343,87 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                     }
 
                     // Action buttons row
-                    if onDelete != nil || hasDeletableItems {
-                        HStack(spacing: 10) {
-                            // Edit Items button (only if there are deletable items)
-                            if hasDeletableItems {
+                    if onDelete != nil || hasDeletableItems || onSplit != nil {
+                        VStack(spacing: 8) {
+                            // Split with Friends button (prominent, full width)
+                            if let splitAction = onSplit, !receipt.displayTransactions.isEmpty {
                                 Button {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        isEditMode.toggle()
-                                    }
                                     let generator = UIImpactFeedbackGenerator(style: .light)
                                     generator.impactOccurred()
+                                    splitAction()
                                 } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: isEditMode ? "checkmark" : "pencil")
-                                            .font(.system(size: 13, weight: .medium))
-                                        Text(isEditMode ? "Done" : "Edit Items")
-                                            .font(.system(size: 13, weight: .semibold))
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "person.2.fill")
+                                            .font(.system(size: 14, weight: .medium))
+                                        Text("Split with Friends")
+                                            .font(.system(size: 14, weight: .semibold))
                                     }
-                                    .foregroundColor(isEditMode ? .green.opacity(0.9) : .white.opacity(0.7))
+                                    .foregroundColor(.blue)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
+                                    .padding(.vertical, 12)
                                     .background(
                                         RoundedRectangle(cornerRadius: 10)
-                                            .fill(isEditMode ? Color.green.opacity(0.12) : Color.white.opacity(0.06))
+                                            .fill(Color.blue.opacity(0.12))
                                     )
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
 
-                            // Delete Receipt button
-                            if let deleteAction = onDelete {
-                                Button {
-                                    showDeleteConfirmation = true
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "trash")
-                                            .font(.system(size: 13, weight: .medium))
-                                        Text("Delete Receipt")
-                                            .font(.system(size: 13, weight: .semibold))
+                            HStack(spacing: 10) {
+                                // Edit Items button (only if there are deletable items)
+                                if hasDeletableItems {
+                                    Button {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            isEditMode.toggle()
+                                        }
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: isEditMode ? "checkmark" : "pencil")
+                                                .font(.system(size: 13, weight: .medium))
+                                            Text(isEditMode ? "Done" : "Edit Items")
+                                                .font(.system(size: 13, weight: .semibold))
+                                        }
+                                        .foregroundColor(isEditMode ? .green.opacity(0.9) : .white.opacity(0.7))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(isEditMode ? Color.green.opacity(0.12) : Color.white.opacity(0.06))
+                                        )
                                     }
-                                    .foregroundColor(.red.opacity(0.8))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color.red.opacity(0.08))
-                                    )
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                .confirmationDialog("Delete Receipt", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
-                                    Button("Delete", role: .destructive) {
-                                        deleteAction()
+
+                                // Delete Receipt button
+                                if let deleteAction = onDelete {
+                                    Button {
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "trash")
+                                                .font(.system(size: 13, weight: .medium))
+                                            Text("Delete Receipt")
+                                                .font(.system(size: 13, weight: .semibold))
+                                        }
+                                        .foregroundColor(.red.opacity(0.8))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(Color.red.opacity(0.08))
+                                        )
                                     }
-                                    Button("Cancel", role: .cancel) {}
-                                } message: {
-                                    Text("Are you sure you want to delete this receipt? This action cannot be undone.")
+                                    .buttonStyle(PlainButtonStyle())
+                                    .confirmationDialog("Delete Receipt", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+                                        Button("Delete", role: .destructive) {
+                                            deleteAction()
+                                        }
+                                        Button("Cancel", role: .cancel) {}
+                                    } message: {
+                                        Text("Are you sure you want to delete this receipt? This action cannot be undone.")
+                                    }
                                 }
                             }
                         }
@@ -434,7 +501,28 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                     isEditMode = false
                 }
             }
+
+            // Fetch split data when expanded (if not already cached)
+            if expanded && splitData == nil {
+                Task {
+                    await splitCache.fetchSplit(for: receipt.displayId)
+                }
+            }
         }
+        .task {
+            // Check for existing split on first appearance
+            if splitData == nil {
+                await splitCache.fetchSplit(for: receipt.displayId)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .expenseSplitSaved)) { notification in
+            // Force refresh when a split is saved for this receipt
+            if let receiptId = notification.userInfo?["receiptId"] as? String,
+               receiptId == receipt.displayId {
+                splitRefreshTrigger = UUID()
+            }
+        }
+        .id(splitRefreshTrigger)
     }
 }
 
@@ -445,6 +533,7 @@ struct EditableLineItemRow: View {
     let item: ReceiptItemDisplayable
     let isEditMode: Bool
     let canDelete: Bool
+    var splitParticipants: [SplitParticipantInfo] = []
     let onDelete: () -> Void
 
     var body: some View {
@@ -500,6 +589,12 @@ struct EditableLineItemRow: View {
                                     .fill(Color.white.opacity(0.08))
                             )
                     }
+
+                    // Split participant avatars
+                    if !splitParticipants.isEmpty {
+                        MiniSplitAvatars(participants: splitParticipants)
+                            .accessibilityIdentifier("split-avatar-indicator")
+                    }
                 }
             }
 
@@ -516,6 +611,54 @@ struct EditableLineItemRow: View {
                 .fill(isEditMode && canDelete ? Color.red.opacity(0.03) : Color.clear)
         )
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isEditMode)
+    }
+}
+
+// MARK: - Mini Split Avatars
+
+/// Compact display of friend avatars for split items
+struct MiniSplitAvatars: View {
+    let participants: [SplitParticipantInfo]
+
+    /// Maximum avatars to show before "+N"
+    private let maxVisible = 3
+
+    var body: some View {
+        HStack(spacing: -4) {
+            // Show up to maxVisible avatars
+            ForEach(Array(participants.prefix(maxVisible).enumerated()), id: \.element.id) { index, participant in
+                Circle()
+                    .fill(participant.swiftUIColor)
+                    .frame(width: 14, height: 14)
+                    .overlay(
+                        Text(String(participant.name.prefix(1)).uppercased())
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundColor(.white)
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color(white: 0.1), lineWidth: 1)
+                    )
+                    .zIndex(Double(maxVisible - index))
+            }
+
+            // Show "+N" if more participants
+            if participants.count > maxVisible {
+                Circle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 14, height: 14)
+                    .overlay(
+                        Text("+\(participants.count - maxVisible)")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundColor(.white.opacity(0.8))
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color(white: 0.1), lineWidth: 1)
+                    )
+            }
+        }
+        .padding(.leading, 4)
     }
 }
 
