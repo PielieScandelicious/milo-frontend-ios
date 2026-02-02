@@ -173,6 +173,8 @@ struct BankAccountSyncResponse: Codable {
     let transactionsFetched: Int
     let newTransactions: Int
     let message: String
+    let requiresReauth: Bool?
+    let connectionId: String?
 
     enum CodingKeys: String, CodingKey {
         case accountId = "account_id"
@@ -180,6 +182,8 @@ struct BankAccountSyncResponse: Codable {
         case transactionsFetched = "transactions_fetched"
         case newTransactions = "new_transactions"
         case message
+        case requiresReauth = "requires_reauth"
+        case connectionId = "connection_id"
     }
 }
 
@@ -204,28 +208,43 @@ struct BankTransactionListResponse: Codable {
 struct BankTransactionResponse: Codable, Identifiable, Hashable {
     let id: String
     let accountId: String
+    let transactionId: String
     let amount: Double
     let currency: String
     let creditorName: String?
     let debtorName: String?
-    let bookingDate: Date
+    let bookingDate: String  // Date as string "YYYY-MM-DD"
+    let valueDate: String?
     let description: String?
     let status: BankTransactionStatus
+    let importedTransactionId: String?
     let suggestedCategory: String?
     let categoryConfidence: Double?
+    let createdAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
         case accountId = "account_id"
+        case transactionId = "transaction_id"
         case amount
         case currency
         case creditorName = "creditor_name"
         case debtorName = "debtor_name"
         case bookingDate = "booking_date"
+        case valueDate = "value_date"
         case description
         case status
+        case importedTransactionId = "imported_transaction_id"
         case suggestedCategory = "suggested_category"
         case categoryConfidence = "category_confidence"
+        case createdAt = "created_at"
+    }
+
+    // Computed property to get booking date as Date
+    var bookingDateParsed: Date {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: bookingDate) ?? Date()
     }
 
     var counterpartyName: String {
@@ -435,4 +454,5 @@ extension Notification.Name {
     static let bankConnectionCompleted = Notification.Name("bankConnectionCompleted")
     static let bankConnectionFailed = Notification.Name("bankConnectionFailed")
     static let bankTransactionsImported = Notification.Name("bankTransactionsImported")
+    static let bankTransactionsPendingReview = Notification.Name("bankTransactionsPendingReview")
 }

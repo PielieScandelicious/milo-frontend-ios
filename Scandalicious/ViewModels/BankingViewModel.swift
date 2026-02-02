@@ -55,7 +55,12 @@ class BankingViewModel: ObservableObject {
     @Published var pendingTransactionsState: BankingLoadingState<[BankTransactionResponse]> = .idle
     @Published var selectedTransactionIds: Set<String> = []
     @Published var categoryOverrides: [String: GroceryCategory] = [:]
+    @Published var descriptionOverrides: [String: String] = [:]
     @Published var pendingTransactionsTotal: Int = 0
+
+    // Notification State
+    @Published var showPendingTransactionsNotification = false
+    @Published var hasShownNotificationForCurrentBatch = false
 
     // UI State
     @Published var isImporting = false
@@ -71,6 +76,10 @@ class BankingViewModel: ObservableObject {
     @Published var pendingConnectionId: String?
     @Published var isAwaitingCallback = false
     @Published var isConnecting = false
+
+    // Reauth State
+    @Published var showingReauthPrompt = false
+    @Published var connectionNeedingReauth: BankConnectionResponse?
 
     // Navigation
     @Published var showingCountryPicker = false
@@ -171,8 +180,13 @@ class BankingViewModel: ObservableObject {
 
         do {
             let connections = try await apiService.getConnections()
+            print("🏦 [Connections] Loaded \(connections.count) connections")
+            for conn in connections {
+                print("🏦 [Connections]   - \(conn.id): \(conn.aspspName) (\(conn.status.rawValue))")
+            }
             connectionsState = .success(connections)
         } catch {
+            print("🏦 [Connections] ❌ Error: \(error.localizedDescription)")
             connectionsState = .error(error.localizedDescription)
         }
     }
@@ -233,7 +247,14 @@ class BankingViewModel: ObservableObject {
             Task {
                 await loadConnections()
                 await loadAccounts()
+
+                // Auto-sync all accounts to fetch transactions from the bank
+                print("🏦 Auto-syncing accounts after successful bank connection...")
+                await syncAllAccounts()
+
+                // Load pending transactions after sync
                 await loadPendingTransactions()
+                print("🏦 Pending transactions: \(pendingTransactionsTotal), notification: \(showPendingTransactionsNotification)")
             }
         case .error:
             if let message = result.errorMessage {
@@ -254,33 +275,94 @@ class BankingViewModel: ObservableObject {
 
         do {
             let accounts = try await apiService.getAccounts()
+            print("🏦 [Accounts] Loaded \(accounts.count) accounts")
+            for account in accounts {
+                print("🏦 [Accounts]   - \(account.id): \(account.displayName) (connection: \(account.connectionId))")
+            }
             accountsState = .success(accounts)
         } catch {
+            print("🏦 [Accounts] ❌ Error: \(error.localizedDescription)")
             accountsState = .error(error.localizedDescription)
         }
     }
 
     func syncAccount(_ accountId: String) async -> Bool {
-        guard !syncingAccountIds.contains(accountId) else { return false }
+        guard !syncingAccountIds.contains(accountId) else {
+            print("🏦 [Sync] Account \(accountId) already syncing, skipping")
+            return false
+        }
 
+        print("🏦 [Sync] Starting sync for account: \(accountId)")
         syncingAccountIds.insert(accountId)
 
         do {
             let result = try await apiService.syncAccountTransactions(accountId: accountId)
             syncingAccountIds.remove(accountId)
 
+            // Check if reauth is required
+            if result.requiresReauth == true {
+                print("🏦 [Sync] ⚠️ Bank connection expired, requires reauth")
+                // Find the connection that needs reauth
+                if let connectionId = result.connectionId,
+                   let connections = connectionsState.data,
+                   let connection = connections.first(where: { $0.id == connectionId }) {
+                    connectionNeedingReauth = connection
+                    showingReauthPrompt = true
+                } else {
+                    // Reload connections to find it
+                    await loadConnections()
+                    if let connectionId = result.connectionId,
+                       let connections = connectionsState.data,
+                       let connection = connections.first(where: { $0.id == connectionId }) {
+                        connectionNeedingReauth = connection
+                        showingReauthPrompt = true
+                    }
+                }
+                return false
+            }
+
+            print("🏦 [Sync] ✅ Synced \(result.transactionsFetched) transactions, \(result.newTransactions) new")
+
             // Reload accounts to get updated balance
             await loadAccounts()
 
-            // Reload pending transactions
+            // Reset notification state so pending transactions notification shows after manual sync
+            print("🏦 [Sync] Resetting hasShownNotificationForCurrentBatch from \(hasShownNotificationForCurrentBatch) to false")
+            hasShownNotificationForCurrentBatch = false
+
+            // Reload pending transactions (notification will show if any pending)
+            print("🏦 [Sync] About to load pending transactions...")
             await loadPendingTransactions()
+            print("🏦 [Sync] After loadPendingTransactions: showNotification=\(showPendingTransactionsNotification), total=\(pendingTransactionsTotal)")
 
             if result.newTransactions > 0 {
                 // Haptic feedback for new transactions
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
             }
 
             return true
+        } catch let error as BankingAPIError {
+            print("🏦 [Sync] ❌ Error: \(error.localizedDescription)")
+            syncingAccountIds.remove(accountId)
+
+            // Handle connection expired error
+            if case .connectionExpired = error {
+                // Find the account's connection
+                if let accounts = accountsState.data,
+                   let account = accounts.first(where: { $0.id == accountId }),
+                   let connections = connectionsState.data,
+                   let connection = connections.first(where: { $0.id == account.connectionId }) {
+                    connectionNeedingReauth = connection
+                    showingReauthPrompt = true
+                    return false
+                }
+            }
+
+            showError(error.localizedDescription)
+            return false
         } catch {
+            print("🏦 [Sync] ❌ Error: \(error.localizedDescription)")
             syncingAccountIds.remove(accountId)
             showError(error.localizedDescription)
             return false
@@ -307,14 +389,43 @@ class BankingViewModel: ObservableObject {
         do {
             let response = try await apiService.getPendingTransactions()
             pendingTransactionsState = .success(response.transactions)
+            let previousTotal = pendingTransactionsTotal
             pendingTransactionsTotal = response.total
+
+            print("🏦 [Transactions] Loaded \(response.total) pending transactions (was: \(previousTotal))")
 
             // Select all by default for easier bulk import
             selectedTransactionIds = Set(response.transactions.map { $0.id })
+
+            // Show notification if there are pending transactions and we haven't shown it yet
+            // or if there are new transactions since last check
+            let shouldShowNotification = response.total > 0 && (!hasShownNotificationForCurrentBatch || response.total > previousTotal)
+            print("🏦 [Notification] shouldShow=\(shouldShowNotification)")
+            print("🏦 [Notification]   - total>0: \(response.total > 0) (total=\(response.total))")
+            print("🏦 [Notification]   - !hasShown: \(!hasShownNotificationForCurrentBatch) (hasShown=\(hasShownNotificationForCurrentBatch))")
+            print("🏦 [Notification]   - total>prev: \(response.total > previousTotal) (prev=\(previousTotal))")
+
+            if shouldShowNotification {
+                print("🏦 [Notification] ✅ Setting showPendingTransactionsNotification = true")
+                showPendingTransactionsNotification = true
+                hasShownNotificationForCurrentBatch = true
+                print("🏦 [Notification] ✅ Notification should now be visible for \(response.total) transactions")
+            } else {
+                print("🏦 [Notification] ❌ NOT showing notification")
+            }
         } catch {
+            print("🏦 [Transactions] ❌ Error loading: \(error.localizedDescription)")
             pendingTransactionsState = .error(error.localizedDescription)
             pendingTransactionsTotal = 0
         }
+    }
+
+    func dismissTransactionNotification() {
+        showPendingTransactionsNotification = false
+    }
+
+    func resetNotificationState() {
+        hasShownNotificationForCurrentBatch = false
     }
 
     func toggleTransactionSelection(_ transactionId: String) {
@@ -349,12 +460,35 @@ class BankingViewModel: ObservableObject {
         return .other
     }
 
-    func importSelectedTransactions() async -> Bool {
-        guard !selectedTransactionIds.isEmpty else { return false }
+    func setDescriptionOverride(for transactionId: String, description: String) {
+        if description.isEmpty {
+            descriptionOverrides.removeValue(forKey: transactionId)
+        } else {
+            descriptionOverrides[transactionId] = description
+        }
+    }
 
+    func getDescription(for transaction: BankTransactionResponse) -> String? {
+        return descriptionOverrides[transaction.id] ?? transaction.description
+    }
+
+    func getCustomDescription(for transactionId: String) -> String? {
+        return descriptionOverrides[transactionId]
+    }
+
+    func importSelectedTransactions() async -> Bool {
+        print("🏦 [Import] importSelectedTransactions() called")
+        print("🏦 [Import] selectedTransactionIds count: \(selectedTransactionIds.count)")
+
+        guard !selectedTransactionIds.isEmpty else {
+            print("🏦 [Import] ❌ No transactions selected, returning false")
+            return false
+        }
+
+        print("🏦 [Import] Setting isImporting = true")
         isImporting = true
 
-        // Build import items with categories
+        // Build import items with categories and descriptions
         let items: [TransactionImportItem] = selectedTransactionIds.compactMap { transactionId in
             guard let transactions = pendingTransactionsState.data,
                   let transaction = transactions.first(where: { $0.id == transactionId }) else {
@@ -362,23 +496,35 @@ class BankingViewModel: ObservableObject {
             }
 
             let category = getCategory(for: transaction)
+            let customDescription = descriptionOverrides[transactionId]
+
             return TransactionImportItem(
                 bankTransactionId: transactionId,
                 category: category.rawValue,
                 storeName: transaction.counterpartyName,
-                itemName: nil
+                itemName: customDescription ?? transaction.description
             )
         }
 
+        print("🏦 [Import] Built \(items.count) import items")
         let request = TransactionImportRequest(transactions: items)
 
         do {
+            print("🏦 [Import] Calling API...")
             let response = try await apiService.importSelectedTransactions(request: request)
+            print("🏦 [Import] ✅ API returned: imported=\(response.importedCount), failed=\(response.failedCount)")
             isImporting = false
 
-            // Clear selections and reload
+            // Clear selections and overrides
             selectedTransactionIds.removeAll()
             categoryOverrides.removeAll()
+            descriptionOverrides.removeAll()
+
+            // Reset notification state for next batch
+            hasShownNotificationForCurrentBatch = false
+            showPendingTransactionsNotification = false
+
+            // Reload to get updated pending list
             await loadPendingTransactions()
 
             // Notify rest of app
@@ -417,6 +563,36 @@ class BankingViewModel: ObservableObject {
             isIgnoring = false
             showError(error.localizedDescription)
             return false
+        }
+    }
+
+    // MARK: - Reauth Methods
+
+    func dismissReauthPrompt() {
+        showingReauthPrompt = false
+        connectionNeedingReauth = nil
+    }
+
+    func startReauthentication() async -> URL? {
+        guard let connection = connectionNeedingReauth else { return nil }
+
+        isConnecting = true
+        dismissReauthPrompt()
+
+        do {
+            // Start a new connection flow for the same bank
+            let response = try await apiService.startBankConnection(
+                bankName: connection.aspspName,
+                country: connection.aspspCountry
+            )
+            pendingConnectionId = response.connectionId
+            isAwaitingCallback = true
+            isConnecting = false
+            return URL(string: response.redirectUrl)
+        } catch {
+            isConnecting = false
+            showError(error.localizedDescription)
+            return nil
         }
     }
 
@@ -463,8 +639,10 @@ class BankingViewModel: ObservableObject {
         await loadConnections()
         await loadAccounts()
 
-        // Load pending transactions count
+        // Auto-sync accounts to fetch latest transactions from bank
         if hasConnections {
+            print("🏦 [Initial Load] Auto-syncing accounts to fetch latest transactions...")
+            await syncAllAccounts()
             await loadPendingTransactions()
         }
     }

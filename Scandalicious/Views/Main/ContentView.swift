@@ -12,10 +12,13 @@ struct ContentView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @StateObject private var transactionManager = TransactionManager()
     @StateObject private var dataManager = StoreDataManager()
+    @StateObject private var bankingViewModel = BankingViewModel()
     @State private var selectedTab: Tab = .scan
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
-    
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var lastSyncTime: Date?
+
     enum Tab: Int, Hashable {
         case view = 0
         case scan = 1
@@ -53,9 +56,23 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
+        .pendingTransactionsNotification(
+            isPresented: $bankingViewModel.showPendingTransactionsNotification,
+            transactionCount: bankingViewModel.pendingTransactionsTotal,
+            onReviewTapped: {
+                bankingViewModel.openTransactionReview()
+            },
+            onDismiss: {
+                bankingViewModel.dismissTransactionNotification()
+            }
+        )
+        .sheet(isPresented: $bankingViewModel.showingTransactionReview) {
+            BankTransactionReviewView(viewModel: bankingViewModel)
+        }
         .animation(.easeInOut(duration: 0.4), value: hasLoadedInitialData)
         .environmentObject(transactionManager)
         .environmentObject(dataManager)
+        .environmentObject(bankingViewModel)
         .preferredColorScheme(.dark)
         .onAppear {
             // Configure data manager on first appear
@@ -118,6 +135,11 @@ struct ContentView: View {
                         }
                     }
                     print("✅ Initial data loaded successfully")
+
+                    // Check for pending bank transactions after initial data loads
+                    // Also sync bank accounts automatically (like Buddy app)
+                    await bankingViewModel.loadInitialData()
+                    lastSyncTime = Date() // Track initial sync time
                 }
             }
         }
@@ -135,6 +157,57 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to sign out?")
+        }
+        .alert("Bank Connection Expired", isPresented: $bankingViewModel.showingReauthPrompt) {
+            Button("Reconnect") {
+                Task {
+                    if let url = await bankingViewModel.startReauthentication() {
+                        await UIApplication.shared.open(url)
+                    }
+                }
+            }
+            Button("Later", role: .cancel) {
+                bankingViewModel.dismissReauthPrompt()
+            }
+        } message: {
+            if let connection = bankingViewModel.connectionNeedingReauth {
+                Text("Your connection to \(connection.aspspName) has expired. Reconnect to continue syncing transactions.")
+            } else {
+                Text("Your bank connection has expired. Reconnect to continue syncing transactions.")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .bankTransactionsImported)) { notification in
+            // Refresh overview data when bank transactions are imported
+            if let importedCount = notification.userInfo?["importedCount"] as? Int, importedCount > 0 {
+                print("🏦 Bank transactions imported (\(importedCount)) - refreshing overview data")
+                Task {
+                    // Refresh current period data to show newly imported transactions
+                    if let currentPeriod = dataManager.periodMetadata.first?.period {
+                        await dataManager.fetchPeriodDetails(currentPeriod)
+                    }
+                }
+            }
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Auto-sync bank accounts when app comes to foreground (like Buddy app)
+            if newPhase == .active && oldPhase == .background && hasLoadedInitialData {
+                // Only sync if it's been more than 5 minutes since last sync
+                let shouldSync: Bool
+                if let lastSync = lastSyncTime {
+                    shouldSync = Date().timeIntervalSince(lastSync) > 300 // 5 minutes
+                } else {
+                    shouldSync = true
+                }
+
+                if shouldSync && bankingViewModel.hasConnections {
+                    print("🏦 [AutoSync] App came to foreground - syncing bank accounts...")
+                    lastSyncTime = Date()
+                    Task {
+                        await bankingViewModel.syncAllAccounts()
+                        await bankingViewModel.loadPendingTransactions()
+                    }
+                }
+            }
         }
     }
 }

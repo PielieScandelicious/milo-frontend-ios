@@ -93,11 +93,15 @@ struct BankTransactionReviewView: View {
                         transaction: transaction,
                         isSelected: viewModel.selectedTransactionIds.contains(transaction.id),
                         category: viewModel.getCategory(for: transaction),
+                        customDescription: viewModel.getCustomDescription(for: transaction.id),
                         onToggleSelection: {
                             viewModel.toggleTransactionSelection(transaction.id)
                         },
                         onCategoryChange: { category in
                             viewModel.setCategoryOverride(for: transaction.id, category: category)
+                        },
+                        onDescriptionChange: { description in
+                            viewModel.setDescriptionOverride(for: transaction.id, description: description)
                         }
                     )
                 }
