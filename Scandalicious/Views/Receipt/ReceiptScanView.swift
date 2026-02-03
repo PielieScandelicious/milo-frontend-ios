@@ -32,11 +32,15 @@ struct ReceiptScanView: View {
     // Syncing status for top banner
     @State private var isSyncing = false
     @State private var isTabVisible = false
+    @State private var contentOpacity: Double = 0
 
     // Recent receipt tracking
     @State private var recentReceipt: ReceiptUploadResponse?
     @State private var showRecentReceiptDetails = false
     @State private var isRecentReceiptExpanded = false
+
+    // Wallet Pass Creator
+    @State private var showWalletPassCreator = false
 
     // Total receipts count (all time)
     @State private var totalReceiptsScanned: Int = 0
@@ -82,16 +86,16 @@ struct ReceiptScanView: View {
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    isTabVisible = true
-                }
+            isTabVisible = true
+            withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
+                contentOpacity = 1.0
             }
             loadTotalReceiptsCount()
             loadAllTimeStats()
         }
         .onDisappear {
             isTabVisible = false
+            contentOpacity = 0
         }
         .receiptErrorOverlay(
             isPresented: $showError,
@@ -135,6 +139,9 @@ struct ReceiptScanView: View {
                     .environmentObject(authManager)
                     .environmentObject(subscriptionManager)
             }
+        }
+        .sheet(isPresented: $showWalletPassCreator) {
+            WalletPassCreatorView()
         }
         .onChange(of: capturedImage) { _, newImage in
             if let image = newImage {
@@ -351,35 +358,36 @@ struct ReceiptScanView: View {
     // MARK: - Main Content View
 
     private var mainContentView: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Syncing banner at top
-                if isTabVisible && (isSyncing || rateLimitManager.isReceiptUploading) {
-                    syncingStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .padding(.top, 8)
-                } else if isTabVisible && rateLimitManager.showReceiptSynced {
-                    syncedStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .padding(.top, 8)
-                }
-
-                // Stats Section (includes Recent Scan card between Top Stores and Scans Remaining)
-                statsSection
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-
-                // Share tip card
-                shareHintCard
-                    .padding(.horizontal, 20)
-
-                // Bottom spacing for floating button
-                Color.clear
-                    .frame(height: 100)
+        VStack(spacing: 20) {
+            // Syncing banner at top
+            if isTabVisible && (isSyncing || rateLimitManager.isReceiptUploading) {
+                syncingStatusBanner
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.top, 8)
+            } else if isTabVisible && rateLimitManager.showReceiptSynced {
+                syncedStatusBanner
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.top, 8)
             }
+
+            // Stats Section
+            statsSection
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+
+            // Share tip card
+            shareHintCard
+                .padding(.horizontal, 20)
+
+            // Wallet Pass Creator card
+            walletPassCard
+                .padding(.horizontal, 20)
+
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(white: 0.05))
+        .opacity(contentOpacity)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSyncing)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
@@ -398,13 +406,10 @@ struct ReceiptScanView: View {
             // Top 3 Stores card
             topStoresCard
 
-            // Recent Receipt Card (if exists) - positioned between Top Stores and Scans Remaining
+            // Recent Receipt Card (if exists)
             if let receipt = recentReceipt {
                 recentReceiptCard(receipt: receipt)
             }
-
-            // Remaining quota pill
-            remainingQuotaPill
         }
     }
 
@@ -917,65 +922,6 @@ struct ReceiptScanView: View {
         }
     }
 
-    // MARK: - Remaining Quota Pill
-
-    private var remainingQuotaPill: some View {
-        HStack(spacing: 12) {
-            // Progress ring
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 3)
-                    .frame(width: 36, height: 36)
-
-                Circle()
-                    .trim(from: 0, to: CGFloat(rateLimitManager.receiptsRemaining) / CGFloat(max(rateLimitManager.receiptsLimit, 1)))
-                    .stroke(
-                        receiptLimitColor,
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 36, height: 36)
-                    .rotationEffect(.degrees(-90))
-
-                Text("\(rateLimitManager.receiptsRemaining)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(receiptLimitColor)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Scans Remaining")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-
-                Text("Resets monthly")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.4))
-            }
-
-            Spacer()
-
-            // Limit badge
-            Text("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit)")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(receiptLimitColor)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(receiptLimitColor.opacity(0.12))
-                )
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
-    }
-
     // MARK: - Recent Receipt Card
 
     private func recentReceiptCard(receipt: ReceiptUploadResponse) -> some View {
@@ -1097,6 +1043,73 @@ struct ReceiptScanView: View {
         .padding()
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    // MARK: - Wallet Pass Card
+
+    private var walletPassCard: some View {
+        Button {
+            showWalletPassCreator = true
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        } label: {
+            HStack(spacing: 14) {
+                // Wallet icon with gradient background
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.black, Color.black.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: "rectangle.stack.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Wallet Pass Creator")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Text("Create apple wallet passes for stores to receive digital receipts")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+            .padding(16)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.04))
+
+                    // Subtle gradient accent
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.03), Color.clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(ScaleCardButtonStyle())
     }
 
     // MARK: - Syncing Status Banners
@@ -1841,6 +1854,17 @@ struct ScaleScanButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Scale Card Button Style
+
+struct ScaleCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
