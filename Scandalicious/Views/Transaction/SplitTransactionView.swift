@@ -20,9 +20,51 @@ struct SplitTransactionView: View {
     @State private var recentFriends: [RecentFriend] = []
     @State private var isLoading = false
 
+    // Custom split state
+    @State private var splitMode: SplitMode = .equal
+    @State private var customAmounts: [UUID: Double] = [:]
+    @FocusState private var focusedField: UUID?
+
     init(transaction: APITransaction, storeName: String) {
         self.transaction = transaction
         self.storeName = storeName
+    }
+
+    // MARK: - Computed Properties
+
+    private var totalAmount: Double {
+        transaction.totalPrice
+    }
+
+    private var equalSplitAmount: Double {
+        guard participants.count > 0 else { return 0 }
+        return totalAmount / Double(participants.count)
+    }
+
+    private var customTotalSum: Double {
+        participants.reduce(0) { sum, participant in
+            sum + (customAmounts[participant.id] ?? 0)
+        }
+    }
+
+    private var amountDifference: Double {
+        totalAmount - customTotalSum
+    }
+
+    private var isCustomSplitValid: Bool {
+        abs(amountDifference) < 0.01
+    }
+
+    private var canShare: Bool {
+        participants.count > 1 && (splitMode == .equal || isCustomSplitValid)
+    }
+
+    private func amountForParticipant(_ participant: SplitParticipant) -> Double {
+        if splitMode == .equal {
+            return equalSplitAmount
+        } else {
+            return customAmounts[participant.id] ?? 0
+        }
     }
 
     var body: some View {
@@ -201,47 +243,184 @@ struct SplitTransactionView: View {
 
     private var splitSummary: some View {
         VStack(spacing: 16) {
-            Text("Each person pays")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.top, 20)
+            // Split mode picker
+            splitModePicker
+                .padding(.top, 12)
 
-            let perPerson = transaction.totalPrice / Double(participants.count)
+            // Amount display
+            if splitMode == .equal {
+                Text("Each person pays")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
-            Text(perPerson, format: .currency(code: "EUR"))
-                .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
+                Text(equalSplitAmount, format: .currency(code: "EUR"))
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+            } else {
+                VStack(spacing: 4) {
+                    Text("Custom split")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
 
-            // Participant list with amounts
-            VStack(spacing: 12) {
-                ForEach(participants) { participant in
-                    HStack(spacing: 12) {
-                        MiniFriendAvatar(
-                            participant: participant,
-                            isSelected: true,
-                            size: 36
-                        )
-
-                        Text(participant.name)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-
-                        Spacer()
-
-                        Text(perPerson, format: .currency(code: "EUR"))
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal)
+                    Text(totalAmount, format: .currency(code: "EUR"))
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .fontDesign(.rounded)
                 }
             }
-            .padding(.vertical, 12)
+
+            // Participant list with amounts
+            VStack(spacing: 0) {
+                ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
+                    VStack(spacing: 0) {
+                        participantRow(participant: participant)
+
+                        if index < participants.count - 1 {
+                            Divider()
+                                .padding(.leading, 60)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color(uiColor: .secondarySystemGroupedBackground))
             )
             .padding(.horizontal)
+
+            // Validation message for custom mode
+            if splitMode == .custom {
+                validationBanner
+            }
+        }
+    }
+
+    // MARK: - Split Mode Picker
+
+    private var splitModePicker: some View {
+        Picker("Split Mode", selection: $splitMode) {
+            ForEach(SplitMode.allCases, id: \.self) { mode in
+                Text(mode.rawValue).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+        .onChange(of: splitMode) { _, newMode in
+            if newMode == .custom {
+                initializeCustomAmounts()
+            }
+        }
+    }
+
+    // MARK: - Participant Row
+
+    private func participantRow(participant: SplitParticipant) -> some View {
+        HStack(spacing: 12) {
+            MiniFriendAvatar(
+                participant: participant,
+                isSelected: true,
+                size: 36
+            )
+
+            Text(participant.name)
+                .font(.subheadline)
+                .fontWeight(.medium)
+
+            Spacer()
+
+            if splitMode == .equal {
+                Text(equalSplitAmount, format: .currency(code: "EUR"))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+            } else {
+                editableAmountField(for: participant)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Editable Amount Field
+
+    private func editableAmountField(for participant: SplitParticipant) -> some View {
+        HStack(spacing: 4) {
+            Text("€")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+
+            TextField(
+                "0.00",
+                value: Binding(
+                    get: { customAmounts[participant.id] ?? 0 },
+                    set: { customAmounts[participant.id] = $0 }
+                ),
+                format: .number.precision(.fractionLength(2))
+            )
+            .font(.subheadline)
+            .fontWeight(.semibold)
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 70)
+            .focused($focusedField, equals: participant.id)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(uiColor: .tertiarySystemGroupedBackground))
+        )
+    }
+
+    // MARK: - Validation Banner
+
+    private var validationBanner: some View {
+        Group {
+            if isCustomSplitValid {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Split adds up correctly")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal)
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+
+                    if amountDifference > 0 {
+                        Text("€\(String(format: "%.2f", amountDifference)) remaining to assign")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("€\(String(format: "%.2f", abs(amountDifference))) over the total")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if abs(amountDifference) > 0.001 {
+                        Button {
+                            distributeRemainder()
+                        } label: {
+                            Text("Fix")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.15))
+                                .foregroundStyle(.blue)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
         }
     }
 
@@ -269,17 +448,39 @@ struct SplitTransactionView: View {
     // MARK: - Share Button
 
     private var shareButton: some View {
-        ShareLink(item: generateShareText()) {
-            HStack {
-                Image(systemName: "square.and.arrow.up")
-                Text("Share Split")
+        VStack(spacing: 12) {
+            // Dismiss keyboard button when editing
+            if focusedField != nil {
+                Button {
+                    focusedField = nil
+                } label: {
+                    HStack {
+                        Image(systemName: "keyboard.chevron.compact.down")
+                        Text("Done Editing")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground))
+                    .foregroundStyle(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
             }
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.blue)
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            ShareLink(item: generateShareText()) {
+                HStack {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("Share Split")
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(canShare ? Color.blue : Color.gray)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .disabled(!canShare)
         }
         .padding()
     }
@@ -328,6 +529,30 @@ struct SplitTransactionView: View {
         }
     }
 
+    // MARK: - Custom Split Helpers
+
+    private func initializeCustomAmounts() {
+        for participant in participants {
+            if customAmounts[participant.id] == nil {
+                customAmounts[participant.id] = equalSplitAmount
+            }
+        }
+    }
+
+    private func distributeRemainder() {
+        guard !participants.isEmpty else { return }
+        let firstParticipant = participants.first!
+        let currentAmount = customAmounts[firstParticipant.id] ?? 0
+        customAmounts[firstParticipant.id] = currentAmount + amountDifference
+    }
+
+    private func redistributeAmountsEqually() {
+        let newEqualAmount = totalAmount / Double(participants.count)
+        for participant in participants {
+            customAmounts[participant.id] = newEqualAmount
+        }
+    }
+
     // MARK: - Participant Management
 
     private func setupDefaultMeParticipant() {
@@ -343,6 +568,10 @@ struct SplitTransactionView: View {
             displayOrder: participants.count
         )
         participants.append(participant)
+
+        if splitMode == .custom {
+            redistributeAmountsEqually()
+        }
     }
 
     private func addParticipantFromRecent(_ friend: RecentFriend) {
@@ -352,16 +581,26 @@ struct SplitTransactionView: View {
             displayOrder: participants.count
         )
         participants.append(participant)
+
+        if splitMode == .custom {
+            redistributeAmountsEqually()
+        }
     }
 
     private func removeParticipant(_ participant: SplitParticipant) {
         // Don't allow removing "Me"
         guard !participant.isMe else { return }
+
+        customAmounts.removeValue(forKey: participant.id)
         participants.removeAll { $0.id == participant.id }
 
         // Reorder remaining participants
         for i in 0..<participants.count {
             participants[i].displayOrder = i
+        }
+
+        if splitMode == .custom && !participants.isEmpty {
+            redistributeAmountsEqually()
         }
     }
 
@@ -375,16 +614,23 @@ struct SplitTransactionView: View {
 
     private func generateShareText() -> String {
         var lines: [String] = []
-        let perPerson = transaction.totalPrice / Double(participants.count)
 
         lines.append("Split for \(transaction.itemName)")
         lines.append("at \(storeName)")
-        lines.append(String(format: "Total: %.2f EUR", transaction.totalPrice))
+        lines.append(String(format: "Total: %.2f EUR", totalAmount))
         lines.append("")
-        lines.append("Each person pays:")
 
-        for participant in participants.sorted(by: { $0.displayOrder < $1.displayOrder }) {
-            lines.append(String(format: "  %@: %.2f EUR", participant.name, perPerson))
+        if splitMode == .equal {
+            lines.append("Each person pays:")
+            for participant in participants.sorted(by: { $0.displayOrder < $1.displayOrder }) {
+                lines.append(String(format: "  %@: %.2f EUR", participant.name, equalSplitAmount))
+            }
+        } else {
+            lines.append("Split breakdown:")
+            for participant in participants.sorted(by: { $0.displayOrder < $1.displayOrder }) {
+                let amount = customAmounts[participant.id] ?? 0
+                lines.append(String(format: "  %@: %.2f EUR", participant.name, amount))
+            }
         }
 
         lines.append("")

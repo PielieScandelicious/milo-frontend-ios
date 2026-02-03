@@ -39,6 +39,7 @@ struct SplitParticipant: Identifiable, Codable, Equatable, Hashable {
     var color: String  // Hex color
     var displayOrder: Int
     var isMe: Bool  // True for the default "Me" participant
+    var customAmount: Double?  // Custom split amount (nil = equal split)
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -46,14 +47,16 @@ struct SplitParticipant: Identifiable, Codable, Equatable, Hashable {
         case color
         case displayOrder = "display_order"
         case isMe = "is_me"
+        case customAmount = "custom_amount"
     }
 
-    init(id: UUID = UUID(), name: String, color: String, displayOrder: Int = 0, isMe: Bool = false) {
+    init(id: UUID = UUID(), name: String, color: String, displayOrder: Int = 0, isMe: Bool = false, customAmount: Double? = nil) {
         self.id = id
         self.name = name
         self.color = color
         self.displayOrder = displayOrder
         self.isMe = isMe
+        self.customAmount = customAmount
     }
 
     /// Static "Me" color - a distinct blue color
@@ -84,6 +87,7 @@ struct SplitParticipant: Identifiable, Codable, Equatable, Hashable {
         self.color = try container.decode(String.self, forKey: .color)
         self.displayOrder = try container.decode(Int.self, forKey: .displayOrder)
         self.isMe = try container.decodeIfPresent(Bool.self, forKey: .isMe) ?? false
+        self.customAmount = try container.decodeIfPresent(Double.self, forKey: .customAmount)
     }
 
     /// Get Color from hex string
@@ -274,6 +278,19 @@ struct ExpenseSplitCreateRequest: Codable {
 struct ParticipantCreateRequest: Codable {
     let name: String
     let color: String
+    let customAmount: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case color
+        case customAmount = "custom_amount"
+    }
+
+    init(name: String, color: String, customAmount: Double? = nil) {
+        self.name = name
+        self.color = color
+        self.customAmount = customAmount
+    }
 }
 
 struct AssignmentCreateRequest: Codable {
