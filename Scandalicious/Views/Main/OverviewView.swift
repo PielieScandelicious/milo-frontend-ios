@@ -1616,7 +1616,7 @@ struct OverviewView: View {
                             totalItems: nil,
                             averageItemPrice: nil,
                             centerIcon: "storefront.fill",
-                            centerLabel: "Stores",
+                            centerLabel: "Stores &\nBusinesses",
                             showAllSegments: showAllRows
                         )
                         .opacity(isPieChartFlipped ? 0 : 1)
@@ -1671,7 +1671,7 @@ struct OverviewView: View {
                         EmptyPieChartView(
                             isNewMonth: isNewMonth,
                             icon: "storefront.fill",
-                            label: "Stores"
+                            label: "Stores &\nBusinesses"
                         )
                         .opacity(isPieChartFlipped ? 0 : 1)
                     }
@@ -1964,7 +1964,7 @@ struct OverviewView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Stores")
+                Text("Stores & Businesses")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                 let subtitle: String = {
@@ -3135,11 +3135,14 @@ private struct EmptyPieChartView: View {
                                 )
                         )
 
-                    // Label (e.g., "Stores" or "Categories")
+                    // Label (e.g., "Stores & Businesses" or "Categories")
                     Text(label)
-                        .font(.system(size: size * 0.08, weight: .semibold))
+                        .font(.system(size: size * 0.07, weight: .semibold))
                         .foregroundColor(isNewMonth ? .white.opacity(0.6) : .white.opacity(0.4))
                         .tracking(0.5)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                 }
             }
             .frame(maxWidth: size * 0.55)

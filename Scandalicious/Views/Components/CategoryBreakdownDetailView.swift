@@ -243,22 +243,144 @@ struct CategoryBreakdownDetailView: View {
                 .padding(.horizontal, 4)
 
             ForEach(data.categories.sorted { $0.totalSpent > $1.totalSpent }) { category in
-                VStack(spacing: 0) {
-                    categoryRow(category)
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                toggleCategoryExpansion(category)
-                            }
-                        }
-
-                    // Expandable items section
-                    if expandedCategoryId == category.id {
-                        expandedItemsSection(category)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-                }
+                expandableCategoryCard(category)
             }
         }
+    }
+
+    // MARK: - Expandable Category Card
+
+    private func expandableCategoryCard(_ category: CategorySpendItem) -> some View {
+        let isExpanded = expandedCategoryId == category.id
+
+        return VStack(spacing: 0) {
+            // Category header button
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    toggleCategoryExpansion(category)
+                }
+            } label: {
+                categoryRowContent(category)
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            // Expanded items - matching StoreDetailView structure
+            if isExpanded {
+                // Divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 1)
+                    .padding(.horizontal, 14)
+
+                // VStack for spacing between items
+                VStack(spacing: 8) {
+                    expandedItemsContent(category)
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+            }
+        }
+        .background(
+            ZStack {
+                // Base glass effect
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.04))
+
+                // Subtle gradient
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.06), Color.white.opacity(0.02)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Colored accent glow on the left
+                HStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    category.color.opacity(0.15),
+                                    Color.clear
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: 60)
+                    Spacer()
+                }
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(isExpanded ? 0.15 : 0.1),
+                            Color.white.opacity(isExpanded ? 0.06 : 0.03)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+    }
+
+    // MARK: - Category Row Content
+
+    private func categoryRowContent(_ category: CategorySpendItem) -> some View {
+        let isExpanded = expandedCategoryId == category.id
+
+        return HStack(spacing: 12) {
+            // Color accent bar on the left (matching StoreDetailView)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(category.color)
+                .frame(width: 4, height: 32)
+
+            // Category icon
+            Image(systemName: category.icon)
+                .font(.system(size: 16))
+                .foregroundStyle(category.color)
+                .frame(width: 24)
+
+            // Category name
+            Text(category.name)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Spacer()
+
+            // Percentage badge with colored background
+            Text(category.percentageText)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(category.color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(category.color.opacity(0.15))
+                )
+
+            // Amount
+            Text(String(format: "€%.2f", category.totalSpent))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .frame(width: 70, alignment: .trailing)
+
+            // Chevron
+            Image(systemName: "chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.25))
+                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 
     // MARK: - Toggle Category Expansion
@@ -325,207 +447,105 @@ struct CategoryBreakdownDetailView: View {
         }
     }
 
-    // MARK: - Expanded Items Section
+    // MARK: - Expanded Items Content
 
-    private func expandedItemsSection(_ category: CategorySpendItem) -> some View {
-        VStack(spacing: 0) {
-            if loadingCategoryId == category.id {
-                // Loading state
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .tint(.white)
-                    Text("Loading items...")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.leading, 8)
-                    Spacer()
-                }
-                .padding(.vertical, 16)
-            } else if let errorMsg = categoryLoadError[category.id] {
-                // Error state
-                VStack(spacing: 8) {
-                    Text("Failed to load items")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.orange)
-                    Text(errorMsg)
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.4))
-                        .multilineTextAlignment(.center)
-                    Button {
-                        Task { await loadCategoryItems(category) }
-                    } label: {
-                        Text("Retry")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.blue)
-                    }
-                }
-                .padding(.vertical, 12)
-            } else if let items = categoryItems[category.id] {
-                if items.isEmpty {
-                    // Empty state
-                    VStack(spacing: 6) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.3))
-                        Text("No items found")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
-                    .padding(.vertical, 16)
-                } else {
-                    // Items list
-                    VStack(spacing: 0) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            expandedItemRow(item, category: category, isLast: index == items.count - 1)
-                        }
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(category.color.opacity(0.05))
-        )
-        .padding(.top, -8)
-        .padding(.horizontal, 4)
-    }
-
-    // MARK: - Expanded Item Row
-
-    private func expandedItemRow(_ item: APITransaction, category: CategorySpendItem, isLast: Bool) -> some View {
-        HStack(spacing: 10) {
-            // Health score badge
-            Text(item.healthScore.nutriScoreLetter)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(item.healthScore.healthScoreColor)
-                .frame(width: 22, height: 22)
-                .background(
-                    Circle()
-                        .fill(item.healthScore.healthScoreColor.opacity(0.15))
-                )
-
-            // Item details
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.itemName)
+    @ViewBuilder
+    private func expandedItemsContent(_ category: CategorySpendItem) -> some View {
+        if loadingCategoryId == category.id {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
+                    .scaleEffect(0.7)
+                Text("Loading...")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(1)
-
-                HStack(spacing: 6) {
-                    Text(item.storeName)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .lineLimit(1)
-
-                    if let date = item.dateParsed {
-                        Text("•")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.3))
-                        Text(formatItemDate(date))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+        } else if let errorMsg = categoryLoadError[category.id] {
+            VStack(spacing: 8) {
+                Text("Failed to load items")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.orange)
+                Text(errorMsg)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.4))
+                    .multilineTextAlignment(.center)
+                Button {
+                    Task { await loadCategoryItems(category) }
+                } label: {
+                    Text("Retry")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.blue)
                 }
             }
-
-            Spacer()
-
-            // Quantity and price
-            HStack(spacing: 6) {
-                if item.quantity > 1 {
-                    Text("×\(item.quantity)")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
+        } else if let items = categoryItems[category.id], !items.isEmpty {
+            // Sort by health score (healthiest first), then alphabetically
+            let sortedItems = items.sorted { t1, t2 in
+                let score1 = t1.healthScore
+                let score2 = t2.healthScore
+                if let s1 = score1, let s2 = score2 {
+                    return s1 > s2
+                }
+                if score1 != nil && score2 == nil { return true }
+                if score1 == nil && score2 != nil { return false }
+                return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
+            }
+            ForEach(sortedItems) { item in
+                HStack(spacing: 10) {
+                    // Sleek Nutri-Score badge
+                    Text(item.healthScore.nutriScoreLetter)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(item.healthScore.healthScoreColor)
+                        .frame(width: 16, height: 16)
                         .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.08))
+                            Circle()
+                                .fill(item.healthScore.healthScoreColor.opacity(0.15))
                         )
+                        .overlay(
+                            Circle()
+                                .stroke(item.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(item.itemName)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.85))
+                                .lineLimit(1)
+
+                            if item.quantity > 1 {
+                                Text("×\(item.quantity)")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.4))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.08))
+                                    )
+                            }
+                        }
+
+                        // Store name for context
+                        Text(item.storeName)
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.4))
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Text(String(format: "€%.2f", item.totalPrice))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
                 }
-
-                Text(String(format: "€%.2f", item.totalPrice))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.75))
             }
+        } else {
+            Text("No transactions")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.4))
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.03))
-        )
-        .padding(.bottom, isLast ? 0 : 4)
-    }
-
-    // MARK: - Date Formatting
-
-    private func formatItemDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM"
-        return formatter.string(from: date)
-    }
-
-    // MARK: - Category Row
-
-    private func categoryRow(_ category: CategorySpendItem) -> some View {
-        let isExpanded = expandedCategoryId == category.id
-
-        return HStack(spacing: 12) {
-            // Color indicator and icon
-            ZStack {
-                Circle()
-                    .fill(category.color.opacity(0.2))
-                    .frame(width: 44, height: 44)
-
-                Image(systemName: category.icon)
-                    .font(.system(size: 18))
-                    .foregroundStyle(category.color)
-            }
-
-            // Category info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(category.name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-
-                Text("\(category.transactionCount) items")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
-            }
-
-            Spacer()
-
-            // Amount and percentage
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(String(format: "€%.2f", category.totalSpent))
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-
-                Text(category.percentageText)
-                    .font(.caption)
-                    .foregroundStyle(category.color)
-            }
-
-            // Chevron indicator
-            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 20)
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isExpanded ? category.color.opacity(0.15) : Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isExpanded ? category.color.opacity(0.5) : Color.clear, lineWidth: 1)
-        )
     }
 
     // MARK: - Data Loading

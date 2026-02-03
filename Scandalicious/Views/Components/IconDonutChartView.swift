@@ -312,11 +312,14 @@ struct IconDonutChartView: View {
                             )
                         )
 
-                    // Label (e.g., "Stores" or "Categories")
+                    // Label (e.g., "Stores & Businesses" or "Categories")
                     Text(label)
-                        .font(.system(size: size * 0.08, weight: .semibold))
+                        .font(.system(size: size * 0.07, weight: .semibold))
                         .foregroundColor(.white.opacity(0.6))
                         .tracking(0.5)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                 }
             }
             // Display average item price if available
