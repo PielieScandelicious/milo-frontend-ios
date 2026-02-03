@@ -33,6 +33,9 @@ struct StoreDetailView: View {
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
 
+    // Expandable transactions section (for bank-imported transactions)
+    @State private var isTransactionsSectionExpanded = false
+
     // Split expense
     @State private var receiptToSplit: APIReceipt?
 
@@ -216,6 +219,11 @@ struct StoreDetailView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 24)
 
+                    // Expandable Transactions Section (Bank-Imported)
+                    transactionsSection
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+
                     // Bottom spacing
                     Color.clear.frame(height: 32)
                 }
@@ -252,6 +260,8 @@ struct StoreDetailView: View {
                 Task {
                     await refreshStoreData()
                 }
+                // Load receipts and transactions on first appearance
+                loadReceipts()
             } else {
                 // Subsequent appearances (navigating back): refresh from backend
                 // This handles the case where a receipt was deleted in ReceiptsListView
@@ -259,6 +269,8 @@ struct StoreDetailView: View {
                 Task {
                     await refreshStoreData()
                 }
+                // Reload receipts when returning to view
+                loadReceipts()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
@@ -402,9 +414,9 @@ struct StoreDetailView: View {
 
                     Spacer()
 
-                    // Count badge
-                    if currentVisitCount > 0 {
-                        Text("\(currentVisitCount)")
+                    // Count badge (only actual receipts)
+                    if actualReceipts.count > 0 {
+                        Text("\(actualReceipts.count)")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .frame(width: 32, height: 32)
@@ -456,7 +468,7 @@ struct StoreDetailView: View {
             // Expanded receipts list (no container background)
             if isReceiptsSectionExpanded {
                 VStack(spacing: 12) {
-                    if receiptsViewModel.state.isLoading && receiptsViewModel.receipts.isEmpty {
+                    if receiptsViewModel.state.isLoading && actualReceipts.isEmpty {
                         HStack(spacing: 12) {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -467,7 +479,7 @@ struct StoreDetailView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 24)
-                    } else if receiptsViewModel.receipts.isEmpty {
+                    } else if actualReceipts.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "doc.text.fill")
                                 .font(.system(size: 40))
@@ -523,11 +535,171 @@ struct StoreDetailView: View {
         }
     }
 
+    // MARK: - Filtered Receipts and Transactions
+
+    /// Actual scanned receipts (source == receiptUpload)
+    private var actualReceipts: [APIReceipt] {
+        receiptsViewModel.receipts
+            .filter { $0.source == .receiptUpload }
+            .sorted { receipt1, receipt2 in
+                let date1 = receipt1.dateParsed ?? Date.distantPast
+                let date2 = receipt2.dateParsed ?? Date.distantPast
+                return date1 > date2
+            }
+    }
+
+    /// Bank-imported transactions (source == bankImport)
+    private var bankTransactions: [APIReceipt] {
+        receiptsViewModel.receipts
+            .filter { $0.source == .bankImport }
+            .sorted { receipt1, receipt2 in
+                let date1 = receipt1.dateParsed ?? Date.distantPast
+                let date2 = receipt2.dateParsed ?? Date.distantPast
+                return date1 > date2
+            }
+    }
+
     private var sortedReceipts: [APIReceipt] {
-        receiptsViewModel.receipts.sorted { receipt1, receipt2 in
-            let date1 = receipt1.dateParsed ?? Date.distantPast
-            let date2 = receipt2.dateParsed ?? Date.distantPast
-            return date1 > date2
+        actualReceipts
+    }
+
+    // MARK: - Transactions Section (Bank-Imported)
+
+    private var transactionsSection: some View {
+        VStack(spacing: 0) {
+            // Header button with glass-morphism
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    isTransactionsSectionExpanded.toggle()
+                }
+                if isTransactionsSectionExpanded && receiptsViewModel.receipts.isEmpty {
+                    loadReceipts()
+                }
+            } label: {
+                HStack(spacing: 14) {
+                    // Transaction icon
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.15))
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: "creditcard.fill")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                    }
+
+                    // Title
+                    Text("Transactions")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    // Count badge
+                    if bankTransactions.count > 0 {
+                        Text("\(bankTransactions.count)")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.2))
+                            )
+                    }
+
+                    // Chevron
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                        .rotationEffect(.degrees(isTransactionsSectionExpanded ? 180 : 0))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    ZStack {
+                        // Glass base
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.white.opacity(0.04))
+
+                        // Gradient overlay
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.07), Color.white.opacity(0.02)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.3), Color.white.opacity(0.04)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+            }
+            .buttonStyle(ReceiptsHeaderButtonStyle())
+
+            // Expanded transactions list
+            if isTransactionsSectionExpanded {
+                VStack(spacing: 12) {
+                    if receiptsViewModel.state.isLoading && bankTransactions.isEmpty {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.0)
+                            Text("Loading transactions...")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                    } else if bankTransactions.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "creditcard.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.white.opacity(0.3))
+                            Text("No Transactions")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                            Text("No bank transactions found for this store")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
+                    } else {
+                        LazyVStack(spacing: 12) {
+                            ForEach(bankTransactions) { transaction in
+                                BankTransactionCard(
+                                    receipt: transaction,
+                                    onDelete: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            deleteReceipt(transaction)
+                                        }
+                                    },
+                                    onSplit: {
+                                        receiptToSplit = transaction
+                                    }
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .opacity,
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                            }
+                        }
+                        .animation(.easeInOut(duration: 0.3), value: bankTransactions.count)
+                    }
+                }
+                .padding(.top, 12)
+                .transition(.opacity)
+            }
         }
     }
 
