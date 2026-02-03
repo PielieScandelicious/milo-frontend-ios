@@ -487,7 +487,14 @@ struct OverviewView: View {
                 CategoryBreakdownDetailView(month: components.month, year: components.year)
             }
             .sheet(item: $receiptToSplit) { receipt in
-                SplitBankTransactionView(receipt: receipt)
+                // Use appropriate split view based on receipt source
+                if receipt.source == .bankImport {
+                    // Bank-imported transactions use custom/equal split
+                    SplitBankTransactionView(receipt: receipt)
+                } else {
+                    // Scanned receipts use line item splitting
+                    SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
+                }
             }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
