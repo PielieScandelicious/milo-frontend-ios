@@ -17,6 +17,9 @@ struct CategoryDetailView: View {
     @State private var error: String?
     @State private var hasInitialized = false
 
+    /// Observe split cache for updates
+    @ObservedObject private var splitCache = SplitCacheManager.shared
+
     // Group transactions by store
     private var transactionsByStore: [(storeName: String, transactions: [APITransaction], totalSpent: Double)] {
         let grouped = Dictionary(grouping: transactions) { $0.storeName }
@@ -335,7 +338,26 @@ struct CategoryDetailView: View {
     // MARK: - Transaction Row
 
     private func transactionRow(_ transaction: APITransaction, isLast: Bool) -> some View {
-        HStack(spacing: 12) {
+        // Get split participants for this transaction
+        let splitParticipants: [SplitParticipantInfo] = {
+            guard let receiptId = transaction.receiptId else {
+                print("🔍 CategoryDetailView: No receiptId for transaction \(transaction.id) - \(transaction.itemName)")
+                return []
+            }
+            guard let splitData = splitCache.getSplit(for: receiptId) else {
+                print("🔍 CategoryDetailView: No split data for receiptId \(receiptId)")
+                return []
+            }
+            let participants = splitData.participantsForTransaction(transaction.id)
+            print("🔍 CategoryDetailView: Found \(participants.count) participants for tx \(transaction.id)")
+            if participants.isEmpty {
+                print("   Available assignment keys: \(splitData.assignments.keys.joined(separator: ", "))")
+            }
+            return participants
+        }()
+        let friendsOnly = splitParticipants.filter { !$0.isMe }
+
+        return HStack(spacing: 12) {
             // Nutri-Score badge
             Text(transaction.healthScore.nutriScoreLetter)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -369,6 +391,11 @@ struct CategoryDetailView: View {
                                     .fill(Color.white.opacity(0.08))
                             )
                     }
+
+                    // Split participant avatars
+                    if !friendsOnly.isEmpty {
+                        MiniSplitAvatars(participants: friendsOnly)
+                    }
                 }
 
                 Text(formatTransactionDate(transaction.dateParsed))
@@ -390,6 +417,12 @@ struct CategoryDetailView: View {
                 .fill(Color.white.opacity(0.02))
         )
         .padding(.bottom, isLast ? 0 : 6)
+        .task {
+            // Fetch split data if we have a receipt ID and it's not cached
+            if let receiptId = transaction.receiptId, !splitCache.hasSplit(for: receiptId) {
+                await splitCache.fetchSplit(for: receiptId)
+            }
+        }
     }
 
     // MARK: - Date Formatting

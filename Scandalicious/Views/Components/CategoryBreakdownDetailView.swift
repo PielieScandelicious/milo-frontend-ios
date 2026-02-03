@@ -28,6 +28,9 @@ struct CategoryBreakdownDetailView: View {
     @State private var loadingCategoryId: String?
     @State private var categoryLoadError: [String: String] = [:]
 
+    /// Observe split cache for updates
+    @ObservedObject private var splitCache = SplitCacheManager.shared
+
     private let apiService = AnalyticsAPIService.shared
 
     private var monthName: String {
@@ -492,6 +495,14 @@ struct CategoryBreakdownDetailView: View {
                 return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
             }
             ForEach(sortedItems) { item in
+                // Get split participants for this item
+                let splitParticipants: [SplitParticipantInfo] = {
+                    guard let receiptId = item.receiptId else { return [] }
+                    guard let splitData = splitCache.getSplit(for: receiptId) else { return [] }
+                    return splitData.participantsForTransaction(item.id)
+                }()
+                let friendsOnly = splitParticipants.filter { !$0.isMe }
+
                 HStack(spacing: 10) {
                     // Sleek Nutri-Score badge
                     Text(item.healthScore.nutriScoreLetter)
@@ -525,6 +536,11 @@ struct CategoryBreakdownDetailView: View {
                                             .fill(Color.white.opacity(0.08))
                                     )
                             }
+
+                            // Split participant avatars
+                            if !friendsOnly.isEmpty {
+                                MiniSplitAvatars(participants: friendsOnly)
+                            }
                         }
 
                         // Store name for context
@@ -539,6 +555,12 @@ struct CategoryBreakdownDetailView: View {
                     Text(String(format: "€%.2f", item.totalPrice))
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(.white.opacity(0.7))
+                }
+                .task {
+                    // Fetch split data if we have a receipt ID and it's not cached
+                    if let receiptId = item.receiptId, !splitCache.hasSplit(for: receiptId) {
+                        await splitCache.fetchSplit(for: receiptId)
+                    }
                 }
             }
         } else {

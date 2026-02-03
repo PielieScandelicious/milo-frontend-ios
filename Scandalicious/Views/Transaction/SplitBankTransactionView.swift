@@ -713,7 +713,8 @@ struct SplitBankTransactionView: View {
                 ParticipantCreateRequest(
                     name: p.name,
                     color: p.color,
-                    customAmount: splitMode == .custom ? customAmounts[p.id] : nil
+                    customAmount: splitMode == .custom ? customAmounts[p.id] : nil,
+                    isMe: p.isMe
                 )
             }
 

@@ -45,6 +45,9 @@ struct StoreDetailView: View {
     @State private var categoryTransactions: [String: [APITransaction]] = [:]
     @State private var loadingCategories: Set<String> = []
 
+    // Split cache for displaying friend avatars on transactions
+    @ObservedObject private var splitCache = SplitCacheManager.shared
+
     // Accent color for the line chart - modern red
     private var chartAccentColor: Color {
         Color(red: 0.95, green: 0.25, blue: 0.3)
@@ -825,6 +828,14 @@ struct StoreDetailView: View {
                                 return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
                             }
                             ForEach(sortedTransactions) { transaction in
+                                // Get split participants for this transaction
+                                let splitParticipants: [SplitParticipantInfo] = {
+                                    guard let receiptId = transaction.receiptId else { return [] }
+                                    guard let splitData = splitCache.getSplit(for: receiptId) else { return [] }
+                                    return splitData.participantsForTransaction(transaction.id)
+                                }()
+                                let friendsOnly = splitParticipants.filter { !$0.isMe }
+
                                 HStack(spacing: 10) {
                                     // Sleek Nutri-Score letter badge (matching receipt style)
                                     Text(transaction.healthScore.nutriScoreLetter)
@@ -858,6 +869,11 @@ struct StoreDetailView: View {
                                                             .fill(Color.white.opacity(0.08))
                                                     )
                                             }
+
+                                            // Split participant avatars
+                                            if !friendsOnly.isEmpty {
+                                                MiniSplitAvatars(participants: friendsOnly)
+                                            }
                                         }
                                     }
 
@@ -866,6 +882,12 @@ struct StoreDetailView: View {
                                     Text(String(format: "€%.2f", transaction.totalPrice))
                                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                                         .foregroundColor(.white.opacity(0.7))
+                                }
+                                .task {
+                                    // Fetch split data if we have a receipt ID and it's not cached
+                                    if let receiptId = transaction.receiptId, !splitCache.hasSplit(for: receiptId) {
+                                        await splitCache.fetchSplit(for: receiptId)
+                                    }
                                 }
                             }
                         } else {

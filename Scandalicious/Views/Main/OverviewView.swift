@@ -65,6 +65,7 @@ struct OverviewView: View {
     @State private var categoryItems: [String: [APITransaction]] = [:]  // Loaded items per category
     @State private var loadingCategoryId: String?  // Currently loading category
     @State private var categoryLoadError: [String: String] = [:]  // Error messages per category
+    @ObservedObject private var splitCache = SplitCacheManager.shared  // For split avatar display
     @State private var showingAllTransactions = false
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
@@ -2091,10 +2092,6 @@ struct OverviewView: View {
 
             let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
 
-            print("✅ [Category] Received \(response.transactions.count) transactions (total: \(response.total))")
-            if !response.transactions.isEmpty {
-                print("   First transaction: \(response.transactions[0].itemName) - \(response.transactions[0].category)")
-            }
             print("═══════════════════════════════════════════════════════════")
 
             await MainActor.run {
@@ -2179,7 +2176,15 @@ struct OverviewView: View {
     }
 
     private func expandedCategoryItemRow(_ item: APITransaction, category: CategorySpendItem, isLast: Bool) -> some View {
-        HStack(spacing: 10) {
+        // Get split participants for this item
+        let splitParticipants: [SplitParticipantInfo] = {
+            guard let receiptId = item.receiptId else { return [] }
+            guard let splitData = splitCache.getSplit(for: receiptId) else { return [] }
+            return splitData.participantsForTransaction(item.id)
+        }()
+        let friendsOnly = splitParticipants.filter { !$0.isMe }
+
+        return HStack(spacing: 10) {
             // Health score badge
             Text(item.healthScore.nutriScoreLetter)
                 .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -2192,10 +2197,17 @@ struct OverviewView: View {
 
             // Item details
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.itemName)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(item.itemName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
+
+                    // Split participant avatars
+                    if !friendsOnly.isEmpty {
+                        MiniSplitAvatars(participants: friendsOnly)
+                    }
+                }
 
                 HStack(spacing: 6) {
                     Text(item.storeName)
@@ -2242,6 +2254,12 @@ struct OverviewView: View {
                 .fill(Color.white.opacity(0.03))
         )
         .padding(.bottom, isLast ? 0 : 4)
+        .task {
+            // Fetch split data if we have a receipt ID and it's not cached
+            if let receiptId = item.receiptId, !splitCache.hasSplit(for: receiptId) {
+                await splitCache.fetchSplit(for: receiptId)
+            }
+        }
     }
 
     private func formatCategoryItemDate(_ date: Date) -> String {

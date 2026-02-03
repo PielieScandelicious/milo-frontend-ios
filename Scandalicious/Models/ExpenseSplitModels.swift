@@ -279,17 +279,20 @@ struct ParticipantCreateRequest: Codable {
     let name: String
     let color: String
     let customAmount: Double?
+    let isMe: Bool
 
     enum CodingKeys: String, CodingKey {
         case name
         case color
         case customAmount = "custom_amount"
+        case isMe = "is_me"
     }
 
-    init(name: String, color: String, customAmount: Double? = nil) {
+    init(name: String, color: String, customAmount: Double? = nil, isMe: Bool = false) {
         self.name = name
         self.color = color
         self.customAmount = customAmount
+        self.isMe = isMe
     }
 }
 

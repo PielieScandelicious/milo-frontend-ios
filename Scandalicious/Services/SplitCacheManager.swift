@@ -39,9 +39,11 @@ struct CachedSplitData: Equatable {
     let splitId: String
     let receiptId: String
     let participants: [SplitParticipantInfo]
-    /// Maps transaction ID to array of participant IDs who share this item
+    /// Maps transaction ID (lowercased) to array of participant IDs who share this item
+    private let assignmentsLowercased: [String: [String]]
+    /// Original assignments for Equatable conformance
     let assignments: [String: [String]]
-    /// Maps participant ID to participant info for quick lookup
+    /// Maps participant ID (lowercased) to participant info for quick lookup
     private let participantMap: [String: SplitParticipantInfo]
 
     init(splitId: String, receiptId: String, participants: [SplitParticipantInfo], assignments: [String: [String]]) {
@@ -49,25 +51,34 @@ struct CachedSplitData: Equatable {
         self.receiptId = receiptId
         self.participants = participants
         self.assignments = assignments
-        // Build lookup map
+
+        // Build lowercased assignments map for case-insensitive lookup
+        var lowercasedAssignments: [String: [String]] = [:]
+        for (key, value) in assignments {
+            lowercasedAssignments[key.lowercased()] = value
+        }
+        self.assignmentsLowercased = lowercasedAssignments
+
+        // Build participant lookup map with lowercased keys
         var map: [String: SplitParticipantInfo] = [:]
         for p in participants {
-            map[p.id] = p
+            map[p.id.lowercased()] = p
         }
         self.participantMap = map
     }
 
-    /// Get participants for a specific transaction
+    /// Get participants for a specific transaction (case-insensitive lookup)
     func participantsForTransaction(_ transactionId: String) -> [SplitParticipantInfo] {
-        guard let participantIds = assignments[transactionId] else {
+        // Case-insensitive lookup for transaction ID
+        guard let participantIds = assignmentsLowercased[transactionId.lowercased()] else {
             return []
         }
 
         var result: [SplitParticipantInfo] = []
         for pid in participantIds {
             let pidLower = pid.lowercased()
-            // Case-insensitive ID match (backend returns lowercase, Swift UUID is uppercase)
-            if let participant = participantMap.first(where: { $0.key.lowercased() == pidLower })?.value {
+            // Case-insensitive ID match for participant lookup
+            if let participant = participantMap[pidLower] {
                 result.append(participant)
             }
         }
@@ -75,9 +86,9 @@ struct CachedSplitData: Equatable {
         return result
     }
 
-    /// Check if a transaction has been split
+    /// Check if a transaction has been split (case-insensitive lookup)
     func isTransactionSplit(_ transactionId: String) -> Bool {
-        guard let participantIds = assignments[transactionId] else { return false }
+        guard let participantIds = assignmentsLowercased[transactionId.lowercased()] else { return false }
         return !participantIds.isEmpty
     }
 

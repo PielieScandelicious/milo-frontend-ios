@@ -500,6 +500,7 @@ struct APITransaction: Codable, Identifiable {
     let category: String
     let date: String
     let healthScore: Int?  // 0-5 for food items, nil for non-food
+    let receiptId: String?  // Receipt ID for split lookup
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -511,9 +512,10 @@ struct APITransaction: Codable, Identifiable {
         case category
         case date
         case healthScore = "health_score"
+        case receiptId = "receipt_id"
     }
 
-    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, healthScore: Int? = nil) {
+    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, healthScore: Int? = nil, receiptId: String? = nil) {
         self.id = id
         self.storeName = storeName
         self.itemName = itemName
@@ -523,6 +525,7 @@ struct APITransaction: Codable, Identifiable {
         self.category = category
         self.date = date
         self.healthScore = healthScore
+        self.receiptId = receiptId
     }
 
     var dateParsed: Date? {

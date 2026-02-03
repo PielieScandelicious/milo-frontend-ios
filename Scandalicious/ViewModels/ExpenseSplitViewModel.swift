@@ -265,7 +265,7 @@ class ExpenseSplitViewModel: ObservableObject {
         do {
             // Build request
             let participantRequests = participants.map { p in
-                ParticipantCreateRequest(name: p.name, color: p.color)
+                ParticipantCreateRequest(name: p.name, color: p.color, isMe: p.isMe)
             }
 
             // Create mapping from participant UUID (lowercase) to index (0-based)

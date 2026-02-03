@@ -17,6 +17,14 @@ struct ReceiptDetailsView: View {
     @State private var showDeleteError = false
     @State private var showSplitView = false
 
+    /// Observe split cache for updates
+    @ObservedObject private var splitCache = SplitCacheManager.shared
+
+    /// Get cached split data for this receipt
+    private var splitData: CachedSplitData? {
+        splitCache.getSplit(for: receipt.receiptId)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -54,6 +62,12 @@ struct ReceiptDetailsView: View {
             }
             .sheet(isPresented: $showSplitView) {
                 SplitExpenseView(receipt: receipt)
+            }
+            .task {
+                // Fetch split data if not already cached
+                if splitData == nil {
+                    await splitCache.fetchSplit(for: receipt.receiptId)
+                }
             }
             .onAppear {
                 print("📋 ReceiptDetailsView appeared")
@@ -269,7 +283,14 @@ struct ReceiptDetailsView: View {
     private var itemsList: some View {
         VStack(spacing: 8) {
             ForEach(receipt.transactions) { transaction in
-                ReceiptItemRow(transaction: transaction)
+                // Get split participants for this item
+                let participants: [SplitParticipantInfo] = {
+                    guard let itemId = transaction.itemId,
+                          let split = splitData else { return [] }
+                    return split.participantsForTransaction(itemId)
+                }()
+
+                ReceiptItemRow(transaction: transaction, splitParticipants: participants)
             }
         }
     }
@@ -335,6 +356,12 @@ struct ReceiptDetailsView: View {
 
 struct ReceiptItemRow: View {
     let transaction: ReceiptTransaction
+    var splitParticipants: [SplitParticipantInfo] = []
+
+    /// Filter out "Me" - only show friends
+    private var friendsOnly: [SplitParticipantInfo] {
+        splitParticipants.filter { !$0.isMe }
+    }
 
     var body: some View {
         let _ = print("🛒 ReceiptItemRow: \(transaction.itemName) - qty: \(transaction.quantity), unitPrice: \(transaction.unitPrice ?? 0)")
@@ -372,10 +399,17 @@ struct ReceiptItemRow: View {
                 HStack(alignment: .top, spacing: 8) {
                     // Horizontally scrollable item name (2 lines max)
                     ScrollView(.horizontal, showsIndicators: false) {
-                        Text(transaction.itemName)
-                            .font(.body)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.primary)
+                        HStack(spacing: 6) {
+                            Text(transaction.itemName)
+                                .font(.body)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+
+                            // Split participant avatars (friends only)
+                            if !friendsOnly.isEmpty {
+                                ReceiptItemSplitAvatars(participants: friendsOnly)
+                            }
+                        }
                     }
                     .frame(maxHeight: 44) // Roughly 2 lines of text
 
@@ -444,6 +478,55 @@ struct ReceiptItemRow: View {
         case "mint": return .mint
         case "cyan": return .cyan
         default: return .gray
+        }
+    }
+}
+
+// MARK: - Receipt Item Split Avatars
+
+/// Compact display of friend avatars for split items in ReceiptDetailsView
+struct ReceiptItemSplitAvatars: View {
+    let participants: [SplitParticipantInfo]
+
+    /// Maximum avatars to show before "+N"
+    private let maxVisible = 3
+
+    var body: some View {
+        if !participants.isEmpty {
+            HStack(spacing: -4) {
+                // Show up to maxVisible avatars
+                ForEach(Array(participants.prefix(maxVisible).enumerated()), id: \.element.id) { index, participant in
+                    Circle()
+                        .fill(participant.swiftUIColor)
+                        .frame(width: 18, height: 18)
+                        .overlay(
+                            Text(String(participant.name.prefix(1)).uppercased())
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color(uiColor: .systemBackground), lineWidth: 1.5)
+                        )
+                        .zIndex(Double(maxVisible - index))
+                }
+
+                // Show "+N" if more participants
+                if participants.count > maxVisible {
+                    Circle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 18, height: 18)
+                        .overlay(
+                            Text("+\(participants.count - maxVisible)")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(.primary.opacity(0.7))
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color(uiColor: .systemBackground), lineWidth: 1.5)
+                        )
+                }
+            }
         }
     }
 }
