@@ -60,6 +60,11 @@ struct OverviewView: View {
     @State private var displayedBreakdowns: [StoreBreakdown] = []
     @State private var selectedBreakdown: StoreBreakdown?
     @State private var selectedStoreColor: Color = Color(red: 0.3, green: 0.7, blue: 1.0)
+    @State private var selectedCategoryItem: CategorySpendItem?  // For category detail navigation (kept for backwards compatibility)
+    @State private var expandedCategoryId: String?  // For inline category expansion
+    @State private var categoryItems: [String: [APITransaction]] = [:]  // Loaded items per category
+    @State private var loadingCategoryId: String?  // Currently loading category
+    @State private var categoryLoadError: [String: String] = [:]  // Error messages per category
     @State private var showingAllTransactions = false
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
@@ -474,6 +479,9 @@ struct OverviewView: View {
             }
             .navigationDestination(item: $selectedBreakdown) { breakdown in
                 StoreDetailView(storeBreakdown: breakdown, storeColor: selectedStoreColor)
+            }
+            .navigationDestination(item: $selectedCategoryItem) { category in
+                CategoryDetailView(category: category, period: selectedPeriod)
             }
             .navigationDestination(isPresented: $showingAllTransactions) {
                 allTransactionsDestination
@@ -1713,17 +1721,32 @@ struct OverviewView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
 
-                    // Category rows with staggered animation
+                    // Category rows with staggered animation - now expandable inline
                     VStack(spacing: 8) {
                         ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
-                            CategoryRowButton(category: category)
-                                .opacity(storeRowsAppeared ? 1 : 0)
-                                .offset(y: storeRowsAppeared ? 0 : 15)
-                                .animation(
-                                    Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                        .delay(Double(index) * 0.08),
-                                    value: storeRowsAppeared
+                            VStack(spacing: 0) {
+                                // Category row header (tappable to expand)
+                                ExpandableCategoryRowHeader(
+                                    category: category,
+                                    isExpanded: expandedCategoryId == category.id,
+                                    onTap: {
+                                        toggleCategoryExpansion(category, period: period)
+                                    }
                                 )
+
+                                // Expanded items section
+                                if expandedCategoryId == category.id {
+                                    expandedCategoryItemsSection(category)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
+                            }
+                            .opacity(storeRowsAppeared ? 1 : 0)
+                            .offset(y: storeRowsAppeared ? 0 : 15)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.08),
+                                value: storeRowsAppeared
+                            )
                         }
 
                         // Show All / Show Less button
@@ -1734,7 +1757,7 @@ struct OverviewView: View {
                             )
                         }
                     }
-                    .id("\(period)-categories-\(showAllRows)")
+                    .id("\(period)-categories-\(showAllRows)-\(expandedCategoryId ?? "")")
                     .padding(.horizontal, 16)
                     .onAppear {
                         if !storeRowsAppeared {
@@ -1995,6 +2018,236 @@ struct OverviewView: View {
 
             Spacer()
         }
+    }
+
+    // MARK: - Expandable Category Functions
+
+    private func toggleCategoryExpansion(_ category: CategorySpendItem, period: String) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            if expandedCategoryId == category.id {
+                // Collapse
+                expandedCategoryId = nil
+            } else {
+                // Expand and load items
+                expandedCategoryId = category.id
+
+                // Load items if not already loaded
+                if categoryItems[category.id] == nil && loadingCategoryId != category.id {
+                    Task {
+                        await loadCategoryItems(category, period: period)
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadCategoryItems(_ category: CategorySpendItem, period: String) async {
+        loadingCategoryId = category.id
+        categoryLoadError[category.id] = nil
+
+        // Comprehensive debug logging
+        print("═══════════════════════════════════════════════════════════")
+        print("🔍 [Category] Loading items for category:")
+        print("   categoryId: \(category.categoryId)")
+        print("   name: '\(category.name)'")
+        print("   period: '\(period)'")
+        print("   transactionCount from summary: \(category.transactionCount)")
+        print("═══════════════════════════════════════════════════════════")
+
+        do {
+            var filters = TransactionFilters()
+
+            // Use the category name directly from the backend (bypasses enum matching issues)
+            filters.categoryName = category.name
+
+            filters.pageSize = 100
+
+            // Parse period to get date range (e.g., "January 2026")
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+            dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+            if let parsedDate = dateFormatter.date(from: period) {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: "UTC")!
+
+                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
+                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+
+                filters.startDate = startOfMonth
+                filters.endDate = endOfMonth
+                print("   📅 Date range: \(DateFormatter.yyyyMMdd.string(from: startOfMonth)) to \(DateFormatter.yyyyMMdd.string(from: endOfMonth))")
+            } else {
+                print("   ⚠️ Failed to parse period: '\(period)' - will load all time")
+            }
+
+            // Debug: Print query items being sent
+            let queryItems = filters.toQueryItems()
+            print("   📤 Query items:")
+            for item in queryItems {
+                print("      - \(item.name)=\(item.value ?? "nil")")
+            }
+
+            let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
+
+            print("✅ [Category] Received \(response.transactions.count) transactions (total: \(response.total))")
+            if !response.transactions.isEmpty {
+                print("   First transaction: \(response.transactions[0].itemName) - \(response.transactions[0].category)")
+            }
+            print("═══════════════════════════════════════════════════════════")
+
+            await MainActor.run {
+                categoryItems[category.id] = response.transactions
+                loadingCategoryId = nil
+            }
+        } catch {
+            print("❌ [Category] Error loading items: \(error.localizedDescription)")
+            print("   Full error: \(error)")
+            print("═══════════════════════════════════════════════════════════")
+            await MainActor.run {
+                categoryLoadError[category.id] = error.localizedDescription
+                loadingCategoryId = nil
+            }
+        }
+    }
+
+    private func expandedCategoryItemsSection(_ category: CategorySpendItem) -> some View {
+        VStack(spacing: 0) {
+            if loadingCategoryId == category.id {
+                // Loading state
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.white)
+                    Text("Loading items...")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.leading, 8)
+                    Spacer()
+                }
+                .padding(.vertical, 16)
+            } else if let errorMsg = categoryLoadError[category.id] {
+                // Error state
+                VStack(spacing: 8) {
+                    Text("Failed to load items")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.orange)
+                    Text(errorMsg)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.4))
+                        .multilineTextAlignment(.center)
+                    Button {
+                        Task { await loadCategoryItems(category, period: selectedPeriod) }
+                    } label: {
+                        Text("Retry")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.blue)
+                    }
+                }
+                .padding(.vertical, 12)
+            } else if let items = categoryItems[category.id] {
+                if items.isEmpty {
+                    // Empty state
+                    VStack(spacing: 6) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white.opacity(0.3))
+                        Text("No items found")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                    .padding(.vertical, 16)
+                } else {
+                    // Items list
+                    VStack(spacing: 0) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            expandedCategoryItemRow(item, category: category, isLast: index == items.count - 1)
+                        }
+                    }
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(category.color.opacity(0.05))
+        )
+        .padding(.top, 4)
+    }
+
+    private func expandedCategoryItemRow(_ item: APITransaction, category: CategorySpendItem, isLast: Bool) -> some View {
+        HStack(spacing: 10) {
+            // Health score badge
+            Text(item.healthScore.nutriScoreLetter)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(item.healthScore.healthScoreColor)
+                .frame(width: 22, height: 22)
+                .background(
+                    Circle()
+                        .fill(item.healthScore.healthScoreColor.opacity(0.15))
+                )
+
+            // Item details
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.itemName)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    Text(item.storeName)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .lineLimit(1)
+
+                    if let date = item.dateParsed {
+                        Text("•")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.3))
+                        Text(formatCategoryItemDate(date))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Quantity and price
+            HStack(spacing: 6) {
+                if item.quantity > 1 {
+                    Text("×\(item.quantity)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                        )
+                }
+
+                Text(String(format: "€%.2f", item.totalPrice))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.75))
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.03))
+        )
+        .padding(.bottom, isLast ? 0 : 4)
+    }
+
+    private func formatCategoryItemDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date)
     }
 
     // MARK: - Show All Rows Button
@@ -3003,105 +3256,239 @@ private struct StoreRowButton: View {
     }
 }
 
-// MARK: - Category Row Button
-private struct CategoryRowButton: View {
+// MARK: - Expandable Category Row Header
+private struct ExpandableCategoryRowHeader: View {
     let category: CategorySpendItem
+    let isExpanded: Bool
+    let onTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Color accent bar on the left
-            RoundedRectangle(cornerRadius: 2)
-                .fill(category.color)
-                .frame(width: 4, height: 32)
+        Button {
+            onTap()
+        } label: {
+            HStack(spacing: 12) {
+                // Color accent bar on the left
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(category.color)
+                    .frame(width: 4, height: 32)
 
-            // Category icon
-            ZStack {
-                Circle()
-                    .fill(category.color.opacity(0.15))
-                    .frame(width: 32, height: 32)
-                Image(systemName: category.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(category.color)
-            }
-
-            // Category name
-            Text(category.name)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
-                .lineLimit(1)
-
-            Spacer()
-
-            // Percentage badge
-            Text("\(Int(category.percentage))%")
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(category.color)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
+                // Category icon
+                ZStack {
+                    Circle()
                         .fill(category.color.opacity(0.15))
-                )
+                        .frame(width: 32, height: 32)
+                    Image(systemName: category.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(category.color)
+                }
 
-            // Amount
-            Text(String(format: "€%.0f", category.totalSpent))
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .frame(width: 65, alignment: .trailing)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            ZStack {
-                // Base glass effect
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.04))
+                // Category name
+                Text(category.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
 
-                // Subtle gradient
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.06),
-                                Color.white.opacity(0.02)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                Spacer()
+
+                // Percentage badge
+                Text("\(Int(category.percentage))%")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(category.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(category.color.opacity(0.15))
                     )
 
-                // Colored accent glow on the left
-                HStack {
+                // Amount
+                Text(String(format: "€%.0f", category.totalSpent))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: 65, alignment: .trailing)
+
+                // Chevron for expand/collapse
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                ZStack {
+                    // Base glass effect
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(isExpanded ? category.color.opacity(0.1) : Color.white.opacity(0.04))
+
+                    // Subtle gradient
                     RoundedRectangle(cornerRadius: 16)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    category.color.opacity(0.15),
-                                    Color.clear
+                                    Color.white.opacity(0.06),
+                                    Color.white.opacity(0.02)
                                 ],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 80)
-                    Spacer()
+
+                    // Colored accent glow on the left
+                    HStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        category.color.opacity(isExpanded ? 0.25 : 0.15),
+                                        Color.clear
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: 80)
+                        Spacer()
+                    }
                 }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: isExpanded
+                                ? [category.color.opacity(0.4), category.color.opacity(0.2)]
+                                : [Color.white.opacity(0.1), Color.white.opacity(0.03)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(OverviewCategoryRowButtonStyle())
+    }
+}
+
+// MARK: - Category Row Button (Legacy - for navigation)
+private struct CategoryRowButton: View {
+    let category: CategorySpendItem
+    let onSelect: (CategorySpendItem) -> Void
+
+    var body: some View {
+        Button {
+            onSelect(category)
+        } label: {
+            HStack(spacing: 12) {
+                // Color accent bar on the left
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(category.color)
+                    .frame(width: 4, height: 32)
+
+                // Category icon
+                ZStack {
+                    Circle()
+                        .fill(category.color.opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: category.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(category.color)
+                }
+
+                // Category name
+                Text(category.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Spacer()
+
+                // Percentage badge
+                Text("\(Int(category.percentage))%")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(category.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(category.color.opacity(0.15))
+                    )
+
+                // Amount
+                Text(String(format: "€%.0f", category.totalSpent))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: 65, alignment: .trailing)
+
+                // Chevron for navigation affordance
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.25))
             }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.1),
-                            Color.white.opacity(0.03)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                ZStack {
+                    // Base glass effect
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.04))
+
+                    // Subtle gradient
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.06),
+                                    Color.white.opacity(0.02)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    // Colored accent glow on the left
+                    HStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        category.color.opacity(0.15),
+                                        Color.clear
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: 80)
+                        Spacer()
+                    }
+                }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.1),
+                                Color.white.opacity(0.03)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(OverviewCategoryRowButtonStyle())
+    }
+}
+
+// MARK: - Category Row Button Style
+private struct OverviewCategoryRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 

@@ -22,6 +22,12 @@ struct CategoryBreakdownDetailView: View {
     @State private var selectedCategory: CategorySpendItem?
     @State private var animateChart = false
 
+    // Expandable category state
+    @State private var expandedCategoryId: String?
+    @State private var categoryItems: [String: [APITransaction]] = [:]
+    @State private var loadingCategoryId: String?
+    @State private var categoryLoadError: [String: String] = [:]
+
     private let apiService = AnalyticsAPIService.shared
 
     private var monthName: String {
@@ -237,24 +243,239 @@ struct CategoryBreakdownDetailView: View {
                 .padding(.horizontal, 4)
 
             ForEach(data.categories.sorted { $0.totalSpent > $1.totalSpent }) { category in
-                categoryRow(category)
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            if selectedCategory?.id == category.id {
-                                selectedCategory = nil
-                            } else {
-                                selectedCategory = category
+                VStack(spacing: 0) {
+                    categoryRow(category)
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                toggleCategoryExpansion(category)
                             }
                         }
+
+                    // Expandable items section
+                    if expandedCategoryId == category.id {
+                        expandedItemsSection(category)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                     }
+                }
             }
         }
+    }
+
+    // MARK: - Toggle Category Expansion
+
+    private func toggleCategoryExpansion(_ category: CategorySpendItem) {
+        if expandedCategoryId == category.id {
+            // Collapse
+            expandedCategoryId = nil
+            selectedCategory = nil
+        } else {
+            // Expand and load items
+            expandedCategoryId = category.id
+            selectedCategory = category
+
+            // Load items if not already loaded
+            if categoryItems[category.id] == nil && loadingCategoryId != category.id {
+                Task {
+                    await loadCategoryItems(category)
+                }
+            }
+        }
+    }
+
+    // MARK: - Load Category Items
+
+    private func loadCategoryItems(_ category: CategorySpendItem) async {
+        loadingCategoryId = category.id
+        categoryLoadError[category.id] = nil
+
+        do {
+            var filters = TransactionFilters()
+
+            // Use the category name directly from the backend (bypasses enum matching issues)
+            filters.categoryName = category.name
+
+            filters.pageSize = 100
+
+            // Set date range for the specific month/year
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: "UTC")!
+
+            var components = DateComponents()
+            components.year = year
+            components.month = month
+            components.day = 1
+
+            if let startOfMonth = calendar.date(from: components),
+               let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) {
+                filters.startDate = startOfMonth
+                filters.endDate = endOfMonth
+            }
+
+            let response = try await apiService.getTransactions(filters: filters)
+
+            await MainActor.run {
+                categoryItems[category.id] = response.transactions
+                loadingCategoryId = nil
+            }
+        } catch {
+            await MainActor.run {
+                categoryLoadError[category.id] = error.localizedDescription
+                loadingCategoryId = nil
+            }
+        }
+    }
+
+    // MARK: - Expanded Items Section
+
+    private func expandedItemsSection(_ category: CategorySpendItem) -> some View {
+        VStack(spacing: 0) {
+            if loadingCategoryId == category.id {
+                // Loading state
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.white)
+                    Text("Loading items...")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.leading, 8)
+                    Spacer()
+                }
+                .padding(.vertical, 16)
+            } else if let errorMsg = categoryLoadError[category.id] {
+                // Error state
+                VStack(spacing: 8) {
+                    Text("Failed to load items")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.orange)
+                    Text(errorMsg)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.4))
+                        .multilineTextAlignment(.center)
+                    Button {
+                        Task { await loadCategoryItems(category) }
+                    } label: {
+                        Text("Retry")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.blue)
+                    }
+                }
+                .padding(.vertical, 12)
+            } else if let items = categoryItems[category.id] {
+                if items.isEmpty {
+                    // Empty state
+                    VStack(spacing: 6) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white.opacity(0.3))
+                        Text("No items found")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                    .padding(.vertical, 16)
+                } else {
+                    // Items list
+                    VStack(spacing: 0) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            expandedItemRow(item, category: category, isLast: index == items.count - 1)
+                        }
+                    }
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(category.color.opacity(0.05))
+        )
+        .padding(.top, -8)
+        .padding(.horizontal, 4)
+    }
+
+    // MARK: - Expanded Item Row
+
+    private func expandedItemRow(_ item: APITransaction, category: CategorySpendItem, isLast: Bool) -> some View {
+        HStack(spacing: 10) {
+            // Health score badge
+            Text(item.healthScore.nutriScoreLetter)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(item.healthScore.healthScoreColor)
+                .frame(width: 22, height: 22)
+                .background(
+                    Circle()
+                        .fill(item.healthScore.healthScoreColor.opacity(0.15))
+                )
+
+            // Item details
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.itemName)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    Text(item.storeName)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .lineLimit(1)
+
+                    if let date = item.dateParsed {
+                        Text("•")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.3))
+                        Text(formatItemDate(date))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Quantity and price
+            HStack(spacing: 6) {
+                if item.quantity > 1 {
+                    Text("×\(item.quantity)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                        )
+                }
+
+                Text(String(format: "€%.2f", item.totalPrice))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.75))
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.03))
+        )
+        .padding(.bottom, isLast ? 0 : 4)
+    }
+
+    // MARK: - Date Formatting
+
+    private func formatItemDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date)
     }
 
     // MARK: - Category Row
 
     private func categoryRow(_ category: CategorySpendItem) -> some View {
-        HStack(spacing: 12) {
+        let isExpanded = expandedCategoryId == category.id
+
+        return HStack(spacing: 12) {
             // Color indicator and icon
             ZStack {
                 Circle()
@@ -289,15 +510,21 @@ struct CategoryBreakdownDetailView: View {
                     .font(.caption)
                     .foregroundStyle(category.color)
             }
+
+            // Chevron indicator
+            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.4))
+                .frame(width: 20)
         }
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(selectedCategory?.id == category.id ? category.color.opacity(0.15) : Color.white.opacity(0.05))
+                .fill(isExpanded ? category.color.opacity(0.15) : Color.white.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(selectedCategory?.id == category.id ? category.color.opacity(0.5) : Color.clear, lineWidth: 1)
+                .stroke(isExpanded ? category.color.opacity(0.5) : Color.clear, lineWidth: 1)
         )
     }
 

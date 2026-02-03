@@ -589,6 +589,7 @@ struct TransactionFilters {
     var endDate: Date?
     var storeName: String?
     var category: AnalyticsCategory?
+    var categoryName: String?  // Direct category name - takes precedence over category enum
     var page: Int = 1
     var pageSize: Int = 50
 
@@ -607,7 +608,10 @@ struct TransactionFilters {
             items.append(URLQueryItem(name: "store_name", value: storeName))
         }
 
-        if let category = category {
+        // Use categoryName if set (direct from backend), otherwise use category enum's displayName
+        if let categoryName = categoryName {
+            items.append(URLQueryItem(name: "category", value: categoryName))
+        } else if let category = category {
             items.append(URLQueryItem(name: "category", value: category.displayName))
         }
 
