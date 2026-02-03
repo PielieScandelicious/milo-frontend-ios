@@ -11,9 +11,11 @@ struct SplitSummaryView: View {
     let receipt: ReceiptUploadResponse
     let results: [SplitResult]
     let shareText: String
+    let onSaveAndDismiss: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var showShareSheet = false
+    @State private var isSaving = false
 
     var body: some View {
         NavigationStack {
@@ -33,19 +35,16 @@ struct SplitSummaryView: View {
                     // Share button
                     shareButton
                         .padding(.horizontal)
+
+                    // Done button - saves and returns to receipts
+                    doneButton
+                        .padding(.horizontal)
                         .padding(.bottom, 20)
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Split Summary")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
             .sheet(isPresented: $showShareSheet) {
                 ShareSheet(text: shareText)
             }
@@ -109,6 +108,39 @@ struct SplitSummaryView: View {
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+    }
+
+    // MARK: - Done Button
+
+    private var doneButton: some View {
+        Button {
+            Task {
+                isSaving = true
+                await onSaveAndDismiss()
+                isSaving = false
+            }
+        } label: {
+            HStack {
+                if isSaving {
+                    ProgressView()
+                        .tint(.blue)
+                } else {
+                    Image(systemName: "checkmark")
+                    Text("Done")
+                }
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .foregroundStyle(.blue)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .disabled(isSaving)
     }
 }
 
@@ -285,6 +317,7 @@ struct ShareSheet: UIViewControllerRepresentable {
         Sarah: 15.84 EUR
 
         Sent from Scandalicious
-        """
+        """,
+        onSaveAndDismiss: {}
     )
 }

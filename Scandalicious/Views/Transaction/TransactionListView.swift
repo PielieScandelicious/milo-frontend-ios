@@ -23,7 +23,18 @@ struct TransactionListView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var searchText: String = ""
     @FocusState private var isSearchFocused: Bool
-    
+
+    // Delete states
+    @State private var transactionToDelete: APITransaction?
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+    @State private var showDeleteError = false
+
+    // Split states
+    @State private var transactionToSplit: APITransaction?
+    @State private var showSplitView = false
+
     private var transactions: [APITransaction] {
         var baseTransactions = viewModel.transactions
 
@@ -204,8 +215,45 @@ struct TransactionListView: View {
                 Text(error)
             }
         }
+        // Delete confirmation
+        .confirmationDialog("Delete Transaction", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let transaction = transactionToDelete {
+                    Task { await deleteTransaction(transaction) }
+                }
+            }
+            Button("Cancel", role: .cancel) { transactionToDelete = nil }
+        } message: {
+            Text(transactionToDelete.map { "Are you sure you want to delete \"\($0.itemName)\"? This action cannot be undone." } ?? "")
+        }
+        // Delete error alert
+        .alert("Delete Failed", isPresented: $showDeleteError) {
+            Button("OK") { deleteError = nil }
+        } message: {
+            Text(deleteError ?? "An error occurred while deleting the transaction.")
+        }
+        // Split expense sheet
+        .sheet(isPresented: $showSplitView) {
+            if let transaction = transactionToSplit {
+                SplitTransactionView(transaction: transaction, storeName: storeName)
+            }
+        }
     }
-    
+
+    // MARK: - Delete Transaction
+
+    private func deleteTransaction(_ transaction: APITransaction) async {
+        isDeleting = true
+        do {
+            try await viewModel.deleteTransaction(transaction)
+            transactionToDelete = nil
+        } catch {
+            deleteError = error.localizedDescription
+            showDeleteError = true
+        }
+        isDeleting = false
+    }
+
     private func loadTransactions() async {
         // Parse period to get start and end dates
         let (startDate, endDate) = parsePeriod(period)
@@ -402,22 +450,76 @@ struct TransactionListView: View {
                     .foregroundColor(.white.opacity(0.7))
                     .textCase(.uppercase)
                     .tracking(0.5)
-                
+
                 Spacer()
-                
+
                 Text(String(format: "€%.0f", transactions.reduce(0) { $0 + $1.totalPrice }))
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundColor(.white.opacity(0.7))
             }
             .padding(.horizontal, 24)
-            
-            // Transaction cards
+
+            // Transaction cards with dropdown menu
             VStack(spacing: 8) {
                 ForEach(transactions) { transaction in
-                    APITransactionRowView(transaction: transaction)
+                    TransactionCardWithMenu(
+                        transaction: transaction,
+                        onSplit: {
+                            transactionToSplit = transaction
+                            showSplitView = true
+                        },
+                        onDelete: {
+                            transactionToDelete = transaction
+                            showDeleteConfirmation = true
+                        }
+                    )
                 }
             }
             .padding(.horizontal, 20)
+        }
+    }
+}
+
+// MARK: - Transaction Card With Dropdown Menu
+
+struct TransactionCardWithMenu: View {
+    let transaction: APITransaction
+    let onSplit: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            // Transaction card content
+            APITransactionRowView(transaction: transaction)
+
+            // Dropdown menu button
+            Menu {
+                Button {
+                    onSplit()
+                } label: {
+                    Label("Split with Friends", systemImage: "person.2.fill")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .frame(width: 44, height: 44)
+            }
+            .padding(.leading, 8)
         }
     }
 }

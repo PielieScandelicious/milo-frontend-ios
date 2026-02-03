@@ -361,6 +361,54 @@ actor AnalyticsAPIService {
         )
     }
 
+    /// Delete a single transaction by ID
+    /// - Parameter transactionId: The transaction ID to delete
+    func deleteTransaction(transactionId: String) async throws {
+        let endpoint = "/transactions/\(transactionId)"
+
+        // Build URL
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            throw AnalyticsAPIError.invalidURL
+        }
+
+        print("🗑️ API Delete Transaction Request: DELETE \(url.absoluteString)")
+
+        // Get auth token
+        let token = try await getAuthToken()
+
+        // Create request
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 30
+
+        // Perform request
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AnalyticsAPIError.invalidResponse
+        }
+
+        print("📥 Delete transaction response: HTTP \(httpResponse.statusCode)")
+
+        switch httpResponse.statusCode {
+        case 200...299:
+            print("✅ Transaction deleted successfully")
+            return
+
+        case 401:
+            throw AnalyticsAPIError.unauthorized
+
+        case 404:
+            throw AnalyticsAPIError.notFound
+
+        default:
+            let errorMessage = parseErrorMessage(from: data) ?? "Delete failed: \(httpResponse.statusCode)"
+            throw AnalyticsAPIError.serverError(errorMessage)
+        }
+    }
+
     // MARK: - Helper Methods
     
     private func performRequest<T: Decodable>(
@@ -614,6 +662,11 @@ extension AnalyticsAPIService {
     /// Nonisolated wrapper for deleteReceipt
     nonisolated func removeReceipt(receiptId: String) async throws {
         return try await deleteReceipt(receiptId: receiptId)
+    }
+
+    /// Nonisolated wrapper for deleteTransaction
+    nonisolated func removeTransaction(transactionId: String) async throws {
+        return try await deleteTransaction(transactionId: transactionId)
     }
 
     /// Nonisolated wrapper for deleteReceiptItem

@@ -616,49 +616,57 @@ struct EditableLineItemRow: View {
 
 // MARK: - Mini Split Avatars
 
-/// Compact display of friend avatars for split items
+/// Compact display of friend avatars for split items (excludes "Me")
 struct MiniSplitAvatars: View {
     let participants: [SplitParticipantInfo]
 
     /// Maximum avatars to show before "+N"
     private let maxVisible = 3
 
-    var body: some View {
-        HStack(spacing: -4) {
-            // Show up to maxVisible avatars
-            ForEach(Array(participants.prefix(maxVisible).enumerated()), id: \.element.id) { index, participant in
-                Circle()
-                    .fill(participant.swiftUIColor)
-                    .frame(width: 14, height: 14)
-                    .overlay(
-                        Text(String(participant.name.prefix(1)).uppercased())
-                            .font(.system(size: 7, weight: .bold))
-                            .foregroundColor(.white)
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color(white: 0.1), lineWidth: 1)
-                    )
-                    .zIndex(Double(maxVisible - index))
-            }
+    /// Filter out "Me" - only show friends
+    private var friendsOnly: [SplitParticipantInfo] {
+        participants.filter { !$0.isMe }
+    }
 
-            // Show "+N" if more participants
-            if participants.count > maxVisible {
-                Circle()
-                    .fill(Color.white.opacity(0.2))
-                    .frame(width: 14, height: 14)
-                    .overlay(
-                        Text("+\(participants.count - maxVisible)")
-                            .font(.system(size: 7, weight: .bold))
-                            .foregroundColor(.white.opacity(0.8))
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color(white: 0.1), lineWidth: 1)
-                    )
+    var body: some View {
+        // Only show if there are friends (not just "Me")
+        if !friendsOnly.isEmpty {
+            HStack(spacing: -4) {
+                // Show up to maxVisible avatars
+                ForEach(Array(friendsOnly.prefix(maxVisible).enumerated()), id: \.element.id) { index, participant in
+                    Circle()
+                        .fill(participant.swiftUIColor)
+                        .frame(width: 14, height: 14)
+                        .overlay(
+                            Text(String(participant.name.prefix(1)).uppercased())
+                                .font(.system(size: 7, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color(white: 0.1), lineWidth: 1)
+                        )
+                        .zIndex(Double(maxVisible - index))
+                }
+
+                // Show "+N" if more participants
+                if friendsOnly.count > maxVisible {
+                    Circle()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 14, height: 14)
+                        .overlay(
+                            Text("+\(friendsOnly.count - maxVisible)")
+                                .font(.system(size: 7, weight: .bold))
+                                .foregroundColor(.white.opacity(0.8))
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color(white: 0.1), lineWidth: 1)
+                        )
+                }
             }
+            .padding(.leading, 4)
         }
-        .padding(.leading, 4)
     }
 }
 

@@ -11,12 +11,23 @@ struct TransactionTableView: View {
     let storeName: String
     let period: String
     let category: String?
-    
+
     @StateObject private var viewModel = TransactionsViewModel()
     @State private var sortOrder: SortOrder = .dateDescending
     @State private var searchText: String = ""
     @FocusState private var isSearchFocused: Bool
-    
+
+    // Delete states
+    @State private var transactionToDelete: APITransaction?
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+    @State private var showDeleteError = false
+
+    // Split states
+    @State private var transactionToSplit: APITransaction?
+    @State private var showSplitView = false
+
     enum SortOrder: String, CaseIterable {
         case dateDescending = "Date (Newest)"
         case dateAscending = "Date (Oldest)"
@@ -57,125 +68,175 @@ struct TransactionTableView: View {
     }
     
     var body: some View {
+        mainContent
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbarContent }
+            .task {
+                await loadTransactions()
+            }
+            .alert("Error", isPresented: .constant(viewModel.state.error != nil)) {
+                Button("OK") { }
+            } message: {
+                Text(viewModel.state.error ?? "Unknown error")
+            }
+            .confirmationDialog("Delete Transaction", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+                deleteDialogButtons
+            } message: {
+                Text(transactionToDelete.map { "Are you sure you want to delete \"\($0.itemName)\"? This action cannot be undone." } ?? "")
+            }
+            .alert("Delete Failed", isPresented: $showDeleteError) {
+                Button("OK") { deleteError = nil }
+            } message: {
+                Text(deleteError ?? "An error occurred while deleting the transaction.")
+            }
+            .sheet(isPresented: $showSplitView) {
+                splitSheetContent
+            }
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
-            
-            if viewModel.state.isLoading && transactions.isEmpty {
-                // Loading state
-                VStack(spacing: 0) {
-                    statsBar
-                    controlBar
-                    
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
-                        .frame(maxHeight: .infinity)
-                }
-            } else if transactions.isEmpty {
-                VStack(spacing: 0) {
-                    // Summary stats
-                    statsBar
-                    
-                    // Search bar
-                    searchBar
-                    
-                    // Sort bar
-                    controlBar
-                    
-                    emptyState
-                }
-            } else {
-                // Full screen scrollable
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Summary stats
-                        statsBar
-                        
-                        // Search bar
-                        searchBar
-                        
-                        // Sort bar
-                        controlBar
-                        
-                        // Table
-                        VStack(spacing: 0) {
-                            // Table header
-                            tableHeader
-                            
-                            // Table rows
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
-                                    APITransactionTableRow(transaction: transaction)
-                                        .onAppear {
-                                            // Auto-load more when reaching near the end
-                                            if index == transactions.count - 1 && viewModel.hasMorePages {
-                                                Task {
-                                                    await viewModel.loadNextPage()
-                                                }
-                                            }
-                                        }
-                                    
-                                    Divider()
-                                        .background(Color.white.opacity(0.1))
-                                }
-                            }
-                        }
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white.opacity(0.03))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
-                        
-                        // Loading indicator at bottom when fetching more
-                        if viewModel.state.isLoading && !viewModel.transactions.isEmpty {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(1.2)
-                                Spacer()
-                            }
-                            .padding(.vertical, 20)
-                            .padding(.bottom, 16)
-                        }
-                    }
-                }
-                .refreshable {
-                    await viewModel.refresh()
-                }
+            contentForState
+        }
+    }
+
+    @ViewBuilder
+    private var contentForState: some View {
+        if viewModel.state.isLoading && transactions.isEmpty {
+            loadingState
+        } else if transactions.isEmpty {
+            emptyContentState
+        } else {
+            transactionsScrollView
+        }
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 0) {
+            statsBar
+            controlBar
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                .scaleEffect(1.5)
+                .frame(maxHeight: .infinity)
+        }
+    }
+
+    private var emptyContentState: some View {
+        VStack(spacing: 0) {
+            statsBar
+            searchBar
+            controlBar
+            emptyState
+        }
+    }
+
+    private var transactionsScrollView: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                statsBar
+                searchBar
+                controlBar
+                transactionsTable
+                loadingIndicator
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(category ?? storeName)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                    
-                    Text(period)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
-                }
-            }
+        .refreshable { await viewModel.refresh() }
+    }
+
+    private var transactionsTable: some View {
+        VStack(spacing: 0) {
+            tableHeader
+            transactionsList
         }
-        .task {
-            await loadTransactions()
-        }
-        .alert("Error", isPresented: .constant(viewModel.state.error != nil)) {
-            Button("OK") { }
-        } message: {
-            if let error = viewModel.state.error {
-                Text(error)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
+    }
+
+    private var transactionsList: some View {
+        LazyVStack(spacing: 0) {
+            ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
+                TransactionRowWithMenu(
+                    transaction: transaction,
+                    onSplit: { transactionToSplit = transaction; showSplitView = true },
+                    onDelete: { transactionToDelete = transaction; showDeleteConfirmation = true },
+                    onAppear: { loadMoreIfNeeded(at: index) }
+                )
+                Divider().background(Color.white.opacity(0.1))
             }
         }
     }
-    
+
+    @ViewBuilder
+    private var loadingIndicator: some View {
+        if viewModel.state.isLoading && !viewModel.transactions.isEmpty {
+            HStack {
+                Spacer()
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.2)
+                Spacer()
+            }
+            .padding(.vertical, 20)
+            .padding(.bottom, 16)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            VStack(spacing: 2) {
+                Text(category ?? storeName)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(period)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var deleteDialogButtons: some View {
+        Button("Delete", role: .destructive) {
+            if let transaction = transactionToDelete {
+                Task { await deleteTransaction(transaction) }
+            }
+        }
+        Button("Cancel", role: .cancel) { transactionToDelete = nil }
+    }
+
+    @ViewBuilder
+    private var splitSheetContent: some View {
+        if let transaction = transactionToSplit {
+            SplitTransactionView(transaction: transaction, storeName: storeName)
+        }
+    }
+
+    private func loadMoreIfNeeded(at index: Int) {
+        if index == transactions.count - 1 && viewModel.hasMorePages {
+            Task { await viewModel.loadNextPage() }
+        }
+    }
+
+    // MARK: - Delete Transaction
+
+    private func deleteTransaction(_ transaction: APITransaction) async {
+        isDeleting = true
+        do {
+            try await viewModel.deleteTransaction(transaction)
+            transactionToDelete = nil
+        } catch {
+            deleteError = error.localizedDescription
+            showDeleteError = true
+        }
+        isDeleting = false
+    }
+
     private func loadTransactions() async {
         // Parse period to get start and end dates
         let (startDate, endDate) = parsePeriod(period)
@@ -326,30 +387,35 @@ struct TransactionTableView: View {
                 .foregroundColor(.white.opacity(0.6))
                 .textCase(.uppercase)
                 .tracking(0.8)
-                .frame(width: 80, alignment: .leading)
-            
+                .frame(width: 70, alignment: .leading)
+
             Text("Item")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.white.opacity(0.6))
                 .textCase(.uppercase)
                 .tracking(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             Text("Qty")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.white.opacity(0.6))
                 .textCase(.uppercase)
                 .tracking(0.8)
                 .frame(width: 40, alignment: .center)
-            
+
             Text("Amount")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.white.opacity(0.6))
                 .textCase(.uppercase)
                 .tracking(0.8)
-                .frame(width: 80, alignment: .trailing)
+                .frame(width: 70, alignment: .trailing)
+
+            // Spacer for menu column
+            Spacer()
+                .frame(width: 40)
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
         .padding(.vertical, 14)
         .background(Color.white.opacity(0.08))
     }
@@ -420,60 +486,114 @@ struct TransactionTableView: View {
     }
 }
 
+// MARK: - Transaction Row With Dropdown Menu
+
+struct TransactionRowWithMenu: View {
+    let transaction: APITransaction
+    let onSplit: () -> Void
+    let onDelete: () -> Void
+    let onAppear: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            // Transaction content
+            APITransactionTableRow(transaction: transaction)
+
+            // Dropdown menu button
+            Menu {
+                Button {
+                    onSplit()
+                } label: {
+                    Label("Split with Friends", systemImage: "person.2.fill")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+                    .frame(width: 32, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .padding(.trailing, 8)
+        }
+        .onAppear {
+            onAppear()
+        }
+    }
+}
+
+// MARK: - Transaction Table Row
+
 struct APITransactionTableRow: View {
     let transaction: APITransaction
-    
+
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM dd"
         return formatter
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Date
-            if let date = transaction.dateParsed {
-                Text(dateFormatter.string(from: date))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 80, alignment: .leading)
-            } else {
-                Text("--")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.5))
-                    .frame(width: 80, alignment: .leading)
-            }
-            
+            dateText
+
             // Item details
-            VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.itemName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                
-                Text(transaction.category)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            
+            itemDetails
+
             // Quantity
             Text("\(transaction.quantity)")
                 .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundColor(.white.opacity(0.7))
                 .frame(width: 40, alignment: .center)
-            
+
             // Amount
             Text(String(format: "€%.2f", transaction.totalPrice))
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-                .frame(width: 80, alignment: .trailing)
+                .frame(width: 70, alignment: .trailing)
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 16)
+        .padding(.trailing, 4)
         .padding(.vertical, 14)
         .background(Color.clear)
-        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var dateText: some View {
+        if let date = transaction.dateParsed {
+            Text(dateFormatter.string(from: date))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 70, alignment: .leading)
+        } else {
+            Text("--")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white.opacity(0.5))
+                .frame(width: 70, alignment: .leading)
+        }
+    }
+
+    private var itemDetails: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(transaction.itemName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Text(transaction.category)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

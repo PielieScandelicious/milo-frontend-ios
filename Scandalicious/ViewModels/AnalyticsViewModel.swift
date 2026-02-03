@@ -305,6 +305,18 @@ class TransactionsViewModel: ObservableObject {
         filters = TransactionFilters()
         await loadTransactions(reset: true)
     }
+
+    /// Delete a single transaction
+    func deleteTransaction(_ transaction: APITransaction) async throws {
+        try await apiService.removeTransaction(transactionId: transaction.id)
+
+        // Remove from local state
+        objectWillChange.send()
+        transactions.removeAll { $0.id == transaction.id }
+
+        // Notify other views
+        NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
+    }
 }
 
 // MARK: - Data Refresh Notification

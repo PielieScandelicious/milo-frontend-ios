@@ -47,6 +47,20 @@ class ExpenseSplitViewModel: ObservableObject {
     init(receipt: ReceiptUploadResponse) {
         self.receipt = receipt
         buildStableTransactionIds()
+        setupDefaultMeParticipant()
+    }
+
+    /// Set up the default "Me" participant and assign to all items
+    private func setupDefaultMeParticipant() {
+        let meParticipant = SplitParticipant.createMe(displayOrder: 0)
+        participants.append(meParticipant)
+
+        // Auto-assign "Me" to all items
+        let meIdLower = meParticipant.id.uuidString.lowercased()
+        for transaction in receipt.transactions {
+            let transactionId = getStableTransactionId(for: transaction)
+            assignments[transactionId] = Set([meIdLower])
+        }
     }
 
     /// Build stable transaction IDs that persist across receipt re-decodes
@@ -145,22 +159,8 @@ class ExpenseSplitViewModel: ObservableObject {
             displayOrder: participants.count
         )
         participants.append(participant)
-
-        // Auto-assign new participant to all items (split everything)
-        if participants.count == 1 {
-            // First participant - assign to all items
-            assignAllToEveryone()
-        } else {
-            // Add to all existing assignments (use lowercase for consistency)
-            let participantIdLower = participant.id.uuidString.lowercased()
-            for transaction in receipt.transactions {
-                let transactionId = getStableTransactionId(for: transaction)
-                if assignments[transactionId] == nil {
-                    assignments[transactionId] = Set()
-                }
-                assignments[transactionId]?.insert(participantIdLower)
-            }
-        }
+        // New friends are NOT auto-assigned to any items
+        // User must tap the greyed out avatar per item to assign
     }
 
     func addParticipantFromRecent(_ friend: RecentFriend) {
@@ -170,16 +170,8 @@ class ExpenseSplitViewModel: ObservableObject {
             displayOrder: participants.count
         )
         participants.append(participant)
-
-        // Auto-assign new participant to all items (use lowercase for consistency)
-        let participantIdLower = participant.id.uuidString.lowercased()
-        for transaction in receipt.transactions {
-            let transactionId = getStableTransactionId(for: transaction)
-            if assignments[transactionId] == nil {
-                assignments[transactionId] = Set()
-            }
-            assignments[transactionId]?.insert(participantIdLower)
-        }
+        // New friends are NOT auto-assigned to any items
+        // User must tap the greyed out avatar per item to assign
     }
 
     func removeParticipant(_ participant: SplitParticipant) {

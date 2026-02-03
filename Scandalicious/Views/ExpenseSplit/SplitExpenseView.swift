@@ -86,7 +86,14 @@ struct SplitExpenseView: View {
                 SplitSummaryView(
                     receipt: receipt,
                     results: viewModel.calculateSplits(),
-                    shareText: viewModel.generateShareText()
+                    shareText: viewModel.generateShareText(),
+                    onSaveAndDismiss: {
+                        await viewModel.saveSplit()
+                        if viewModel.error == nil {
+                            showSummary = false
+                            dismiss()
+                        }
+                    }
                 )
             }
             .alert("Error", isPresented: .constant(viewModel.error != nil)) {

@@ -15,6 +15,7 @@ struct FriendAvatarChip: View {
     var isSelected: Bool = true
     var size: CGFloat = 36
     var showName: Bool = false
+    var isMe: Bool = false
     var onTap: (() -> Void)?
 
     var body: some View {
@@ -33,14 +34,21 @@ struct FriendAvatarChip: View {
                         .strokeBorder(isSelected ? participant.swiftUIColor : Color.gray.opacity(0.5), lineWidth: 2)
                         .frame(width: size, height: size)
 
-                    Text(participant.initials)
-                        .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
-                        .foregroundStyle(isSelected ? .white : .gray)
+                    if isMe || participant.isMe {
+                        // Show person icon for "Me"
+                        Image(systemName: "person.fill")
+                            .font(.system(size: size * 0.45, weight: .semibold))
+                            .foregroundStyle(isSelected ? .white : .gray)
+                    } else {
+                        Text(participant.initials)
+                            .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
+                            .foregroundStyle(isSelected ? .white : .gray)
+                    }
                 }
                 .scaleEffect(isSelected ? 1.0 : 0.9)
 
                 if showName {
-                    Text(participant.name.split(separator: " ").first ?? "")
+                    Text(participant.isMe ? "Me" : (participant.name.split(separator: " ").first.map(String.init) ?? ""))
                         .font(.caption2)
                         .fontWeight(.medium)
                         .foregroundStyle(isSelected ? .primary : .secondary)
@@ -72,9 +80,16 @@ struct MiniFriendAvatar: View {
                     .frame(width: size, height: size)
             }
 
-            Text(participant.initials)
-                .font(.system(size: size * 0.38, weight: .bold, design: .rounded))
-                .foregroundStyle(isSelected ? .white : .gray.opacity(0.6))
+            if participant.isMe {
+                // Show person icon for "Me"
+                Image(systemName: "person.fill")
+                    .font(.system(size: size * 0.45, weight: .semibold))
+                    .foregroundStyle(isSelected ? .white : .gray.opacity(0.6))
+            } else {
+                Text(participant.initials)
+                    .font(.system(size: size * 0.38, weight: .bold, design: .rounded))
+                    .foregroundStyle(isSelected ? .white : .gray.opacity(0.6))
+            }
         }
     }
 }
@@ -114,25 +129,40 @@ struct FriendChipsRow: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                AddFriendButton(size: 40, onTap: onAddTap)
-
-                ForEach(participants) { participant in
-                    FriendAvatarChip(
-                        participant: participant,
-                        isSelected: true,
-                        size: 40,
-                        showName: true
-                    ) {
-                        onParticipantTap?(participant)
-                    }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            onParticipantLongPress?(participant)
-                        } label: {
-                            Label("Remove", systemImage: "trash")
+                // Show "Me" avatar first (sorted by displayOrder, "Me" is always 0)
+                ForEach(participants.sorted { $0.displayOrder < $1.displayOrder }) { participant in
+                    if participant.isMe {
+                        // "Me" avatar - no context menu (can't be removed)
+                        FriendAvatarChip(
+                            participant: participant,
+                            isSelected: true,
+                            size: 40,
+                            showName: true,
+                            isMe: true
+                        ) {
+                            onParticipantTap?(participant)
+                        }
+                    } else {
+                        // Friend avatar - can be removed via context menu
+                        FriendAvatarChip(
+                            participant: participant,
+                            isSelected: true,
+                            size: 40,
+                            showName: true
+                        ) {
+                            onParticipantTap?(participant)
+                        }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                onParticipantLongPress?(participant)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
                         }
                     }
                 }
+
+                AddFriendButton(size: 40, onTap: onAddTap)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
