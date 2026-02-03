@@ -13,15 +13,32 @@ import SwiftUI
 struct BankTransactionCard: View {
     let receipt: APIReceipt
     let onDelete: (() -> Void)?
+    let onSplit: (() -> Void)?
 
     @State private var showDeleteConfirmation = false
 
+    /// Observe split cache for updates
+    @ObservedObject private var splitCache = SplitCacheManager.shared
+
+    /// Get split data for this transaction
+    private var splitData: CachedSplitData? {
+        splitCache.getSplit(for: receipt.receiptId)
+    }
+
+    /// Get split participants (friends only, excluding "Me")
+    private var splitFriends: [SplitParticipantInfo] {
+        guard let split = splitData else { return [] }
+        return split.participants.filter { !$0.isMe }
+    }
+
     init(
         receipt: APIReceipt,
-        onDelete: (() -> Void)? = nil
+        onDelete: (() -> Void)? = nil,
+        onSplit: (() -> Void)? = nil
     ) {
         self.receipt = receipt
         self.onDelete = onDelete
+        self.onSplit = onSplit
     }
 
     var body: some View {
@@ -47,7 +64,7 @@ struct BankTransactionCard: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
 
-                    // Date and category
+                    // Date, category, and split avatars
                     HStack(spacing: 8) {
                         // Date
                         if let dateString = receipt.receiptDate {
@@ -68,6 +85,11 @@ struct BankTransactionCard: View {
                                         .fill(Color.white.opacity(0.1))
                                 )
                         }
+
+                        // Split friend avatars (show if transaction is split)
+                        if !splitFriends.isEmpty {
+                            BankTransactionSplitAvatars(friends: splitFriends)
+                        }
                     }
                 }
 
@@ -77,6 +99,42 @@ struct BankTransactionCard: View {
                 Text(formattedAmount(receipt.displayTotalAmount))
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
+
+                // Dropdown menu button
+                Menu {
+                    // Split with Friends option
+                    if let splitAction = onSplit {
+                        Button {
+                            splitAction()
+                        } label: {
+                            Label("Split with Friends", systemImage: "person.2.fill")
+                        }
+                    }
+
+                    if onSplit != nil && onDelete != nil {
+                        Divider()
+                    }
+
+                    // Delete option
+                    if onDelete != nil {
+                        Button(role: .destructive) {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .frame(width: 36, height: 36)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -94,13 +152,10 @@ struct BankTransactionCard: View {
         } message: {
             Text("This will remove the transaction from your spending history.")
         }
-        .contextMenu {
-            if onDelete != nil {
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
+        .task {
+            // Fetch split data if not already cached
+            if splitData == nil {
+                await splitCache.fetchSplit(for: receipt.receiptId)
             }
         }
     }
@@ -162,6 +217,53 @@ struct BankTransactionCard: View {
         formatter.currencyCode = "EUR"
         formatter.currencySymbol = "€"
         return formatter.string(from: NSNumber(value: amount)) ?? "€\(String(format: "%.2f", amount))"
+    }
+}
+
+// MARK: - Bank Transaction Split Avatars
+
+/// Compact display of friend avatars for split bank transactions (excludes "Me")
+struct BankTransactionSplitAvatars: View {
+    let friends: [SplitParticipantInfo]
+
+    /// Maximum avatars to show before "+N"
+    private let maxVisible = 2
+
+    var body: some View {
+        HStack(spacing: -4) {
+            // Show up to maxVisible avatars
+            ForEach(Array(friends.prefix(maxVisible).enumerated()), id: \.element.id) { index, friend in
+                Circle()
+                    .fill(friend.swiftUIColor)
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        Text(String(friend.name.prefix(1)).uppercased())
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white)
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color(white: 0.1), lineWidth: 1)
+                    )
+                    .zIndex(Double(maxVisible - index))
+            }
+
+            // Show "+N" if more friends
+            if friends.count > maxVisible {
+                Circle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        Text("+\(friends.count - maxVisible)")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white.opacity(0.8))
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color(white: 0.1), lineWidth: 1)
+                    )
+            }
+        }
     }
 }
 

@@ -487,7 +487,7 @@ struct OverviewView: View {
                 CategoryBreakdownDetailView(month: components.month, year: components.year)
             }
             .sheet(item: $receiptToSplit) { receipt in
-                SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
+                SplitBankTransactionView(receipt: receipt)
             }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
@@ -2455,6 +2455,9 @@ struct OverviewView: View {
                                         withAnimation(.easeInOut(duration: 0.3)) {
                                             deleteReceiptFromOverview(transaction)
                                         }
+                                    },
+                                    onSplit: {
+                                        receiptToSplit = transaction
                                     }
                                 )
                                 .transition(.asymmetric(

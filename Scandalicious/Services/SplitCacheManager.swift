@@ -15,6 +15,7 @@ struct SplitParticipantInfo: Identifiable, Equatable {
     let id: String
     let name: String
     let color: String
+    let isMe: Bool
 
     var swiftUIColor: Color {
         Color(hex: color) ?? .gray
@@ -147,10 +148,13 @@ class SplitCacheManager: ObservableObject {
     /// Cache split data from an ExpenseSplit model
     func cacheSplit(_ split: ExpenseSplit) {
         let participants = split.participants.map { p in
-            SplitParticipantInfo(
+            // Detect "Me" by isMe flag OR by name (for splits loaded from backend)
+            let isMe = p.isMe || p.name.lowercased() == "me"
+            return SplitParticipantInfo(
                 id: p.id.uuidString,
                 name: p.name,
-                color: p.color
+                color: p.color,
+                isMe: isMe
             )
         }
 

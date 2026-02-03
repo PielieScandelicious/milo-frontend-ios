@@ -38,19 +38,35 @@ struct SplitParticipant: Identifiable, Codable, Equatable, Hashable {
     var name: String
     var color: String  // Hex color
     var displayOrder: Int
+    var isMe: Bool  // True for the default "Me" participant
 
     enum CodingKeys: String, CodingKey {
         case id
         case name
         case color
         case displayOrder = "display_order"
+        case isMe = "is_me"
     }
 
-    init(id: UUID = UUID(), name: String, color: String, displayOrder: Int = 0) {
+    init(id: UUID = UUID(), name: String, color: String, displayOrder: Int = 0, isMe: Bool = false) {
         self.id = id
         self.name = name
         self.color = color
         self.displayOrder = displayOrder
+        self.isMe = isMe
+    }
+
+    /// Static "Me" color - a distinct blue color
+    static let meColor = "#3B82F6"
+
+    /// Create the default "Me" participant
+    static func createMe(displayOrder: Int = 0) -> SplitParticipant {
+        SplitParticipant(
+            name: "Me",
+            color: meColor,
+            displayOrder: displayOrder,
+            isMe: true
+        )
     }
 
     // Custom decoder to handle backend's string UUID format
@@ -67,6 +83,7 @@ struct SplitParticipant: Identifiable, Codable, Equatable, Hashable {
         self.name = try container.decode(String.self, forKey: .name)
         self.color = try container.decode(String.self, forKey: .color)
         self.displayOrder = try container.decode(Int.self, forKey: .displayOrder)
+        self.isMe = try container.decodeIfPresent(Bool.self, forKey: .isMe) ?? false
     }
 
     /// Get Color from hex string
