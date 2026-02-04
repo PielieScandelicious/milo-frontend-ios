@@ -45,9 +45,6 @@ struct StoreDetailView: View {
     @State private var categoryTransactions: [String: [APITransaction]] = [:]
     @State private var loadingCategories: Set<String> = []
 
-    // Split cache for displaying friend avatars on transactions
-    @ObservedObject private var splitCache = SplitCacheManager.shared
-
     // Accent color for the line chart - modern red
     private var chartAccentColor: Color {
         Color(red: 0.95, green: 0.25, blue: 0.3)
@@ -807,83 +804,7 @@ struct StoreDetailView: View {
                             }
                             .padding(.vertical, 16)
                         } else if let transactions = categoryTransactions[segment.label], !transactions.isEmpty {
-                            // Sort by health score (healthiest first), then alphabetically
-                            let sortedTransactions = transactions.sorted { t1, t2 in
-                                let score1 = t1.healthScore
-                                let score2 = t2.healthScore
-                                // Both have scores - sort by score descending (higher = healthier first)
-                                if let s1 = score1, let s2 = score2 {
-                                    return s1 > s2
-                                }
-                                // Item with score comes before item without score
-                                if score1 != nil && score2 == nil { return true }
-                                if score1 == nil && score2 != nil { return false }
-                                // Neither has score - sort alphabetically
-                                return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
-                            }
-                            ForEach(sortedTransactions) { transaction in
-                                // Get split participants for this transaction
-                                let splitParticipants: [SplitParticipantInfo] = {
-                                    guard let receiptId = transaction.receiptId else { return [] }
-                                    guard let splitData = splitCache.getSplit(for: receiptId) else { return [] }
-                                    return splitData.participantsForTransaction(transaction.id)
-                                }()
-                                let friendsOnly = splitParticipants.filter { !$0.isMe }
-
-                                HStack(spacing: 10) {
-                                    // Sleek Nutri-Score letter badge (matching receipt style)
-                                    Text(transaction.healthScore.nutriScoreLetter)
-                                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                                        .foregroundColor(transaction.healthScore.healthScoreColor)
-                                        .frame(width: 16, height: 16)
-                                        .background(
-                                            Circle()
-                                                .fill(transaction.healthScore.healthScoreColor.opacity(0.15))
-                                        )
-                                        .overlay(
-                                            Circle()
-                                                .stroke(transaction.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
-                                        )
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        HStack(spacing: 6) {
-                                            Text(transaction.itemName)
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundColor(.white.opacity(0.85))
-                                                .lineLimit(1)
-
-                                            if transaction.quantity > 1 {
-                                                Text("×\(transaction.quantity)")
-                                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                                    .foregroundColor(.white.opacity(0.4))
-                                                    .padding(.horizontal, 5)
-                                                    .padding(.vertical, 1)
-                                                    .background(
-                                                        Capsule()
-                                                            .fill(Color.white.opacity(0.08))
-                                                    )
-                                            }
-
-                                            // Split participant avatars
-                                            if !friendsOnly.isEmpty {
-                                                MiniSplitAvatars(participants: friendsOnly)
-                                            }
-                                        }
-                                    }
-
-                                    Spacer()
-
-                                    Text(String(format: "€%.2f", transaction.totalPrice))
-                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                                .task {
-                                    // Fetch split data if we have a receipt ID and it's not cached
-                                    if let receiptId = transaction.receiptId, !splitCache.hasSplit(for: receiptId) {
-                                        await splitCache.fetchSplit(for: receiptId)
-                                    }
-                                }
-                            }
+                            CategoryTransactionsContent(transactions: transactions)
                         } else {
                             Text("No transactions")
                                 .font(.system(size: 13, weight: .medium))
@@ -1041,6 +962,108 @@ struct StoreDetailView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Category Transaction Subviews (Performance-Isolated)
+
+/// Observes SplitCacheManager independently so split-data loads only re-render
+/// this small list — not the entire StoreDetailView (header, chart, receipts, etc.).
+private struct CategoryTransactionsContent: View {
+    let transactions: [APITransaction]
+    @ObservedObject private var splitCache = SplitCacheManager.shared
+
+    var body: some View {
+        let sorted = transactions.sorted { t1, t2 in
+            let s1 = t1.healthScore
+            let s2 = t2.healthScore
+            if let a = s1, let b = s2 { return a > b }
+            if s1 != nil && s2 == nil { return true }
+            if s1 == nil && s2 != nil { return false }
+            return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
+        }
+
+        ForEach(sorted) { transaction in
+            CategoryTransactionItemRow(
+                transaction: transaction,
+                friends: friendsFor(transaction)
+            )
+        }
+        .task {
+            // Batch-fetch all unique receipt splits at once instead of N individual fetches
+            let ids = Set(transactions.compactMap { $0.receiptId })
+                .filter { !splitCache.hasSplit(for: $0) }
+            guard !ids.isEmpty else { return }
+            await withTaskGroup(of: Void.self) { group in
+                for id in ids {
+                    group.addTask {
+                        await SplitCacheManager.shared.fetchSplit(for: id)
+                    }
+                }
+            }
+        }
+    }
+
+    private func friendsFor(_ transaction: APITransaction) -> [SplitParticipantInfo] {
+        guard let receiptId = transaction.receiptId,
+              let splitData = splitCache.getSplit(for: receiptId) else { return [] }
+        return splitData.participantsForTransaction(transaction.id).filter { !$0.isMe }
+    }
+}
+
+/// Pure rendering view — no observation, no async work.
+/// Receives pre-computed friends so SwiftUI can diff efficiently via Equatable arrays.
+private struct CategoryTransactionItemRow: View {
+    let transaction: APITransaction
+    let friends: [SplitParticipantInfo]
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Nutri-Score badge
+            Text(transaction.healthScore.nutriScoreLetter)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundColor(transaction.healthScore.healthScoreColor)
+                .frame(width: 16, height: 16)
+                .background(
+                    Circle()
+                        .fill(transaction.healthScore.healthScoreColor.opacity(0.15))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(transaction.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(transaction.itemName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+
+                    if transaction.quantity > 1 {
+                        Text("×\(transaction.quantity)")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.4))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                    }
+
+                    if !friends.isEmpty {
+                        MiniSplitAvatars(participants: friends)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Text(String(format: "€%.2f", transaction.totalPrice))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.7))
+        }
     }
 }
 

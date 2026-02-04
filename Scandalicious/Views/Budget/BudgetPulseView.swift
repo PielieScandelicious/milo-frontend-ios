@@ -19,25 +19,36 @@ struct BudgetPulseView: View {
     @State private var showDeleteConfirmation = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            switch viewModel.state {
-            case .idle, .loading:
-                loadingView
-
-            case .noBudget:
-                noBudgetView
-
-            case .active(let progress):
-                activeBudgetView(progress)
-
-            case .error(let message):
-                errorView(message)
-            }
+        let stateDescription: String
+        switch viewModel.state {
+        case .idle: stateDescription = "idle"
+        case .loading: stateDescription = "loading"
+        case .noBudget: stateDescription = "noBudget"
+        case .active(let progress): stateDescription = "active(\(progress.budget.id))"
+        case .error(let msg): stateDescription = "error(\(msg))"
         }
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(white: 0.12))
-        )
+        print("🎨 [BudgetPulseView] ===== BODY CALLED =====")
+        print("🎨 [BudgetPulseView] state: \(stateDescription)")
+        print("🎨 [BudgetPulseView] hasBudget: \(viewModel.state.hasBudget)")
+        print("🎨 [BudgetPulseView] refreshTrigger: \(viewModel.forceRefreshTrigger)")
+        print("🎨 [BudgetPulseView] isExpanded: \(isExpanded)")
+        print("🎨 [BudgetPulseView] ========================")
+
+        return contentView
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(white: 0.12))
+            )
+            .id("\(stateDescription)-\(viewModel.forceRefreshTrigger)")
+            .onReceive(NotificationCenter.default.publisher(for: .budgetDeleted)) { _ in
+                print("🎨 [BudgetPulseView] ⚡️ Received budgetDeleted notification, resetting local state")
+                print("🎨 [BudgetPulseView] Before reset - isExpanded: \(isExpanded)")
+                isExpanded = false
+                showingCategoryDetail = false
+                showingAIReport = false
+                showingAIInsight = false
+                print("🎨 [BudgetPulseView] After reset - isExpanded: \(isExpanded)")
+            }
         .sheet(isPresented: $viewModel.showingSetupSheet) {
             BudgetSetupView(viewModel: viewModel)
         }
@@ -59,12 +70,44 @@ struct BudgetPulseView: View {
         .alert("Remove Budget?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) {
-                Task {
-                    await viewModel.deleteBudget()
+                Task { @MainActor in
+                    print("🎨 [BudgetPulseView] Delete button tapped, calling viewModel.deleteBudget()")
+                    let success = await viewModel.deleteBudget()
+                    if success {
+                        print("🎨 [BudgetPulseView] Deletion successful, state should now be: \(viewModel.state)")
+                    } else {
+                        print("🎨 [BudgetPulseView] Deletion failed")
+                    }
                 }
             }
         } message: {
             Text("This will remove your budget tracking. You can set a new AI budget anytime.")
+        }
+    }
+
+    // MARK: - Content View
+
+    private var contentView: some View {
+        print("🎨 [BudgetPulseView.contentView] Building content for state: \(viewModel.state.hasBudget ? "HAS BUDGET" : "NO BUDGET")")
+
+        return VStack(spacing: 0) {
+            switch viewModel.state {
+            case .idle, .loading:
+                let _ = print("🎨 [BudgetPulseView.contentView] Showing loadingView")
+                loadingView
+
+            case .noBudget:
+                let _ = print("🎨 [BudgetPulseView.contentView] 🎯 Showing noBudgetView")
+                noBudgetView
+
+            case .active(let progress):
+                let _ = print("🎨 [BudgetPulseView.contentView] Showing activeBudgetView for budget: \(progress.budget.id)")
+                activeBudgetView(progress)
+
+            case .error(let message):
+                let _ = print("🎨 [BudgetPulseView.contentView] Showing errorView: \(message)")
+                errorView(message)
+            }
         }
     }
 
@@ -87,9 +130,12 @@ struct BudgetPulseView: View {
     // MARK: - No Budget View
 
     private var noBudgetView: some View {
-        Group {
+        let _ = print("🎨 [BudgetPulseView.noBudgetView] 🚀 RENDERING noBudgetView, isCurrentMonth: \(viewModel.isCurrentMonth)")
+
+        return Group {
             if viewModel.isCurrentMonth {
                 // Current month: Show setup button
+                let _ = print("🎨 [BudgetPulseView.noBudgetView] ✅ Showing 'Set Smart Budget' button")
                 Button(action: { viewModel.startSetup() }) {
                     HStack(spacing: 12) {
                         ZStack {
@@ -262,7 +308,9 @@ struct BudgetPulseView: View {
     // MARK: - Active Budget View
 
     private func activeBudgetView(_ progress: BudgetProgress) -> some View {
-        VStack(spacing: 0) {
+        let _ = print("🎨 [BudgetPulseView.activeBudgetView] 💰 RENDERING activeBudgetView for budget: \(progress.budget.id), isExpanded: \(isExpanded)")
+
+        return VStack(spacing: 0) {
             // Collapsed header (always visible)
             collapsedHeader(progress)
 

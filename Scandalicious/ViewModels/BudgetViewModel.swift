@@ -41,6 +41,7 @@ class BudgetViewModel: ObservableObject {
     // MARK: - Published State
 
     @Published var state: BudgetState = .idle
+    @Published var forceRefreshTrigger: Int = 0  // Increment to force view refresh
 
     // Period selection state
     @Published var selectedPeriod: String = ""  // "January 2026" format
@@ -358,12 +359,18 @@ class BudgetViewModel: ObservableObject {
 
     /// Refresh just the progress (when spending changes)
     func refreshProgress() async {
-        guard case .active = state else { return }
+        print("🔄 [BudgetViewModel] refreshProgress called, current state: \(state)")
+        guard case .active = state else {
+            print("🔄 [BudgetViewModel] refreshProgress skipped - state is not .active")
+            return
+        }
 
         do {
             let progressResponse = try await apiService.getBudgetProgress()
             state = .active(progressResponse.toBudgetProgress())
+            print("🔄 [BudgetViewModel] refreshProgress completed - state updated to .active")
         } catch {
+            print("🔄 [BudgetViewModel] refreshProgress failed: \(error)")
             // Don't change state on refresh failure
         }
     }
@@ -508,22 +515,44 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    /// Delete the budget
+    /// Delete the budget for the currently selected period
     func deleteBudget() async -> Bool {
+        // Convert selected period to API format (yyyy-MM)
+        let monthParam = isCurrentMonth ? nil : convertToAPIFormat(selectedPeriod)
+        print("🗑️ [BudgetViewModel] Starting budget deletion for \(monthParam ?? "current month")...")
         isSaving = true
         saveError = nil
 
         do {
-            try await apiService.removeBudget()
-            state = .noBudget
-            // Reset all AI states when budget is deleted
+            try await apiService.removeBudget(month: monthParam)
+            print("🗑️ [BudgetViewModel] API deletion successful, setting state to .noBudget")
+
+            // Reset all AI states FIRST before changing main state
             aiCheckInState = .idle
             aiSuggestionState = .idle
             aiMonthlyReportState = .idle
-            NotificationCenter.default.post(name: .budgetDeleted, object: nil)
+
+            // Clear past month report if deleting a past month
+            if !isCurrentMonth {
+                pastMonthReport = nil
+            }
+
+            // Then update main state - this will trigger SwiftUI view updates
+            state = .noBudget
             isSaving = false
+
+            // Force view refresh by incrementing trigger
+            forceRefreshTrigger += 1
+
+            print("🗑️ [BudgetViewModel] State is now: \(state), refresh trigger: \(forceRefreshTrigger)")
+
+            // Post notification for any other observers - this will trigger view reset
+            NotificationCenter.default.post(name: .budgetDeleted, object: nil)
+
+            print("🗑️ [BudgetViewModel] Budget deletion complete, notification posted")
             return true
         } catch {
+            print("🗑️ [BudgetViewModel] Budget deletion failed: \(error.localizedDescription)")
             saveError = error.localizedDescription
             isSaving = false
             return false

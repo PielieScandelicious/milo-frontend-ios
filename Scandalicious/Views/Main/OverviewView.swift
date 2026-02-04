@@ -2953,7 +2953,7 @@ struct OverviewView: View {
             VStack(spacing: 16) {
                 // Spending section
                 VStack(spacing: 4) {
-                    Text(isAllPeriod(period) ? "TOTAL SPENT" : "SPENT THIS MONTH")
+                    Text(isAllPeriod(period) ? "TOTAL SPENT" : (isYearPeriod(period) ? "SPENT THIS YEAR" : "SPENT THIS MONTH"))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
                         .tracking(1.2)

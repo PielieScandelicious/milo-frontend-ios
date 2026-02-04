@@ -89,10 +89,18 @@ actor BudgetAPIService {
     }
 
     /// Delete the user's budget
-    func deleteBudget() async throws {
-        let _: EmptyResponse = try await performRequest(
+    /// - Parameter month: Optional month in "yyyy-MM" format. If nil, deletes current month's budget.
+    func deleteBudget(month: String? = nil) async throws {
+        var queryItems: [URLQueryItem] = []
+        if let month = month {
+            queryItems.append(URLQueryItem(name: "month", value: month))
+        }
+
+        // DELETE endpoints often return 204 No Content, so we don't try to decode response
+        try await performRequestWithoutResponse(
             endpoint: "/budgets",
-            method: "DELETE"
+            method: "DELETE",
+            queryItems: queryItems
         )
     }
 
@@ -323,6 +331,61 @@ actor BudgetAPIService {
         }
     }
 
+    /// Perform a request that doesn't expect a response body (e.g., DELETE with 204 No Content)
+    private func performRequestWithoutResponse(
+        endpoint: String,
+        method: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws {
+        // Build URL
+        guard var urlComponents = URLComponents(string: "\(baseURL)\(endpoint)") else {
+            throw BudgetAPIError.invalidURL
+        }
+
+        if !queryItems.isEmpty {
+            urlComponents.queryItems = queryItems
+        }
+
+        guard let url = urlComponents.url else {
+            throw BudgetAPIError.invalidURL
+        }
+
+        // Get auth token
+        let token = try await getAuthToken()
+
+        // Create request
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 30
+
+        // Perform request
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw BudgetAPIError.invalidResponse
+            }
+
+            // Check for success (2xx status codes)
+            switch httpResponse.statusCode {
+            case 200...299:
+                // Success - no need to decode response
+                return
+            case 401:
+                throw BudgetAPIError.unauthorized
+            case 404:
+                throw BudgetAPIError.notFound
+            default:
+                throw BudgetAPIError.serverError("Server returned status \(httpResponse.statusCode)")
+            }
+        } catch let error as BudgetAPIError {
+            throw error
+        } catch {
+            throw BudgetAPIError.networkError(error)
+        }
+    }
+
     private func getAuthToken() async throws -> String {
         guard let user = Auth.auth().currentUser else {
             throw BudgetAPIError.noAuthToken
@@ -363,8 +426,8 @@ extension BudgetAPIService {
         return try await updateBudget(request: request)
     }
 
-    nonisolated func removeBudget() async throws {
-        return try await deleteBudget()
+    nonisolated func removeBudget(month: String? = nil) async throws {
+        return try await deleteBudget(month: month)
     }
 
     nonisolated func getBudgetProgress(month: String? = nil) async throws -> BudgetProgressResponse {
