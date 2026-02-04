@@ -438,7 +438,7 @@ enum DataCollectionPhase: Equatable {
         switch self {
         case .onboarding: return "Getting Started"
         case .buildingProfile: return "Building Your Profile"
-        case .fullyPersonalized: return "Your Personalized Budget"
+        case .fullyPersonalized: return "Your Smart Budget"
         }
     }
 

@@ -372,6 +372,7 @@ struct AIReceiptFeedbackView: View {
 struct AISuggestionView: View {
     let suggestion: AIBudgetSuggestionResponse
     @Binding var selectedAmount: Double
+    @State private var expandedOpportunityIds = Set<String>()
 
     private var isPartialData: Bool {
         suggestion.dataCollectionPhase != .fullyPersonalized
@@ -562,7 +563,9 @@ struct AISuggestionView: View {
             }
 
             ForEach(suggestion.aiAnalysis.savingsOpportunities.prefix(3)) { opportunity in
-                HStack(spacing: 12) {
+                let isExpanded = expandedOpportunityIds.contains(opportunity.id)
+
+                HStack(alignment: .top, spacing: 12) {
                     Image(systemName: opportunity.difficultyIcon)
                         .font(.system(size: 16))
                         .foregroundColor(opportunity.difficultyColor.opacity(isPartialData ? 0.7 : 1.0))
@@ -576,14 +579,21 @@ struct AISuggestionView: View {
                         Text(opportunity.description)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(isPartialData ? 0.4 : 0.5))
-                            .lineLimit(2)
+                            .lineLimit(isExpanded ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Spacer()
 
-                    Text(String(format: "€%.0f/mo", opportunity.potentialSavings))
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5).opacity(isPartialData ? 0.7 : 1.0))
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(String(format: "€%.0f/mo", opportunity.potentialSavings))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5).opacity(isPartialData ? 0.7 : 1.0))
+
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.3))
+                    }
                 }
                 .padding(12)
                 .background(
@@ -596,6 +606,16 @@ struct AISuggestionView: View {
                             nil
                         )
                 )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if isExpanded {
+                            expandedOpportunityIds.remove(opportunity.id)
+                        } else {
+                            expandedOpportunityIds.insert(opportunity.id)
+                        }
+                    }
+                }
             }
         }
     }

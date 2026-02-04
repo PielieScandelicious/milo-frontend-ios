@@ -20,6 +20,7 @@ struct BudgetSetupView: View {
     @State private var customAmount: Double = 500
     @State private var showSuccessSheet = false
     @State private var showAllCategories = false
+    @State private var expandedOpportunityIds = Set<String>()
 
     // Callback to switch to scan tab
     var onScanReceipt: (() -> Void)?
@@ -1215,7 +1216,9 @@ struct BudgetSetupView: View {
             }
 
             ForEach(opportunities.prefix(3)) { opportunity in
-                HStack(spacing: 12) {
+                let isExpanded = expandedOpportunityIds.contains(opportunity.id)
+
+                HStack(alignment: .top, spacing: 12) {
                     Image(systemName: opportunity.difficultyIcon)
                         .font(.system(size: 16))
                         .foregroundColor(opportunity.difficultyColor)
@@ -1229,20 +1232,37 @@ struct BudgetSetupView: View {
                         Text(opportunity.description)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(0.5))
-                            .lineLimit(2)
+                            .lineLimit(isExpanded ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Spacer()
 
-                    Text(String(format: "€%.0f", opportunity.potentialSavings))
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(String(format: "€%.0f", opportunity.potentialSavings))
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
+
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.3))
+                    }
                 }
                 .padding(12)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.05))
                 )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if isExpanded {
+                            expandedOpportunityIds.remove(opportunity.id)
+                        } else {
+                            expandedOpportunityIds.insert(opportunity.id)
+                        }
+                    }
+                }
             }
         }
         .padding(16)

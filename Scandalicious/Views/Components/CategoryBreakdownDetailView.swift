@@ -239,13 +239,15 @@ struct CategoryBreakdownDetailView: View {
     // MARK: - Category List Section
 
     private func categoryListSection(_ data: PieChartSummaryResponse) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let sortedCategories = data.categories.sorted { $0.totalSpent > $1.totalSpent }
+
+        return VStack(alignment: .leading, spacing: 12) {
             Text("By Category")
                 .font(.headline)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 4)
 
-            ForEach(data.categories.sorted { $0.totalSpent > $1.totalSpent }) { category in
+            ForEach(sortedCategories) { category in
                 expandableCategoryCard(category)
             }
         }
@@ -400,6 +402,8 @@ struct CategoryBreakdownDetailView: View {
 
             // Load items if not already loaded
             if categoryItems[category.id] == nil && loadingCategoryId != category.id {
+                // Set loading state immediately (synchronously) before async Task
+                loadingCategoryId = category.id
                 Task {
                     await loadCategoryItems(category)
                 }
@@ -438,9 +442,47 @@ struct CategoryBreakdownDetailView: View {
 
             let response = try await apiService.getTransactions(filters: filters)
 
+            // Show items immediately - don't block UI waiting for splits
             await MainActor.run {
                 categoryItems[category.id] = response.transactions
                 loadingCategoryId = nil
+            }
+
+            // Load split data in background (non-blocking) - avatars will appear progressively
+            // Use detached task so it doesn't block this function's completion
+            Task.detached { [weak splitCache] in
+                let uniqueReceiptIds = Set(response.transactions.compactMap { $0.receiptId })
+
+                // Load splits in parallel with limited concurrency to avoid overwhelming the backend
+                await withTaskGroup(of: Void.self) { group in
+                    var activeTasksCount = 0
+                    let maxConcurrentTasks = 5  // Limit concurrent API calls
+
+                    var remainingIds = Array(uniqueReceiptIds)
+
+                    while !remainingIds.isEmpty || activeTasksCount > 0 {
+                        // Add new tasks up to the limit
+                        while activeTasksCount < maxConcurrentTasks && !remainingIds.isEmpty {
+                            let receiptId = remainingIds.removeFirst()
+
+                            // Only fetch if not already cached
+                            guard let cache = splitCache, await !cache.hasSplit(for: receiptId) else {
+                                continue
+                            }
+
+                            group.addTask {
+                                await cache.fetchSplit(for: receiptId)
+                            }
+                            activeTasksCount += 1
+                        }
+
+                        // Wait for at least one task to complete
+                        if activeTasksCount > 0 {
+                            await group.next()
+                            activeTasksCount -= 1
+                        }
+                    }
+                }
             }
         } catch {
             await MainActor.run {
@@ -555,12 +597,6 @@ struct CategoryBreakdownDetailView: View {
                     Text(String(format: "€%.2f", item.totalPrice))
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(.white.opacity(0.7))
-                }
-                .task {
-                    // Fetch split data if we have a receipt ID and it's not cached
-                    if let receiptId = item.receiptId, !splitCache.hasSplit(for: receiptId) {
-                        await splitCache.fetchSplit(for: receiptId)
-                    }
                 }
             }
         } else {
