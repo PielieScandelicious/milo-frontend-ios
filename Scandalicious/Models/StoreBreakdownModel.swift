@@ -37,6 +37,29 @@ struct StoreBreakdown: Codable, Identifiable, Equatable, Hashable {
         self.averageHealthScore = averageHealthScore
     }
 
+    // MARK: - Primary Group (derived from highest-spend category group)
+
+    /// The category group where this store's spending is highest (e.g., "Food & Dining")
+    var primaryGroup: String? {
+        guard !categories.isEmpty else { return nil }
+        let groupSpend = Dictionary(grouping: categories, by: { $0.group ?? "Miscellaneous" })
+            .mapValues { $0.reduce(0.0) { $0 + $1.spent } }
+        return groupSpend.max(by: { $0.value < $1.value })?.key
+    }
+
+    /// Hex color for the primary group (e.g., "#2ECC71")
+    var primaryGroupColorHex: String? {
+        guard let group = primaryGroup else { return nil }
+        // Find first category matching this group and return its color
+        return categories.first(where: { $0.group == group })?.groupColorHex
+    }
+
+    /// SF Symbol icon for the primary group (e.g., "fork.knife")
+    var primaryGroupIcon: String? {
+        guard let group = primaryGroup else { return nil }
+        return categories.first(where: { $0.group == group })?.groupIcon
+    }
+
     // Equatable conformance
     static func == (lhs: StoreBreakdown, rhs: StoreBreakdown) -> Bool {
         return lhs.id == rhs.id
@@ -52,8 +75,26 @@ struct Category: Codable, Identifiable, Equatable, Hashable {
     let name: String
     let spent: Double
     let percentage: Int
+    let group: String?  // Top-level group name (e.g., "Food & Dining")
+    let groupColorHex: String?  // Hex color for the group
+    let groupIcon: String?  // SF Symbol icon for the group
 
     var id: String { name }
+
+    enum CodingKeys: String, CodingKey {
+        case name, spent, percentage, group
+        case groupColorHex = "group_color_hex"
+        case groupIcon = "group_icon"
+    }
+
+    init(name: String, spent: Double, percentage: Int, group: String? = nil, groupColorHex: String? = nil, groupIcon: String? = nil) {
+        self.name = name
+        self.spent = spent
+        self.percentage = percentage
+        self.group = group
+        self.groupColorHex = groupColorHex
+        self.groupIcon = groupIcon
+    }
 
     // Hashable conformance
     func hash(into hasher: inout Hasher) {
@@ -578,12 +619,15 @@ class StoreDataManager: ObservableObject {
                 filters: filters
             )
 
-            // Convert categories
+            // Convert categories (preserving group info)
             let categories = storeDetails.categories.map { categoryBreakdown in
                 Category(
                     name: categoryBreakdown.name,
                     spent: categoryBreakdown.spent,
-                    percentage: Int(categoryBreakdown.percentage)
+                    percentage: Int(categoryBreakdown.percentage),
+                    group: categoryBreakdown.group,
+                    groupColorHex: categoryBreakdown.groupColorHex,
+                    groupIcon: categoryBreakdown.groupIcon
                 )
             }
 

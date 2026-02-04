@@ -69,6 +69,56 @@ struct StoreDetailView: View {
         storeColor
     }
 
+    // MARK: - Categories Grouped by Mid-Level Category
+
+    /// A group of categories for display with section header
+    struct CategoryGroup: Identifiable {
+        let groupName: String
+        let groupIcon: String
+        let groupColorHex: String
+        let categories: [Category]
+        let totalSpent: Double
+
+        var id: String { groupName }
+
+        var groupColor: Color {
+            Color(hex: groupColorHex) ?? .white.opacity(0.5)
+        }
+    }
+
+    /// Group currentCategories by their mid-level category (e.g., "Groceries", "Electronics"),
+    /// sorted by total spend descending. Icon/color come from the parent group.
+    private var categoriesByGroup: [CategoryGroup] {
+        let registry = CategoryRegistryManager.shared
+        var groupDict: [String: (icon: String, colorHex: String, categories: [Category])] = [:]
+
+        for category in currentCategories {
+            let midCategory = registry.categoryForSubCategory(category.name)
+            let parentGroup = registry.groupForCategory(midCategory)
+            let icon = registry.iconForGroup(parentGroup)
+            let colorHex = registry.colorHexForGroup(parentGroup)
+
+            if var existing = groupDict[midCategory] {
+                existing.categories.append(category)
+                groupDict[midCategory] = existing
+            } else {
+                groupDict[midCategory] = (icon: icon, colorHex: colorHex, categories: [category])
+            }
+        }
+
+        // Convert to CategoryGroup array and sort by total spent descending
+        return groupDict.map { name, data in
+            CategoryGroup(
+                groupName: name,
+                groupIcon: data.icon,
+                groupColorHex: data.colorHex,
+                categories: data.categories.sorted { $0.spent > $1.spent },
+                totalSpent: data.categories.reduce(0) { $0 + $1.spent }
+            )
+        }
+        .sorted { $0.totalSpent > $1.totalSpent }
+    }
+
     // Top 5 categories + "Other" grouping - uses refreshable currentCategories
     private var groupedChartSegments: [ChartSegment] {
         let sortedCategories = currentCategories.sorted { $0.spent > $1.spent }
@@ -200,19 +250,16 @@ struct StoreDetailView: View {
                     )
                     .padding(.top, 24)
 
-                    // Categories Section Header
-                    categoriesSectionHeader
+                    // Grouped category sections
+                    if !categoriesByGroup.isEmpty {
+                        VStack(spacing: 20) {
+                            ForEach(categoriesByGroup) { group in
+                                groupSection(group: group)
+                            }
+                        }
                         .padding(.horizontal, 16)
                         .padding(.top, 24)
-
-                    // Expandable category rows
-                    VStack(spacing: 8) {
-                        ForEach(Array(groupedChartSegments.enumerated()), id: \.element.id) { _, segment in
-                            expandableCategoryRow(segment: segment, isOther: segment.label == "Other")
-                        }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
 
                     // Expandable Receipts Section
                     receiptsSection
@@ -323,12 +370,15 @@ struct StoreDetailView: View {
                 filters: filters
             )
 
-            // Convert categories
+            // Convert categories (preserving group info)
             let categories = storeDetails.categories.map { categoryBreakdown in
                 Category(
                     name: categoryBreakdown.name,
                     spent: categoryBreakdown.spent,
-                    percentage: Int(categoryBreakdown.percentage)
+                    percentage: Int(categoryBreakdown.percentage),
+                    group: categoryBreakdown.group,
+                    groupColorHex: categoryBreakdown.groupColorHex,
+                    groupIcon: categoryBreakdown.groupIcon
                 )
             }
 
@@ -350,30 +400,51 @@ struct StoreDetailView: View {
         }
     }
 
-    // MARK: - Categories Section Header
+    // MARK: - Grouped Category Section
 
-    private var categoriesSectionHeader: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 36, height: 36)
-                Image(systemName: "chart.pie.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
-            }
+    private func groupSection(group: CategoryGroup) -> some View {
+        VStack(spacing: 8) {
+            // Group header
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(group.groupColor.opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: group.groupIcon)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(group.groupColor)
+                }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Categories")
-                    .font(.system(size: 16, weight: .semibold))
+                Text(group.groupName)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.white)
-                Text("\(currentCategories.count) categories")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-            }
 
-            Spacer()
+                Spacer()
+
+                Text(String(format: "€%.0f", group.totalSpent))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            .padding(.bottom, 4)
+
+            // Category rows within this group
+            ForEach(group.categories) { category in
+                let segment = categoryToSegment(category: category)
+                expandableCategoryRow(segment: segment, isOther: false)
+            }
         }
+    }
+
+    /// Convert a Category to a ChartSegment for use in expandableCategoryRow
+    private func categoryToSegment(category: Category) -> ChartSegment {
+        ChartSegment(
+            startAngle: .degrees(0),
+            endAngle: .degrees(0),
+            color: category.groupColorHex.flatMap { Color(hex: $0) } ?? category.name.categoryColor,
+            value: category.spent,
+            label: category.name,
+            percentage: category.percentage
+        )
     }
 
     // MARK: - Expandable Receipts Section
@@ -1095,15 +1166,15 @@ struct DonutChartButtonStyle: ButtonStyle {
                 period: "January 2026",
                 totalStoreSpend: 189.90,
                 categories: [
-                    Category(name: "Meat & Fish", spent: 65.40, percentage: 34),
-                    Category(name: "Alcohol", spent: 42.50, percentage: 22),
-                    Category(name: "Drinks (Soft/Soda)", spent: 28.00, percentage: 15),
-                    Category(name: "Household", spent: 35.00, percentage: 18),
-                    Category(name: "Snacks & Sweets", spent: 19.00, percentage: 11)
+                    Category(name: "Meat Poultry & Seafood", spent: 65.40, percentage: 34, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife"),
+                    Category(name: "Beer & Wine (Retail)", spent: 42.50, percentage: 22, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife"),
+                    Category(name: "Beverages (Non-Alcoholic)", spent: 28.00, percentage: 15, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife"),
+                    Category(name: "Household Consumables (Paper/Cleaning)", spent: 35.00, percentage: 18, group: "Housing & Utilities", groupColorHex: "#8E44AD", groupIcon: "house.fill"),
+                    Category(name: "Snacks & Candy", spent: 19.00, percentage: 11, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife")
                 ],
                 visitCount: 15
             ),
-            storeColor: Color(red: 0.3, green: 0.7, blue: 1.0)  // Blue from donut chart
+            storeColor: Color(red: 0.3, green: 0.7, blue: 1.0)
         )
     }
     .preferredColorScheme(.dark)

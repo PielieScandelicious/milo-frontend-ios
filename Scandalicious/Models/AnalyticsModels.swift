@@ -122,6 +122,9 @@ struct CategoryBreakdown: Codable, Identifiable {
     let percentage: Double
     let transactionCount: Int
     let averageHealthScore: Double?  // Average health score for this category
+    let group: String?  // Top-level group name (e.g., "Food & Dining")
+    let groupColorHex: String?  // Hex color for the group
+    let groupIcon: String?  // SF Symbol icon for the group
 
     var id: String { name }
 
@@ -131,14 +134,20 @@ struct CategoryBreakdown: Codable, Identifiable {
         case percentage
         case transactionCount = "transaction_count"
         case averageHealthScore = "average_health_score"
+        case group
+        case groupColorHex = "group_color_hex"
+        case groupIcon = "group_icon"
     }
 
-    init(name: String, spent: Double, percentage: Double, transactionCount: Int, averageHealthScore: Double? = nil) {
+    init(name: String, spent: Double, percentage: Double, transactionCount: Int, averageHealthScore: Double? = nil, group: String? = nil, groupColorHex: String? = nil, groupIcon: String? = nil) {
         self.name = name
         self.spent = spent
         self.percentage = percentage
         self.transactionCount = transactionCount
         self.averageHealthScore = averageHealthScore
+        self.group = group
+        self.groupColorHex = groupColorHex
+        self.groupIcon = groupIcon
     }
 
     var icon: String {

@@ -1629,7 +1629,7 @@ struct OverviewView: View {
                             totalItems: nil,
                             averageItemPrice: nil,
                             centerIcon: "storefront.fill",
-                            centerLabel: "Stores &\nBusinesses",
+                            centerLabel: "Stores",
                             showAllSegments: showAllRows
                         )
                         .opacity(isPieChartFlipped ? 0 : 1)
@@ -1683,7 +1683,7 @@ struct OverviewView: View {
                         EmptyPieChartView(
                             isNewMonth: isNewMonth,
                             icon: "storefront.fill",
-                            label: "Stores &\nBusinesses"
+                            label: "Stores"
                         )
                         .opacity(isPieChartFlipped ? 0 : 1)
                     }
@@ -1726,37 +1726,63 @@ struct OverviewView: View {
                     let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
                     let hasMoreCategories = categories.count > maxVisibleRows
 
-                    // Categories section header
-                    categoriesSectionHeader(categoryCount: categories.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
+                    // Category rows grouped by mid-level category (e.g., "Groceries", "Electronics")
+                    VStack(spacing: 6) {
+                        let registry = CategoryRegistryManager.shared
+                        let groupedCategories = Dictionary(grouping: displayCategories, by: { registry.categoryForSubCategory($0.name) })
+                        let sortedMidCategories = groupedCategories.keys.sorted { a, b in
+                            let totalA = groupedCategories[a]!.reduce(0.0) { $0 + $1.totalSpent }
+                            let totalB = groupedCategories[b]!.reduce(0.0) { $0 + $1.totalSpent }
+                            return totalA > totalB
+                        }
 
-                    // Category rows with staggered animation - now expandable inline
-                    VStack(spacing: 8) {
-                        ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
-                            VStack(spacing: 0) {
-                                // Category row header (tappable to expand)
-                                ExpandableCategoryRowHeader(
-                                    category: category,
-                                    isExpanded: expandedCategoryId == category.id,
-                                    onTap: {
-                                        toggleCategoryExpansion(category, period: period)
+                        // Track cumulative index for staggered animation
+                        let allCategoriesInOrder: [(midCategory: String, category: CategorySpendItem)] = sortedMidCategories.flatMap { midCat in
+                            (groupedCategories[midCat] ?? []).map { (midCategory: midCat, category: $0) }
+                        }
+
+                        ForEach(sortedMidCategories, id: \.self) { midCategoryName in
+                            if let groupCats = groupedCategories[midCategoryName], !groupCats.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    // Mid-level category header (icon/color from parent group)
+                                    let parentGroup = registry.groupForCategory(midCategoryName)
+                                    groupSectionHeader(
+                                        groupName: midCategoryName,
+                                        icon: registry.iconForGroup(parentGroup),
+                                        colorHex: registry.colorHexForGroup(parentGroup)
+                                    )
+
+                                    // Category rows in this group
+                                    ForEach(groupCats, id: \.id) { category in
+                                        let globalIndex = allCategoriesInOrder.firstIndex(where: { $0.category.id == category.id }) ?? 0
+
+                                        VStack(spacing: 0) {
+                                            // Category row header (tappable to expand)
+                                            ExpandableCategoryRowHeader(
+                                                category: category,
+                                                isExpanded: expandedCategoryId == category.id,
+                                                onTap: {
+                                                    toggleCategoryExpansion(category, period: period)
+                                                }
+                                            )
+
+                                            // Expanded items section
+                                            if expandedCategoryId == category.id {
+                                                expandedCategoryItemsSection(category)
+                                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                                            }
+                                        }
+                                        .opacity(storeRowsAppeared ? 1 : 0)
+                                        .offset(y: storeRowsAppeared ? 0 : 15)
+                                        .animation(
+                                            Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                                .delay(Double(globalIndex) * 0.08),
+                                            value: storeRowsAppeared
+                                        )
                                     }
-                                )
-
-                                // Expanded items section
-                                if expandedCategoryId == category.id {
-                                    expandedCategoryItemsSection(category)
-                                        .transition(.opacity.combined(with: .move(edge: .top)))
                                 }
+                                .padding(.top, 4)
                             }
-                            .opacity(storeRowsAppeared ? 1 : 0)
-                            .offset(y: storeRowsAppeared ? 0 : 15)
-                            .animation(
-                                Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index) * 0.08),
-                                value: storeRowsAppeared
-                            )
                         }
 
                         // Show All / Show Less button
@@ -1781,31 +1807,53 @@ struct OverviewView: View {
                     let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
                     let hasMoreSegments = segments.count > maxVisibleRows
 
-                    // Stores section header
-                    storesSectionHeader(storeCount: segments.count, isAllTime: isAllPeriod(period), isYear: isYearPeriod(period))
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
+                    // Store rows grouped by category group
+                    VStack(spacing: 6) {
+                        let groupedSegments = Dictionary(grouping: displaySegments, by: { $0.group ?? "Other" })
+                        let sortedGroups = groupedSegments.keys.sorted { a, b in
+                            let totalA = groupedSegments[a]!.reduce(0.0) { $0 + $1.amount }
+                            let totalB = groupedSegments[b]!.reduce(0.0) { $0 + $1.amount }
+                            return totalA > totalB
+                        }
 
-                    // Store rows with staggered animation
-                    // Use .id(period) to force SwiftUI to recreate views when period changes
-                    // This prevents duplicate views during period transitions
-                    VStack(spacing: 8) {
-                        ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
-                            StoreRowButton(
-                                segment: segment,
-                                breakdowns: breakdowns,
-                                onSelect: { breakdown, color in
-                                    selectedStoreColor = color
-                                    selectedBreakdown = breakdown
+                        // Track cumulative index for staggered animation
+                        let allSegmentsInOrder: [(group: String, segment: StoreChartSegment)] = sortedGroups.flatMap { group in
+                            (groupedSegments[group] ?? []).map { (group: group, segment: $0) }
+                        }
+
+                        ForEach(sortedGroups, id: \.self) { groupName in
+                            if let groupStores = groupedSegments[groupName], !groupStores.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    // Group header
+                                    groupSectionHeader(
+                                        groupName: groupName,
+                                        icon: groupStores.first?.groupIcon ?? "square.grid.2x2.fill",
+                                        colorHex: groupStores.first?.groupColorHex ?? "#95A5A6"
+                                    )
+
+                                    // Store rows in this group
+                                    ForEach(groupStores, id: \.id) { segment in
+                                        let globalIndex = allSegmentsInOrder.firstIndex(where: { $0.segment.storeName == segment.storeName }) ?? 0
+
+                                        StoreRowButton(
+                                            segment: segment,
+                                            breakdowns: breakdowns,
+                                            onSelect: { breakdown, color in
+                                                selectedStoreColor = color
+                                                selectedBreakdown = breakdown
+                                            }
+                                        )
+                                        .opacity(storeRowsAppeared ? 1 : 0)
+                                        .offset(y: storeRowsAppeared ? 0 : 15)
+                                        .animation(
+                                            Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                                .delay(Double(globalIndex) * 0.08),
+                                            value: storeRowsAppeared
+                                        )
+                                    }
                                 }
-                            )
-                            .opacity(storeRowsAppeared ? 1 : 0)
-                            .offset(y: storeRowsAppeared ? 0 : 15)
-                            .animation(
-                                Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index) * 0.08),
-                                value: storeRowsAppeared
-                            )
+                                .padding(.top, 4)
+                            }
                         }
 
                         // Show All / Show Less button
@@ -1936,7 +1984,10 @@ struct OverviewView: View {
                 storeName: breakdown.storeName,
                 amount: breakdown.totalStoreSpend,
                 percentage: Int(percentage * 100),
-                healthScore: breakdown.averageHealthScore
+                healthScore: breakdown.averageHealthScore,
+                group: breakdown.primaryGroup,
+                groupColorHex: breakdown.primaryGroupColorHex,
+                groupIcon: breakdown.primaryGroupIcon
             )
             currentAngle += angleRange
             return segment
@@ -1990,6 +2041,29 @@ struct OverviewView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
             }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Group Section Header
+
+    private func groupSectionHeader(groupName: String, icon: String, colorHex: String) -> some View {
+        let groupColor = Color(hex: colorHex) ?? .white.opacity(0.7)
+
+        return HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(groupColor.opacity(0.15))
+                    .frame(width: 30, height: 30)
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(groupColor)
+            }
+
+            Text(groupName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
 
             Spacer()
         }

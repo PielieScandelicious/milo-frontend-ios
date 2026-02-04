@@ -75,6 +75,7 @@ struct ScandaLiciousApp: App {
                     Task {
                         await subscriptionManager.loadProducts()
                         await subscriptionManager.updateSubscriptionStatus()
+                        await CategoryRegistryManager.shared.loadIfNeeded()
                         hasCheckedSubscription = true
                     }
                 } else {
@@ -86,6 +87,8 @@ struct ScandaLiciousApp: App {
                 if authManager.isAuthenticated {
                     await subscriptionManager.loadProducts()
                     await subscriptionManager.updateSubscriptionStatus()
+                    // Load category hierarchy for mid-level category lookups
+                    await CategoryRegistryManager.shared.loadIfNeeded()
                 }
                 hasCheckedSubscription = true
             }

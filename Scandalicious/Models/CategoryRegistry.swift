@@ -84,6 +84,10 @@ class CategoryRegistryManager: ObservableObject {
     private var groupLookup: [String: (icon: String, colorHex: String)] = [:]
     // Sub-category -> group name
     private var subCategoryToGroup: [String: String] = [:]
+    // Sub-category -> mid-level category name (e.g., "Phones & Accessories" -> "Electronics")
+    private var subCategoryToCategory: [String: String] = [:]
+    // Mid-level category -> group name (e.g., "Electronics" -> "Shopping & Personal Care")
+    private var categoryToGroup: [String: String] = [:]
 
     private var baseURL: String { AppConfiguration.apiBase }
     private let decoder = JSONDecoder()
@@ -128,12 +132,16 @@ class CategoryRegistryManager: ObservableObject {
     private func buildLookups(from response: CategoryHierarchyResponse) {
         groupLookup.removeAll()
         subCategoryToGroup.removeAll()
+        subCategoryToCategory.removeAll()
+        categoryToGroup.removeAll()
 
         for group in response.groups {
             groupLookup[group.name] = (icon: group.icon, colorHex: group.colorHex)
             for category in group.categories {
+                categoryToGroup[category.name] = group.name
                 for subCategory in category.subCategories {
                     subCategoryToGroup[subCategory] = group.name
+                    subCategoryToCategory[subCategory] = category.name
                 }
             }
         }
@@ -143,6 +151,16 @@ class CategoryRegistryManager: ObservableObject {
 
     func groupForSubCategory(_ subCategory: String) -> String {
         subCategoryToGroup[subCategory] ?? "Miscellaneous"
+    }
+
+    /// Get the mid-level category for a sub-category (e.g., "Phones & Accessories" -> "Electronics")
+    func categoryForSubCategory(_ subCategory: String) -> String {
+        subCategoryToCategory[subCategory] ?? subCategory
+    }
+
+    /// Get the group for a mid-level category (e.g., "Electronics" -> "Shopping & Personal Care")
+    func groupForCategory(_ category: String) -> String {
+        categoryToGroup[category] ?? "Miscellaneous"
     }
 
     func iconForSubCategory(_ subCategory: String) -> String {

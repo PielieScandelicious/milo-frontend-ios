@@ -56,7 +56,10 @@ struct AllStoresBreakdownView: View {
                 storeName: breakdown.storeName,
                 amount: breakdown.totalStoreSpend,
                 percentage: Int(percentage * 100),
-                healthScore: breakdown.averageHealthScore
+                healthScore: breakdown.averageHealthScore,
+                group: breakdown.primaryGroup,
+                groupColorHex: breakdown.primaryGroupColorHex,
+                groupIcon: breakdown.primaryGroupIcon
             )
             currentAngle += angleRange
             return segment
@@ -90,16 +93,37 @@ struct AllStoresBreakdownView: View {
                         .padding(.top, 24)
                         .padding(.bottom, 12)
                         
-                        // Legend
-                        VStack(spacing: 12) {
-                            ForEach(storeSegments, id: \.id) { segment in
-                                Button {
-                                    selectedStoreName = segment.storeName
-                                    showingStoreTransactions = true
-                                } label: {
-                                    storeRow(segment: segment)
+                        // Legend grouped by category group
+                        VStack(spacing: 20) {
+                            let groupedSegments = Dictionary(grouping: storeSegments, by: { $0.group ?? "Other" })
+                            let sortedGroups = groupedSegments.keys.sorted { a, b in
+                                let totalA = groupedSegments[a]!.reduce(0.0) { $0 + $1.amount }
+                                let totalB = groupedSegments[b]!.reduce(0.0) { $0 + $1.amount }
+                                return totalA > totalB
+                            }
+
+                            ForEach(sortedGroups, id: \.self) { groupName in
+                                if let groupStores = groupedSegments[groupName], !groupStores.isEmpty {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        // Group header
+                                        groupSectionHeader(
+                                            groupName: groupName,
+                                            icon: groupStores.first?.groupIcon ?? "square.grid.2x2.fill",
+                                            colorHex: groupStores.first?.groupColorHex ?? "#95A5A6"
+                                        )
+
+                                        // Store rows in this group
+                                        ForEach(groupStores, id: \.id) { segment in
+                                            Button {
+                                                selectedStoreName = segment.storeName
+                                                showingStoreTransactions = true
+                                            } label: {
+                                                storeRow(segment: segment)
+                                            }
+                                            .buttonStyle(StoreRowButtonStyle())
+                                        }
+                                    }
                                 }
-                                .buttonStyle(StoreRowButtonStyle())
                             }
                         }
                         .padding(.horizontal)
@@ -118,6 +142,28 @@ struct AllStoresBreakdownView: View {
                 )
             }
         }
+    }
+
+    private func groupSectionHeader(groupName: String, icon: String, colorHex: String) -> some View {
+        HStack(spacing: 10) {
+            let groupColor = Color(hex: colorHex) ?? .white.opacity(0.7)
+
+            ZStack {
+                Circle()
+                    .fill(groupColor.opacity(0.15))
+                    .frame(width: 30, height: 30)
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(groupColor)
+            }
+
+            Text(groupName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
+
+            Spacer()
+        }
+        .padding(.top, 4)
     }
 
     private func storeRow(segment: StoreChartSegment) -> some View {
@@ -221,6 +267,9 @@ struct StoreChartSegment: Identifiable {
     let amount: Double
     let percentage: Int
     let healthScore: Double?  // Average health score for this store
+    let group: String?  // Primary category group (e.g., "Food & Dining")
+    let groupColorHex: String?  // Hex color for the group
+    let groupIcon: String?  // SF Symbol icon for the group
 }
 
 // MARK: - Button Styles
