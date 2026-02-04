@@ -22,6 +22,12 @@ struct BudgetSetupView: View {
     @State private var showAllCategories = false
     @State private var expandedOpportunityIds = Set<String>()
 
+    // Category editing state
+    @State private var showCategoryEditor = false
+    @State private var editableCategoryAllocations: [EditableCategoryAllocation] = []
+    @State private var hasCustomizedCategories = false
+    @State private var categoryListExpanded = false
+
     // Callback to switch to scan tab
     var onScanReceipt: (() -> Void)?
 
@@ -81,7 +87,20 @@ struct BudgetSetupView: View {
     }
 
     /// Scale AI category allocations to match the target budget
+    /// If categories have been customized, return those instead
     private var scaledCategoryAllocations: [CategoryAllocation] {
+        // If user has customized categories, use those
+        if hasCustomizedCategories && !editableCategoryAllocations.isEmpty {
+            return editableCategoryAllocations.map { editable in
+                CategoryAllocation(
+                    category: editable.category,
+                    amount: editable.amount,
+                    isLocked: editable.isLocked
+                )
+            }
+        }
+
+        // Otherwise, scale AI suggestions
         guard let aiSuggestion = viewModel.aiSuggestionState.data else { return [] }
 
         let originalTotal = aiSuggestion.categoryAllocations.reduce(0) { $0 + $1.suggestedAmount }
@@ -172,6 +191,25 @@ struct BudgetSetupView: View {
                 allocations: scaledCategoryAllocations,
                 totalBudget: targetBudget
             )
+        }
+        .sheet(isPresented: $showCategoryEditor) {
+            // Create a temporary budget for editing
+            let tempBudget = UserBudget(
+                id: "temp",
+                userId: "temp",
+                monthlyAmount: targetBudget,
+                categoryAllocations: editableCategoryAllocations.isEmpty ? scaledCategoryAllocations : editableCategoryAllocations.map { editable in
+                    CategoryAllocation(
+                        category: editable.category,
+                        amount: editable.amount,
+                        isLocked: editable.isLocked
+                    )
+                }
+            )
+
+            EditCategoryBudgetsSheet(initialBudget: tempBudget) { updatedAllocations in
+                handleCategorySave(updatedAllocations)
+            }
         }
     }
 
@@ -688,16 +726,39 @@ struct BudgetSetupView: View {
 
             // Category bars with slightly muted styling
             VStack(spacing: 10) {
-                ForEach(scaledCategoryAllocations.prefix(5), id: \.category) { allocation in
+                ForEach(categoryListExpanded ? scaledCategoryAllocations : Array(scaledCategoryAllocations.prefix(5)), id: \.category) { allocation in
                     categoryBarForPartialData(allocation)
                 }
 
+                // Expand/collapse button
                 if scaledCategoryAllocations.count > 5 {
-                    Button(action: { showAllCategories = true }) {
-                        Text("+ \(scaledCategoryAllocations.count - 5) more categories")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            categoryListExpanded.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            if !categoryListExpanded {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Show \(scaledCategoryAllocations.count - 5) more categories")
+                                    .font(.system(size: 12, weight: .semibold))
+                            } else {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Show less")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                        }
+                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.08))
+                        )
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
 
@@ -1576,37 +1637,74 @@ struct BudgetSetupView: View {
                     Text("Milo's Category Budgets")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
+
+                    // Customized indicator
+                    if hasCustomizedCategories {
+                        HStack(spacing: 3) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 10))
+                            Text("Customized")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(Color(red: 0.3, green: 0.8, blue: 0.5).opacity(0.15))
+                        )
+                    }
                 }
 
                 Spacer()
 
-                if scaledCategoryAllocations.count > 5 {
-                    Button(action: { showAllCategories = true }) {
-                        HStack(spacing: 4) {
-                            Text("See All")
-                                .font(.system(size: 13, weight: .semibold))
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
+                // Edit button
+                Button(action: { openCategoryEditor() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Edit")
+                            .font(.system(size: 13, weight: .semibold))
                     }
-                } else {
-                    Text("\(scaledCategoryAllocations.count) categories")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
                 }
             }
 
-            // Category bars - show top 5 categories
+            // Category bars - show top 5 or all if expanded
             VStack(spacing: 10) {
-                ForEach(scaledCategoryAllocations.prefix(5), id: \.category) { allocation in
+                ForEach(categoryListExpanded ? scaledCategoryAllocations : Array(scaledCategoryAllocations.prefix(5)), id: \.category) { allocation in
                     categoryBar(allocation)
                 }
 
+                // Expand/collapse button
                 if scaledCategoryAllocations.count > 5 {
-                    Text("+ \(scaledCategoryAllocations.count - 5) more categories")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            categoryListExpanded.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            if !categoryListExpanded {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Show \(scaledCategoryAllocations.count - 5) more categories")
+                                    .font(.system(size: 12, weight: .semibold))
+                            } else {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Show less")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                        }
+                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.08))
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
         }
@@ -1643,6 +1741,13 @@ struct BudgetSetupView: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white)
                         .lineLimit(1)
+
+                    // Edited indicator
+                    if allocation.isLocked {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                    }
 
                     Spacer()
 
@@ -1809,6 +1914,36 @@ struct BudgetSetupView: View {
         } else {
             return "cart.fill"
         }
+    }
+
+    // MARK: - Category Editing
+
+    private func openCategoryEditor() {
+        // Initialize editable categories if not already done
+        if editableCategoryAllocations.isEmpty {
+            editableCategoryAllocations = scaledCategoryAllocations.map { allocation in
+                EditableCategoryAllocation(
+                    category: allocation.category,
+                    amount: allocation.amount,
+                    originalAmount: allocation.amount,
+                    isLocked: allocation.isLocked
+                )
+            }
+        }
+        showCategoryEditor = true
+    }
+
+    private func handleCategorySave(_ allocations: [CategoryAllocation]) {
+        // Update editable categories
+        editableCategoryAllocations = allocations.map { allocation in
+            EditableCategoryAllocation(
+                category: allocation.category,
+                amount: allocation.amount,
+                originalAmount: allocation.amount, // Keep current as new original
+                isLocked: allocation.isLocked
+            )
+        }
+        hasCustomizedCategories = true
     }
 
     // MARK: - Actions

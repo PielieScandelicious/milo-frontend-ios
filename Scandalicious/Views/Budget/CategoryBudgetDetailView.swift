@@ -15,6 +15,7 @@ struct CategoryBudgetDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var sortOrder: CategorySortOrder = .worstFirst
     @State private var selectedCategory: CategoryBudgetProgress?
+    @State private var showingEditSheet = false
 
     enum CategorySortOrder: String, CaseIterable {
         case worstFirst = "Needs Attention"
@@ -75,13 +76,36 @@ struct CategoryBudgetDetailView: View {
             .navigationTitle("Category Budgets")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showingEditSheet = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Edit")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                        .foregroundColor(.white.opacity(0.7))
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showingEditSheet) {
+            EditCategoryBudgetsSheet(initialBudget: progress.budget) { updatedAllocations in
+                // Handle save - notify parent to update budget
+                // This will be handled by NotificationCenter or callback
+                NotificationCenter.default.post(
+                    name: .budgetCategoryAllocationsUpdated,
+                    object: nil,
+                    userInfo: ["allocations": updatedAllocations]
+                )
+            }
+        }
     }
 
     // MARK: - Summary Header

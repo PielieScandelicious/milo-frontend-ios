@@ -634,4 +634,5 @@ struct BudgetHistoryResponse: Codable {
 extension Notification.Name {
     static let budgetUpdated = Notification.Name("budgetUpdated")
     static let budgetDeleted = Notification.Name("budgetDeleted")
+    static let budgetCategoryAllocationsUpdated = Notification.Name("budgetCategoryAllocationsUpdated")
 }

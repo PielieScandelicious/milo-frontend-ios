@@ -86,6 +86,7 @@ class BudgetViewModel: ObservableObject {
 
     private let apiService = BudgetAPIService.shared
     private var notificationObserver: NSObjectProtocol?
+    private var categoryAllocationsObserver: NSObjectProtocol?
 
     // Date formatters
     private let displayFormatter: DateFormatter = {
@@ -116,6 +117,19 @@ class BudgetViewModel: ObservableObject {
                 await self?.refreshProgress()
             }
         }
+
+        // Listen for category allocation updates
+        categoryAllocationsObserver = NotificationCenter.default.addObserver(
+            forName: .budgetCategoryAllocationsUpdated,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor in
+                if let allocations = notification.userInfo?["allocations"] as? [CategoryAllocation] {
+                    let _ = await self?.updateCategoryAllocations(allocations)
+                }
+            }
+        }
     }
 
     /// Initialize periods synchronously (called from init)
@@ -135,6 +149,9 @@ class BudgetViewModel: ObservableObject {
 
     deinit {
         if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = categoryAllocationsObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
