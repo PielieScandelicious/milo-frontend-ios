@@ -154,15 +154,12 @@ struct OnboardingView: View {
                     authManager.markProfileAsCompleted()
                     isLoading = false
                 }
-
-                print("✅ Profile created successfully: \(profile)")
             } catch {
                 await MainActor.run {
                     isLoading = false
                     errorMessage = error.localizedDescription
                     showError = true
                 }
-                print("❌ Error creating profile: \(error)")
             }
         }
     }

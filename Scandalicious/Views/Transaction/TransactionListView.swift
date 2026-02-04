@@ -61,11 +61,11 @@ struct TransactionListView: View {
             }
         }
     }
-    
+
     private var totalAmount: Double {
         transactions.reduce(0) { $0 + $1.totalPrice }
     }
-    
+
     private var groupedTransactions: [(String, [APITransaction])] {
         // When sorting by health score, group by score ranges instead of dates
         if sortOrder == .healthScoreDescending {
@@ -115,11 +115,11 @@ struct TransactionListView: View {
             return firstDate > secondDate
         }
     }
-    
+
     var body: some View {
         ZStack {
             Color(white: 0.05).ignoresSafeArea()
-            
+
             if viewModel.state.isLoading && transactions.isEmpty {
                 // Loading state
                 VStack(spacing: 0) {
@@ -155,7 +155,7 @@ struct TransactionListView: View {
 
                         // Search bar
                         searchBar
-                        
+
                         // Transaction list
                         LazyVStack(spacing: 24) {
                             ForEach(groupedTransactions, id: \.0) { date, dayTransactions in
@@ -169,7 +169,7 @@ struct TransactionListView: View {
                                         }
                                     }
                             }
-                            
+
                             // Loading indicator at bottom when fetching more
                             if viewModel.state.isLoading && !viewModel.transactions.isEmpty {
                                 HStack {
@@ -257,34 +257,26 @@ struct TransactionListView: View {
     private func loadTransactions() async {
         // Parse period to get start and end dates
         let (startDate, endDate) = parsePeriod(period)
-        
-        print("📋 Loading transactions for:")
-        print("   Store: \(storeName)")
-        print("   Period: \(period)")
-        print("   Start Date: \(startDate?.description ?? "nil")")
-        print("   End Date: \(endDate?.description ?? "nil")")
-        print("   Category: \(category ?? "nil")")
-        
+
         // Configure filters
         var filters = TransactionFilters()
-        
+
         // Only filter by store name if it's not "All Stores"
         if storeName != "All Stores" {
             filters.storeName = storeName
         }
-        
+
         filters.startDate = startDate
         filters.endDate = endDate
-        
+
         // If category is specified, try to match it to an AnalyticsCategory
         if let categoryName = category {
             filters.category = AnalyticsCategory.allCases.first { $0.displayName == categoryName }
-            print("   Mapped to AnalyticsCategory: \(filters.category?.rawValue ?? "nil")")
         }
-        
+
         await viewModel.updateFilters(filters)
     }
-    
+
     private func parsePeriod(_ period: String) -> (Date?, Date?) {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
@@ -292,7 +284,6 @@ struct TransactionListView: View {
         dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
 
         guard let date = dateFormatter.date(from: period) else {
-            print("⚠️ Failed to parse period: \(period)")
             return (nil, nil)
         }
 
@@ -309,11 +300,9 @@ struct TransactionListView: View {
         endComponents.second = -1
         let endOfMonth = calendar.date(byAdding: endComponents, to: startOfMonth ?? date)
 
-        print("   Parsed dates: \(startOfMonth?.description ?? "nil") to \(endOfMonth?.description ?? "nil")")
-
         return (startOfMonth, endOfMonth)
     }
-    
+
     private var headerSection: some View {
         VStack(spacing: 16) {
             // Category indicator if present
@@ -322,17 +311,17 @@ struct TransactionListView: View {
                     Circle()
                         .fill(color)
                         .frame(width: 12, height: 12)
-                    
+
                     Text(category)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
             }
-            
+
             // Total amount
             VStack(spacing: 8) {
                 Text("Total Transactions")
@@ -340,11 +329,11 @@ struct TransactionListView: View {
                     .foregroundColor(.white.opacity(0.6))
                     .textCase(.uppercase)
                     .tracking(1)
-                
+
                 Text(String(format: "€%.0f", totalAmount))
                     .font(.system(size: 42, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 Text("\(transactions.count) transaction\(transactions.count == 1 ? "" : "s")")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
@@ -372,18 +361,18 @@ struct TransactionListView: View {
             .padding(.bottom, 8)
         }
     }
-    
+
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: searchText.isEmpty ? "cart.fill.badge.questionmark" : "magnifyingglass")
                 .font(.system(size: 60))
                 .foregroundColor(.white.opacity(0.3))
                 .padding(.top, 60)
-            
+
             Text(searchText.isEmpty ? "No Transactions" : "No Results")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundColor(.white)
-            
+
             Text(searchText.isEmpty ? "No transactions found for this period" : "Try adjusting your search")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
@@ -392,14 +381,14 @@ struct TransactionListView: View {
         }
         .frame(maxHeight: .infinity)
     }
-    
+
     private var searchBar: some View {
         HStack(spacing: 12) {
             // Search icon
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(searchText.isEmpty ? .white.opacity(0.4) : .white.opacity(0.6))
-            
+
             // Text field
             TextField("Search Items", text: $searchText)
                 .font(.system(size: 16, weight: .medium))
@@ -407,7 +396,7 @@ struct TransactionListView: View {
                 .accentColor(.blue)
                 .focused($isSearchFocused)
                 .autocorrectionDisabled()
-            
+
             // Clear button
             if !searchText.isEmpty {
                 Button {
@@ -440,7 +429,7 @@ struct TransactionListView: View {
         .padding(.bottom, 8)
         .animation(.spring(response: 0.3), value: isSearchFocused)
     }
-    
+
     private func transactionSection(date: String, transactions: [APITransaction]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // Date header
@@ -734,4 +723,3 @@ struct TransactionSplitAvatars: View {
     }
     .preferredColorScheme(.dark)
 }
-

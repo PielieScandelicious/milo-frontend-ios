@@ -36,16 +36,16 @@ struct TransactionTableView: View {
         case nameAscending = "Name (A-Z)"
         case nameDescending = "Name (Z-A)"
     }
-    
+
     private var transactions: [APITransaction] {
         let baseTransactions = viewModel.transactions
-        
+
         // Filter by search
         let filtered = searchText.isEmpty ? baseTransactions : baseTransactions.filter {
             $0.itemName.localizedCaseInsensitiveContains(searchText) ||
             $0.category.localizedCaseInsensitiveContains(searchText)
         }
-        
+
         // Sort
         switch sortOrder {
         case .dateDescending:
@@ -62,11 +62,11 @@ struct TransactionTableView: View {
             return filtered.sorted { $0.itemName > $1.itemName }
         }
     }
-    
+
     private var totalAmount: Double {
         transactions.reduce(0) { $0 + $1.totalPrice }
     }
-    
+
     var body: some View {
         mainContent
             .navigationBarTitleDisplayMode(.inline)
@@ -240,34 +240,26 @@ struct TransactionTableView: View {
     private func loadTransactions() async {
         // Parse period to get start and end dates
         let (startDate, endDate) = parsePeriod(period)
-        
-        print("📋 Loading transactions for:")
-        print("   Store: \(storeName)")
-        print("   Period: \(period)")
-        print("   Start Date: \(startDate?.description ?? "nil")")
-        print("   End Date: \(endDate?.description ?? "nil")")
-        print("   Category: \(category ?? "nil")")
-        
+
         // Configure filters
         var filters = TransactionFilters()
-        
+
         // Only filter by store name if it's not "All Stores"
         if storeName != "All Stores" {
             filters.storeName = storeName
         }
-        
+
         filters.startDate = startDate
         filters.endDate = endDate
-        
+
         // If category is specified, try to match it to an AnalyticsCategory
         if let categoryName = category {
             filters.category = AnalyticsCategory.allCases.first { $0.displayName == categoryName }
-            print("   Mapped to AnalyticsCategory: \(filters.category?.rawValue ?? "nil")")
         }
-        
+
         await viewModel.updateFilters(filters)
     }
-    
+
     private func parsePeriod(_ period: String) -> (Date?, Date?) {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
@@ -275,7 +267,6 @@ struct TransactionTableView: View {
         dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
 
         guard let date = dateFormatter.date(from: period) else {
-            print("⚠️ Failed to parse period: \(period)")
             return (nil, nil)
         }
 
@@ -292,11 +283,9 @@ struct TransactionTableView: View {
         endComponents.second = -1
         let endOfMonth = calendar.date(byAdding: endComponents, to: startOfMonth ?? date)
 
-        print("   Parsed dates: \(startOfMonth?.description ?? "nil") to \(endOfMonth?.description ?? "nil")")
-
         return (startOfMonth, endOfMonth)
     }
-    
+
     private var controlBar: some View {
         HStack(spacing: 12) {
             // Sort menu
@@ -329,13 +318,13 @@ struct TransactionTableView: View {
                             .stroke(Color.white.opacity(0.15), lineWidth: 1)
                     )
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
     }
-    
+
     private var statsBar: some View {
         HStack(spacing: 20) {
             VStack(spacing: 4) {
@@ -344,23 +333,23 @@ struct TransactionTableView: View {
                     .foregroundColor(.white.opacity(0.5))
                     .textCase(.uppercase)
                     .tracking(0.5)
-                
+
                 Text("\(transactions.count)")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
-            
+
             Divider()
                 .frame(height: 40)
                 .background(Color.white.opacity(0.2))
-            
+
             VStack(spacing: 4) {
                 Text("Total Amount")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
                     .textCase(.uppercase)
                     .tracking(0.5)
-                
+
                 Text(String(format: "€%.0f", totalAmount))
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -379,7 +368,7 @@ struct TransactionTableView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
     }
-    
+
     private var tableHeader: some View {
         HStack(spacing: 12) {
             Text("Date")
@@ -419,32 +408,32 @@ struct TransactionTableView: View {
         .padding(.vertical, 14)
         .background(Color.white.opacity(0.08))
     }
-    
+
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: searchText.isEmpty ? "cart.fill.badge.questionmark" : "magnifyingglass")
                 .font(.system(size: 60))
                 .foregroundColor(.white.opacity(0.3))
                 .padding(.top, 60)
-            
+
             Text(searchText.isEmpty ? "No Transactions" : "No Results")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundColor(.white)
-            
+
             Text(searchText.isEmpty ? "No transactions found for this period" : "Try adjusting your search")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
         }
         .frame(maxHeight: .infinity)
     }
-    
+
     private var searchBar: some View {
         HStack(spacing: 12) {
             // Search icon
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(searchText.isEmpty ? .white.opacity(0.4) : .white.opacity(0.6))
-            
+
             // Text field
             TextField("Search transactions", text: $searchText)
                 .font(.system(size: 16, weight: .medium))
@@ -452,7 +441,7 @@ struct TransactionTableView: View {
                 .accentColor(.blue)
                 .focused($isSearchFocused)
                 .autocorrectionDisabled()
-            
+
             // Clear button
             if !searchText.isEmpty {
                 Button {

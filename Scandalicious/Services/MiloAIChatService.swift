@@ -18,7 +18,7 @@ struct ChatMessage: Identifiable, Codable, Sendable {
     let role: ChatRole
     let content: String
     let timestamp: Date
-    
+
     init(id: UUID = UUID(), role: ChatRole, content: String, timestamp: Date = Date()) {
         self.id = id
         self.role = role
@@ -37,7 +37,7 @@ enum ChatRole: String, Codable, Sendable {
 struct ChatRequest: Sendable, Codable {
     let message: String
     let conversationHistory: [BackendChatMessage]
-    
+
     enum CodingKeys: String, CodingKey {
         case message
         case conversationHistory = "conversation_history"
@@ -52,7 +52,7 @@ struct BackendChatMessage: Sendable, Codable {
 struct ChatResponse: Sendable, Codable {
     let response: String
     let createdAt: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case response
         case createdAt = "created_at"
@@ -127,22 +127,21 @@ actor MiloAIChatService {
             RateLimitManager.shared.syncFromHeaders(limit: limit, remaining: remaining, resetTimestamp: reset)
         }
     }
-    
+
     // MARK: - Get Firebase Auth Token
     private func getAuthToken() async throws -> String {
         guard let user = Auth.auth().currentUser else {
             throw ChatServiceError.authenticationRequired
         }
-        
+
         do {
             let token = try await user.getIDToken()
             return token
         } catch {
-            print("❌ Failed to get Firebase ID token: \(error)")
             throw ChatServiceError.tokenRefreshFailed
         }
     }
-    
+
     // MARK: - Send Chat Message (Streaming) - RECOMMENDED
     nonisolated func sendMessageStreaming(_ userMessage: String, transactions: [MiloTransaction], conversationHistory: [ChatMessage]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
@@ -153,39 +152,39 @@ actor MiloAIChatService {
                         continuation.finish(throwing: ChatServiceError.invalidURL)
                         return
                     }
-                    
+
                     // Get auth token
                     let authToken = try await MiloAIChatService.shared.getAuthToken()
-                    
+
                     // Convert conversation history to backend format
                     let backendHistory = conversationHistory
                         .filter { $0.role != .system }
                         .map { BackendChatMessage(role: $0.role.rawValue, content: $0.content) }
-                    
+
                     // Create request
                     let chatRequest = ChatRequest(
                         message: userMessage,
                         conversationHistory: backendHistory
                     )
-                    
+
                     var request = URLRequest(url: url)
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
                     request.timeoutInterval = 60 // 60 second timeout for streaming
-                    
+
                     let encoder = JSONEncoder()
                     encoder.keyEncodingStrategy = .convertToSnakeCase
                     request.httpBody = try encoder.encode(chatRequest)
-                    
+
                     // Create streaming session
                     let (asyncBytes, response) = try await URLSession.shared.bytes(for: request)
-                    
+
                     guard let httpResponse = response as? HTTPURLResponse else {
                         continuation.finish(throwing: ChatServiceError.invalidResponse)
                         return
                     }
-                    
+
                     // Handle authentication errors
                     if httpResponse.statusCode == 401 {
                         continuation.finish(throwing: ChatServiceError.authenticationRequired)
@@ -225,25 +224,25 @@ actor MiloAIChatService {
 
                     // Parse rate limit headers and sync
                     await Self.parseAndSyncRateLimitHeaders(from: httpResponse)
-                    
+
                     // Parse SSE stream
                     var buffer = ""
                     for try await byte in asyncBytes {
                         let char = Character(UnicodeScalar(byte))
                         buffer.append(char)
-                        
+
                         // SSE messages end with double newline
                         if buffer.hasSuffix("\n\n") {
                             let lines = buffer.components(separatedBy: "\n")
-                            
+
                             for line in lines {
                                 // SSE events start with "data: "
                                 if line.hasPrefix("data: ") {
                                     let jsonString = String(line.dropFirst(6))
-                                    
+
                                     if let data = jsonString.data(using: .utf8),
                                        let event = try? JSONDecoder().decode(ChatStreamEvent.self, from: data) {
-                                        
+
                                         switch event.type {
                                         case "text":
                                             if let content = event.content {
@@ -257,36 +256,35 @@ actor MiloAIChatService {
                                             continuation.finish(throwing: ChatServiceError.streamingError(errorMsg))
                                             return
                                         default:
-                                            print("⚠️ Unknown SSE event type: \(event.type)")
+                                            break
                                         }
                                     }
                                 }
                             }
-                            
+
                             buffer = ""
                         }
                     }
-                    
+
                     // Stream ended without "done" event
                     continuation.finish()
-                    
+
                 } catch let error as ChatServiceError {
                     continuation.finish(throwing: error)
                 } catch {
-                    print("❌ Streaming error: \(error)")
                     continuation.finish(throwing: error)
                 }
             }
         }
     }
-    
+
     // MARK: - Send Chat Message (Non-streaming) - Fallback
     nonisolated func sendMessage(_ userMessage: String, transactions: [MiloTransaction], conversationHistory: [ChatMessage]) async throws -> String {
         let endpoint = await MainActor.run { AppConfiguration.chatEndpoint }
         guard let url = URL(string: endpoint) else {
             throw ChatServiceError.invalidURL
         }
-        
+
         // Get auth token with retry logic
         var authToken: String
         do {
@@ -296,85 +294,82 @@ actor MiloAIChatService {
             try? await Task.sleep(for: .milliseconds(500))
             authToken = try await MiloAIChatService.shared.getAuthToken()
         }
-        
+
         // Convert conversation history to backend format
         let backendHistory = conversationHistory
             .filter { $0.role != .system }
             .map { BackendChatMessage(role: $0.role.rawValue, content: $0.content) }
-        
+
         // Create request
         let chatRequest = ChatRequest(
             message: userMessage,
             conversationHistory: backendHistory
         )
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 30
-        
+
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         request.httpBody = try encoder.encode(chatRequest)
-        
+
         // Send request
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw ChatServiceError.invalidResponse
         }
-        
+
         // Handle authentication errors with retry
         if httpResponse.statusCode == 401 {
-            print("⚠️ 401 Unauthorized - attempting token refresh...")
-            
             // Try to refresh token and retry once
             try? await Task.sleep(for: .milliseconds(500))
             let newToken = try await MiloAIChatService.shared.getAuthToken()
             request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
-            
+
             let (retryData, retryResponse) = try await URLSession.shared.data(for: request)
-            
+
             guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
                 throw ChatServiceError.invalidResponse
             }
-            
+
             if retryHttpResponse.statusCode == 401 {
                 throw ChatServiceError.authenticationRequired
             }
-            
+
             guard retryHttpResponse.statusCode == 200 else {
                 let errorMessage = String(data: retryData, encoding: .utf8) ?? "Unknown error"
                 throw ChatServiceError.serverError(statusCode: retryHttpResponse.statusCode, message: errorMessage)
             }
-            
+
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let chatResponse = try decoder.decode(ChatResponse.self, from: retryData)
-            
+
             guard !chatResponse.response.isEmpty else {
                 throw ChatServiceError.emptyResponse
             }
-            
+
             return chatResponse.response
         }
-        
+
         guard httpResponse.statusCode == 200 else {
             let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw ChatServiceError.serverError(statusCode: httpResponse.statusCode, message: errorMessage)
         }
-        
+
         // Parse response
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let chatResponse = try decoder.decode(ChatResponse.self, from: data)
-        
+
         guard !chatResponse.response.isEmpty else {
             throw ChatServiceError.emptyResponse
         }
-        
+
         return chatResponse.response
     }
 }
-

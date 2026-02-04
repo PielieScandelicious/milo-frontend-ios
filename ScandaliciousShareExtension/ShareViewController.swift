@@ -11,163 +11,42 @@ import FirebaseCore
 import FirebaseAuth
 
 class ShareViewController: UIViewController {
-    
+
     // MARK: - UI Components (Unified Status View)
     private var statusVC: ReceiptStatusViewController?
-    
-    
+
+
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+
         // Initialize Firebase if not already configured
         if FirebaseApp.app() == nil {
             FirebaseApp.configure()
-            print("🔥 Firebase configured in Share Extension")
         }
-        
+
         // Debug: Check authentication status
         debugAuthenticationStatus()
     }
-    
+
     // MARK: - Debug Authentication
     private func debugAuthenticationStatus() {
-        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-        
-        print("🔍 ========================================")
-        print("🔍 Share Extension Authentication Debug")
-        print("🔍 ========================================")
-        
-        // Check if Firebase is configured
-        if FirebaseApp.app() != nil {
-            print("✅ Firebase is configured")
-        } else {
-            print("❌ Firebase is NOT configured!")
-        }
-        
-        // Print container path
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) {
-            print("📁 App Group Container Path:")
-            print("   \(containerURL.path)")
-        } else {
-            print("❌ Could not get container URL for App Group!")
-        }
-        
-        // Check Firebase Auth
-        if let user = Auth.auth().currentUser {
-            print("✅ Firebase user found:")
-            print("   UID: \(user.uid)")
-            print("   Email: \(user.email ?? "N/A")")
-            print("   isAnonymous: \(user.isAnonymous)")
-            
-            Task {
-                do {
-                    let token = try await user.getIDToken()
-                    print("✅ Successfully got token from Firebase")
-                    print("   Token length: \(token.count)")
-                    print("   Token prefix: \(token.prefix(20))...")
-                } catch {
-                    print("❌ Failed to get token from Firebase: \(error.localizedDescription)")
-                }
-            }
-        } else {
-            print("❌ NO Firebase user in Share Extension")
-            print("   This means Firebase Auth state is not shared")
-        }
-        
-        // Check shared storage
-        print("\n📦 Checking App Group Storage:")
-        print("   Identifier: \(appGroupIdentifier)")
-        
-        if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
-            print("✅ Can access shared UserDefaults")
-            
-            // Check for test value first
-            if let testValue = sharedDefaults.string(forKey: "SCANDALICIOUS_TEST") {
-                print("✅✅✅ TEST VALUE FOUND: '\(testValue)'")
-                print("   This confirms we're accessing the SAME container as main app!")
-            } else {
-                print("❌❌❌ TEST VALUE NOT FOUND!")
-                print("   This means we're NOT accessing the same container!")
-            }
-            
-            // Check obvious key
-            if let token = sharedDefaults.string(forKey: "SCANDALICIOUS_AUTH_TOKEN") {
-                print("✅ Token found with obvious key!")
-                print("   Token length: \(token.count)")
-            }
-            
-            // Check primary key
-            if let token = sharedDefaults.string(forKey: "firebase_auth_token") {
-                print("✅ Token found in shared storage")
-                print("   Token length: \(token.count)")
-                print("   Token prefix: \(token.prefix(20))...")
-            } else {
-                print("❌ NO token in shared storage")
-                print("   Key 'firebase_auth_token' is missing")
-            }
-            
-            // Check alternative key
-            if let altToken = sharedDefaults.string(forKey: "auth_token") {
-                print("✅ Alternative token found (key: 'auth_token')")
-                print("   Token length: \(altToken.count)")
-            }
-            
-            // Check timestamp
-            if let timestamp = sharedDefaults.object(forKey: "firebase_auth_token_timestamp") as? TimeInterval {
-                let date = Date(timeIntervalSince1970: timestamp)
-                let formatter = DateFormatter()
-                formatter.dateFormat = "HH:mm:ss"
-                print("ℹ️  Last token save: \(formatter.string(from: date))")
-            }
-            
-            // List all keys
-            let allKeys = Array(sharedDefaults.dictionaryRepresentation().keys).sorted()
-            print("\n📋 All keys in shared UserDefaults (\(allKeys.count) total):")
-            
-            // Print first 20 to look for our keys
-            for (index, key) in allKeys.prefix(20).enumerated() {
-                let value = sharedDefaults.object(forKey: key)
-                let valueType = type(of: value)
-                
-                // Highlight our keys
-                if key.contains("SCANDALICIOUS") || key.contains("firebase_auth") || key.contains("auth_token") {
-                    print("   [\(index + 1)] ⭐️ \(key) = \(valueType)")
-                } else {
-                    print("   [\(index + 1)] \(key) = \(valueType)")
-                }
-            }
-            
-            if allKeys.count > 20 {
-                print("   ... and \(allKeys.count - 20) more")
-            }
-            
-            if allKeys.isEmpty {
-                print("   ⚠️ Shared UserDefaults is EMPTY!")
-            }
-        } else {
-            print("❌ CANNOT access shared UserDefaults")
-            print("   App Group '\(appGroupIdentifier)' may not be configured")
-            print("   OR the identifier is wrong")
-        }
-        
-        print("\n🔍 ========================================")
+        // Authentication debugging disabled for production
     }
-    
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
         // Start processing immediately - success will be shown once upload begins
         processSharedContent()
     }
-    
+
     // MARK: - Rate Limit Check
 
     /// Decrements the rate limit locally after showing success to prevent stale data issues
     private func decrementRateLimitLocally() {
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("⚠️ Could not access shared UserDefaults to decrement rate limit")
             return
         }
 
@@ -178,7 +57,6 @@ class ShareViewController: UIViewController {
         } else if let storedUserId = sharedDefaults.string(forKey: "rateLimit_currentUserId") {
             userId = storedUserId
         } else {
-            print("⚠️ No user ID available to decrement rate limit")
             return
         }
 
@@ -187,7 +65,6 @@ class ShareViewController: UIViewController {
 
         // Check if the key exists
         guard sharedDefaults.object(forKey: receiptsRemainingKey) != nil else {
-            print("⚠️ No rate limit data found for user \(userId) to decrement")
             return
         }
 
@@ -195,7 +72,6 @@ class ShareViewController: UIViewController {
         let newValue = max(0, currentValue - 1)
         sharedDefaults.set(newValue, forKey: receiptsRemainingKey)
         sharedDefaults.synchronize()
-        print("📉 Decremented rate limit for user \(userId): \(currentValue) -> \(newValue)")
     }
 
     /// Checks if the user has remaining receipt uploads by reading from shared UserDefaults
@@ -203,7 +79,6 @@ class ShareViewController: UIViewController {
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
 
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("⚠️ Could not access shared UserDefaults for rate limit check")
             // If we can't check, allow the upload (backend will reject if needed)
             return (true, nil)
         }
@@ -212,12 +87,9 @@ class ShareViewController: UIViewController {
         let userId: String
         if let firebaseUserId = Auth.auth().currentUser?.uid {
             userId = firebaseUserId
-            print("🔐 Using Firebase Auth user ID for rate limit check")
         } else if let storedUserId = sharedDefaults.string(forKey: "rateLimit_currentUserId") {
             userId = storedUserId
-            print("🔐 Using stored user ID for rate limit check (Firebase Auth not available)")
         } else {
-            print("⚠️ No user ID available for rate limit check, allowing upload")
             // If we can't identify the user, allow the upload (backend will reject if needed)
             return (true, nil)
         }
@@ -228,15 +100,12 @@ class ShareViewController: UIViewController {
 
         // Check if the key exists - UserDefaults.integer(forKey:) returns 0 for non-existent keys
         guard sharedDefaults.object(forKey: receiptsRemainingKey) != nil else {
-            print("⚠️ No rate limit data found for user \(userId), allowing upload")
             // If no rate limit data is saved, allow the upload (backend will reject if needed)
             return (true, nil)
         }
 
         let receiptsRemaining = sharedDefaults.integer(forKey: receiptsRemainingKey)
         let daysUntilReset = sharedDefaults.integer(forKey: daysUntilResetKey)
-
-        print("🔍 Rate limit check for user \(userId): receiptsRemaining = \(receiptsRemaining), daysUntilReset = \(daysUntilReset)")
 
         // If receiptsRemaining is 0, block the upload
         if receiptsRemaining <= 0 {
@@ -257,7 +126,6 @@ class ShareViewController: UIViewController {
         // Check rate limit before processing
         let rateLimitCheck = checkRateLimitFromSharedStorage()
         if !rateLimitCheck.canUpload {
-            print("🚫 Rate limit reached - blocking upload")
             updateStatus(.failed(message: rateLimitCheck.message ?? "Upload limit reached for this month.", canRetry: false))
             return
         }
@@ -272,30 +140,21 @@ class ShareViewController: UIViewController {
             return
         }
 
-        print("📋 Available type identifiers:")
-        for identifier in itemProvider.registeredTypeIdentifiers {
-            print("  - \(identifier)")
-        }
-        
         // Try to load in priority order
         // 1. Try image types first (most common - Photos, Safari)
         if itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-            print("✅ Found UTType.image, loading...")
             loadImageFromProvider(itemProvider)
         }
         // 2. Try file URL (Preview's primary method)
         else if itemProvider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-            print("✅ Found UTType.fileURL, loading...")
             loadFileURL(itemProvider)
         }
         // 3. Try generic URL
         else if itemProvider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-            print("✅ Found UTType.url, loading...")
             loadURLFromProvider(itemProvider)
         }
         // 4. Try PDF
         else if itemProvider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) {
-            print("✅ Found UTType.pdf, loading...")
             loadPDFFromProvider(itemProvider)
         }
         // 5. Try common image UTIs directly
@@ -304,35 +163,32 @@ class ShareViewController: UIViewController {
                 itemProvider.hasItemConformingToTypeIdentifier("public.heic") ||
                 itemProvider.hasItemConformingToTypeIdentifier("org.webmproject.webp") ||
                 itemProvider.hasItemConformingToTypeIdentifier("public.webp") {
-            print("✅ Found specific image format, loading...")
             loadImageFromProvider(itemProvider)
         }
         // 6. Try public.data as last resort (can be ambiguous)
         else if itemProvider.hasItemConformingToTypeIdentifier(UTType.data.identifier) {
-            print("✅ Found UTType.data, attempting to load as image...")
             loadDataAsImage(itemProvider)
         }
         // 7. Try to load whatever type is available as a file
         else if let firstType = itemProvider.registeredTypeIdentifiers.first {
-            print("🔄 Trying to load '\(firstType)' as generic content...")
             loadGenericContent(itemProvider, typeIdentifier: firstType)
         }
         else {
             updateStatus(error: "No supported content found.\n\nSupported: images (JPG, PNG, HEIC, WebP, etc.) and PDF")
         }
     }
-    
+
     private func loadImageFromProvider(_ itemProvider: NSItemProvider) {
         itemProvider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { [weak self] (item, error) in
             guard let self = self else { return }
-            
+
             if let error = error {
                 self.updateStatus(error: "Failed to load image: \(error.localizedDescription)")
                 return
             }
-            
+
             var image: UIImage?
-            
+
             // Handle different image types
             if let url = item as? URL {
                 // Try to load from file URL
@@ -346,34 +202,30 @@ class ShareViewController: UIViewController {
             } else if let img = item as? UIImage {
                 image = img
             }
-            
+
             guard let receiptImage = image else {
                 self.updateStatus(error: "Could not load image from file")
                 return
             }
-            
+
             // Save the receipt image
             Task {
                 await self.saveReceiptImage(receiptImage)
             }
         }
     }
-    
+
     private func loadPDFFromProvider(_ itemProvider: NSItemProvider) {
         itemProvider.loadItem(forTypeIdentifier: UTType.pdf.identifier, options: nil) { [weak self] (item, error) in
             guard let self = self else { return }
 
             if let error = error {
-                print("❌ Failed to load PDF: \(error)")
                 self.updateStatus(error: "Failed to load PDF: \(error.localizedDescription)")
                 return
             }
 
-            print("📄 PDF item type: \(type(of: item))")
-
             // Handle PDF provided as URL
             if let url = item as? URL {
-                print("📄 PDF provided as URL: \(url)")
                 Task {
                     await self.uploadPDFReceipt(from: url)
                 }
@@ -382,7 +234,6 @@ class ShareViewController: UIViewController {
 
             // Handle PDF provided as Data
             if let pdfData = item as? Data {
-                print("📄 PDF provided as Data: \(pdfData.count) bytes")
                 // Save to temp file and upload
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("receipt_\(UUID().uuidString).pdf")
                 do {
@@ -391,71 +242,62 @@ class ShareViewController: UIViewController {
                         await self.uploadPDFReceipt(from: tempURL)
                     }
                 } catch {
-                    print("❌ Failed to write temp PDF: \(error)")
                     self.updateStatus(error: "Could not save PDF file")
                 }
                 return
             }
 
             // Unknown format
-            print("❌ PDF provided in unknown format: \(type(of: item))")
             self.updateStatus(error: "Could not load PDF from file")
         }
     }
-    
+
     private func loadURLFromProvider(_ itemProvider: NSItemProvider) {
         itemProvider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
             guard let self = self else { return }
-            
+
             if let error = error {
                 self.updateStatus(error: "Failed to load URL: \(error.localizedDescription)")
                 return
             }
-            
+
             guard let url = item as? URL else {
                 self.updateStatus(error: "Invalid URL")
                 return
             }
-            
-            print("📂 Loading from URL: \(url)")
-            
+
             // Try to load image from URL
             var image: UIImage?
             if let data = try? Data(contentsOf: url) {
                 image = UIImage(data: data)
             }
-            
+
             guard let receiptImage = image else {
                 self.updateStatus(error: "Could not load image from URL")
                 return
             }
-            
+
             Task {
                 await self.saveReceiptImage(receiptImage)
             }
         }
     }
-    
+
     // MARK: - Load File URL (for Preview app)
     private func loadFileURL(_ itemProvider: NSItemProvider) {
         itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { [weak self] (item, error) in
             guard let self = self else { return }
-            
+
             if let error = error {
-                print("❌ Failed to load file URL: \(error)")
                 self.updateStatus(error: "Failed to load file: \(error.localizedDescription)")
                 return
             }
-            
+
             guard let fileURL = item as? URL else {
-                print("❌ Item is not a URL")
                 self.updateStatus(error: "Invalid file URL")
                 return
             }
-            
-            print("📂 File URL: \(fileURL)")
-            print("📂 Path extension: \(fileURL.pathExtension)")
-            
+
             // Check file type and handle accordingly
             let pathExtension = fileURL.pathExtension.lowercased()
 
@@ -473,129 +315,104 @@ class ShareViewController: UIViewController {
                 self.loadImageFromFileURL(fileURL)
             } else if pathExtension == "pdf" {
                 // Upload PDF directly without conversion
-                print("📄 Uploading PDF directly...")
                 Task {
                     await self.uploadPDFReceipt(from: fileURL)
                 }
             } else {
                 // For unknown extensions, try to load as image first (many image formats work)
-                print("🔄 Unknown extension '.\(pathExtension)', attempting to load as image...")
                 self.loadImageFromFileURL(fileURL, fallbackToPDF: true)
             }
         }
     }
-    
+
     // MARK: - Load Data as Image (for Preview app)
     private func loadDataAsImage(_ itemProvider: NSItemProvider) {
         // Try loading as file URL first within the data type
         if itemProvider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-            print("📋 Data type also has fileURL, trying that instead...")
             loadFileURL(itemProvider)
             return
         }
-        
+
         itemProvider.loadItem(forTypeIdentifier: UTType.data.identifier, options: nil) { [weak self] (item, error) in
             guard let self = self else { return }
-            
+
             if let error = error {
-                print("❌ Failed to load data: \(error)")
                 // Try loading as image type as fallback
                 if itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                    print("🔄 Retrying as image type...")
                     self.loadImageFromProvider(itemProvider)
                     return
                 }
                 self.updateStatus(error: "Failed to load data: \(error.localizedDescription)")
                 return
             }
-            
-            print("📦 Data item type: \(type(of: item))")
-            
+
             var imageData: Data?
             var imageFromItem: UIImage?
-            
+
             // Try different ways to extract the image
             if let data = item as? Data {
-                print("✅ Got Data directly (\(data.count) bytes)")
                 imageData = data
             } else if let url = item as? URL {
-                print("📂 Data provided as URL: \(url)")
-                print("📂 URL scheme: \(url.scheme ?? "none")")
-                
                 // Check if it's a file URL
                 if url.isFileURL {
                     // Try to read the file
                     if let data = try? Data(contentsOf: url) {
-                        print("✅ Read \(data.count) bytes from file URL")
                         imageData = data
-                    } else {
-                        print("❌ Could not read data from file URL")
                     }
                 } else {
                     // Try to download from URL
                     if let data = try? Data(contentsOf: url) {
-                        print("✅ Downloaded \(data.count) bytes from URL")
                         imageData = data
                     }
                 }
             } else if let image = item as? UIImage {
-                print("✅ Got UIImage directly")
                 imageFromItem = image
             }
-            
+
             // If we got a UIImage directly, use it
             if let image = imageFromItem {
-                print("✅ Using UIImage directly: \(image.size)")
                 Task {
                     await self.saveReceiptImage(image)
                 }
                 return
             }
-            
+
             // Try to create image from data
             guard let data = imageData else {
-                print("❌ Could not extract data from item")
                 // Try one more time with image type
                 if itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                    print("🔄 Retrying as UTType.image...")
                     self.loadImageFromProvider(itemProvider)
                     return
                 }
                 self.updateStatus(error: "Could not extract image data")
                 return
             }
-            
+
             // Try to create UIImage from data
             if let image = UIImage(data: data) {
-                print("✅ Created image from data: \(image.size)")
                 Task {
                     await self.saveReceiptImage(image)
                 }
             } else {
-                print("❌ Could not create image from data (\(data.count) bytes)")
-                print("📋 Data header (first 16 bytes): \(data.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " "))")
-                
                 // One last attempt - try all available image type identifiers
                 for identifier in itemProvider.registeredTypeIdentifiers {
                     if identifier.contains("image") || identifier.contains("jpeg") || identifier.contains("png") {
-                        print("🔄 Found possible image identifier: \(identifier), trying that...")
                         self.loadImageFromProvider(itemProvider)
                         return
                     }
                 }
-                
+
                 self.updateStatus(error: "Could not create image from data")
             }
         }
     }
-    
+
     // MARK: - Load Generic Content (fallback for unknown types)
     private func loadGenericContent(_ itemProvider: NSItemProvider, typeIdentifier: String) {
         itemProvider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) { [weak self] (item, error) in
             guard let self = self else { return }
 
             if let error = error {
-                print("❌ Failed to load generic content: \(error)")
                 self.updateStatus(error: "Could not load file.\n\nSupported: images and PDF")
                 return
             }
@@ -604,7 +421,6 @@ class ShareViewController: UIViewController {
             var data: Data?
 
             if let url = item as? URL {
-                print("📂 Generic content is a URL: \(url)")
                 data = try? Data(contentsOf: url)
 
                 // Also try loading directly via the file URL handler
@@ -613,10 +429,8 @@ class ShareViewController: UIViewController {
                     return
                 }
             } else if let itemData = item as? Data {
-                print("📦 Generic content is Data: \(itemData.count) bytes")
                 data = itemData
             } else if let image = item as? UIImage {
-                print("🖼️ Generic content is UIImage")
                 Task {
                     await self.saveReceiptImage(image)
                 }
@@ -626,7 +440,6 @@ class ShareViewController: UIViewController {
             // Try to create image from data
             if let data = data {
                 if let image = UIImage(data: data) {
-                    print("✅ Created image from generic data")
                     Task {
                         await self.saveReceiptImage(image)
                     }
@@ -637,7 +450,6 @@ class ShareViewController: UIViewController {
                 if data.count >= 4 {
                     let header = data.prefix(4)
                     if header.elementsEqual([0x25, 0x50, 0x44, 0x46]) {  // %PDF
-                        print("✅ Detected PDF from generic data")
                         // Save to temp file and upload
                         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("receipt_\(UUID().uuidString).pdf")
                         do {
@@ -647,14 +459,13 @@ class ShareViewController: UIViewController {
                             }
                             return
                         } catch {
-                            print("❌ Failed to write temp PDF: \(error)")
+                            // Failed to write temp PDF
                         }
                     }
                 }
             }
 
             // If we got here, we couldn't handle the content
-            print("❌ Could not interpret generic content as image or PDF")
             self.updateStatus(error: "Unsupported file type.\n\nSupported: images (JPG, PNG, HEIC, WebP, etc.) and PDF")
         }
     }
@@ -664,7 +475,6 @@ class ShareViewController: UIViewController {
         // Try to load as image
         if let data = try? Data(contentsOf: fileURL),
            let image = UIImage(data: data) {
-            print("✅ Loaded image from file URL")
             Task {
                 await self.saveReceiptImage(image)
             }
@@ -673,13 +483,11 @@ class ShareViewController: UIViewController {
 
         // If image loading failed and fallback is enabled, try PDF
         if fallbackToPDF {
-            print("🔄 Image loading failed, trying as PDF...")
             if let pdfData = try? Data(contentsOf: fileURL),
                pdfData.count >= 4 {
                 // Check for PDF magic bytes (%PDF)
                 let header = pdfData.prefix(4)
                 if header.elementsEqual([0x25, 0x50, 0x44, 0x46]) {  // %PDF
-                    print("✅ Detected PDF file by magic bytes")
                     Task {
                         await self.uploadPDFReceipt(from: fileURL)
                     }
@@ -689,88 +497,73 @@ class ShareViewController: UIViewController {
 
             // Neither image nor PDF worked
             let ext = fileURL.pathExtension.lowercased()
-            print("❌ Could not load file as image or PDF: \(ext)")
             self.updateStatus(error: "Unsupported file type: .\(ext)\n\nSupported: images (JPG, PNG, HEIC, WebP, etc.) and PDF")
         } else {
-            print("❌ Could not create image from file data")
             self.updateStatus(error: "Could not load image from file")
         }
     }
 
     private func convertPDFToImage(url: URL) -> UIImage? {
-        print("📄 Converting PDF at: \(url.path)")
-        
         guard let document = CGPDFDocument(url as CFURL) else {
-            print("❌ Could not create CGPDFDocument from URL")
             return nil
         }
-        
-        print("📄 PDF has \(document.numberOfPages) pages")
-        
+
         guard let page = document.page(at: 1) else {
-            print("❌ Could not get first page of PDF")
             return nil
         }
-        
+
         let pageRect = page.getBoxRect(.mediaBox)
-        print("📄 PDF page size: \(pageRect.size)")
-        
+
         // Scale down if the PDF is too large (to prevent memory issues)
         let maxDimension: CGFloat = 2048.0  // Maximum width or height
         var renderSize = pageRect.size
-        
+
         if renderSize.width > maxDimension || renderSize.height > maxDimension {
             let scaleFactor = maxDimension / max(renderSize.width, renderSize.height)
-            renderSize = CGSize(width: renderSize.width * scaleFactor, 
+            renderSize = CGSize(width: renderSize.width * scaleFactor,
                                height: renderSize.height * scaleFactor)
-            print("📄 Scaling down to: \(renderSize)")
         }
-        
+
         // Create the image at the (possibly scaled) size
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0  // Don't use screen scale, we're controlling size ourselves
-        
+
         let renderer = UIGraphicsImageRenderer(size: renderSize, format: format)
-        
+
         let image = renderer.image { ctx in
             // Fill with white background
             UIColor.white.set()
             ctx.fill(CGRect(origin: .zero, size: renderSize))
-            
+
             // Save the graphics state
             ctx.cgContext.saveGState()
-            
+
             // Transform to render the PDF correctly
             ctx.cgContext.translateBy(x: 0, y: renderSize.height)
             ctx.cgContext.scaleBy(x: 1.0, y: -1.0)
-            
+
             // Scale the PDF to fit our render size
             let scaleX = renderSize.width / pageRect.width
             let scaleY = renderSize.height / pageRect.height
             ctx.cgContext.scaleBy(x: scaleX, y: scaleY)
-            
+
             // Render the PDF
             ctx.cgContext.drawPDFPage(page)
-            
+
             // Restore the graphics state
             ctx.cgContext.restoreGState()
         }
-        
-        print("✅ PDF converted to image: \(image.size)")
+
         return image
     }
-    
+
     // MARK: - Upload PDF Receipt
     private func uploadPDFReceipt(from pdfURL: URL) async {
-        print("📄 uploadPDFReceipt started for: \(pdfURL)")
-
         // Read PDF data first to ensure it's valid
         guard let pdfData = try? Data(contentsOf: pdfURL), !pdfData.isEmpty else {
             updateStatus(.failed(message: "Could not read PDF file.", canRetry: false))
             return
         }
-
-        print("☁️ Starting PDF upload...")
 
         // Show success immediately for instant feedback
         updateStatus(.success(message: ""))
@@ -784,16 +577,13 @@ class ShareViewController: UIViewController {
         // Start upload with expiring activity to ensure it completes
         ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading PDF receipt") { expired in
             if expired {
-                print("⚠️ Background time expired before PDF upload completed")
                 return
             }
 
             Task {
                 do {
-                    let response = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
-                    print("✅ PDF upload completed - Receipt ID: \(response.receiptId)")
+                    let _ = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
                 } catch {
-                    print("⚠️ PDF upload failed: \(error.localizedDescription)")
                     // Error is logged but not shown - user already saw success
                 }
             }
@@ -806,21 +596,15 @@ class ShareViewController: UIViewController {
         await MainActor.run {
             self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
         }
-
-        print("✅ Extension completed")
     }
 
     // MARK: - Upload Receipt Image
     private func saveReceiptImage(_ image: UIImage) async {
-        print("💾 uploadReceiptImage started")
-
         // Validate image
         guard image.size.width > 0 && image.size.height > 0 else {
             updateStatus(.failed(message: "The image appears to be invalid. Please try again.", canRetry: false))
             return
         }
-
-        print("☁️ Starting image upload...")
 
         // Show success immediately for instant feedback
         updateStatus(.success(message: ""))
@@ -834,16 +618,13 @@ class ShareViewController: UIViewController {
         // Start upload with expiring activity to ensure it completes
         ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading receipt") { expired in
             if expired {
-                print("⚠️ Background time expired before upload completed")
                 return
             }
 
             Task {
                 do {
-                    let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
-                    print("✅ Image upload completed - Receipt ID: \(response.receiptId)")
+                    let _ = try await ReceiptUploadService.shared.uploadReceipt(image: image)
                 } catch {
-                    print("⚠️ Image upload failed: \(error.localizedDescription)")
                     // Error is logged but not shown - user already saw success
                 }
             }
@@ -856,12 +637,10 @@ class ShareViewController: UIViewController {
         await MainActor.run {
             self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
         }
-
-        print("✅ Extension completed")
     }
 
     // MARK: - Status Management
-    
+
     private func showStatus(_ status: ReceiptStatusType) {
         DispatchQueue.main.async {
             if self.statusVC == nil {
@@ -895,8 +674,6 @@ class ShareViewController: UIViewController {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     self?.presentStatusViewController(with: status, retryCount: retryCount + 1)
                 }
-            } else {
-                print("⚠️ Failed to present status VC after \(retryCount) retries - view not in window")
             }
             return
         }
@@ -904,19 +681,17 @@ class ShareViewController: UIViewController {
         self.present(vc, animated: true)
         self.statusVC = vc
     }
-    
+
     private func updateStatus(_ newStatus: ReceiptStatusType) {
         showStatus(newStatus)
     }
-    
+
     // MARK: - Signal Main App to Refresh
 
     /// Saves a timestamp to shared UserDefaults to signal the main app that new data is available
     private func signalMainAppToRefresh() {
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("⚠️ Could not access shared UserDefaults to signal refresh")
-            print("⚠️ App Group identifier: \(appGroupIdentifier)")
             return
         }
 
@@ -924,13 +699,6 @@ class ShareViewController: UIViewController {
         let timestamp = Date().timeIntervalSince1970
         sharedDefaults.set(timestamp, forKey: "receipt_upload_timestamp")
         sharedDefaults.synchronize()
-
-        // Verify the write succeeded
-        let verifyTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-        print("✅ Signaled main app to refresh")
-        print("   Written timestamp: \(timestamp)")
-        print("   Verified timestamp: \(verifyTimestamp)")
-        print("   Write successful: \(timestamp == verifyTimestamp)")
     }
 
     // MARK: - User-Friendly Error Messages
@@ -944,7 +712,7 @@ class ShareViewController: UIViewController {
                 return "Unable to upload receipt. Please try again."
             }
         }
-        
+
         if let uploadError = error as? ReceiptUploadError {
             switch uploadError {
             case .noImage:
@@ -968,23 +736,23 @@ class ShareViewController: UIViewController {
                 return "Unable to delete receipt. Please try again."
             }
         }
-        
+
         // Generic user-friendly message
         return "Unable to upload receipt. Please try again."
     }
-    
+
     // MARK: - Update UI Status (Legacy - kept for error cases)
-    
+
     private func updateStatus(message: String) {
         updateStatus(.uploading(subtitle: message))
     }
-    
+
     private func updateStatus(error: String) {
         // Convert to user-friendly message
         let friendlyMessage = error.contains("Server error:") || error.contains("HTTP") || error.contains("URLSession")
             ? "Unable to upload receipt. Please try again later."
             : error
-        
+
         updateStatus(.failed(message: friendlyMessage, canRetry: false))
     }
 }
@@ -993,7 +761,7 @@ class ShareViewController: UIViewController {
 enum ReceiptError: LocalizedError {
     case invalidImage
     case uploadFailed
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidImage:

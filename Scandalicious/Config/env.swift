@@ -35,8 +35,7 @@ enum AppConfiguration {
 
     // Helper to log current configuration
     static func logConfiguration() {
-        print("🔧 App Environment: \(environment)")
-        print("🌐 Backend URL: \(backendBaseURL)")
+        // Configuration logging removed
     }
 }
 

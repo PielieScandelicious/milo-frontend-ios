@@ -69,33 +69,11 @@ struct ReceiptDetailsView: View {
                     await splitCache.fetchSplit(for: receipt.receiptId)
                 }
             }
-            .onAppear {
-                print("📋 ReceiptDetailsView appeared")
-                print("   Receipt ID: \(receipt.receiptId)")
-                print("   Store: \(receipt.storeName ?? "N/A")")
-                print("   Total: \(receipt.totalAmount ?? 0.0)")
-                print("   Items Count: \(receipt.itemsCount)")
-                print("   Is Duplicate: \(receipt.isDuplicate)")
-                if let score = receipt.duplicateScore {
-                    print("   Duplicate Score: \(String(format: "%.1f%%", score * 100))")
-                }
-                print("   Transactions array count: \(receipt.transactions.count)")
-                print("   Transactions isEmpty: \(receipt.transactions.isEmpty)")
-                
-                if !receipt.transactions.isEmpty {
-                    print("   First few transactions:")
-                    for (index, transaction) in receipt.transactions.prefix(3).enumerated() {
-                        print("      [\(index)] \(transaction.itemName) - €\(transaction.itemPrice) - qty: \(transaction.quantity) - unitPrice: \(transaction.unitPrice ?? 0)")
-                    }
-                } else {
-                    print("   ⚠️ Transactions array is empty!")
-                }
-            }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
-    
+
     // MARK: - Duplicate Warning Banner
 
     private var duplicateWarningBanner: some View {
@@ -243,13 +221,13 @@ struct ReceiptDetailsView: View {
     }
 
     // MARK: - Items Section
-    
+
     private var itemsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Items")
                 .font(.headline)
                 .padding(.horizontal, 4)
-            
+
             if receipt.transactions.isEmpty {
                 emptyItemsView
             } else {
@@ -257,17 +235,17 @@ struct ReceiptDetailsView: View {
             }
         }
     }
-    
+
     private var emptyItemsView: some View {
         VStack(spacing: 12) {
             Image(systemName: "cart")
                 .font(.system(size: 50))
                 .foregroundStyle(.secondary)
-            
+
             Text("No items found")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            
+
             Text("The receipt was uploaded successfully, but no items were detected.")
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
@@ -279,7 +257,7 @@ struct ReceiptDetailsView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
-    
+
     private var itemsList: some View {
         VStack(spacing: 8) {
             ForEach(receipt.transactions) { transaction in
@@ -328,21 +306,13 @@ struct ReceiptDetailsView: View {
         isDeleting = true
 
         do {
-            print("🗑️ Attempting to delete receipt ID: \(receipt.receiptId)")
-            print("   Store: \(receipt.storeName ?? "N/A")")
-            print("   Status: \(receipt.status.rawValue)")
-
             try await AnalyticsAPIService.shared.removeReceipt(receiptId: receipt.receiptId)
-            print("✅ Receipt \(receipt.receiptId) deleted successfully")
-            print("ℹ️ Rate limit counter NOT changed - you already paid for the upload processing")
 
             await MainActor.run {
                 onDelete?()
                 dismiss()
             }
         } catch {
-            print("❌ Failed to delete receipt: \(error.localizedDescription)")
-            print("   Receipt ID that failed: \(receipt.receiptId)")
             await MainActor.run {
                 deleteError = error.localizedDescription
                 showDeleteError = true
@@ -364,7 +334,6 @@ struct ReceiptItemRow: View {
     }
 
     var body: some View {
-        let _ = print("🛒 ReceiptItemRow: \(transaction.itemName) - qty: \(transaction.quantity), unitPrice: \(transaction.unitPrice ?? 0)")
         HStack(alignment: .top, spacing: 12) {
             // Category Icon with Quantity Badge
             ZStack(alignment: .topTrailing) {

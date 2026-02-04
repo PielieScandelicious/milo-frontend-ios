@@ -193,7 +193,7 @@ struct ShareExtensionView: View {
                         let filename = generateFilename(extension: "jpg")
                         itemsToUpload.append((data, filename, "image/jpeg"))
                     } catch {
-                        print("❌ Failed to load image: \(error.localizedDescription)")
+                        // Failed to load image - skip
                     }
                 }
                 // Handle PDFs
@@ -203,7 +203,7 @@ struct ShareExtensionView: View {
                         let filename = generateFilename(extension: "pdf")
                         itemsToUpload.append((data, filename, "application/pdf"))
                     } catch {
-                        print("❌ Failed to load PDF: \(error.localizedDescription)")
+                        // Failed to load PDF - skip
                     }
                 }
                 // Handle other files
@@ -213,7 +213,7 @@ struct ShareExtensionView: View {
                         let filename = generateFilename(extension: "file")
                         itemsToUpload.append((data, filename, "application/octet-stream"))
                     } catch {
-                        print("❌ Failed to load file: \(error.localizedDescription)")
+                        // Failed to load file - skip
                     }
                 }
             }
@@ -233,14 +233,12 @@ struct ShareExtensionView: View {
             
             do {
                 let response = try await uploadData(data, filename: filename, contentType: contentType)
-                print("✅ Uploaded: \(response.receiptId)")
 
                 await MainActor.run {
                     uploadedCount += 1
                     lastUploadResponse = response
                 }
             } catch {
-                print("❌ Upload failed: \(error.localizedDescription)")
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     isProcessing = false

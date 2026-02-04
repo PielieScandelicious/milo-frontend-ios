@@ -608,7 +608,7 @@ struct SplitTransactionView: View {
         do {
             recentFriends = try await ExpenseSplitAPIService.shared.getRecentFriends()
         } catch {
-            print("Failed to load recent friends: \(error)")
+            // Failed to load recent friends
         }
     }
 

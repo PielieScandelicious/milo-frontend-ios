@@ -359,40 +359,29 @@ class RateLimitManager: ObservableObject {
             // Try to get user from Firebase Auth directly
             if let user = Auth.auth().currentUser {
                 currentUserId = user.uid
-                print("🔄 RateLimitManager: Restored currentUserId from Firebase Auth")
             } else {
-                print("⚠️ RateLimitManager: No user ID, skipping sync")
                 return
             }
         }
 
         guard !isSyncing else {
-            print("⚠️ RateLimitManager: Already syncing, skipping")
             return
         }
 
         isSyncing = true
         lastSyncError = nil
-        print("🔄 RateLimitManager: Starting sync from backend...")
 
         do {
             let status = try await fetchRateLimitStatus()
-            print("📥 RateLimitManager: Received from backend:")
-            print("   Messages: \(status.messagesUsed)/\(status.messagesLimit) used")
-            print("   Receipts: \(status.receiptsUsed)/\(status.receiptsLimit) used")
-            print("   Receipts remaining: \(status.receiptsRemaining)")
             syncFromResponse(status)
-            print("✅ Rate limit synced - Receipts: \(receiptsUsed)/\(receiptsLimit) used, \(receiptsRemaining) remaining")
         } catch {
             // Check if it's a timeout error - these are non-critical and shouldn't alarm the user
             let nsError = error as NSError
             if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut {
-                // Timeout is non-critical - just log quietly and continue
-                print("⏱️ Rate limit sync timed out - using cached values (this is normal)")
+                // Timeout is non-critical - continue with cached values
             } else {
                 // Only set lastSyncError for actual failures, not timeouts
                 lastSyncError = error.localizedDescription
-                print("❌ Failed to sync rate limit: \(error)")
             }
             // Non-critical - app continues with cached/default values
         }
@@ -490,11 +479,6 @@ class RateLimitManager: ObservableObject {
             throw ChatServiceError.invalidResponse
         }
 
-        print("📡 RateLimitManager API response: HTTP \(httpResponse.statusCode)")
-        if let rawJSON = String(data: data, encoding: .utf8) {
-            print("📄 Raw response: \(rawJSON)")
-        }
-
         guard httpResponse.statusCode == 200 else {
             throw ChatServiceError.serverError(
                 statusCode: httpResponse.statusCode,
@@ -512,73 +496,42 @@ class RateLimitManager: ObservableObject {
     private func getAuthToken() async throws -> String {
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
 
-        print("🔑 RateLimitManager: Getting auth token...")
-        print("   Firebase user exists: \(Auth.auth().currentUser != nil)")
-
         // Method 1: Try Firebase Auth with force refresh
         if let user = Auth.auth().currentUser {
-            print("   Firebase user UID: \(user.uid)")
             do {
                 // Force refresh to get a fresh token
                 let token = try await user.getIDToken(forcingRefresh: true)
-                print("✅ RateLimitManager: Got fresh token from Firebase Auth")
-                print("   Token length: \(token.count)")
-                print("   Token prefix: \(String(token.prefix(50)))...")
 
                 // Also save to shared storage for Share Extension
                 if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
                     sharedDefaults.set(token, forKey: "SCANDALICIOUS_AUTH_TOKEN")
                     sharedDefaults.set(token, forKey: "firebase_auth_token")
                     sharedDefaults.synchronize()
-                    print("   Saved token to shared UserDefaults")
                 }
 
                 return token
             } catch {
-                print("⚠️ RateLimitManager: Failed to get token from Firebase Auth: \(error.localizedDescription)")
                 // Fall through to try other methods
             }
-        } else {
-            print("⚠️ RateLimitManager: No Firebase user, trying shared storage...")
         }
 
         // Method 2: Try Keychain
         if let token = KeychainHelper.shared.retrieveToken() {
-            print("✅ RateLimitManager: Got token from Keychain")
-            print("   Token length: \(token.count)")
             return token
-        } else {
-            print("⚠️ RateLimitManager: No token in Keychain")
         }
 
         // Method 3: Try shared UserDefaults (SCANDALICIOUS_AUTH_TOKEN)
         if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
-            print("   Checking shared UserDefaults...")
             if let token = sharedDefaults.string(forKey: "SCANDALICIOUS_AUTH_TOKEN") {
-                print("✅ RateLimitManager: Got token from shared UserDefaults (SCANDALICIOUS_AUTH_TOKEN)")
-                print("   Token length: \(token.count)")
                 return token
-            } else {
-                print("   SCANDALICIOUS_AUTH_TOKEN not found")
             }
 
             // Method 4: Try firebase_auth_token
             if let token = sharedDefaults.string(forKey: "firebase_auth_token") {
-                print("✅ RateLimitManager: Got token from shared UserDefaults (firebase_auth_token)")
-                print("   Token length: \(token.count)")
                 return token
-            } else {
-                print("   firebase_auth_token not found")
             }
-
-            // Debug: List all keys
-            let allKeys = sharedDefaults.dictionaryRepresentation().keys.filter { $0.contains("token") || $0.contains("TOKEN") || $0.contains("auth") }
-            print("   Token-related keys in shared defaults: \(Array(allKeys))")
-        } else {
-            print("❌ RateLimitManager: Could not access shared UserDefaults!")
         }
 
-        print("❌ RateLimitManager: No auth token found after trying all methods")
         throw ChatServiceError.authenticationRequired
     }
 

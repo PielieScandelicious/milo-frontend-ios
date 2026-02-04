@@ -64,7 +64,7 @@ class CameraService: NSObject, ObservableObject {
 
             device.unlockForConfiguration()
         } catch {
-            print("Flash toggle error: \(error)")
+            // Flash toggle error
         }
     }
 

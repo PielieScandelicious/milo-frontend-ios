@@ -114,9 +114,7 @@ class SubscriptionManager: ObservableObject {
                 return product1.price < product2.price
             }
 
-            print("✅ Loaded \(products.count) subscription products")
         } catch {
-            print("❌ Failed to load products: \(error)")
             errorMessage = "Failed to load subscription options. Please try again."
         }
     }
@@ -142,27 +140,21 @@ class SubscriptionManager: ObservableObject {
                 // Finish the transaction
                 await transaction.finish()
 
-                print("✅ Purchase successful for \(product.id)")
                 return true
 
             case .userCancelled:
-                print("ℹ️ User cancelled purchase")
                 return false
 
             case .pending:
-                print("ℹ️ Purchase pending (may require approval)")
                 errorMessage = "Purchase is pending approval."
                 return false
 
             @unknown default:
-                print("⚠️ Unknown purchase result")
                 return false
             }
         } catch StoreKitError.userCancelled {
-            print("ℹ️ User cancelled purchase")
             return false
         } catch {
-            print("❌ Purchase failed: \(error)")
             errorMessage = "Purchase failed. Please try again."
             return false
         }
@@ -176,9 +168,7 @@ class SubscriptionManager: ObservableObject {
         do {
             try await AppStore.sync()
             await updateSubscriptionStatus()
-            print("✅ Purchases restored")
         } catch {
-            print("❌ Failed to restore purchases: \(error)")
             errorMessage = "Failed to restore purchases. Please try again."
         }
     }
@@ -192,7 +182,6 @@ class SubscriptionManager: ObservableObject {
             expirationDate: Date().addingTimeInterval(365 * 24 * 60 * 60), // 1 year from now
             productId: "com.deepmaind.scandalicious.premium.yearly"
         )
-        print("✅ Paywall disabled - returning active subscription")
     }
 
     // MARK: - Transaction Listener

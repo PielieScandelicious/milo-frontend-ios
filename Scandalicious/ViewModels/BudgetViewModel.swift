@@ -255,7 +255,6 @@ class BudgetViewModel: ObservableObject {
             pastMonthError = error.localizedDescription
             pastMonthReport = nil
             state = .noBudget  // Show no budget state for past months without data
-            print("⚠️ Could not load past month report: \(error.localizedDescription)")
         }
 
         isLoadingPastMonth = false
@@ -304,7 +303,6 @@ class BudgetViewModel: ObservableObject {
             )
         } catch {
             // Silently fail - last month summary is optional
-            print("⚠️ Could not load last month summary: \(error.localizedDescription)")
             lastMonthSummary = nil
         }
 
@@ -349,8 +347,7 @@ class BudgetViewModel: ObservableObject {
             let progressResponse = try await apiService.getBudgetProgress()
             state = .active(progressResponse.toBudgetProgress())
         } catch {
-            // Don't change state on refresh failure, just log
-            print("⚠️ Failed to refresh budget progress: \(error.localizedDescription)")
+            // Don't change state on refresh failure
         }
     }
 
@@ -366,10 +363,8 @@ class BudgetViewModel: ObservableObject {
             // 2. Previous month had a smart budget (isSmartBudget = true)
             // 3. Previous month's budget wasn't deleted
             try await apiService.performAutoRollover()
-            print("🔄 [Budget] Auto-rollover check completed successfully")
         } catch {
             // Silently fail - auto-rollover is optional
-            print("⚠️ [Budget] Auto-rollover check failed: \(error.localizedDescription)")
         }
     }
 
@@ -381,10 +376,8 @@ class BudgetViewModel: ObservableObject {
         do {
             let response = try await apiService.getBudgetHistory()
             budgetHistory = response.budgetHistory
-            print("📚 [Budget] Loaded \(budgetHistory.count) historical budget entries")
         } catch {
             historyError = error.localizedDescription
-            print("⚠️ [Budget] Failed to load budget history: \(error.localizedDescription)")
         }
 
         isLoadingHistory = false

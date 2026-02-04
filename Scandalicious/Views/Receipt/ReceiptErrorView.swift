@@ -1117,14 +1117,13 @@ class AnimatedCheckmarkView: UIView {
     ZStack {
         Color(white: 0.05)
             .ignoresSafeArea()
-        
+
         ReceiptStatusView(
             status: .failed(
                 message: "Please check your internet connection and try again.",
                 canRetry: true
             ),
             onRetry: {
-                print("Retry tapped")
             },
             onDismiss: {}
         )
@@ -1152,15 +1151,13 @@ class AnimatedCheckmarkView: UIView {
     ZStack {
         Color(white: 0.05)
             .ignoresSafeArea()
-        
+
         ReceiptErrorView(
             title: "Processing Failed!",
             message: "Failed to upload receipt to server. Please check your internet connection and try again.",
             onRetry: {
-                print("Retry tapped")
             },
             onDismiss: {
-                print("Dismiss tapped")
             }
         )
     }
@@ -1170,13 +1167,12 @@ class AnimatedCheckmarkView: UIView {
     ZStack {
         Color(white: 0.05)
             .ignoresSafeArea()
-        
+
         ReceiptErrorView(
             title: "Processing Failed!",
             message: "Receipt quality too low for accurate processing. Please ensure good lighting and try again.",
             onRetry: nil,
             onDismiss: {
-                print("Dismiss tapped")
             }
         )
     }
@@ -1185,29 +1181,27 @@ class AnimatedCheckmarkView: UIView {
     ZStack {
         Color(white: 0.05)
             .ignoresSafeArea()
-        
+
         ReceiptErrorView(
             title: "Quality Check Failed",
             message: """
             Receipt quality too low for accurate processing.
-            
+
             Issues detected:
             • Image is too blurry
             • Poor lighting conditions
-            
+
             Quality Score: 45%
             Minimum Required: 60%
-            
+
             Tips:
             • Ensure good lighting
             • Hold device steady
             • Capture entire receipt
             """,
             onRetry: {
-                print("Retry tapped")
             },
             onDismiss: {
-                print("Dismiss tapped")
             }
         )
     }
@@ -1217,7 +1211,7 @@ class AnimatedCheckmarkView: UIView {
     ZStack {
         Color(white: 0.05)
             .ignoresSafeArea()
-        
+
         VStack {
             Text("Main Content")
                 .font(.largeTitle)
@@ -1228,7 +1222,6 @@ class AnimatedCheckmarkView: UIView {
         isPresented: .constant(true),
         message: "Failed to upload receipt. Please check your internet connection.",
         onRetry: {
-            print("Retry tapped")
         }
     )
 }

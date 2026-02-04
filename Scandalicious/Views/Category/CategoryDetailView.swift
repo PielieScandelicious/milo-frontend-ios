@@ -194,7 +194,7 @@ struct CategoryDetailView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
 
-                Text(String(format: "€%.2f", totalSpent))
+                Text(String(format: "%.2f", totalSpent))
                     .font(.system(size: 28, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
                     .padding(.top, 2)
@@ -282,7 +282,7 @@ struct CategoryDetailView: View {
 
                 Spacer()
 
-                Text(String(format: "€%.2f", storeData.totalSpent))
+                Text(String(format: "%.2f", storeData.totalSpent))
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
@@ -341,18 +341,12 @@ struct CategoryDetailView: View {
         // Get split participants for this transaction
         let splitParticipants: [SplitParticipantInfo] = {
             guard let receiptId = transaction.receiptId else {
-                print("🔍 CategoryDetailView: No receiptId for transaction \(transaction.id) - \(transaction.itemName)")
                 return []
             }
             guard let splitData = splitCache.getSplit(for: receiptId) else {
-                print("🔍 CategoryDetailView: No split data for receiptId \(receiptId)")
                 return []
             }
             let participants = splitData.participantsForTransaction(transaction.id)
-            print("🔍 CategoryDetailView: Found \(participants.count) participants for tx \(transaction.id)")
-            if participants.isEmpty {
-                print("   Available assignment keys: \(splitData.assignments.keys.joined(separator: ", "))")
-            }
             return participants
         }()
         let friendsOnly = splitParticipants.filter { !$0.isMe }
@@ -381,7 +375,7 @@ struct CategoryDetailView: View {
                         .lineLimit(1)
 
                     if transaction.quantity > 1 {
-                        Text("×\(transaction.quantity)")
+                        Text("\(transaction.quantity)")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundColor(.white.opacity(0.4))
                             .padding(.horizontal, 6)
@@ -406,7 +400,7 @@ struct CategoryDetailView: View {
             Spacer()
 
             // Price
-            Text(String(format: "€%.2f", transaction.totalPrice))
+            Text(String(format: "%.2f", transaction.totalPrice))
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundColor(.white.opacity(0.8))
         }

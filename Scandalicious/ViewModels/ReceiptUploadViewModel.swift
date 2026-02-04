@@ -38,7 +38,6 @@ class ReceiptUploadViewModel: ObservableObject {
     
     func uploadReceipt(image: UIImage) async {
         guard uploadState == .idle else {
-            print("Upload already in progress")
             return
         }
         

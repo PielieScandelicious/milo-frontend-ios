@@ -629,7 +629,7 @@ struct SplitBankTransactionView: View {
         do {
             recentFriends = try await ExpenseSplitAPIService.shared.getRecentFriends()
         } catch {
-            print("Failed to load recent friends: \(error)")
+            // Failed to load recent friends
         }
     }
 
@@ -664,7 +664,6 @@ struct SplitBankTransactionView: View {
             }
         } catch {
             // Not an error - just means no split exists yet, set up default "Me"
-            print("No existing split found: \(error)")
             setupDefaultMeParticipant()
         }
     }
@@ -722,7 +721,6 @@ struct SplitBankTransactionView: View {
             // Bank imports create one receipt with one transaction entry
             guard let transactionId = receipt.transactions.first?.itemId else {
                 // Fallback to receiptId if no transaction found (shouldn't happen for imported bank transactions)
-                print("⚠️ No transaction found for bank receipt \(receipt.receiptId)")
                 await MainActor.run {
                     self.error = "Transaction not found"
                     self.showError = true

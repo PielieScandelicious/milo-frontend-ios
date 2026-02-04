@@ -125,8 +125,6 @@ actor ExpenseSplitAPIService {
             throw ExpenseSplitAPIError.invalidURL
         }
 
-        print("ExpenseSplitAPI \(method) \(url.absoluteString)")
-
         // Get auth token
         let token = try await getAuthToken()
 
@@ -144,8 +142,6 @@ actor ExpenseSplitAPIService {
             throw ExpenseSplitAPIError.invalidResponse
         }
 
-        print("Response: HTTP \(httpResponse.statusCode)")
-
         // Handle status codes
         switch httpResponse.statusCode {
         case 200...299:
@@ -159,10 +155,6 @@ actor ExpenseSplitAPIService {
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {
-                print("Decoding error: \(error)")
-                if let jsonString = responseString {
-                    print("Raw response: \(jsonString)")
-                }
                 throw ExpenseSplitAPIError.decodingError(error.localizedDescription)
             }
 
@@ -207,8 +199,6 @@ actor ExpenseSplitAPIService {
             throw ExpenseSplitAPIError.invalidURL
         }
 
-        print("ExpenseSplitAPI \(method) \(url.absoluteString)")
-
         // Get auth token
         let token = try await getAuthToken()
 
@@ -223,10 +213,6 @@ actor ExpenseSplitAPIService {
         if let body = body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try encoder.encode(body)
-
-            if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8) {
-                print("Request body: \(bodyString)")
-            }
         }
 
         // Perform request
@@ -235,8 +221,6 @@ actor ExpenseSplitAPIService {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw ExpenseSplitAPIError.invalidResponse
         }
-
-        print("Response: HTTP \(httpResponse.statusCode)")
 
         // Handle status codes
         switch httpResponse.statusCode {
@@ -251,10 +235,6 @@ actor ExpenseSplitAPIService {
                 }
                 return try decoder.decode(T.self, from: data)
             } catch {
-                print("Decoding error: \(error)")
-                if let jsonString = String(data: data, encoding: .utf8) {
-                    print("Raw response: \(jsonString)")
-                }
                 throw ExpenseSplitAPIError.decodingError(error.localizedDescription)
             }
 

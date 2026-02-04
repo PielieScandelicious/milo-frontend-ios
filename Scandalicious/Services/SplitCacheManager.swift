@@ -152,7 +152,7 @@ class SplitCacheManager: ObservableObject {
                 cacheSplit(split)
             }
         } catch {
-            print("Failed to fetch split for receipt \(receiptId): \(error)")
+            // Failed to fetch split for receipt
         }
     }
 

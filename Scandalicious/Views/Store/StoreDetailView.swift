@@ -268,7 +268,6 @@ struct StoreDetailView: View {
             } else {
                 // Subsequent appearances (navigating back): refresh from backend
                 // This handles the case where a receipt was deleted in ReceiptsListView
-                print("🔄 [StoreDetailView] Re-appeared - refreshing from backend")
                 Task {
                     await refreshStoreData()
                 }
@@ -277,7 +276,6 @@ struct StoreDetailView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
-            print("🗑️ [StoreDetailView] Received receiptsDataDidChange - refreshing store data")
             Task {
                 // Wait for backend to process the change
                 try? await Task.sleep(for: .seconds(0.5))
@@ -301,7 +299,6 @@ struct StoreDetailView: View {
             // Handle "All" period - no date filtering
             if storeBreakdown.period == "All" {
                 filters.period = .all
-                print("📡 [StoreDetailView] Fetching all-time data for \(storeBreakdown.storeName)")
             } else {
                 // Parse the period to get date range
                 let dateFormatter = DateFormatter()
@@ -310,7 +307,6 @@ struct StoreDetailView: View {
                 dateFormatter.timeZone = TimeZone(identifier: "UTC")
 
                 guard let parsedDate = dateFormatter.date(from: storeBreakdown.period) else {
-                    print("❌ [StoreDetailView] Could not parse period: \(storeBreakdown.period)")
                     return
                 }
 
@@ -323,7 +319,6 @@ struct StoreDetailView: View {
                 filters.period = .month
                 filters.startDate = startOfMonth
                 filters.endDate = endOfMonth
-                print("📡 [StoreDetailView] Fetching fresh data for \(storeBreakdown.storeName)")
             }
 
             let storeDetails = try await AnalyticsAPIService.shared.getStoreDetails(
@@ -351,11 +346,10 @@ struct StoreDetailView: View {
                 currentHealthScore = storeDetails.averageHealthScore
                 currentTotalItems = totalItems
                 backendAverageItemPrice = storeDetails.averageItemPrice  // Use backend value if available
-                print("✅ [StoreDetailView] Updated: €\(storeDetails.totalSpend), \(storeDetails.visitCount) receipts, \(totalItems) items, avg price: \(storeDetails.averageItemPrice.map { String(format: "€%.2f", $0) } ?? "computed locally")")
             }
 
         } catch {
-            print("❌ [StoreDetailView] Failed to refresh store data: \(error.localizedDescription)")
+            // Error refreshing store data - silently ignore
         }
     }
 
@@ -998,7 +992,6 @@ struct StoreDetailView: View {
                     loadingCategories.remove(category)
                 }
             } catch {
-                print("❌ Failed to load transactions for \(category): \(error)")
                 await MainActor.run {
                     loadingCategories.remove(category)
                 }

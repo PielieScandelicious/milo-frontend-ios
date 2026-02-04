@@ -120,7 +120,6 @@ actor InsightService {
                 }
             } catch {
                 // Silently fail - user can still generate on demand
-                print("Insight prefetch failed: \(error.localizedDescription)")
             }
         }
     }

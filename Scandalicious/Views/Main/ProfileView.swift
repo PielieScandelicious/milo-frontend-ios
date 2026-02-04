@@ -209,7 +209,7 @@ struct ProfileView: View {
                         try authManager.signOut()
                         dismiss()
                     } catch {
-                        print("Error signing out: \(error.localizedDescription)")
+                        // Error signing out - silently ignore
                     }
                 } label: {
                     HStack {
@@ -362,13 +362,11 @@ struct ProfileView: View {
                 hasUnsavedChanges = false
                 isLoading = false
             }
-            print("✅ Profile loaded successfully")
         } catch {
             // If profile not found, that's okay - user hasn't filled it out yet
             await MainActor.run {
                 isLoading = false
             }
-            print("⚠️ Could not load profile: \(error.localizedDescription)")
         }
     }
 
@@ -404,15 +402,12 @@ struct ProfileView: View {
                         authManager.markProfileAsCompleted()
                     }
                 }
-
-                print("✅ Profile saved successfully")
             } catch {
                 await MainActor.run {
                     isSaving = false
                     errorMessage = error.localizedDescription
                     showError = true
                 }
-                print("❌ Error saving profile: \(error)")
             }
         }
     }

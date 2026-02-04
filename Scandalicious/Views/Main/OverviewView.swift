@@ -627,12 +627,10 @@ struct OverviewView: View {
     }
 
     private func handleReceiptUploadStarted() {
-        print("📤 Received receipt upload started notification")
         isReceiptUploading = true
     }
 
     private func handleReceiptUploadSuccess() {
-        print("📬 Received receipt upload notification - refreshing backend data")
         isReceiptUploading = false
 
         let dateFormatter = DateFormatter()
@@ -673,8 +671,6 @@ struct OverviewView: View {
     }
 
     private func handleReceiptDeleted() {
-        print("🗑️ Received receiptsDataDidChange - refreshing period data")
-
         Task {
             // Wait briefly for backend to process the deletion
             try? await Task.sleep(for: .milliseconds(500))
@@ -812,15 +808,11 @@ struct OverviewView: View {
             filters.allTime = true
             filters.topStoresLimit = 20  // Get more stores for the pie chart
 
-            print("📊 Fetching all-time store data from backend (aggregate)...")
             let aggregate = try await AnalyticsAPIService.shared.getAggregate(filters: filters)
             let stores = aggregate.topStores
 
-            print("📊 Backend response: totalSpend=€\(aggregate.totals.totalSpend), stores=\(stores.count), receipts=\(aggregate.totals.totalReceipts)")
-
             // Convert to StoreBreakdown array
             let breakdowns: [StoreBreakdown] = stores.map { store in
-                print("   📍 Store: \(store.storeName) - €\(store.totalSpent) (\(store.visitCount) visits)")
                 return StoreBreakdown(
                     storeName: store.storeName,
                     period: Self.allPeriodIdentifier,
@@ -830,8 +822,6 @@ struct OverviewView: View {
                     averageHealthScore: store.averageHealthScore
                 )
             }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
-
-            print("✅ Fetched \(breakdowns.count) stores for all-time view, total: €\(aggregate.totals.totalSpend)")
 
             await MainActor.run {
                 // Store all-time totals from backend FIRST
@@ -853,15 +843,12 @@ struct OverviewView: View {
 
                     // Cache segments for the donut chart using the correct total
                     cacheSegmentsForPeriod(Self.allPeriodIdentifier)
-
-                    print("📊 Updated All view: \(breakdowns.count) stores, €\(allTimeTotalSpend) total, \(cachedSegmentsByPeriod[Self.allPeriodIdentifier]?.count ?? 0) segments")
                 }
 
                 // Loading complete - chart can now render with backend data
                 isLoadingAllTimeData = false
             }
         } catch {
-            print("❌ Failed to fetch all-time data: \(error.localizedDescription)")
             await MainActor.run {
                 isLoadingAllTimeData = false
             }
@@ -898,7 +885,6 @@ struct OverviewView: View {
                 isLoadingCategoryData = false
             }
         } catch {
-            print("❌ Failed to fetch category data for \(period): \(error.localizedDescription)")
             await MainActor.run {
                 isLoadingCategoryData = false
             }
@@ -950,16 +936,11 @@ struct OverviewView: View {
         }
 
         do {
-            print("📊 Fetching year summary for \(year) from backend...")
-
             // First try the dedicated year endpoint
             let yearSummary = try await AnalyticsAPIService.shared.getYearSummary(year: yearInt)
 
-            print("📊 Year \(year) response: totalSpend=€\(yearSummary.totalSpend), stores=\(yearSummary.stores.count), receipts=\(yearSummary.receiptCount)")
-
             // Convert to StoreBreakdown array for consistent handling
             let breakdowns: [StoreBreakdown] = yearSummary.stores.map { store in
-                print("   📍 Store: \(store.storeName) - €\(store.amountSpent) (\(store.storeVisits) visits)")
                 return StoreBreakdown(
                     storeName: store.storeName,
                     period: year,
@@ -969,8 +950,6 @@ struct OverviewView: View {
                     averageHealthScore: store.averageHealthScore
                 )
             }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
-
-            print("✅ Fetched \(breakdowns.count) stores for year \(year), total: €\(yearSummary.totalSpend)")
 
             await MainActor.run {
                 // Cache the year summary
@@ -990,8 +969,6 @@ struct OverviewView: View {
 
                     // Cache segments for the donut chart
                     cacheSegmentsForPeriod(year)
-
-                    print("📊 Updated year \(year) view: \(breakdowns.count) stores, €\(yearSummary.totalSpend) total")
                 }
 
                 // Loading complete
@@ -999,7 +976,6 @@ struct OverviewView: View {
                 currentLoadingYear = nil
             }
         } catch {
-            print("⚠️ Year endpoint not available, falling back to summary endpoint: \(error.localizedDescription)")
 
             // Fallback: Use the summary endpoint with year date range
             await fetchYearDataFallback(year: year, yearInt: yearInt)
@@ -1086,7 +1062,6 @@ struct OverviewView: View {
                 currentLoadingYear = nil
             }
         } catch {
-            print("❌ Failed to fetch year data: \(error.localizedDescription)")
             await MainActor.run {
                 isLoadingYearData = false
                 currentLoadingYear = nil
@@ -1187,8 +1162,6 @@ struct OverviewView: View {
 
         // If there's a new upload (timestamp is newer than last checked)
         if uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0 {
-            print("📬 Detected Share Extension upload (timestamp: \(uploadTimestamp)) - refreshing data")
-
             // Update last checked timestamp and persist it
             lastCheckedUploadTimestamp = uploadTimestamp
             sharedDefaults.set(uploadTimestamp, forKey: "lastCheckedUploadTimestamp")
@@ -1204,8 +1177,6 @@ struct OverviewView: View {
                 Task {
                     await refreshWithRetry()
                 }
-            } else {
-                print("ℹ️ refreshWithRetry already running, skipping duplicate call")
             }
         }
     }
@@ -1233,11 +1204,9 @@ struct OverviewView: View {
         let retryDelays: [Double] = [3.0, 3.0, 3.0, 3.0] // Total: up to 12 seconds of waiting
         var dataChanged = false
 
-        for (attempt, delay) in retryDelays.enumerated() {
-            print("⏳ Share Extension sync - attempt \(attempt + 1)/\(retryDelays.count), waiting \(delay)s...")
+        for (_, delay) in retryDelays.enumerated() {
             try? await Task.sleep(for: .seconds(delay))
 
-            print("📥 Refreshing data for current month: '\(currentMonthPeriod)' (attempt \(attempt + 1))")
             await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
 
             // Check if data changed (count OR total spending - handles uploads to existing stores)
@@ -1251,21 +1220,13 @@ struct OverviewView: View {
             let spendingChanged = abs(newTotalSpending - initialTotalSpending) > 0.01
 
             if countChanged || spendingChanged {
-                print("✅ Data changed! Breakdowns: \(initialBreakdownCount) -> \(newBreakdownCount), Transactions: \(initialTransactionCount) -> \(newTransactionCount), Spending: €\(String(format: "%.2f", initialTotalSpending)) -> €\(String(format: "%.2f", newTotalSpending))")
                 dataChanged = true
                 break
-            } else {
-                print("ℹ️ No changes yet (breakdowns: \(newBreakdownCount), transactions: \(newTransactionCount), spending: €\(String(format: "%.2f", newTotalSpending)))")
             }
-        }
-
-        if !dataChanged {
-            print("⚠️ No data changes after all retries - upload may have failed or still processing")
         }
 
         // Sync rate limit status
         await rateLimitManager.syncFromBackend()
-        print("✅ Data and rate limit refreshed after Share Extension upload")
 
         // Update UI on main thread and always reset isReceiptUploading
         await MainActor.run {
@@ -1286,7 +1247,6 @@ struct OverviewView: View {
 
             // Always update displayed breakdowns to ensure UI reflects latest data
             // The filter inside updateDisplayedBreakdowns will handle period matching
-            print("📊 Updating display after sync (selectedPeriod: '\(selectedPeriod)', currentMonthPeriod: '\(currentMonthPeriod)')")
             updateDisplayedBreakdowns()
 
             // Update refresh time for "Updated X ago" display
@@ -2046,15 +2006,6 @@ struct OverviewView: View {
         loadingCategoryId = category.id
         categoryLoadError[category.id] = nil
 
-        // Comprehensive debug logging
-        print("═══════════════════════════════════════════════════════════")
-        print("🔍 [Category] Loading items for category:")
-        print("   categoryId: \(category.categoryId)")
-        print("   name: '\(category.name)'")
-        print("   period: '\(period)'")
-        print("   transactionCount from summary: \(category.transactionCount)")
-        print("═══════════════════════════════════════════════════════════")
-
         do {
             var filters = TransactionFilters()
 
@@ -2078,30 +2029,15 @@ struct OverviewView: View {
 
                 filters.startDate = startOfMonth
                 filters.endDate = endOfMonth
-                print("   📅 Date range: \(DateFormatter.yyyyMMdd.string(from: startOfMonth)) to \(DateFormatter.yyyyMMdd.string(from: endOfMonth))")
-            } else {
-                print("   ⚠️ Failed to parse period: '\(period)' - will load all time")
-            }
-
-            // Debug: Print query items being sent
-            let queryItems = filters.toQueryItems()
-            print("   📤 Query items:")
-            for item in queryItems {
-                print("      - \(item.name)=\(item.value ?? "nil")")
             }
 
             let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
-
-            print("═══════════════════════════════════════════════════════════")
 
             await MainActor.run {
                 categoryItems[category.id] = response.transactions
                 loadingCategoryId = nil
             }
         } catch {
-            print("❌ [Category] Error loading items: \(error.localizedDescription)")
-            print("   Full error: \(error)")
-            print("═══════════════════════════════════════════════════════════")
             await MainActor.run {
                 categoryLoadError[category.id] = error.localizedDescription
                 loadingCategoryId = nil

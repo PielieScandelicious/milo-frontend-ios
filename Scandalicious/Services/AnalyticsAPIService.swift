@@ -19,7 +19,7 @@ enum AnalyticsAPIError: LocalizedError {
     case decodingError(String)
     case networkError(Error)
     case invalidResponse
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -49,13 +49,13 @@ actor AnalyticsAPIService {
 
     private var baseURL: String { AppConfiguration.apiBase }
     private let decoder: JSONDecoder
-    
+
     private init() {
         self.decoder = JSONDecoder()
     }
-    
+
     // MARK: - Analytics Endpoints
-    
+
     /// Fetch spending trends over time
     /// - Parameters:
     ///   - periodType: Type of period (week, month, year)
@@ -76,7 +76,7 @@ actor AnalyticsAPIService {
             queryItems: queryItems
         )
     }
-    
+
     /// Fetch category breakdown for spending
     /// - Parameter filters: Analytics filters for period, dates, and store
     func fetchCategories(filters: AnalyticsFilters = AnalyticsFilters()) async throws -> CategoriesResponse {
@@ -85,7 +85,7 @@ actor AnalyticsAPIService {
             queryItems: filters.toQueryItems()
         )
     }
-    
+
     /// Fetch summary with store breakdown
     /// - Parameter filters: Analytics filters for period and dates
     /// Note: Backend now requires month and year parameters instead of start_date/end_date
@@ -106,7 +106,7 @@ actor AnalyticsAPIService {
             queryItems: queryItems
         )
     }
-    
+
     /// Fetch detailed breakdown for a specific store
     /// - Parameters:
     ///   - storeName: Name of the store
@@ -246,8 +246,6 @@ actor AnalyticsAPIService {
             throw AnalyticsAPIError.invalidURL
         }
 
-        print("🗑️ API Delete Request: DELETE \(url.absoluteString)")
-
         // Get auth token
         let token = try await getAuthToken()
 
@@ -265,11 +263,8 @@ actor AnalyticsAPIService {
             throw AnalyticsAPIError.invalidResponse
         }
 
-        print("📥 Delete response: HTTP \(httpResponse.statusCode)")
-
         switch httpResponse.statusCode {
         case 200...299:
-            print("✅ Receipt deleted successfully")
             return
 
         case 401:
@@ -296,8 +291,6 @@ actor AnalyticsAPIService {
             throw AnalyticsAPIError.invalidURL
         }
 
-        print("🗑️ API Delete Item Request: DELETE \(url.absoluteString)")
-
         // Get auth token
         let token = try await getAuthToken()
 
@@ -315,11 +308,8 @@ actor AnalyticsAPIService {
             throw AnalyticsAPIError.invalidResponse
         }
 
-        print("📥 Delete item response: HTTP \(httpResponse.statusCode)")
-
         switch httpResponse.statusCode {
         case 200...299:
-            print("✅ Receipt item deleted successfully")
             do {
                 let decodedResponse = try decoder.decode(DeleteReceiptItemResponse.self, from: data)
                 return decodedResponse
@@ -371,8 +361,6 @@ actor AnalyticsAPIService {
             throw AnalyticsAPIError.invalidURL
         }
 
-        print("🗑️ API Delete Transaction Request: DELETE \(url.absoluteString)")
-
         // Get auth token
         let token = try await getAuthToken()
 
@@ -390,11 +378,8 @@ actor AnalyticsAPIService {
             throw AnalyticsAPIError.invalidResponse
         }
 
-        print("📥 Delete transaction response: HTTP \(httpResponse.statusCode)")
-
         switch httpResponse.statusCode {
         case 200...299:
-            print("✅ Transaction deleted successfully")
             return
 
         case 401:
@@ -410,7 +395,7 @@ actor AnalyticsAPIService {
     }
 
     // MARK: - Helper Methods
-    
+
     private func performRequest<T: Decodable>(
         endpoint: String,
         queryItems: [URLQueryItem] = [],
@@ -420,36 +405,33 @@ actor AnalyticsAPIService {
         guard var urlComponents = URLComponents(string: "\(baseURL)\(endpoint)") else {
             throw AnalyticsAPIError.invalidURL
         }
-        
+
         if !queryItems.isEmpty {
             urlComponents.queryItems = queryItems
         }
-        
+
         guard let url = urlComponents.url else {
             throw AnalyticsAPIError.invalidURL
         }
-        
-        // Log the request
-        print("📡 API Request: \(method) \(url.absoluteString)")
-        
+
         // Get auth token
         let token = try await getAuthToken()
-        
+
         // Create request
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = 30
-        
+
         // Perform request
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AnalyticsAPIError.invalidResponse
             }
-            
+
             // Handle status codes
             switch httpResponse.statusCode {
             case 200...299:
@@ -462,29 +444,29 @@ actor AnalyticsAPIService {
                     logDecodingError(decodingError, data: data, endpoint: endpoint)
                     throw AnalyticsAPIError.decodingError(decodingError.localizedDescription)
                 }
-                
+
             case 401:
                 // Unauthorized
                 throw AnalyticsAPIError.unauthorized
-                
+
             case 404:
                 // Not found
                 throw AnalyticsAPIError.notFound
-                
+
             case 400...499:
                 // Client error
                 let errorMessage = parseErrorMessage(from: data) ?? "Client error: \(httpResponse.statusCode)"
                 throw AnalyticsAPIError.serverError(errorMessage)
-                
+
             case 500...599:
                 // Server error
                 let errorMessage = parseErrorMessage(from: data) ?? "Server error: \(httpResponse.statusCode)"
                 throw AnalyticsAPIError.serverError(errorMessage)
-                
+
             default:
                 throw AnalyticsAPIError.serverError("Unexpected status code: \(httpResponse.statusCode)")
             }
-            
+
         } catch let error as AnalyticsAPIError {
             throw error
         } catch {
@@ -501,9 +483,6 @@ actor AnalyticsAPIService {
         guard let url = URL(string: "\(baseURL)\(endpoint)") else {
             throw AnalyticsAPIError.invalidURL
         }
-
-        // Log the request
-        print("📡 API Request: \(method) \(url.absoluteString)")
 
         // Get auth token
         let token = try await getAuthToken()
@@ -569,7 +548,7 @@ actor AnalyticsAPIService {
         guard let user = Auth.auth().currentUser else {
             throw AnalyticsAPIError.noAuthToken
         }
-        
+
         do {
             let token = try await user.getIDToken()
             return token
@@ -577,47 +556,16 @@ actor AnalyticsAPIService {
             throw AnalyticsAPIError.unauthorized
         }
     }
-    
+
     private func parseErrorMessage(from data: Data) -> String? {
         if let errorDict = try? JSONDecoder().decode([String: String].self, from: data) {
             return errorDict["error"] ?? errorDict["message"]
         }
         return nil
     }
-    
+
     private func logDecodingError(_ error: DecodingError, data: Data, endpoint: String) {
-        print("❌ Decoding error for endpoint: \(endpoint)")
-        
-        // Print raw response
-        if let jsonString = String(data: data, encoding: .utf8) {
-            print("📄 Raw server response:\n\(jsonString)")
-        }
-        
-        // Print detailed error info
-        switch error {
-        case .keyNotFound(let key, let context):
-            print("🔑 Missing key '\(key.stringValue)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-            print("ℹ️  \(context.debugDescription)")
-            
-        case .typeMismatch(let type, let context):
-            print("⚠️ Type mismatch for type '\(type)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-            print("ℹ️  \(context.debugDescription)")
-            
-        case .valueNotFound(let type, let context):
-            print("❓ Value not found for type '\(type)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-            print("ℹ️  \(context.debugDescription)")
-            
-        case .dataCorrupted(let context):
-            print("💥 Data corrupted")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-            print("ℹ️  \(context.debugDescription)")
-            
-        @unknown default:
-            print("❔ Unknown decoding error")
-        }
+        // Decoding error logging removed
     }
 }
 
@@ -628,17 +576,17 @@ extension AnalyticsAPIService {
     nonisolated func getTrends(periodType: PeriodType = .month, numPeriods: Int = 12, storeName: String? = nil) async throws -> TrendsResponse {
         return try await fetchTrends(periodType: periodType, numPeriods: numPeriods, storeName: storeName)
     }
-    
+
     /// Nonisolated wrapper for fetchCategories
     nonisolated func getCategories(filters: AnalyticsFilters = AnalyticsFilters()) async throws -> CategoriesResponse {
         return try await fetchCategories(filters: filters)
     }
-    
+
     /// Nonisolated wrapper for fetchSummary
     nonisolated func getSummary(filters: AnalyticsFilters = AnalyticsFilters()) async throws -> SummaryResponse {
         return try await fetchSummary(filters: filters)
     }
-    
+
     /// Nonisolated wrapper for fetchStoreDetails
     nonisolated func getStoreDetails(storeName: String, filters: AnalyticsFilters = AnalyticsFilters()) async throws -> StoreDetailsResponse {
         return try await fetchStoreDetails(storeName: storeName, filters: filters)

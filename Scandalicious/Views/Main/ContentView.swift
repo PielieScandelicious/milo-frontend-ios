@@ -24,7 +24,7 @@ struct ContentView: View {
         case scan = 1
         case dobby = 2
     }
-    
+
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
@@ -82,8 +82,6 @@ struct ContentView: View {
                 // Optimized loading: fetch lightweight period metadata first (1 API call)
                 // Falls back to fetchAllHistoricalData if /analytics/periods is not available
                 Task {
-                    print("🚀 App launched - fetching period metadata (optimized)")
-
                     // Step 1: Fetch lightweight period metadata (falls back if endpoint unavailable)
                     await dataManager.fetchPeriodMetadata()
 
@@ -94,12 +92,10 @@ struct ContentView: View {
                         // Get periods to preload - we need current + 2 before + 2 after for smooth swiping
                         // Since periodMetadata is sorted most recent first, we preload first 5 periods
                         let periodsToPreload = Array(dataManager.periodMetadata.prefix(8))
-                        print("📊 Preloading \(periodsToPreload.count) periods for smooth swiping")
 
                         // Load current period + immediate neighbors first (blocking)
                         // These are critical for smooth UX - load in parallel but wait for all
                         let criticalPeriods = Array(periodsToPreload.prefix(5))
-                        print("📊 Loading \(criticalPeriods.count) critical periods before showing UI...")
 
                         await withTaskGroup(of: Void.self) { group in
                             for periodMeta in criticalPeriods {
@@ -108,7 +104,6 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        print("✅ Critical periods loaded - showing UI")
 
                         // Show UI after critical periods are loaded
                         await MainActor.run {
@@ -118,7 +113,6 @@ struct ContentView: View {
                         // Then load remaining periods in background
                         if periodsToPreload.count > criticalPeriods.count {
                             let remainingPeriods = Array(periodsToPreload.dropFirst(criticalPeriods.count))
-                            print("📊 Background loading \(remainingPeriods.count) additional periods...")
                             await withTaskGroup(of: Void.self) { group in
                                 for periodMeta in remainingPeriods {
                                     group.addTask {
@@ -126,15 +120,12 @@ struct ContentView: View {
                                     }
                                 }
                             }
-                            print("✅ All \(periodsToPreload.count) periods preloaded")
                         }
                     } else {
-                        print("📊 Using fallback: all historical data already loaded")
                         await MainActor.run {
                             hasLoadedInitialData = true
                         }
                     }
-                    print("✅ Initial data loaded successfully")
 
                     // Check for pending bank transactions after initial data loads
                     // Also sync bank accounts automatically (like Buddy app)
@@ -144,14 +135,12 @@ struct ContentView: View {
             }
         }
         .onChange(of: selectedTab) { oldValue, newValue in
-            print("🔄 Tab changed: \(oldValue.rawValue) → \(newValue.rawValue)")
         }
         .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
             Button("Sign Out", role: .destructive) {
                 do {
                     try authManager.signOut()
                 } catch {
-                    print("Error signing out: \(error.localizedDescription)")
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -179,7 +168,6 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .bankTransactionsImported)) { notification in
             // Refresh overview data when bank transactions are imported
             if let importedCount = notification.userInfo?["importedCount"] as? Int, importedCount > 0 {
-                print("🏦 Bank transactions imported (\(importedCount)) - refreshing overview data")
                 Task {
                     // Refresh current period data to show newly imported transactions
                     if let currentPeriod = dataManager.periodMetadata.first?.period {
@@ -200,7 +188,6 @@ struct ContentView: View {
                 }
 
                 if shouldSync && bankingViewModel.hasConnections {
-                    print("🏦 [AutoSync] App came to foreground - syncing bank accounts...")
                     lastSyncTime = Date()
                     Task {
                         await bankingViewModel.syncAllAccounts()
@@ -216,7 +203,7 @@ struct ContentView: View {
 struct ViewTab: View {
     @Binding var showSignOutConfirmation: Bool
     @ObservedObject var dataManager: StoreDataManager
-    
+
     var body: some View {
         NavigationStack {
             OverviewView(dataManager: dataManager, showSignOutConfirmation: $showSignOutConfirmation)
@@ -298,5 +285,3 @@ struct ScandaLiciousTab: View {
     ContentView()
         .environmentObject(AuthenticationManager())
 }
-
-

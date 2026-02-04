@@ -52,9 +52,9 @@ struct Category: Codable, Identifiable, Equatable, Hashable {
     let name: String
     let spent: Double
     let percentage: Int
-    
+
     var id: String { name }
-    
+
     // Hashable conformance
     func hash(into hasher: inout Hasher) {
         hasher.combine(name)
@@ -84,18 +84,18 @@ class StoreDataManager: ObservableObject {
 
     var transactionManager: TransactionManager?
     private var hasInitiallyFetched = false
-    
+
     init() {
         // Don't load local JSON anymore - will fetch from backend
     }
-    
+
     // Inject transaction manager
     func configure(with transactionManager: TransactionManager) {
         self.transactionManager = transactionManager
     }
-    
+
     // MARK: - Fetch Data from Backend
-    
+
     /// Fetch analytics data from backend API - Initial load
     /// - Parameters:
     ///   - period: The period type (week/month/year)
@@ -115,8 +115,6 @@ class StoreDataManager: ObservableObject {
         }
 
         do {
-            print("📥 Fetching analytics from backend for period: \(period.rawValue), periodString: \(periodString ?? "nil")")
-
             // Create filters for the selected period
             let filters: AnalyticsFilters
 
@@ -128,7 +126,6 @@ class StoreDataManager: ObservableObject {
                 customFilters.startDate = DateFormatter.yyyyMMdd.date(from: startDateStr)
                 customFilters.endDate = DateFormatter.yyyyMMdd.date(from: endDateStr)
                 filters = customFilters
-                print("   Using custom date range: \(startDateStr) to \(endDateStr)")
             } else {
                 // Default to current period
                 switch period {
@@ -151,19 +148,6 @@ class StoreDataManager: ObservableObject {
             let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
 
             let stores = summary.stores ?? []
-            print("✅ Received \(stores.count) stores from backend")
-            print("   Total spend (from backend summary): €\(summary.totalSpend)")
-            print("   Transaction count: \(summary.transactionCount ?? 0)")
-
-            // Debug: Calculate sum of individual store amounts
-            let storeSum = stores.reduce(0) { $0 + $1.amountSpent }
-            print("   Sum of store amounts: €\(storeSum)")
-            print("   ⚠️ Difference (summary - stores): €\(summary.totalSpend - storeSum)")
-
-            // Debug: Print each store's amount
-            for store in stores {
-                print("   📍 \(store.storeName): €\(store.amountSpent) (\(store.percentage)%)")
-            }
 
             // Convert API response to StoreBreakdown format
             let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: period)
@@ -185,7 +169,6 @@ class StoreDataManager: ObservableObject {
                 receiptFilters.pageSize = 1  // We only need the total count
                 if let receiptsResponse = try? await AnalyticsAPIService.shared.getReceipts(filters: receiptFilters) {
                     receiptCount = receiptsResponse.total
-                    print("   📊 Receipt count from /receipts endpoint: \(receiptCount)")
                 }
             }
 
@@ -215,7 +198,6 @@ class StoreDataManager: ObservableObject {
                         totalItems: existingMetadata.totalItems,
                         averageHealthScore: summary.averageHealthScore
                     )
-                    print("📊 Updated periodMetadata for '\(periodKey)': €\(summary.totalSpend), \(receiptCount) receipts")
                 }
 
                 self.averageHealthScore = summary.averageHealthScore
@@ -223,19 +205,13 @@ class StoreDataManager: ObservableObject {
                 self.isRefreshing = false
                 self.lastFetchDate = Date()
                 self.hasInitiallyFetched = true
-                print("✅ Updated storeBreakdowns for period '\(periodKey)' with \(breakdowns.count) stores")
-                print("   Total spend: €\(summary.totalSpend), Receipts: \(receiptCount)")
-                if let healthScore = summary.averageHealthScore {
-                    print("   Average health score: \(healthScore)")
-                }
             }
-            
+
         } catch let apiError as AnalyticsAPIError {
             // Check if it's a cancellation error
             if case .networkError(let underlyingError) = apiError,
                (underlyingError as NSError).code == NSURLErrorCancelled {
                 if retryCount < 3 {
-                    print("⚠️ Request was cancelled - will retry after delay (attempt \(retryCount + 1)/3)")
                     await MainActor.run {
                         self.isLoading = false
                         self.isRefreshing = false
@@ -244,7 +220,6 @@ class StoreDataManager: ObservableObject {
                     try? await Task.sleep(for: .seconds(0.5))
                     await fetchFromBackend(for: period, periodString: periodString, retryCount: retryCount + 1)
                 } else {
-                    print("⚠️ Request was cancelled after 3 retries - giving up")
                     await MainActor.run {
                         self.isLoading = false
                         self.isRefreshing = false
@@ -252,8 +227,7 @@ class StoreDataManager: ObservableObject {
                 }
                 return
             }
-            
-            print("❌ Backend fetch error: \(apiError.localizedDescription)")
+
             await MainActor.run {
                 // Only show error if this is not a refresh (initial load is more important)
                 if isInitialFetch {
@@ -264,13 +238,11 @@ class StoreDataManager: ObservableObject {
             }
         } catch is CancellationError {
             // Task was cancelled - this is normal, don't show error
-            print("⚠️ Task cancelled - ignoring")
             await MainActor.run {
                 self.isLoading = false
                 self.isRefreshing = false
             }
         } catch {
-            print("❌ Unexpected error fetching from backend: \(error.localizedDescription)")
             await MainActor.run {
                 if isInitialFetch {
                     self.error = error.localizedDescription
@@ -280,15 +252,13 @@ class StoreDataManager: ObservableObject {
             }
         }
     }
-    
+
     /// Refresh data from backend - for pull-to-refresh
     /// - Parameters:
     ///   - period: The period type (week/month/year)
     ///   - periodString: Optional specific period string like "January 2026" to refresh that exact period
     func refreshData(for period: PeriodType = .month, periodString: String? = nil) async {
-        print("🔄 refreshData called - period: \(period.rawValue), periodString: \(periodString ?? "nil")")
         await fetchFromBackend(for: period, periodString: periodString)
-        print("✅ refreshData completed")
     }
 
     // MARK: - Fetch Period Metadata (Lightweight)
@@ -303,11 +273,7 @@ class StoreDataManager: ObservableObject {
         }
 
         do {
-            print("📥 Fetching period metadata from /analytics/periods...")
-
             let response = try await AnalyticsAPIService.shared.getPeriods(periodType: .month, numPeriods: 52)
-
-            print("✅ Received \(response.periods.count) periods from backend")
 
             await MainActor.run {
                 self.periodMetadata = response.periods
@@ -326,14 +292,10 @@ class StoreDataManager: ObservableObject {
                 self.isLoadingPeriods = false
                 self.hasInitiallyFetched = true
                 self.lastFetchDate = Date()
-
-                print("✅ Period metadata loaded - \(response.totalPeriods) total periods")
             }
 
         } catch {
             // Endpoint not available yet - fall back to loading all historical data
-            print("⚠️ /analytics/periods endpoint not available, falling back to fetchAllHistoricalData()")
-            print("   Error: \(error.localizedDescription)")
 
             await MainActor.run {
                 self.isLoadingPeriods = false
@@ -354,7 +316,6 @@ class StoreDataManager: ObservableObject {
     func fetchPeriodDetails(_ periodString: String) async {
         // Skip if already loaded
         guard !loadedPeriods.contains(periodString) else {
-            print("⏭️ Period '\(periodString)' already loaded, skipping")
             return
         }
 
@@ -363,14 +324,11 @@ class StoreDataManager: ObservableObject {
         }
 
         do {
-            print("📥 Fetching store breakdowns for period: \(periodString)")
-
             // Parse the period string to get date range
             let (startDateStr, endDateStr) = parsePeriodToDates(periodString, periodType: .month)
 
             guard let startDate = DateFormatter.yyyyMMdd.date(from: startDateStr),
                   let endDate = DateFormatter.yyyyMMdd.date(from: endDateStr) else {
-                print("❌ Could not parse dates for \(periodString)")
                 await MainActor.run { isRefreshing = false }
                 return
             }
@@ -383,8 +341,6 @@ class StoreDataManager: ObservableObject {
 
             // Fetch summary to get store breakdowns
             let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
-
-            print("✅ Received \((summary.stores ?? []).count) stores for \(periodString)")
 
             // Convert to StoreBreakdowns
             let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: .month)
@@ -405,12 +361,9 @@ class StoreDataManager: ObservableObject {
                 }
 
                 self.isRefreshing = false
-
-                print("✅ Loaded \(breakdowns.count) store breakdowns for '\(periodString)'")
             }
 
         } catch {
-            print("❌ Failed to fetch period details for \(periodString): \(error.localizedDescription)")
             await MainActor.run {
                 isRefreshing = false
             }
@@ -433,19 +386,14 @@ class StoreDataManager: ObservableObject {
         }
 
         do {
-            print("📥 Fetching all historical data using trends endpoint...")
-
             // First, fetch trends to discover all periods with data (max 52 months = ~4 years)
             let trendsResponse = try await AnalyticsAPIService.shared.getTrends(
                 periodType: .month,
                 numPeriods: 52
             )
 
-            print("✅ Received \(trendsResponse.trends.count) periods from trends")
-
             // Filter to periods with actual spending
             let periodsWithData = trendsResponse.trends.filter { $0.totalSpend > 0 }
-            print("   Periods with data: \(periodsWithData.count)")
 
             if periodsWithData.isEmpty {
                 // No historical data, just set empty state
@@ -465,14 +413,9 @@ class StoreDataManager: ObservableObject {
             var latestHealthScore: Double?
 
             for trendPeriod in periodsWithData {
-                print("   📊 Fetching summary for \(trendPeriod.period)...")
-                print("      🔍 Trends API returned: periodStart='\(trendPeriod.periodStart)', periodEnd='\(trendPeriod.periodEnd)'")
-                print("      🔍 Trends API totalSpend: €\(trendPeriod.totalSpend)")
-
                 // Parse start and end dates from the trend period
                 guard let startDate = DateFormatter.yyyyMMdd.date(from: trendPeriod.periodStart),
                       let endDate = DateFormatter.yyyyMMdd.date(from: trendPeriod.periodEnd) else {
-                    print("   ⚠️ Could not parse dates for \(trendPeriod.period)")
                     continue
                 }
 
@@ -483,14 +426,8 @@ class StoreDataManager: ObservableObject {
                 filters.startDate = startDate
                 filters.endDate = endDate
 
-                // Log the actual dates being sent to the API
-                let startDateStr = DateFormatter.yyyyMMdd.string(from: startDate)
-                let endDateStr = DateFormatter.yyyyMMdd.string(from: endDate)
-                print("      📤 Sending to summary API: start_date='\(startDateStr)', end_date='\(endDateStr)'")
-
                 do {
                     let summary = try await AnalyticsAPIService.shared.getSummary(filters: filters)
-                    print("      📥 Summary API returned: totalSpend=€\(summary.totalSpend), transactionCount=\(summary.transactionCount ?? 0)")
 
                     // Convert to StoreBreakdowns
                     let breakdowns = await convertToStoreBreakdowns(summary: summary, periodType: .month)
@@ -508,7 +445,6 @@ class StoreDataManager: ObservableObject {
                     receiptFilters.endDate = endDate
                     receiptFilters.pageSize = 1  // We only need the total count
                     let receiptsResponse = try await AnalyticsAPIService.shared.getReceipts(filters: receiptFilters)
-                    print("      📊 Receipt count from /receipts endpoint: \(receiptsResponse.total)")
                     allPeriodReceiptCounts[periodKey] = receiptsResponse.total
 
                     // Store the health score from the most recent period (first one with data)
@@ -516,10 +452,8 @@ class StoreDataManager: ObservableObject {
                         latestHealthScore = summary.averageHealthScore
                     }
 
-                    print("   ✅ Added \(breakdowns.count) stores for \(periodKey), total: €\(summary.totalSpend), receipts: \(receiptsResponse.total)")
-
                 } catch {
-                    print("   ⚠️ Failed to fetch summary for \(trendPeriod.period): \(error.localizedDescription)")
+                    // Failed to fetch summary for period - continue with others
                 }
             }
 
@@ -542,24 +476,21 @@ class StoreDataManager: ObservableObject {
                 self.isLoading = false
                 self.hasInitiallyFetched = true
                 self.lastFetchDate = Date()
-                print("✅ Loaded \(allBreakdowns.count) total store breakdowns across \(periodsWithData.count) periods")
             }
 
         } catch let apiError as AnalyticsAPIError {
-            print("❌ Failed to fetch historical data: \(apiError.localizedDescription)")
             await MainActor.run {
                 self.error = apiError.localizedDescription
                 self.isLoading = false
             }
         } catch {
-            print("❌ Unexpected error fetching historical data: \(error.localizedDescription)")
             await MainActor.run {
                 self.error = error.localizedDescription
                 self.isLoading = false
             }
         }
     }
-    
+
     // MARK: - Convert API Response to StoreBreakdown
 
     /// Converts API summary response to StoreBreakdown models
@@ -591,9 +522,6 @@ class StoreDataManager: ObservableObject {
         }
 
         let stores = summary.stores ?? []
-        print("📅 Converting breakdowns - month/year: \(summary.month ?? 0)/\(summary.year ?? 0)")
-        print("📅 Generated period string: '\(periodString)'")
-        print("🚀 Fetching details for \(stores.count) stores in parallel...")
 
         let startTime = Date()
 
@@ -621,9 +549,6 @@ class StoreDataManager: ObservableObject {
 
             return results
         }
-
-        let elapsed = Date().timeIntervalSince(startTime)
-        print("✅ Parallel fetch completed in \(String(format: "%.2f", elapsed))s for \(breakdowns.count) stores")
 
         // Sort by total spend (descending) to maintain consistent ordering
         return breakdowns.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
@@ -672,8 +597,6 @@ class StoreDataManager: ObservableObject {
             )
 
         } catch {
-            print("⚠️ Failed to fetch details for \(apiStore.storeName): \(error.localizedDescription)")
-
             // Fallback: Create breakdown without category details
             return StoreBreakdown(
                 storeName: apiStore.storeName,
@@ -685,11 +608,10 @@ class StoreDataManager: ObservableObject {
             )
         }
     }
-    
+
     private func formatPeriod(from startDateStr: String, to endDateStr: String, period: PeriodType) -> String {
         guard let startDate = ISO8601DateFormatter().date(from: startDateStr) ??
                 DateFormatter.yyyyMMdd.date(from: startDateStr) else {
-            print("❌ formatPeriod: Could not parse date from '\(startDateStr)'")
             return "Unknown Period"
         }
 
@@ -698,10 +620,9 @@ class StoreDataManager: ObservableObject {
         dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
 
         let result = dateFormatter.string(from: startDate)
-        print("📅 formatPeriod: '\(startDateStr)' -> '\(result)'")
         return result
     }
-    
+
     // Regenerate breakdowns from transactions (for local data)
     func regenerateBreakdowns() {
         guard let transactionManager = transactionManager else { return }
@@ -711,42 +632,36 @@ class StoreDataManager: ObservableObject {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
-        
-        print("🔄 Regenerating breakdowns from \(transactions.count) transactions")
-        
+
         // Group by store and period
         var breakdownDict: [String: [Transaction]] = [:]
-        
+
         for transaction in transactions {
             let period = dateFormatter.string(from: transaction.date)
             let key = "\(transaction.storeName)-\(period)"
             breakdownDict[key, default: []].append(transaction)
         }
-        
-        print("   Found \(breakdownDict.count) store-period combinations")
-        
+
         // Convert to StoreBreakdown objects
         let localBreakdowns = breakdownDict.map { key, transactions -> StoreBreakdown in
             let components = key.split(separator: "-")
             let storeName = String(components[0])
             let period = components.dropFirst().joined(separator: "-")
-            
+
             // Group by category
             let categoryDict = Dictionary(grouping: transactions, by: { $0.category })
             let totalSpend = transactions.reduce(0) { $0 + $1.amount }
-            
+
             let categories = categoryDict.map { category, items in
                 let spent = items.reduce(0) { $0 + $1.amount }
                 let percentage = Int((spent / totalSpend) * 100)
                 return Category(name: category, spent: spent, percentage: percentage)
             }.sorted { $0.spent > $1.spent }
-            
+
             // Calculate visit count (unique dates)
             let uniqueDates = Set(transactions.map { calendar.startOfDay(for: $0.date) })
             let visitCount = uniqueDates.count
-            
-            print("   📊 Created breakdown: \(storeName) - \(period) (€\(totalSpend), \(categories.count) categories)")
-            
+
             return StoreBreakdown(
                 storeName: storeName,
                 period: period,
@@ -755,17 +670,16 @@ class StoreDataManager: ObservableObject {
                 visitCount: visitCount
             )
         }
-        
+
         // Update or add breakdowns
         // First, create a dictionary of existing breakdowns for fast lookup
         var existingBreakdownsDict = Dictionary(uniqueKeysWithValues: storeBreakdowns.map { ($0.id, $0) })
-        
+
         // Update or add local breakdowns
         for localBreakdown in localBreakdowns {
             existingBreakdownsDict[localBreakdown.id] = localBreakdown
-            print("   ✅ Updated/Added: \(localBreakdown.storeName) - \(localBreakdown.period)")
         }
-        
+
         // Convert back to array and sort by date (most recent first)
         storeBreakdowns = Array(existingBreakdownsDict.values).sorted { breakdown1, breakdown2 in
             // Extract date from period string for sorting
@@ -773,22 +687,20 @@ class StoreDataManager: ObservableObject {
             let date2 = dateFormatter.date(from: breakdown2.period) ?? Date.distantPast
             return date1 > date2
         }
-        
-        print("✅ Regenerated breakdowns - total: \(storeBreakdowns.count)")
     }
-    
+
     // Group breakdowns by period for overview
     func breakdownsByPeriod() -> [String: [StoreBreakdown]] {
         Dictionary(grouping: storeBreakdowns, by: { $0.period })
     }
-    
+
     // Calculate total spending per period
     func totalSpending(for period: String) -> Double {
         storeBreakdowns
             .filter { $0.period == period }
             .reduce(0) { $0 + $1.totalStoreSpend }
     }
-    
+
     // Delete a store breakdown - removes from local state only (for immediate UI feedback)
     func deleteBreakdownLocally(_ breakdown: StoreBreakdown) {
         storeBreakdowns.removeAll { $0.id == breakdown.id }
@@ -806,10 +718,6 @@ class StoreDataManager: ObservableObject {
             // Parse the period string (e.g., "January 2026") to get date range
             let (startDate, endDate) = parsePeriodToDates(breakdown.period, periodType: periodType)
 
-            print("🗑️ Deleting transactions for \(breakdown.storeName)")
-            print("   Period: \(periodType.rawValue)")
-            print("   Start: \(startDate), End: \(endDate)")
-
             // Call backend API
             let response = try await AnalyticsAPIService.shared.removeTransactions(
                 storeName: breakdown.storeName,
@@ -817,8 +725,6 @@ class StoreDataManager: ObservableObject {
                 startDate: startDate,
                 endDate: endDate
             )
-
-            print("✅ Deleted \(response.deletedCount) transactions")
 
             await MainActor.run {
                 // Remove from local state after successful API call
@@ -830,7 +736,6 @@ class StoreDataManager: ObservableObject {
             return true
 
         } catch let apiError as AnalyticsAPIError {
-            print("❌ Delete failed: \(apiError.localizedDescription)")
             await MainActor.run {
                 self.isDeleting = false
                 self.deleteError = apiError.localizedDescription
@@ -838,7 +743,6 @@ class StoreDataManager: ObservableObject {
             return false
 
         } catch {
-            print("❌ Unexpected delete error: \(error.localizedDescription)")
             await MainActor.run {
                 self.isDeleting = false
                 self.deleteError = error.localizedDescription
@@ -920,4 +824,3 @@ extension DateFormatter {
         return formatter
     }
 }
-

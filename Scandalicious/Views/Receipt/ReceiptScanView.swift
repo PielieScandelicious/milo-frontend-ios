@@ -175,31 +175,25 @@ struct ReceiptScanView: View {
             Text(rateLimitManager.receiptLimitMessage ?? "You've used all your receipt uploads for this month. Your limit will reset soon.")
         }
         .onAppear {
-            print("👁️ [ScanTab] onAppear - view appeared")
             // Initialize lastCheckedUploadTimestamp to current value to avoid retriggering old uploads
             initializeLastCheckedTimestamp()
             // Sync rate limit when view appears to ensure we have latest count
             Task {
-                print("🔄 [ScanTab] onAppear - syncing rate limit...")
                 await rateLimitManager.syncFromBackend()
-                print("✅ [ScanTab] onAppear - sync complete. Receipts: \(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit)")
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
             // Check for share extension uploads when app becomes active
             if newPhase == .active {
-                print("🔄 [ScanTab] scenePhase changed to active")
                 checkForShareExtensionUploads()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Early notification when app is about to enter foreground
-            print("🔄 [ScanTab] App will enter foreground")
             checkForShareExtensionUploads()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             // Backup: Also check when app becomes active via notification (more reliable)
-            print("🔄 [ScanTab] App became active (UIApplication notification)")
             checkForShareExtensionUploads()
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
@@ -1182,7 +1176,6 @@ struct ReceiptScanView: View {
                 }
             } catch {
                 // Fallback to old multi-request approach if new endpoint not available
-                print("New /analytics/all-time endpoint not available, falling back to legacy approach: \(error)")
                 await loadAllTimeStatsLegacy()
             }
         }
@@ -1219,7 +1212,7 @@ struct ReceiptScanView: View {
                 topStores = Array(sortedStores)
             }
         } catch {
-            print("Failed to load all-time stats (legacy): \(error)")
+            // Failed to load all-time stats
         }
     }
 
@@ -1227,15 +1220,12 @@ struct ReceiptScanView: View {
 
     private func processReceipt(image: UIImage) async {
         guard uploadState == .idle else {
-            print("Already processing, skipping")
             return
         }
 
         // Check image quality
         let qualityChecker = ReceiptQualityChecker()
         let qualityResult = await qualityChecker.checkQuality(of: image)
-
-        print("📊 Quality Check: Score \(String(format: "%.1f%%", qualityResult.qualityScore * 100))")
 
         guard qualityResult.isAcceptable else {
             await MainActor.run {
@@ -1269,19 +1259,6 @@ struct ReceiptScanView: View {
 
         do {
             let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
-
-            // Debug logging for duplicate detection
-            print("📬 Receipt upload response:")
-            print("   Status: \(response.status.rawValue)")
-            print("   Store: \(response.storeName ?? "N/A")")
-            print("   Items: \(response.itemsCount)")
-            print("   Is Duplicate: \(response.isDuplicate)")
-            if let score = response.duplicateScore {
-                print("   Duplicate Score: \(String(format: "%.1f%%", score * 100))")
-            }
-            if response.isDuplicate {
-                print("   ⚠️ DUPLICATE RECEIPT DETECTED - items not saved")
-            }
 
             await MainActor.run {
                 capturedImage = nil
@@ -1376,7 +1353,6 @@ struct ReceiptScanView: View {
             let persistedLastChecked = sharedDefaults.double(forKey: "lastCheckedUploadTimestamp")
             if persistedLastChecked > 0 {
                 lastCheckedUploadTimestamp = persistedLastChecked
-                print("📋 [ScanTab] Restored lastCheckedUploadTimestamp from storage: \(persistedLastChecked)")
             } else {
                 // Fall back to current upload timestamp to prevent detecting old uploads as new
                 let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
@@ -1384,7 +1360,6 @@ struct ReceiptScanView: View {
                     lastCheckedUploadTimestamp = existingTimestamp
                     // Also persist it so future checks use this value
                     sharedDefaults.set(existingTimestamp, forKey: "lastCheckedUploadTimestamp")
-                    print("📋 [ScanTab] Initialized lastCheckedUploadTimestamp to current upload timestamp: \(existingTimestamp)")
                 }
             }
         }
@@ -1392,26 +1367,16 @@ struct ReceiptScanView: View {
 
     /// Checks if the Share Extension uploaded a receipt while the app was in the background
     private func checkForShareExtensionUploads() {
-        print("🔍 [ScanTab] checkForShareExtensionUploads() called")
-
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            print("❌ [ScanTab] Could not access shared UserDefaults with App Group: \(appGroupIdentifier)")
             return
         }
-        print("✅ [ScanTab] Successfully accessed shared UserDefaults")
 
         // Check if there's a new upload timestamp
         let uploadTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-        print("🔍 [ScanTab] Checking for Share Extension uploads:")
-        print("   Timestamp from shared defaults: \(uploadTimestamp)")
-        print("   Last checked timestamp: \(lastCheckedUploadTimestamp)")
-        print("   Is new upload: \(uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0)")
 
         // If there's a new upload (timestamp is newer than last checked)
         if uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0 {
-            print("📬 [ScanTab] NEW Share Extension upload detected!")
-
             // Update last checked timestamp and persist it
             lastCheckedUploadTimestamp = uploadTimestamp
             sharedDefaults.set(uploadTimestamp, forKey: "lastCheckedUploadTimestamp")
@@ -1421,11 +1386,7 @@ struct ReceiptScanView: View {
 
             // Optimistically decrement the local rate limit counter
             // This is a workaround for the backend rate-limit API returning 403
-            print("📉 [ScanTab] Optimistically decrementing rate limit counter")
             rateLimitManager.decrementReceiptLocal()
-            print("✅ [ScanTab] Rate limit updated. Receipts: \(rateLimitManager.receiptsUsed)/\(rateLimitManager.receiptsLimit) used, \(rateLimitManager.receiptsRemaining) remaining")
-        } else {
-            print("ℹ️ [ScanTab] No new Share Extension upload detected")
         }
     }
 }

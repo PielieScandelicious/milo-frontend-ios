@@ -48,11 +48,6 @@ class ReceiptsViewModel: ObservableObject {
             filters.storeName = store
         }
 
-        // Log API call
-        let storeInfo = storeName ?? "all stores"
-        let dateRange = period == "All" ? "all time" : formatDateRange(start: filters.startDate, end: filters.endDate)
-        print("📥 GET /receipts - period: \(period), store: \(storeInfo), page: \(currentPage), dates: \(dateRange)")
-
         do {
             let response = try await apiService.fetchReceipts(filters: filters)
 
@@ -66,15 +61,12 @@ class ReceiptsViewModel: ObservableObject {
             hasMorePages = response.page < response.totalPages
             state = .success(receipts)
 
-            print("✅ GET /receipts - returned \(response.receipts.count) receipts (total: \(response.total), page \(response.page)/\(response.totalPages))")
-
             // Auto-load remaining pages to show all receipts at initial load
             if reset && hasMorePages {
                 await loadAllRemainingPages(period: period, storeName: storeName)
             }
 
         } catch {
-            print("❌ GET /receipts - error: \(error.localizedDescription)")
             state = .error(error.localizedDescription)
         }
     }
@@ -85,43 +77,33 @@ class ReceiptsViewModel: ObservableObject {
             currentPage += 1
             filters.page = currentPage
 
-            print("📄 Auto-loading page \(currentPage) of \(totalPages)")
-
             do {
                 let response = try await apiService.fetchReceipts(filters: filters)
                 receipts.append(contentsOf: response.receipts)
                 hasMorePages = response.page < response.totalPages
                 state = .success(receipts)
-
-                print("✅ Page \(currentPage) loaded - total receipts: \(receipts.count)")
             } catch {
-                print("❌ Failed to load page \(currentPage): \(error.localizedDescription)")
                 break
             }
         }
 
         hasMorePages = false
-        print("📋 All \(receipts.count) receipts loaded")
     }
 
     /// Load next page of receipts
     func loadNextPage(period: String, storeName: String? = nil) async {
         guard hasMorePages else { return }
         currentPage += 1
-        print("📄 Loading next page of receipts (page \(currentPage))")
         await loadReceipts(period: period, storeName: storeName, reset: false)
     }
 
     /// Refresh receipts
     func refresh(period: String, storeName: String? = nil) async {
-        print("🔄 Refreshing receipts for \(period)")
         await loadReceipts(period: period, storeName: storeName, reset: true)
     }
 
     /// Delete a receipt by ID and update the list
     func deleteReceipt(_ receipt: APIReceipt, period: String, storeName: String?) async throws {
-        print("🗑️ DELETE /receipts/\(receipt.receiptId) - store: \(receipt.storeName ?? "unknown")")
-
         // Delete from server
         try await apiService.removeReceipt(receiptId: receipt.receiptId)
 
@@ -130,22 +112,12 @@ class ReceiptsViewModel: ObservableObject {
         receipts.removeAll { $0.receiptId == receipt.receiptId }
         state = .success(receipts)
 
-        print("✅ Receipt deleted, remaining: \(receipts.count)")
-
         // Notify other views to refresh their data
         NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
     }
 
     /// Delete a specific line item from a receipt
     func deleteReceiptItem(receiptId: String, itemId: String) async throws {
-        print("🗑️ DELETE /receipts/\(receiptId)/items/\(itemId)")
-
-        // Find the receipt and item for logging
-        if let receipt = receipts.first(where: { $0.receiptId == receiptId }),
-           let item = receipt.transactions.first(where: { $0.itemId == itemId }) {
-            print("  → Deleting item: \(item.itemName) (€\(String(format: "%.2f", item.itemPrice)))")
-        }
-
         // Delete from server
         let response = try await apiService.removeReceiptItem(receiptId: receiptId, itemId: itemId)
 
@@ -158,7 +130,6 @@ class ReceiptsViewModel: ObservableObject {
             // Check if backend indicates the receipt was deleted (last item removed)
             if response.receiptDeleted == true {
                 receipts.remove(at: receiptIndex)
-                print("✅ Receipt removed by backend (no items remaining)")
             } else {
                 // Remove the item from the receipt's transactions
                 let updatedTransactions = receipt.transactions.filter { $0.itemId != itemId }
@@ -177,10 +148,8 @@ class ReceiptsViewModel: ObservableObject {
                 // If no items left locally, remove the receipt
                 if updatedTransactions.isEmpty {
                     receipts.remove(at: receiptIndex)
-                    print("✅ Receipt removed (no items remaining)")
                 } else {
                     receipts[receiptIndex] = updatedReceipt
-                    print("✅ Item deleted, remaining items in receipt: \(updatedTransactions.count)")
                 }
             }
 
@@ -237,7 +206,6 @@ class ReceiptsViewModel: ObservableObject {
         dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
 
         guard let date = dateFormatter.date(from: period) else {
-            print("⚠️ Failed to parse period '\(period)' - expected format 'MMMM yyyy' or 'yyyy'")
             return (nil, nil)
         }
 

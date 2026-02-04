@@ -229,7 +229,6 @@ class ExpenseSplitViewModel: ObservableObject {
         do {
             recentFriends = try await ExpenseSplitAPIService.shared.getRecentFriends()
         } catch {
-            print("Failed to load recent friends: \(error)")
             // Non-critical, don't show error to user
         }
     }

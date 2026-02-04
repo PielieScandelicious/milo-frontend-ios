@@ -68,15 +68,12 @@ actor BankingAPIService {
 
     /// Get list of available banks for a country
     func fetchBanks(country: String) async throws -> BankListResponse {
-        print("🏦 [Banking] Fetching banks for country: \(country)")
-
         let response: BankListResponse = try await performRequest(
             endpoint: "/banks",
             method: "GET",
             queryItems: [URLQueryItem(name: "country", value: country)]
         )
 
-        print("🏦 [Banking] ✅ Found \(response.banks.count) banks")
         return response
     }
 
@@ -84,8 +81,6 @@ actor BankingAPIService {
 
     /// Start OAuth flow for bank connection
     func createConnection(bankName: String, country: String) async throws -> BankConnectionAuthResponse {
-        print("🏦 [Banking] Creating connection for bank: \(bankName)")
-
         let request = BankConnectionCreate(bankName: bankName, country: country)
 
         let response: BankConnectionAuthResponse = try await performRequestWithBody(
@@ -94,62 +89,48 @@ actor BankingAPIService {
             body: request
         )
 
-        print("🏦 [Banking] ✅ Connection created, redirect URL: \(response.redirectUrl)")
         return response
     }
 
     /// Get all bank connections for user
     func fetchConnections() async throws -> [BankConnectionResponse] {
-        print("🏦 [Banking] Fetching connections...")
-
         let response: BankConnectionListResponse = try await performRequest(
             endpoint: "/bank-connections",
             method: "GET"
         )
 
-        print("🏦 [Banking] ✅ Found \(response.connections.count) connections")
         return response.connections
     }
 
     /// Delete a bank connection
     func deleteConnection(connectionId: String) async throws {
-        print("🏦 [Banking] Deleting connection: \(connectionId)")
-
         let _: EmptyResponse = try await performRequest(
             endpoint: "/bank-connections/\(connectionId)",
             method: "DELETE"
         )
-
-        print("🏦 [Banking] ✅ Connection deleted")
     }
 
     // MARK: - Bank Accounts Endpoints
 
     /// Get all bank accounts
     func fetchAccounts() async throws -> [BankAccountResponse] {
-        print("🏦 [Banking] Fetching accounts...")
-
         let response: BankAccountListResponse = try await performRequest(
             endpoint: "/bank-accounts",
             method: "GET"
         )
 
-        print("🏦 [Banking] ✅ Found \(response.accounts.count) accounts")
         return response.accounts
     }
 
     /// Sync transactions for an account
     /// Note: Uses longer timeout (120s) as sync involves external bank API calls
     func syncAccount(accountId: String) async throws -> BankAccountSyncResponse {
-        print("🏦 [Banking] Syncing account: \(accountId)")
-
         let response: BankAccountSyncResponse = try await performRequest(
             endpoint: "/bank-accounts/\(accountId)/sync",
             method: "POST",
             timeout: 120  // Extended timeout for bank API calls
         )
 
-        print("🏦 [Banking] ✅ Synced \(response.transactionsFetched) transactions, \(response.newTransactions) new")
         return response
     }
 
@@ -157,8 +138,6 @@ actor BankingAPIService {
 
     /// Get pending transactions for review
     func fetchPendingTransactions(page: Int = 1, pageSize: Int = 50) async throws -> BankTransactionListResponse {
-        print("🏦 [Banking] Fetching pending transactions (page \(page))...")
-
         let response: BankTransactionListResponse = try await performRequest(
             endpoint: "/bank-transactions",
             method: "GET",
@@ -169,35 +148,27 @@ actor BankingAPIService {
             ]
         )
 
-        print("🏦 [Banking] ✅ Found \(response.transactions.count) pending transactions (page \(page)/\(response.totalPages))")
         return response
     }
 
     /// Import selected transactions
     func importTransactions(request: TransactionImportRequest) async throws -> TransactionImportResponse {
-        print("🏦 [Banking] Importing \(request.transactions.count) transactions...")
-
         let response: TransactionImportResponse = try await performRequestWithBody(
             endpoint: "/bank-transactions/import",
             method: "POST",
             body: request
         )
 
-        print("🏦 [Banking] ✅ Imported \(response.importedCount), failed \(response.failedCount)")
         return response
     }
 
     /// Mark transactions as ignored
     func ignoreTransactions(request: TransactionIgnoreRequest) async throws {
-        print("🏦 [Banking] Ignoring \(request.transactionIds.count) transactions...")
-
         let _: EmptyResponse = try await performRequestWithBody(
             endpoint: "/bank-transactions/ignore",
             method: "POST",
             body: request
         )
-
-        print("🏦 [Banking] ✅ Transactions ignored")
     }
 
     // MARK: - Helper Methods
@@ -220,8 +191,6 @@ actor BankingAPIService {
             throw BankingAPIError.invalidURL
         }
 
-        print("📡 Banking API Request: \(method) \(url.absoluteString)")
-
         let token = try await getAuthToken()
 
         var request = URLRequest(url: url)
@@ -236,8 +205,6 @@ actor BankingAPIService {
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw BankingAPIError.invalidResponse
             }
-
-            print("📥 Banking response: HTTP \(httpResponse.statusCode)")
 
             switch httpResponse.statusCode {
             case 200...299:
@@ -289,8 +256,6 @@ actor BankingAPIService {
             throw BankingAPIError.invalidURL
         }
 
-        print("📡 Banking API Request: \(method) \(url.absoluteString)")
-
         let token = try await getAuthToken()
 
         var request = URLRequest(url: url)
@@ -307,8 +272,6 @@ actor BankingAPIService {
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw BankingAPIError.invalidResponse
             }
-
-            print("📥 Banking response: HTTP \(httpResponse.statusCode)")
 
             switch httpResponse.statusCode {
             case 200...299:
@@ -372,28 +335,7 @@ actor BankingAPIService {
     }
 
     private func logDecodingError(_ error: DecodingError, data: Data, endpoint: String) {
-        print("❌ Banking decoding error for endpoint: \(endpoint)")
-
-        if let jsonString = String(data: data, encoding: .utf8) {
-            print("📄 Raw server response:\n\(jsonString)")
-        }
-
-        switch error {
-        case .keyNotFound(let key, let context):
-            print("🔑 Missing key '\(key.stringValue)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-        case .typeMismatch(let type, let context):
-            print("⚠️ Type mismatch for type '\(type)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-        case .valueNotFound(let type, let context):
-            print("❓ Value not found for type '\(type)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-        case .dataCorrupted(let context):
-            print("💥 Data corrupted")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-        @unknown default:
-            print("❓ Unknown decoding error")
-        }
+        // Decoding error logging removed for production
     }
 }
 

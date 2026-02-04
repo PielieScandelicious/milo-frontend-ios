@@ -325,11 +325,6 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                                     }
                                 )
                                 .opacity(isDeleting ? 0.5 : 1.0)
-                                .onAppear {
-                                    if index == 0 {
-                                        print("🔍 Line item delete check - itemId: \(itemId ?? "nil"), canDelete: \(canDelete), onDeleteItem: \(onDeleteItem != nil ? "✅" : "❌")")
-                                    }
-                                }
                                 .transition(.asymmetric(
                                     insertion: .opacity,
                                     removal: .move(edge: .leading).combined(with: .opacity)

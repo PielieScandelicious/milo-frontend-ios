@@ -96,14 +96,10 @@ struct ScandaLiciousApp: App {
 
     private func handleBankingDeepLink(_ url: URL) {
         guard let host = url.host else {
-            print("🏦 [DeepLink] No host in URL: \(url)")
             return
         }
 
-        print("🏦 [DeepLink] Handling banking deep link: \(url)")
-
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            print("🏦 [DeepLink] Failed to parse URL components")
             return
         }
 
@@ -114,7 +110,7 @@ struct ScandaLiciousApp: App {
         case "banking":
             handleBankingPath(path: path, queryItems: queryItems)
         default:
-            print("🏦 [DeepLink] Unknown host: \(host)")
+            break
         }
     }
 
@@ -125,8 +121,6 @@ struct ScandaLiciousApp: App {
             let connectionId = queryItems.first { $0.name == "connection_id" }?.value
             let status = queryItems.first { $0.name == "status" }?.value
             let accountsCount = Int(queryItems.first { $0.name == "accounts" }?.value ?? "0") ?? 0
-
-            print("🏦 [DeepLink] Callback received - connection: \(connectionId ?? "nil"), status: \(status ?? "nil"), accounts: \(accountsCount)")
 
             let result = BankingCallbackResult(
                 connectionId: connectionId,
@@ -146,8 +140,6 @@ struct ScandaLiciousApp: App {
             let error = queryItems.first { $0.name == "error" }?.value ?? "unknown_error"
             let message = queryItems.first { $0.name == "message" }?.value?.removingPercentEncoding
 
-            print("🏦 [DeepLink] Error received - error: \(error), message: \(message ?? "nil")")
-
             let callbackStatus: BankingCallbackResult.CallbackStatus = error == "user_cancelled" ? .cancelled : .error
 
             let result = BankingCallbackResult(
@@ -164,7 +156,7 @@ struct ScandaLiciousApp: App {
             )
 
         default:
-            print("🏦 [DeepLink] Unknown banking path: \(path)")
+            break
         }
     }
 
@@ -195,7 +187,6 @@ struct ScandaLiciousApp: App {
             // Schedule background refresh when app goes to background
             if authManager.isAuthenticated {
                 backgroundSyncManager.scheduleBackgroundRefresh()
-                print("🔄 [App] Scheduled background sync on entering background")
             }
 
         case .inactive:
@@ -210,20 +201,12 @@ struct ScandaLiciousApp: App {
     private func performAutoSync() async {
         // Skip if we've already done initial sync this session and it's been less than 5 minutes
         if hasPerformedInitialSync && !backgroundSyncManager.shouldRefresh {
-            print("🔄 [App] Skipping auto-sync (recently synced)")
             return
         }
 
-        print("🔄 [App] Performing auto-sync...")
         let result = await backgroundSyncManager.performForegroundSync()
 
         hasPerformedInitialSync = true
-
-        if result.success {
-            print("🔄 [App] Auto-sync complete: \(result.newTransactions) new, \(result.totalPending) pending")
-        } else if let error = result.error {
-            print("🔄 [App] Auto-sync failed: \(error)")
-        }
     }
 }
 
@@ -250,7 +233,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             _ = await BackgroundSyncManager.shared.requestNotificationPermissions()
         }
 
-        print("🚀 [App] AppDelegate initialized with background sync support")
         return true
     }
 
@@ -295,4 +277,3 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         completionHandler()
     }
 }
-

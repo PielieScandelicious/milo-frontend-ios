@@ -247,7 +247,7 @@ struct BarcodeCameraView: View {
             flashOn.toggle()
             device.unlockForConfiguration()
         } catch {
-            print("Flash toggle failed: \(error)")
+            // Flash toggle failed
         }
     }
 

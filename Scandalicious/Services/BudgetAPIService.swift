@@ -115,8 +115,6 @@ actor BudgetAPIService {
 
     /// Get AI-powered budget suggestion with personalized insights
     func fetchAISuggestion(basedOnMonths: Int = 3) async throws -> AIBudgetSuggestionResponse {
-        print("🤖 [Milo] Fetching AI suggestion for \(basedOnMonths) months...")
-
         let queryItems = [
             URLQueryItem(name: "months", value: String(basedOnMonths))
         ]
@@ -127,64 +125,32 @@ actor BudgetAPIService {
             queryItems: queryItems
         )
 
-        // Log AI response details
-        print("🤖 [Milo] ✅ AI Suggestion received:")
-        print("   📅 Based on Months: \(response.basedOnMonths) (Data Collection Phase: \(response.dataCollectionPhase.title))")
-        print("   💵 Total Spend Analyzed: €\(response.totalSpendAnalyzed)")
-        print("   📊 Recommended Budget: €\(response.recommendedBudget.amount) (confidence: \(response.recommendedBudget.confidence))")
-        print("   📈 Health Score: \(response.budgetHealthScore)/100")
-        print("   📦 Category Allocations (\(response.categoryAllocations.count) categories):")
-        for allocation in response.categoryAllocations {
-            print("      - \(allocation.category): €\(allocation.suggestedAmount) (\(allocation.percentage)%) - Savings potential: \(allocation.savingsPotential)")
-        }
-        print("   💡 Tips: \(response.personalizedTips.count) personalized tips")
-        print("   💰 Savings Opportunities: \(response.savingsOpportunities.count)")
-        print("   📝 Summary: \(response.summary)")
-
         return response
     }
 
     /// Get weekly AI check-in with budget progress analysis
     func fetchAICheckIn() async throws -> AICheckInResponse {
-        print("🤖 [Milo] Fetching AI check-in...")
-
         let response: AICheckInResponse = try await performRequest(
             endpoint: "/budgets/ai-check-in",
             method: "GET"
         )
-
-        print("🤖 [Milo] ✅ AI Check-in received:")
-        print("   👋 Greeting: \(response.greeting)")
-        print("   📊 Status: \(response.statusSummary.headline)")
-        print("   💵 Daily Budget Remaining: €\(response.dailyBudgetRemaining)")
 
         return response
     }
 
     /// Analyze a receipt for budget impact
     func fetchAIReceiptAnalysis(receiptId: String) async throws -> AIReceiptAnalysisResponse {
-        print("🤖 [Milo] Analyzing receipt \(receiptId) for budget impact...")
-
         let response: AIReceiptAnalysisResponse = try await performRequestWithBody(
             endpoint: "/budgets/ai-analyze-receipt",
             method: "POST",
             body: ["receipt_id": receiptId]
         )
 
-        print("🤖 [Milo] ✅ Receipt analysis received:")
-        print("   \(response.emoji) Status: \(response.status)")
-        print("   📝 Summary: \(response.impactSummary)")
-        if let tip = response.quickTip {
-            print("   💡 Quick Tip: \(tip)")
-        }
-
         return response
     }
 
     /// Get AI-generated monthly budget report
     func fetchAIMonthlyReport(month: String) async throws -> AIMonthlyReportResponse {
-        print("🤖 [Milo] Fetching AI monthly report for \(month)...")
-
         let queryItems = [
             URLQueryItem(name: "month", value: month)
         ]
@@ -195,12 +161,6 @@ actor BudgetAPIService {
             queryItems: queryItems
         )
 
-        print("🤖 [Milo] ✅ Monthly report received:")
-        print("   📊 Grade: \(response.grade) (Score: \(response.score))")
-        print("   📝 Headline: \(response.headline)")
-        print("   ✅ Wins: \(response.wins.count)")
-        print("   ⚠️ Challenges: \(response.challenges.count)")
-
         return response
     }
 
@@ -208,27 +168,20 @@ actor BudgetAPIService {
 
     /// Get budget history for all past months
     func fetchBudgetHistory() async throws -> BudgetHistoryResponse {
-        print("📚 [Budget] Fetching budget history...")
-
         let response: BudgetHistoryResponse = try await performRequest(
             endpoint: "/budgets/history",
             method: "GET"
         )
 
-        print("📚 [Budget] ✅ Budget history received: \(response.budgetHistory.count) entries")
         return response
     }
 
     /// Check if a budget should be auto-created for the current month based on smart budget settings
     func checkAutoRollover() async throws {
-        print("🔄 [Budget] Checking for smart budget auto-rollover...")
-
         let _: EmptyResponse = try await performRequest(
             endpoint: "/budgets/auto-rollover",
             method: "POST"
         )
-
-        print("🔄 [Budget] ✅ Auto-rollover check completed")
     }
 
     // MARK: - Helper Methods
@@ -251,8 +204,6 @@ actor BudgetAPIService {
             throw BudgetAPIError.invalidURL
         }
 
-        print("📡 Budget API Request: \(method) \(url.absoluteString)")
-
         // Get auth token
         let token = try await getAuthToken()
 
@@ -270,8 +221,6 @@ actor BudgetAPIService {
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw BudgetAPIError.invalidResponse
             }
-
-            print("📥 Budget response: HTTP \(httpResponse.statusCode)")
 
             switch httpResponse.statusCode {
             case 200...299:
@@ -322,8 +271,6 @@ actor BudgetAPIService {
             throw BudgetAPIError.invalidURL
         }
 
-        print("📡 Budget API Request: \(method) \(url.absoluteString)")
-
         let token = try await getAuthToken()
 
         var request = URLRequest(url: url)
@@ -340,8 +287,6 @@ actor BudgetAPIService {
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw BudgetAPIError.invalidResponse
             }
-
-            print("📥 Budget response: HTTP \(httpResponse.statusCode)")
 
             switch httpResponse.statusCode {
             case 200...299:
@@ -399,32 +344,7 @@ actor BudgetAPIService {
     }
 
     private func logDecodingError(_ error: DecodingError, data: Data, endpoint: String) {
-        print("❌ Budget decoding error for endpoint: \(endpoint)")
-
-        if let jsonString = String(data: data, encoding: .utf8) {
-            print("📄 Raw server response:\n\(jsonString)")
-        }
-
-        switch error {
-        case .keyNotFound(let key, let context):
-            print("🔑 Missing key '\(key.stringValue)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-
-        case .typeMismatch(let type, let context):
-            print("⚠️ Type mismatch for type '\(type)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-
-        case .valueNotFound(let type, let context):
-            print("❓ Value not found for type '\(type)'")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-
-        case .dataCorrupted(let context):
-            print("💥 Data corrupted")
-            print("📍 Path: \(context.codingPath.map { $0.stringValue }.joined(separator: " -> "))")
-
-        @unknown default:
-            print("❔ Unknown decoding error")
-        }
+        // Decoding error logging disabled for production
     }
 }
 

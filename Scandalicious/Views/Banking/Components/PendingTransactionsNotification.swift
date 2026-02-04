@@ -165,8 +165,8 @@ extension View {
 
             PendingTransactionsNotification(
                 transactionCount: 5,
-                onReviewTapped: { print("Review tapped") },
-                onDismiss: { print("Dismissed") }
+                onReviewTapped: { },
+                onDismiss: { }
             )
             .padding(.bottom, 100)
         }
@@ -183,8 +183,8 @@ extension View {
 
             PendingTransactionsNotification(
                 transactionCount: 1,
-                onReviewTapped: { print("Review tapped") },
-                onDismiss: { print("Dismissed") }
+                onReviewTapped: { },
+                onDismiss: { }
             )
             .padding(.bottom, 100)
         }

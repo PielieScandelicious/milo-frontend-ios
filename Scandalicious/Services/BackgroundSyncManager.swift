@@ -80,8 +80,6 @@ final class BackgroundSyncManager: @unchecked Sendable {
                 await self.handleBackgroundRefresh(task: refreshTask)
             }
         }
-
-        print("🔄 [BackgroundSync] Registered background task: \(Self.backgroundRefreshTaskId)")
     }
 
     /// Schedule the next background refresh
@@ -91,16 +89,14 @@ final class BackgroundSyncManager: @unchecked Sendable {
 
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("🔄 [BackgroundSync] Scheduled background refresh for ~\(Int(minimumBackgroundInterval/60)) minutes from now")
         } catch {
-            print("🔄 [BackgroundSync] Failed to schedule background refresh: \(error)")
+            // Background refresh scheduling failed
         }
     }
 
     /// Cancel any pending background refresh tasks
     func cancelBackgroundRefresh() {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.backgroundRefreshTaskId)
-        print("🔄 [BackgroundSync] Cancelled background refresh")
     }
 
     // MARK: - Notification Permissions
@@ -109,10 +105,8 @@ final class BackgroundSyncManager: @unchecked Sendable {
     func requestNotificationPermissions() async -> Bool {
         do {
             let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
-            print("🔔 [BackgroundSync] Notification permission: \(granted ? "granted" : "denied")")
             return granted
         } catch {
-            print("🔔 [BackgroundSync] Notification permission error: \(error)")
             return false
         }
     }
@@ -136,18 +130,14 @@ final class BackgroundSyncManager: @unchecked Sendable {
         }
 
         guard shouldProceed else {
-            print("🔄 [BackgroundSync] Sync already in progress, skipping")
             return SyncResult(newTransactions: 0, totalPending: 0, success: false, error: "Sync already in progress")
         }
 
         // Check if user is authenticated
         guard Auth.auth().currentUser != nil else {
             stateQueue.sync { _isSyncing = false }
-            print("🔄 [BackgroundSync] User not authenticated, skipping sync")
             return SyncResult(newTransactions: 0, totalPending: 0, success: false, error: "Not authenticated")
         }
-
-        print("🔄 [BackgroundSync] Starting foreground sync...")
 
         let result = await performSync(isBackground: false)
 
@@ -162,7 +152,6 @@ final class BackgroundSyncManager: @unchecked Sendable {
         // Post notification for UI updates on main thread
         // Show notification when there are pending transactions (even if not "new" from this sync)
         if result.success && result.totalPending > 0 {
-            print("🔄 [BackgroundSync] Posting notification for \(result.newTransactions) new, \(result.totalPending) pending")
             await MainActor.run {
                 NotificationCenter.default.post(
                     name: .bankTransactionsPendingReview,
@@ -180,20 +169,16 @@ final class BackgroundSyncManager: @unchecked Sendable {
 
     /// Handle background refresh task
     private func handleBackgroundRefresh(task: BGAppRefreshTask) async {
-        print("🔄 [BackgroundSync] Background refresh triggered")
-
         // Schedule the next refresh
         scheduleBackgroundRefresh()
 
         // Set expiration handler
         task.expirationHandler = { [weak self] in
-            print("🔄 [BackgroundSync] Background task expired")
             self?.stateQueue.sync { self?._isSyncing = false }
         }
 
         // Check if user is authenticated
         guard Auth.auth().currentUser != nil else {
-            print("🔄 [BackgroundSync] User not authenticated, completing task")
             task.setTaskCompleted(success: false)
             return
         }
@@ -214,7 +199,6 @@ final class BackgroundSyncManager: @unchecked Sendable {
         }
 
         task.setTaskCompleted(success: result.success)
-        print("🔄 [BackgroundSync] Background task completed: \(result.success)")
     }
 
     /// Core sync logic - fetches and syncs all accounts
@@ -224,7 +208,6 @@ final class BackgroundSyncManager: @unchecked Sendable {
             let accounts = try await apiService.getAccounts()
 
             if accounts.isEmpty {
-                print("🔄 [BackgroundSync] No accounts to sync")
                 return SyncResult(newTransactions: 0, totalPending: 0, success: true, error: nil)
             }
 
@@ -237,12 +220,10 @@ final class BackgroundSyncManager: @unchecked Sendable {
                     let syncResult = try await apiService.syncAccountTransactions(accountId: account.id)
                     totalNew += syncResult.newTransactions
                     syncedAccounts += 1
-                    print("🔄 [BackgroundSync] Synced account \(account.displayName): \(syncResult.newTransactions) new")
                 } catch BankingAPIError.connectionExpired {
                     // Skip expired connections silently
-                    print("🔄 [BackgroundSync] Skipping expired connection for account: \(account.displayName)")
                 } catch {
-                    print("🔄 [BackgroundSync] Error syncing account \(account.id): \(error)")
+                    // Error syncing account - continue with next
                 }
             }
 
@@ -257,8 +238,6 @@ final class BackgroundSyncManager: @unchecked Sendable {
             // Calculate truly new transactions (for notification purposes)
             let newForNotification = max(0, totalPending - previousPending)
 
-            print("🔄 [BackgroundSync] Sync complete: \(syncedAccounts) accounts, \(totalNew) new transactions, \(totalPending) pending")
-
             return SyncResult(
                 newTransactions: isBackground ? newForNotification : totalNew,
                 totalPending: totalPending,
@@ -267,7 +246,6 @@ final class BackgroundSyncManager: @unchecked Sendable {
             )
 
         } catch {
-            print("🔄 [BackgroundSync] Sync failed: \(error)")
             return SyncResult(newTransactions: 0, totalPending: 0, success: false, error: error.localizedDescription)
         }
     }
@@ -306,9 +284,8 @@ final class BackgroundSyncManager: @unchecked Sendable {
 
         do {
             try await UNUserNotificationCenter.current().add(request)
-            print("🔔 [BackgroundSync] Notification scheduled for \(count) new transactions")
         } catch {
-            print("🔔 [BackgroundSync] Failed to schedule notification: \(error)")
+            // Failed to schedule notification
         }
     }
 
@@ -334,7 +311,6 @@ final class BackgroundSyncManager: @unchecked Sendable {
         )
 
         UNUserNotificationCenter.current().setNotificationCategories([category])
-        print("🔔 [BackgroundSync] Notification categories configured")
     }
 
     /// Clear badge count
