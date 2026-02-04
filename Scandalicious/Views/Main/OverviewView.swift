@@ -87,6 +87,7 @@ struct OverviewView: View {
     @State private var allTimeTotalSpend: Double = 0 // Cached all-time total spend from backend
     @State private var allTimeTotalReceipts: Int = 0 // Cached all-time receipt count from backend
     @State private var allTimeHealthScore: Double? = nil // Cached all-time health score from backend
+    @State private var allTimeCategories: [AggregateCategory] = [] // Cached all-time category breakdown from backend
     @State private var isLoadingAllTimeData = false // Track if fetching all-time data for first time
     // Year period data
     @State private var yearSummaryCache: [String: YearSummaryResponse] = [:] // Cache year summaries by year string
@@ -807,6 +808,7 @@ struct OverviewView: View {
             var filters = AggregateFilters()
             filters.allTime = true
             filters.topStoresLimit = 20  // Get more stores for the pie chart
+            filters.topCategoriesLimit = 20  // Get more categories for the flip view
 
             let aggregate = try await AnalyticsAPIService.shared.getAggregate(filters: filters)
             let stores = aggregate.topStores
@@ -828,6 +830,7 @@ struct OverviewView: View {
                 allTimeTotalSpend = aggregate.totals.totalSpend
                 allTimeTotalReceipts = aggregate.totals.totalReceipts
                 allTimeHealthScore = aggregate.averages.averageHealthScore
+                allTimeCategories = aggregate.topCategories // Cache categories for flip animation
 
                 // Cache the all-time breakdowns
                 cachedBreakdownsByPeriod[Self.allPeriodIdentifier] = breakdowns
@@ -898,7 +901,46 @@ struct OverviewView: View {
 
     /// Get cached category data for a period, or empty array if not loaded
     private func categoryDataForPeriod(_ period: String) -> [CategorySpendItem] {
-        pieChartSummaryCache[period]?.categories ?? []
+        // Month periods: use pieChartSummaryCache
+        if !isAllPeriod(period) && !isYearPeriod(period) {
+            return pieChartSummaryCache[period]?.categories ?? []
+        }
+
+        // Year periods: convert from YearSummaryResponse topCategories
+        if isYearPeriod(period), let yearSummary = yearSummaryCache[period], let categories = yearSummary.topCategories {
+            return categories.map { category in
+                // Convert CategoryBreakdown to CategorySpendItem
+                let analyticsCategory = category.analyticsCategory
+                return CategorySpendItem(
+                    categoryId: analyticsCategory?.rawValue ?? "OTHER",
+                    name: category.name,
+                    totalSpent: category.spent,
+                    colorHex: category.name.categoryColorHex,
+                    percentage: category.percentage,
+                    transactionCount: category.transactionCount,
+                    averageHealthScore: category.averageHealthScore
+                )
+            }
+        }
+
+        // All-time period: convert from AggregateCategory
+        if isAllPeriod(period) {
+            return allTimeCategories.map { category in
+                // Convert AggregateCategory to CategorySpendItem
+                let analyticsCategory = AnalyticsCategory.allCases.first { $0.displayName == category.name }
+                return CategorySpendItem(
+                    categoryId: analyticsCategory?.rawValue ?? "OTHER",
+                    name: category.name,
+                    totalSpent: category.totalSpent,
+                    colorHex: category.name.categoryColorHex,
+                    percentage: category.percentage,
+                    transactionCount: category.transactionCount,
+                    averageHealthScore: category.averageHealthScore
+                )
+            }
+        }
+
+        return []
     }
 
     /// Get average item price for a period
@@ -936,8 +978,8 @@ struct OverviewView: View {
         }
 
         do {
-            // First try the dedicated year endpoint
-            let yearSummary = try await AnalyticsAPIService.shared.getYearSummary(year: yearInt)
+            // First try the dedicated year endpoint (request more categories for flip view)
+            let yearSummary = try await AnalyticsAPIService.shared.getYearSummary(year: yearInt, topCategoriesLimit: 20)
 
             // Convert to StoreBreakdown array for consistent handling
             let breakdowns: [StoreBreakdown] = yearSummary.stores.map { store in
@@ -1004,6 +1046,7 @@ struct OverviewView: View {
             filters.startDate = startDate
             filters.endDate = endDate
             filters.topStoresLimit = 20
+            filters.topCategoriesLimit = 20  // Get more categories for the flip view
 
             let aggregate = try await AnalyticsAPIService.shared.getAggregate(filters: filters)
             let aggregateStores = aggregate.topStores
@@ -1020,6 +1063,17 @@ struct OverviewView: View {
                 )
             }
 
+            // Convert AggregateCategory to CategoryBreakdown for consistency
+            let categories: [CategoryBreakdown] = aggregate.topCategories.map { category in
+                CategoryBreakdown(
+                    name: category.name,
+                    spent: category.totalSpent,
+                    percentage: category.percentage,
+                    transactionCount: category.transactionCount,
+                    averageHealthScore: category.averageHealthScore
+                )
+            }
+
             let yearSummary = YearSummaryResponse(
                 year: yearInt,
                 startDate: DateFormatter.yyyyMMdd.string(from: startDate),
@@ -1031,7 +1085,7 @@ struct OverviewView: View {
                 averageHealthScore: aggregate.averages.averageHealthScore,
                 stores: stores,
                 monthlyBreakdown: nil,
-                topCategories: nil
+                topCategories: categories
             )
 
             let breakdowns: [StoreBreakdown] = aggregateStores.map { store in
@@ -1592,20 +1646,19 @@ struct OverviewView: View {
                     .padding(.bottom, 8)
                     .contentShape(Circle())
                     .onTapGesture {
-                        // Only allow flip for month periods, not year or all-time
+                        // Load category data if not already loaded (month periods only)
                         if !isAllPeriod(period) && !isYearPeriod(period) {
-                            // Load category data if not already loaded
                             if pieChartSummaryCache[period] == nil {
                                 Task {
                                     await fetchCategoryData(for: period)
                                 }
                             }
-                            // Flip the chart and reset row expansion
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                isPieChartFlipped.toggle()
-                                pieChartFlipDegrees += 180
-                                showAllRows = false // Reset to collapsed state when flipping
-                            }
+                        }
+                        // Flip the chart and reset row expansion (works for all period types)
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            isPieChartFlipped.toggle()
+                            pieChartFlipDegrees += 180
+                            showAllRows = false // Reset to collapsed state when flipping
                         }
                     }
                     .onChange(of: period) { _, newPeriod in
@@ -1645,13 +1698,11 @@ struct OverviewView: View {
                     .padding(.bottom, 8)
                     .contentShape(Circle())
                     .onTapGesture {
-                        // Allow flip for empty month periods too
-                        if !isAllPeriod(period) && !isYearPeriod(period) {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                isPieChartFlipped.toggle()
-                                pieChartFlipDegrees += 180
-                                showAllRows = false
-                            }
+                        // Allow flip for empty periods (all period types)
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            isPieChartFlipped.toggle()
+                            pieChartFlipDegrees += 180
+                            showAllRows = false
                         }
                     }
                     .onChange(of: period) { _, _ in

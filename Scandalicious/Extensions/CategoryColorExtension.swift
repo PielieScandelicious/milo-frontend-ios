@@ -113,4 +113,39 @@ extension String {
         let hash = abs(categoryName.hashValue)
         return fallbackColors[hash % fallbackColors.count]
     }
+
+    /// Returns hex color string for categories (for CategorySpendItem conversion)
+    var categoryColorHex: String {
+        return categoryColor.toHex()
+    }
+}
+
+// MARK: - Color to Hex Extension
+extension Color {
+    /// Convert SwiftUI Color to hex string
+    func toHex() -> String {
+        // Convert to UIColor/NSColor components
+        #if canImport(UIKit)
+        let uiColor = UIColor(self)
+        #elseif canImport(AppKit)
+        let uiColor = NSColor(self)
+        #endif
+
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        #if canImport(UIKit)
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        #elseif canImport(AppKit)
+        uiColor.usingColorSpace(.deviceRGB)?.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        #endif
+
+        let r = Int(red * 255)
+        let g = Int(green * 255)
+        let b = Int(blue * 255)
+
+        return String(format: "#%02X%02X%02X", r, g, b)
+    }
 }
