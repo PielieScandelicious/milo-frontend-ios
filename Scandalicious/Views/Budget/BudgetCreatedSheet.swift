@@ -19,6 +19,7 @@ struct BudgetCreatedSheet: View {
     @State private var showCategories = false
     @State private var ringProgress: CGFloat = 0
     @State private var checkmarkScale: CGFloat = 0
+    @State private var categoryListExpanded = false
 
     private var savingsPercentage: Double {
         guard budgetAmount > 0 else { return 0 }
@@ -259,8 +260,39 @@ struct BudgetCreatedSheet: View {
 
             // Category list
             VStack(spacing: 8) {
-                ForEach(Array(categoryAllocations.enumerated()), id: \.element.category) { index, allocation in
+                ForEach(Array((categoryListExpanded ? categoryAllocations : Array(categoryAllocations.prefix(6))).enumerated()), id: \.element.category) { index, allocation in
                     categoryRow(allocation, index: index)
+                }
+
+                // Expandable button
+                if categoryAllocations.count > 6 {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            categoryListExpanded.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            if !categoryListExpanded {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("Show \(categoryAllocations.count - 6) more categories")
+                                    .font(.system(size: 14, weight: .semibold))
+                            } else {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("Show less")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                        }
+                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.white.opacity(0.03))
+                        )
+                    }
+                    .padding(.top, 4)
                 }
             }
         }
