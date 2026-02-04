@@ -21,6 +21,7 @@ struct CategoryBudgetDetailView: View {
         case worstFirst = "Needs Attention"
         case bestFirst = "On Track First"
         case highestSpend = "Highest Spend"
+        case byGroup = "By Group"
         case alphabetical = "A-Z"
     }
 
@@ -32,9 +33,30 @@ struct CategoryBudgetDetailView: View {
             return progress.categoryProgress.sorted { $0.spendRatio < $1.spendRatio }
         case .highestSpend:
             return progress.categoryProgress.sorted { $0.currentSpend > $1.currentSpend }
+        case .byGroup:
+            return progress.categoryProgress.sorted { $0.currentSpend > $1.currentSpend }
         case .alphabetical:
             return progress.categoryProgress.sorted { $0.category < $1.category }
         }
+    }
+
+    /// Group categories by their parent group for "By Group" sort mode
+    private var groupedCategories: [(group: String, categories: [CategoryBudgetProgress])] {
+        let registry = CategoryRegistryManager.shared
+        var groups: [String: [CategoryBudgetProgress]] = [:]
+
+        for cat in progress.categoryProgress {
+            let group = registry.groupForSubCategory(cat.category)
+            groups[group, default: []].append(cat)
+        }
+
+        return groups
+            .map { (group: $0.key, categories: $0.value.sorted { $0.currentSpend > $1.currentSpend }) }
+            .sorted { group1, group2 in
+                let total1 = group1.categories.reduce(0) { $0 + $1.currentSpend }
+                let total2 = group2.categories.reduce(0) { $0 + $1.currentSpend }
+                return total1 > total2
+            }
     }
 
     private var overBudgetCategories: [CategoryBudgetProgress] {
@@ -227,9 +249,55 @@ struct CategoryBudgetDetailView: View {
     // MARK: - Category List
 
     private var categoryList: some View {
-        VStack(spacing: 12) {
-            ForEach(sortedCategories) { category in
-                CategoryBudgetCard(categoryProgress: category)
+        Group {
+            if sortOrder == .byGroup {
+                // Grouped view with section headers
+                VStack(spacing: 20) {
+                    ForEach(groupedCategories, id: \.group) { section in
+                        VStack(alignment: .leading, spacing: 12) {
+                            // Group header
+                            let registry = CategoryRegistryManager.shared
+                            let groupSpent = section.categories.reduce(0) { $0 + $1.currentSpend }
+                            let groupBudget = section.categories.reduce(0) { $0 + $1.budgetAmount }
+
+                            HStack(spacing: 8) {
+                                Image(systemName: registry.iconForGroup(section.group))
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(registry.colorForGroup(section.group))
+
+                                Text(section.group)
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundColor(.white)
+
+                                Text("(\(section.categories.count))")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+
+                                Spacer()
+
+                                VStack(alignment: .trailing, spacing: 1) {
+                                    Text(String(format: "€%.0f / €%.0f", groupSpent, groupBudget))
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        .foregroundColor(groupSpent > groupBudget ? Color(red: 1.0, green: 0.4, blue: 0.4) : .white.opacity(0.7))
+                                }
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 6)
+
+                            // Category cards for this group
+                            ForEach(section.categories) { category in
+                                CategoryBudgetCard(categoryProgress: category)
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Flat sorted view
+                VStack(spacing: 12) {
+                    ForEach(sortedCategories) { category in
+                        CategoryBudgetCard(categoryProgress: category)
+                    }
+                }
             }
         }
     }

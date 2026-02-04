@@ -23,91 +23,6 @@ enum PeriodType: String, Codable, CaseIterable {
     }
 }
 
-// MARK: - Analytics Category (API Format)
-
-enum AnalyticsCategory: String, Codable, CaseIterable {
-    case meatFish = "MEAT_FISH"
-    case alcohol = "ALCOHOL"
-    case drinksSoftSoda = "DRINKS_SOFT_SODA"
-    case drinksWater = "DRINKS_WATER"
-    case household = "HOUSEHOLD"
-    case snacksSweets = "SNACKS_SWEETS"
-    case freshProduce = "FRESH_PRODUCE"
-    case dairyEggs = "DAIRY_EGGS"
-    case readyMeals = "READY_MEALS"
-    case bakery = "BAKERY"
-    case pantry = "PANTRY"
-    case personalCare = "PERSONAL_CARE"
-    case frozen = "FROZEN"
-    case babyKids = "BABY_KIDS"
-    case petSupplies = "PET_SUPPLIES"
-    case other = "OTHER"
-    
-    var displayName: String {
-        switch self {
-        case .meatFish: return "Meat & Fish"
-        case .alcohol: return "Alcohol"
-        case .drinksSoftSoda: return "Drinks (Soft/Soda)"
-        case .drinksWater: return "Drinks (Water)"
-        case .household: return "Household"
-        case .snacksSweets: return "Snacks & Sweets"
-        case .freshProduce: return "Fresh Produce"
-        case .dairyEggs: return "Dairy & Eggs"
-        case .readyMeals: return "Ready Meals"
-        case .bakery: return "Bakery"
-        case .pantry: return "Pantry"
-        case .personalCare: return "Personal Care"
-        case .frozen: return "Frozen"
-        case .babyKids: return "Baby & Kids"
-        case .petSupplies: return "Pet Supplies"
-        case .other: return "Other"
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .meatFish: return "fish.fill"
-        case .alcohol: return "wineglass.fill"
-        case .drinksSoftSoda: return "cup.and.saucer.fill"
-        case .drinksWater: return "waterbottle.fill"
-        case .household: return "house.fill"
-        case .snacksSweets: return "birthday.cake.fill"
-        case .freshProduce: return "leaf.fill"
-        case .dairyEggs: return "carton.fill"
-        case .readyMeals: return "takeoutbag.and.cup.and.straw.fill"
-        case .bakery: return "croissant.fill"
-        case .pantry: return "cabinet.fill"
-        case .personalCare: return "sparkles"
-        case .frozen: return "snowflake"
-        case .babyKids: return "figure.and.child.holdinghands"
-        case .petSupplies: return "pawprint.fill"
-        case .other: return "shippingbox.fill"
-        }
-    }
-    
-    // Convert from ReceiptCategory if needed
-    init?(from receiptCategory: ReceiptCategory) {
-        switch receiptCategory {
-        case .meatAndFish: self = .meatFish
-        case .alcohol: self = .alcohol
-        case .drinksSoftSoda: self = .drinksSoftSoda
-        case .drinksWater: self = .drinksWater
-        case .household: self = .household
-        case .snacksAndSweets: self = .snacksSweets
-        case .freshProduce: self = .freshProduce
-        case .dairyAndEggs: self = .dairyEggs
-        case .readyMeals: self = .readyMeals
-        case .bakery: self = .bakery
-        case .pantry: self = .pantry
-        case .personalCare: self = .personalCare
-        case .frozen: self = .frozen
-        case .babyAndKids: self = .babyKids
-        case .petSupplies: self = .petSupplies
-        case .other: self = .other
-        }
-    }
-}
-
 // MARK: - Trends Response
 
 struct TrendsResponse: Codable {
@@ -226,12 +141,8 @@ struct CategoryBreakdown: Codable, Identifiable {
         self.averageHealthScore = averageHealthScore
     }
 
-    var analyticsCategory: AnalyticsCategory? {
-        AnalyticsCategory.allCases.first { $0.displayName == name }
-    }
-
     var icon: String {
-        analyticsCategory?.icon ?? "shippingbox.fill"
+        name.categoryIcon
     }
 }
 
@@ -533,8 +444,8 @@ struct APITransaction: Codable, Identifiable {
         DateFormatter.yyyyMMdd.date(from: date)
     }
 
-    var analyticsCategory: AnalyticsCategory? {
-        AnalyticsCategory.allCases.first { $0.displayName == category }
+    var icon: String {
+        category.categoryIcon
     }
 
     var totalPrice: Double {
@@ -549,9 +460,9 @@ struct AnalyticsFilters {
     var startDate: Date?
     var endDate: Date?
     var storeName: String?
-    var category: AnalyticsCategory?
+    var category: String?
     var numPeriods: Int = 12
-    
+
     func toQueryItems() -> [URLQueryItem] {
         var items: [URLQueryItem] = []
 
@@ -573,7 +484,7 @@ struct AnalyticsFilters {
         }
 
         if let category = category {
-            items.append(URLQueryItem(name: "category", value: category.rawValue))
+            items.append(URLQueryItem(name: "category", value: category))
         }
 
         return items
@@ -591,8 +502,7 @@ struct TransactionFilters {
     var startDate: Date?
     var endDate: Date?
     var storeName: String?
-    var category: AnalyticsCategory?
-    var categoryName: String?  // Direct category name - takes precedence over category enum
+    var category: String?
     var page: Int = 1
     var pageSize: Int = 50
 
@@ -611,11 +521,8 @@ struct TransactionFilters {
             items.append(URLQueryItem(name: "store_name", value: storeName))
         }
 
-        // Use categoryName if set (direct from backend), otherwise use category enum's displayName
-        if let categoryName = categoryName {
-            items.append(URLQueryItem(name: "category", value: categoryName))
-        } else if let category = category {
-            items.append(URLQueryItem(name: "category", value: category.displayName))
+        if let category = category {
+            items.append(URLQueryItem(name: "category", value: category))
         }
 
         items.append(URLQueryItem(name: "page", value: String(page)))
@@ -773,17 +680,13 @@ extension APIReceipt {
     /// Convert APIReceipt to ReceiptUploadResponse for use with SplitExpenseView
     func toReceiptUploadResponse() -> ReceiptUploadResponse {
         let convertedTransactions = transactions.map { item -> ReceiptTransaction in
-            // Map category string to ReceiptCategory enum
-            let category = ReceiptCategory.allCases.first { $0.displayName == item.category }
-                ?? ReceiptCategory.other
-
             return ReceiptTransaction(
                 itemId: item.itemId,
                 itemName: item.itemName,
                 itemPrice: item.itemPrice,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
-                category: category,
+                category: item.category,
                 healthScore: item.healthScore
             )
         }
@@ -1112,14 +1015,9 @@ struct TopCategory: Codable, Identifiable {
         case rank
     }
 
-    /// Get the corresponding AnalyticsCategory for icon/display
-    var analyticsCategory: AnalyticsCategory? {
-        AnalyticsCategory.allCases.first { $0.displayName == name }
-    }
-
     /// Get the SF Symbol icon for this category
     var icon: String {
-        analyticsCategory?.icon ?? "shippingbox.fill"
+        name.categoryIcon
     }
 }
 
@@ -1368,24 +1266,7 @@ struct CategorySpendItem: Codable, Identifiable {
 
     /// SF Symbol icon for this category
     var icon: String {
-        switch categoryId {
-        case "MEAT_FISH": return "fish.fill"
-        case "ALCOHOL": return "wineglass.fill"
-        case "DRINKS_SOFT_SODA": return "cup.and.saucer.fill"
-        case "DRINKS_WATER": return "waterbottle.fill"
-        case "HOUSEHOLD": return "house.fill"
-        case "SNACKS_SWEETS": return "birthday.cake.fill"
-        case "FRESH_PRODUCE": return "leaf.fill"
-        case "DAIRY_EGGS": return "carton.fill"
-        case "READY_MEALS": return "takeoutbag.and.cup.and.straw.fill"
-        case "BAKERY": return "croissant.fill"
-        case "PANTRY": return "cabinet.fill"
-        case "PERSONAL_CARE": return "sparkles"
-        case "FROZEN": return "snowflake"
-        case "BABY_KIDS": return "figure.and.child.holdinghands"
-        case "PET_SUPPLIES": return "pawprint.fill"
-        default: return "shippingbox.fill"
-        }
+        name.categoryIcon
     }
 
     /// Formatted percentage string

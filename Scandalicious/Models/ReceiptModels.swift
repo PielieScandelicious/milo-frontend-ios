@@ -110,7 +110,7 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     let itemPrice: Double
     let quantity: Int
     let unitPrice: Double?
-    let category: ReceiptCategory
+    let category: String
     let healthScore: Int?  // 0-5 for food items, nil for non-food
 
     // Generate a unique ID using UUID to handle duplicate items
@@ -127,7 +127,7 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     }
 
     // Custom initializer to generate UUID
-    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: ReceiptCategory, healthScore: Int? = nil) {
+    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, healthScore: Int? = nil) {
         self.itemId = itemId
         self.itemName = itemName
         self.itemPrice = itemPrice
@@ -146,7 +146,7 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         itemPrice = try container.decode(Double.self, forKey: .itemPrice)
         quantity = try container.decode(Int.self, forKey: .quantity)
         unitPrice = try container.decodeIfPresent(Double.self, forKey: .unitPrice)
-        category = try container.decode(ReceiptCategory.self, forKey: .category)
+        category = try container.decode(String.self, forKey: .category)
         healthScore = try container.decodeIfPresent(Int.self, forKey: .healthScore)
         // Generate a unique ID for each decoded transaction
         id = UUID()
@@ -162,73 +162,6 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         try container.encodeIfPresent(unitPrice, forKey: .unitPrice)
         try container.encode(category, forKey: .category)
         try container.encodeIfPresent(healthScore, forKey: .healthScore)
-    }
-}
-
-// MARK: - Receipt Category
-
-enum ReceiptCategory: String, Codable, CaseIterable, Sendable {
-    case meatAndFish = "Meat & Fish"
-    case alcohol = "Alcohol"
-    case drinksSoftSoda = "Drinks (Soft/Soda)"
-    case drinksWater = "Drinks (Water)"
-    case household = "Household"
-    case snacksAndSweets = "Snacks & Sweets"
-    case freshProduce = "Fresh Produce"
-    case dairyAndEggs = "Dairy & Eggs"
-    case readyMeals = "Ready Meals"
-    case bakery = "Bakery"
-    case pantry = "Pantry"
-    case personalCare = "Personal Care"
-    case frozen = "Frozen"
-    case babyAndKids = "Baby & Kids"
-    case petSupplies = "Pet Supplies"
-    case other = "Other"
-    
-    var displayName: String {
-        rawValue
-    }
-    
-    var icon: String {
-        switch self {
-        case .meatAndFish: return "fish.fill"
-        case .alcohol: return "wineglass.fill"
-        case .drinksSoftSoda: return "cup.and.saucer.fill"
-        case .drinksWater: return "waterbottle.fill"
-        case .household: return "house.fill"
-        case .snacksAndSweets: return "birthday.cake.fill"
-        case .freshProduce: return "leaf.fill"
-        case .dairyAndEggs: return "mug.fill"  // Changed from "carton.fill" which doesn't exist
-        case .readyMeals: return "takeoutbag.and.cup.and.straw.fill"
-        case .bakery: return "croissant.fill"
-        case .pantry: return "cabinet.fill"
-        case .personalCare: return "sparkles"
-        case .frozen: return "snowflake"
-        case .babyAndKids: return "figure.and.child.holdinghands"
-        case .petSupplies: return "pawprint.fill"
-        case .other: return "shippingbox.fill"
-        }
-    }
-    
-    var color: String {
-        switch self {
-        case .meatAndFish: return "red"
-        case .alcohol: return "purple"
-        case .drinksSoftSoda: return "orange"
-        case .drinksWater: return "blue"
-        case .household: return "gray"
-        case .snacksAndSweets: return "pink"
-        case .freshProduce: return "green"
-        case .dairyAndEggs: return "yellow"
-        case .readyMeals: return "brown"
-        case .bakery: return "orange"
-        case .pantry: return "brown"
-        case .personalCare: return "mint"
-        case .frozen: return "cyan"
-        case .babyAndKids: return "pink"
-        case .petSupplies: return "brown"
-        case .other: return "gray"
-        }
     }
 }
 

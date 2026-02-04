@@ -420,8 +420,8 @@ struct CategoryBreakdownDetailView: View {
         do {
             var filters = TransactionFilters()
 
-            // Use the category name directly from the backend (bypasses enum matching issues)
-            filters.categoryName = category.name
+            // Use the category name directly from the backend
+            filters.category = category.name
 
             filters.pageSize = 100
 

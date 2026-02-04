@@ -699,7 +699,7 @@ extension BudgetViewModel {
         guard let progress = state.progress else { return [] }
         return progress.categoryProgress.map { categoryProgress in
             BudgetProgressItem(
-                categoryId: categoryProgress.analyticsCategory?.rawValue ?? categoryProgress.category.uppercased().replacingOccurrences(of: " ", with: "_").replacingOccurrences(of: "&", with: ""),
+                categoryId: categoryProgress.category,
                 name: categoryProgress.category,
                 limitAmount: categoryProgress.budgetAmount,
                 spentAmount: categoryProgress.currentSpend,

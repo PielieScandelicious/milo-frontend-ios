@@ -1894,26 +1894,7 @@ struct BudgetSetupView: View {
     }
 
     private func categoryIcon(for category: String) -> String {
-        let lowercased = category.lowercased()
-        if lowercased.contains("produce") || lowercased.contains("vegetable") || lowercased.contains("fruit") {
-            return "leaf.fill"
-        } else if lowercased.contains("meat") || lowercased.contains("fish") || lowercased.contains("protein") {
-            return "fish.fill"
-        } else if lowercased.contains("dairy") || lowercased.contains("milk") {
-            return "drop.fill"
-        } else if lowercased.contains("snack") || lowercased.contains("sweet") || lowercased.contains("candy") {
-            return "birthday.cake.fill"
-        } else if lowercased.contains("beverage") || lowercased.contains("drink") || lowercased.contains("alcohol") {
-            return "cup.and.saucer.fill"
-        } else if lowercased.contains("bakery") || lowercased.contains("bread") {
-            return "storefront.fill"
-        } else if lowercased.contains("frozen") {
-            return "snowflake"
-        } else if lowercased.contains("household") || lowercased.contains("cleaning") {
-            return "house.fill"
-        } else {
-            return "cart.fill"
-        }
+        category.categoryIcon
     }
 
     // MARK: - Category Editing
@@ -1984,6 +1965,25 @@ struct AllCategoriesSheet: View {
     let totalBudget: Double
     @Environment(\.dismiss) private var dismiss
 
+    /// Group allocations by category group
+    private var groupedAllocations: [(group: String, allocations: [CategoryAllocation])] {
+        let registry = CategoryRegistryManager.shared
+        var groups: [String: [CategoryAllocation]] = [:]
+
+        for allocation in allocations {
+            let group = registry.groupForSubCategory(allocation.category)
+            groups[group, default: []].append(allocation)
+        }
+
+        return groups
+            .map { (group: $0.key, allocations: $0.value) }
+            .sorted { g1, g2 in
+                let total1 = g1.allocations.reduce(0) { $0 + $1.amount }
+                let total2 = g2.allocations.reduce(0) { $0 + $1.amount }
+                return total1 > total2
+            }
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -2003,10 +2003,44 @@ struct AllCategoriesSheet: View {
                         }
                         .padding(.vertical, 20)
 
-                        // All categories
-                        VStack(spacing: 8) {
-                            ForEach(allocations, id: \.category) { allocation in
-                                allocationRow(allocation)
+                        // All categories grouped
+                        let grouped = groupedAllocations
+                        if grouped.count <= 1 {
+                            VStack(spacing: 8) {
+                                ForEach(allocations, id: \.category) { allocation in
+                                    allocationRow(allocation)
+                                }
+                            }
+                        } else {
+                            VStack(spacing: 20) {
+                                ForEach(grouped, id: \.group) { section in
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        // Group header
+                                        let registry = CategoryRegistryManager.shared
+                                        let groupTotal = section.allocations.reduce(0) { $0 + $1.amount }
+
+                                        HStack(spacing: 8) {
+                                            Image(systemName: registry.iconForGroup(section.group))
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(registry.colorForGroup(section.group))
+
+                                            Text(section.group)
+                                                .font(.system(size: 14, weight: .bold))
+                                                .foregroundColor(.white.opacity(0.8))
+
+                                            Spacer()
+
+                                            Text(String(format: "€%.0f", groupTotal))
+                                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                                .foregroundColor(.white.opacity(0.5))
+                                        }
+                                        .padding(.horizontal, 4)
+
+                                        ForEach(section.allocations, id: \.category) { allocation in
+                                            allocationRow(allocation)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

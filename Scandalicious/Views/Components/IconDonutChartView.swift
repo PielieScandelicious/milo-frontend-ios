@@ -548,9 +548,8 @@ extension Array where Element == Category {
     /// Convert Category array to ChartData for IconDonutChartView
     func toIconChartData() -> [ChartData] {
         return map { category in
-            // Get icon from AnalyticsCategory if available
-            let icon = AnalyticsCategory.allCases
-                .first { $0.displayName == category.name }?.icon ?? "shippingbox.fill"
+            // Get icon from category name
+            let icon = category.name.categoryIcon
 
             return ChartData(
                 value: category.spent,

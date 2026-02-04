@@ -342,7 +342,7 @@ struct ReceiptItemRow: View {
                         .fill(categoryColor.opacity(0.15))
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: transaction.category.icon)
+                    Image(systemName: transaction.category.categoryIcon)
                         .font(.system(size: 20))
                         .foregroundStyle(categoryColor)
                 }
@@ -403,7 +403,7 @@ struct ReceiptItemRow: View {
                     }
 
                     // Category
-                    Text(transaction.category.displayName)
+                    Text(transaction.category)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -434,20 +434,7 @@ struct ReceiptItemRow: View {
     }
 
     private var categoryColor: Color {
-        switch transaction.category.color {
-        case "red": return .red
-        case "purple": return .purple
-        case "orange": return .orange
-        case "blue": return .blue
-        case "gray": return .gray
-        case "pink": return .pink
-        case "green": return .green
-        case "yellow": return .yellow
-        case "brown": return .brown
-        case "mint": return .mint
-        case "cyan": return .cyan
-        default: return .gray
-        }
+        transaction.category.categoryColor
     }
 }
 
@@ -517,7 +504,7 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 2.99,
                     quantity: 2,
                     unitPrice: 1.50,
-                    category: .dairyAndEggs,
+                    category: "Dairy & Eggs",
                     healthScore: 4
                 ),
                 ReceiptTransaction(
@@ -525,7 +512,7 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 3.49,
                     quantity: 1,
                     unitPrice: 3.49,
-                    category: .bakery,
+                    category: "Bakery",
                     healthScore: 3
                 ),
                 ReceiptTransaction(
@@ -533,7 +520,7 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 4.99,
                     quantity: 1,
                     unitPrice: 4.99,
-                    category: .freshProduce,
+                    category: "Fresh Produce",
                     healthScore: 5
                 ),
                 ReceiptTransaction(
@@ -541,7 +528,7 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 8.99,
                     quantity: 1,
                     unitPrice: 8.99,
-                    category: .meatAndFish,
+                    category: "Meat & Fish",
                     healthScore: 4
                 ),
                 ReceiptTransaction(
@@ -549,7 +536,7 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 3.99,
                     quantity: 1,
                     unitPrice: 3.99,
-                    category: .drinksSoftSoda,
+                    category: "Drinks (Soft/Soda)",
                     healthScore: 1
                 ),
                 ReceiptTransaction(
@@ -557,7 +544,7 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 5.99,
                     quantity: 1,
                     unitPrice: 5.99,
-                    category: .household,
+                    category: "Household",
                     healthScore: nil  // Non-food item
                 )
             ],
@@ -582,7 +569,7 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 1.99,
                     quantity: 1,
                     unitPrice: 1.99,
-                    category: .freshProduce,
+                    category: "Fresh Produce",
                     healthScore: 5
                 ),
                 ReceiptTransaction(
@@ -590,7 +577,7 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 3.49,
                     quantity: 1,
                     unitPrice: 3.49,
-                    category: .dairyAndEggs,
+                    category: "Dairy & Eggs",
                     healthScore: 4
                 )
             ],

@@ -252,9 +252,9 @@ struct TransactionTableView: View {
         filters.startDate = startDate
         filters.endDate = endDate
 
-        // If category is specified, try to match it to an AnalyticsCategory
+        // If category is specified, use the category name directly
         if let categoryName = category {
-            filters.category = AnalyticsCategory.allCases.first { $0.displayName == categoryName }
+            filters.category = categoryName
         }
 
         await viewModel.updateFilters(filters)

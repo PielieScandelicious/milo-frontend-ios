@@ -880,7 +880,7 @@ struct StoreDetailView: View {
             do {
                 var filters = TransactionFilters()
                 filters.storeName = storeBreakdown.storeName
-                filters.category = AnalyticsCategory.allCases.first { $0.displayName == category }
+                filters.category = category
                 filters.pageSize = 100
 
                 // Handle "All" period - no date filtering

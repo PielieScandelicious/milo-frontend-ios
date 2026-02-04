@@ -115,7 +115,7 @@ struct EditableCategoryBudgetRow: View {
     }
 
     private var categoryIcon: String {
-        AnalyticsCategory.allCases.first { $0.displayName == category }?.icon ?? "shippingbox.fill"
+        category.categoryIcon
     }
 
     var body: some View {

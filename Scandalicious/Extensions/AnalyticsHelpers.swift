@@ -230,34 +230,10 @@ extension TransactionFilters {
 
 // MARK: - Color Helpers for Charts
 
-extension AnalyticsCategory {
-    /// SwiftUI Color for category
-    var chartColor: Color {
-        switch self {
-        case .meatFish: return .red
-        case .alcohol: return .purple
-        case .drinksSoftSoda: return .orange
-        case .drinksWater: return .blue
-        case .household: return .gray
-        case .snacksSweets: return .pink
-        case .freshProduce: return .green
-        case .dairyEggs: return .yellow
-        case .readyMeals: return .brown
-        case .bakery: return .orange
-        case .pantry: return Color(red: 0.6, green: 0.4, blue: 0.2)
-        case .personalCare: return .mint
-        case .frozen: return .cyan
-        case .babyKids: return .pink
-        case .petSupplies: return Color(red: 0.5, green: 0.3, blue: 0.1)
-        case .other: return .secondary
-        }
-    }
-}
-
 extension CategoryBreakdown {
     /// SwiftUI Color for category
     var chartColor: Color {
-        analyticsCategory?.chartColor ?? .gray
+        name.categoryColor
     }
 }
 

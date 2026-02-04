@@ -179,21 +179,88 @@ struct EditCategoryBudgetsSheet: View {
         }
     }
 
-    // MARK: - Category List
+    // MARK: - Category List (Grouped)
+
+    /// Group categories by their parent group using CategoryRegistryManager
+    private var groupedCategoryIndices: [(group: String, indices: [Int])] {
+        let registry = CategoryRegistryManager.shared
+        var groups: [String: [Int]] = [:]
+
+        for index in categoryAllocations.indices {
+            let group = registry.groupForSubCategory(categoryAllocations[index].category)
+            groups[group, default: []].append(index)
+        }
+
+        return groups
+            .map { (group: $0.key, indices: $0.value) }
+            .sorted { group1, group2 in
+                let total1 = group1.indices.reduce(0.0) { $0 + categoryAllocations[$1].amount }
+                let total2 = group2.indices.reduce(0.0) { $0 + categoryAllocations[$1].amount }
+                return total1 > total2
+            }
+    }
 
     private var categoryList: some View {
-        VStack(spacing: 12) {
-            ForEach(categoryAllocations.indices, id: \.self) { index in
-                EditableCategoryCard(
-                    allocation: $categoryAllocations[index],
-                    totalBudget: targetBudget,
-                    onAmountChanged: { newAmount in
-                        handleCategoryEdit(at: index, newAmount: newAmount)
-                    },
-                    onReset: {
-                        resetCategory(at: index)
+        let grouped = groupedCategoryIndices
+
+        return VStack(spacing: 20) {
+            if grouped.count <= 1 {
+                VStack(spacing: 12) {
+                    ForEach(categoryAllocations.indices, id: \.self) { index in
+                        EditableCategoryCard(
+                            allocation: $categoryAllocations[index],
+                            totalBudget: targetBudget,
+                            onAmountChanged: { newAmount in
+                                handleCategoryEdit(at: index, newAmount: newAmount)
+                            },
+                            onReset: {
+                                resetCategory(at: index)
+                            }
+                        )
                     }
-                )
+                }
+            } else {
+                ForEach(grouped, id: \.group) { section in
+                    VStack(alignment: .leading, spacing: 12) {
+                        let registry = CategoryRegistryManager.shared
+                        let groupTotal = section.indices.reduce(0.0) { $0 + categoryAllocations[$1].amount }
+
+                        HStack(spacing: 8) {
+                            Image(systemName: registry.iconForGroup(section.group))
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(registry.colorForGroup(section.group))
+
+                            Text(section.group)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.white)
+
+                            Text("(\(section.indices.count))")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.4))
+
+                            Spacer()
+
+                            Text(String(format: "€%.0f", groupTotal))
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.top, 4)
+
+                        ForEach(section.indices, id: \.self) { index in
+                            EditableCategoryCard(
+                                allocation: $categoryAllocations[index],
+                                totalBudget: targetBudget,
+                                onAmountChanged: { newAmount in
+                                    handleCategoryEdit(at: index, newAmount: newAmount)
+                                },
+                                onReset: {
+                                    resetCategory(at: index)
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -375,7 +442,7 @@ struct EditableCategoryCard: View {
     }
 
     private var categoryIcon: String {
-        AnalyticsCategory.allCases.first { $0.displayName == allocation.category }?.icon ?? "shippingbox.fill"
+        allocation.category.categoryIcon
     }
 
     var body: some View {

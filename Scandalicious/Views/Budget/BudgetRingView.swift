@@ -251,11 +251,9 @@ struct CategoryBudgetRing: View {
                 .rotationEffect(.degrees(-90))
 
             // Category icon
-            if let category = categoryProgress.analyticsCategory {
-                Image(systemName: category.icon)
-                    .font(.system(size: size * 0.32, weight: .semibold))
-                    .foregroundColor(ringColor)
-            }
+            Image(systemName: categoryProgress.icon)
+                .font(.system(size: size * 0.32, weight: .semibold))
+                .foregroundColor(ringColor)
         }
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {

@@ -117,7 +117,7 @@ class TransactionsViewModel: ObservableObject {
         await loadTransactions(reset: true)
     }
 
-    func updateCategory(_ category: AnalyticsCategory?) async {
+    func updateCategory(_ category: String?) async {
         filters.category = category
         filters.page = 1
         await loadTransactions(reset: true)

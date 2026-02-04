@@ -910,9 +910,8 @@ struct OverviewView: View {
         if isYearPeriod(period), let yearSummary = yearSummaryCache[period], let categories = yearSummary.topCategories {
             return categories.map { category in
                 // Convert CategoryBreakdown to CategorySpendItem
-                let analyticsCategory = category.analyticsCategory
                 return CategorySpendItem(
-                    categoryId: analyticsCategory?.rawValue ?? "OTHER",
+                    categoryId: category.name,
                     name: category.name,
                     totalSpent: category.spent,
                     colorHex: category.name.categoryColorHex,
@@ -927,9 +926,8 @@ struct OverviewView: View {
         if isAllPeriod(period) {
             return allTimeCategories.map { category in
                 // Convert AggregateCategory to CategorySpendItem
-                let analyticsCategory = AnalyticsCategory.allCases.first { $0.displayName == category.name }
                 return CategorySpendItem(
-                    categoryId: analyticsCategory?.rawValue ?? "OTHER",
+                    categoryId: category.name,
                     name: category.name,
                     totalSpent: category.totalSpent,
                     colorHex: category.name.categoryColorHex,
@@ -2060,8 +2058,8 @@ struct OverviewView: View {
         do {
             var filters = TransactionFilters()
 
-            // Use the category name directly from the backend (bypasses enum matching issues)
-            filters.categoryName = category.name
+            // Use the category name directly from the backend
+            filters.category = category.name
 
             filters.pageSize = 100
 

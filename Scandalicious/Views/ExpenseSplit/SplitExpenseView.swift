@@ -291,20 +291,7 @@ struct SplitItemRow: View {
     var onToggle: ((SplitParticipant) -> Void)?
 
     private var categoryColor: Color {
-        switch transaction.category.color {
-        case "red": return .red
-        case "purple": return .purple
-        case "orange": return .orange
-        case "blue": return .blue
-        case "gray": return .gray
-        case "pink": return .pink
-        case "green": return .green
-        case "yellow": return .yellow
-        case "brown": return .brown
-        case "mint": return .mint
-        case "cyan": return .cyan
-        default: return .gray
-        }
+        transaction.category.categoryColor
     }
 
     var body: some View {
@@ -317,7 +304,7 @@ struct SplitItemRow: View {
                         .fill(categoryColor.opacity(0.15))
                         .frame(width: 36, height: 36)
 
-                    Image(systemName: transaction.category.icon)
+                    Image(systemName: transaction.category.categoryIcon)
                         .font(.system(size: 16))
                         .foregroundStyle(categoryColor)
                 }
@@ -393,7 +380,7 @@ struct SplitItemRow: View {
                     itemPrice: 12.00,
                     quantity: 1,
                     unitPrice: 12.00,
-                    category: .readyMeals,
+                    category: "Ready Meals",
                     healthScore: 3
                 ),
                 ReceiptTransaction(
@@ -402,7 +389,7 @@ struct SplitItemRow: View {
                     itemPrice: 15.00,
                     quantity: 3,
                     unitPrice: 5.00,
-                    category: .alcohol,
+                    category: "Alcohol",
                     healthScore: 1
                 ),
                 ReceiptTransaction(
@@ -411,7 +398,7 @@ struct SplitItemRow: View {
                     itemPrice: 8.50,
                     quantity: 1,
                     unitPrice: 8.50,
-                    category: .snacksAndSweets,
+                    category: "Snacks & Sweets",
                     healthScore: 2
                 ),
                 ReceiptTransaction(
@@ -420,7 +407,7 @@ struct SplitItemRow: View {
                     itemPrice: 4.00,
                     quantity: 2,
                     unitPrice: 2.00,
-                    category: .drinksWater,
+                    category: "Drinks (Water)",
                     healthScore: 5
                 ),
             ],

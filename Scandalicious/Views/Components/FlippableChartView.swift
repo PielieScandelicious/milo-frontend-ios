@@ -21,9 +21,8 @@ struct FlippableDonutChartView: View {
     /// Convert ChartSegments to ChartData for IconDonutChartView
     private var chartData: [ChartData] {
         segments.map { segment in
-            // Get icon from AnalyticsCategory if available
-            let icon = AnalyticsCategory.allCases
-                .first { $0.displayName == segment.label }?.icon ?? "shippingbox.fill"
+            // Get icon from category name
+            let icon = segment.label.categoryIcon
 
             return ChartData(
                 value: segment.value,

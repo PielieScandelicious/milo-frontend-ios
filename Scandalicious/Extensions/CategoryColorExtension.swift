@@ -7,6 +7,113 @@
 
 import SwiftUI
 
+// MARK: - Category Icon Lookup
+extension String {
+    /// Get SF Symbol icon for a category based on its name (matches group)
+    var categoryIcon: String {
+        let name = self.lowercased()
+
+        // Food & Dining group
+        if name.contains("produce") || name.contains("fruit") || name.contains("veg") { return "leaf.fill" }
+        if name.contains("meat") || name.contains("poultry") || name.contains("seafood") || name.contains("fish") { return "fork.knife" }
+        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "mug.fill" }
+        if name.contains("bakery") || name.contains("bread") { return "croissant.fill" }
+        if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "cabinet.fill" }
+        if name.contains("frozen") { return "snowflake" }
+        if name.contains("snack") || name.contains("candy") { return "birthday.cake.fill" }
+        if name.contains("beverage") || name.contains("non-alcoholic") { return "cup.and.saucer.fill" }
+        if name.contains("baby food") || name.contains("formula") { return "figure.and.child.holdinghands" }
+        if name.contains("pet food") || name.contains("pet supplies") { return "pawprint.fill" }
+        if name.contains("household consumable") || name.contains("paper/cleaning") { return "house.fill" }
+        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") { return "sparkles" }
+        if name.contains("ready meal") || name.contains("prepared food") { return "takeoutbag.and.cup.and.straw.fill" }
+        if name.contains("tobacco") { return "smoke.fill" }
+        if name.contains("fast food") || name.contains("quick service") { return "takeoutbag.and.cup.and.straw.fill" }
+        if name.contains("restaurant") || name.contains("sit-down") { return "fork.knife" }
+        if name.contains("coffee") || name.contains("cafe") { return "cup.and.saucer.fill" }
+        if name.contains("bar") || name.contains("nightlife") { return "wineglass.fill" }
+        if name.contains("delivery") { return "bicycle" }
+        if name.contains("liquor") || name.contains("wine shop") || name.contains("beer") || name.contains("alcohol") { return "wineglass.fill" }
+
+        // Housing & Utilities
+        if name.contains("rent") || name.contains("mortgage") || name.contains("property tax") { return "house.fill" }
+        if name.contains("electric") || name.contains("water") || name.contains("gas") || name.contains("heating") || name.contains("trash") { return "bolt.fill" }
+        if name.contains("internet") || name.contains("wi-fi") || name.contains("cable") || name.contains("phone") || name.contains("mobile") { return "wifi" }
+        if name.contains("repair") || name.contains("plumbing") || name.contains("lawn") || name.contains("cleaning service") || name.contains("furniture") || name.contains("home improvement") { return "wrench.fill" }
+
+        // Transportation
+        if name.contains("car payment") || name.contains("auto insurance") || name.contains("registration") { return "car.fill" }
+        if name.contains("fuel") || name.contains("gas/diesel") { return "fuelpump.fill" }
+        if name.contains("maintenance") || name.contains("oil change") || name.contains("car wash") { return "car.fill" }
+        if name.contains("uber") || name.contains("lyft") || name.contains("ride share") || name.contains("taxi") { return "car.fill" }
+        if name.contains("transit") || name.contains("bus") || name.contains("train") { return "bus.fill" }
+        if name.contains("parking") || name.contains("toll") { return "p.square.fill" }
+        if name.contains("bike") || name.contains("scooter") { return "bicycle" }
+
+        // Health & Wellness
+        if name.contains("doctor") || name.contains("specialist") || name.contains("dental") || name.contains("vision") || name.contains("optometry") { return "heart.fill" }
+        if name.contains("pharmacy") || name.contains("prescription") { return "pills.fill" }
+        if name.contains("insurance") { return "shield.fill" }
+        if name.contains("gym") || name.contains("sport") || name.contains("vitamin") || name.contains("supplement") { return "figure.run" }
+        if name.contains("therapy") || name.contains("counseling") { return "brain.head.profile" }
+
+        // Shopping & Personal Care
+        if name.contains("apparel") || name.contains("clothing") || name.contains("shoes") || name.contains("footwear") { return "tshirt.fill" }
+        if name.contains("jewelry") || name.contains("watch") { return "sparkle" }
+        if name.contains("computer") || name.contains("tablet") || name.contains("gaming") || name.contains("console") { return "desktopcomputer" }
+        if name.contains("software") { return "app.badge.fill" }
+        if name.contains("salon") || name.contains("barber") || name.contains("spa") || name.contains("massage") || name.contains("cosmetic") || name.contains("makeup") || name.contains("nail") { return "sparkles" }
+
+        // Entertainment & Leisure
+        if name.contains("streaming") || name.contains("netflix") || name.contains("hulu") { return "play.tv.fill" }
+        if name.contains("spotify") || name.contains("music") && name.contains("streaming") { return "headphones" }
+        if name.contains("news") || name.contains("magazine") { return "newspaper.fill" }
+        if name.contains("movie") || name.contains("theater") || name.contains("concert") || name.contains("festival") { return "film.fill" }
+        if name.contains("museum") || name.contains("exhibition") { return "building.columns.fill" }
+        if name.contains("book") || name.contains("audiobook") { return "book.fill" }
+        if name.contains("art") || name.contains("craft") || name.contains("photography") || name.contains("instrument") { return "paintbrush.fill" }
+
+        // Financial & Legal
+        if name.contains("emergency") || name.contains("retirement") || name.contains("investment") || name.contains("crypto") || name.contains("saving") { return "banknote.fill" }
+        if name.contains("credit card") || name.contains("student loan") || name.contains("personal loan") || name.contains("debt") { return "creditcard.fill" }
+        if name.contains("bank fee") || name.contains("tax") || name.contains("legal") { return "doc.text.fill" }
+
+        // Family & Education
+        if name.contains("tuition") || name.contains("textbook") || name.contains("online course") { return "graduationcap.fill" }
+        if name.contains("daycare") || name.contains("babysit") || name.contains("toy") || name.contains("extracurricular") || name.contains("baby supplies") || name.contains("diaper") { return "figure.and.child.holdinghands" }
+        if name.contains("veterinary") || name.contains("pet groom") || name.contains("pet sit") || name.contains("boarding") { return "pawprint.fill" }
+
+        // Travel & Vacation
+        if name.contains("airfare") || name.contains("flight") { return "airplane" }
+        if name.contains("hotel") || name.contains("resort") || name.contains("airbnb") || name.contains("vacation rental") { return "bed.double.fill" }
+        if name.contains("car rental") || name.contains("cruise") { return "car.fill" }
+        if name.contains("sightseeing") || name.contains("tour") || name.contains("souvenir") { return "map.fill" }
+        if name.contains("travel insurance") { return "shield.fill" }
+
+        // Gifts & Donations
+        if name.contains("gift") { return "gift.fill" }
+        if name.contains("charit") || name.contains("donat") || name.contains("tith") || name.contains("political") { return "heart.fill" }
+
+        // Miscellaneous
+        if name.contains("cash withdrawal") { return "banknote.fill" }
+        if name.contains("reimbursement") || name.contains("adjustment") || name.contains("correction") { return "arrow.uturn.left.circle.fill" }
+        if name.contains("unknown") { return "questionmark.circle.fill" }
+
+        // Legacy category names (for backward compatibility)
+        if name.contains("personal care") { return "sparkles" }
+        if name.contains("household") { return "house.fill" }
+        if name.contains("pet") { return "pawprint.fill" }
+        if name.contains("baby") { return "figure.and.child.holdinghands" }
+        if name.contains("ready") || name.contains("meal") { return "takeoutbag.and.cup.and.straw.fill" }
+        if name.contains("drink") || name.contains("soda") || name.contains("soft") { return "cup.and.saucer.fill" }
+        if name.contains("water") { return "waterbottle.fill" }
+        if name.contains("sweet") { return "birthday.cake.fill" }
+        if name == "other" { return "shippingbox.fill" }
+
+        return "square.grid.2x2.fill"
+    }
+}
+
 // MARK: - Premium High-Contrast Category Colors
 extension String {
     /// Intelligently assigns premium, high-contrast colors to categories
@@ -99,6 +206,125 @@ extension String {
         // "Other" category - Soft Steel
         if categoryName == "other" {
             return Color(red: 0.55, green: 0.58, blue: 0.65)  // Steel gray
+        }
+
+        // Housing & Utilities - Royal Purple
+        if categoryName.contains("rent") || categoryName.contains("mortgage") || categoryName.contains("property tax") ||
+           categoryName.contains("hoa") || categoryName.contains("syndic") ||
+           categoryName.contains("electric") || categoryName.contains("water & sewer") ||
+           categoryName.contains("heating") || categoryName.contains("trash") ||
+           categoryName.contains("internet") || categoryName.contains("cable") ||
+           categoryName.contains("phone") || categoryName.contains("security service") ||
+           categoryName.contains("repair") || categoryName.contains("plumbing") ||
+           categoryName.contains("lawn") || categoryName.contains("furniture") ||
+           categoryName.contains("home improvement") {
+            return Color(red: 0.56, green: 0.27, blue: 0.68)  // Royal purple
+        }
+
+        // Transportation - Electric Blue
+        if categoryName.contains("car payment") || categoryName.contains("auto insurance") ||
+           categoryName.contains("registration") || categoryName.contains("fuel") ||
+           categoryName.contains("gas/diesel") || categoryName.contains("maintenance") ||
+           categoryName.contains("oil change") || categoryName.contains("car wash") ||
+           categoryName.contains("uber") || categoryName.contains("lyft") || categoryName.contains("ride share") ||
+           categoryName.contains("transit") || categoryName.contains("taxi") ||
+           categoryName.contains("parking") || categoryName.contains("toll") ||
+           categoryName.contains("bike") || categoryName.contains("scooter") {
+            return Color(red: 0.20, green: 0.60, blue: 0.86)  // Electric blue
+        }
+
+        // Health & Wellness - Coral Red
+        if categoryName.contains("doctor") || categoryName.contains("specialist") ||
+           categoryName.contains("dental") || categoryName.contains("vision") ||
+           categoryName.contains("optometry") || categoryName.contains("pharmacy") ||
+           categoryName.contains("prescription") || categoryName.contains("insurance premium") ||
+           categoryName.contains("life insurance") || categoryName.contains("disability insurance") ||
+           categoryName.contains("gym") || categoryName.contains("sports equipment") ||
+           categoryName.contains("vitamin") || categoryName.contains("supplement") ||
+           categoryName.contains("therapy") || categoryName.contains("counseling") {
+            return Color(red: 0.91, green: 0.30, blue: 0.24)  // Coral red
+        }
+
+        // Entertainment & Leisure - Golden Yellow
+        if categoryName.contains("streaming") || categoryName.contains("netflix") ||
+           categoryName.contains("spotify") || categoryName.contains("news") ||
+           categoryName.contains("magazine") || categoryName.contains("movie") ||
+           categoryName.contains("theater") || categoryName.contains("concert") ||
+           categoryName.contains("festival") || categoryName.contains("sporting event") ||
+           categoryName.contains("museum") || categoryName.contains("exhibition") ||
+           categoryName.contains("arts") || categoryName.contains("crafts") ||
+           categoryName.contains("book") || categoryName.contains("audiobook") ||
+           categoryName.contains("instrument") || categoryName.contains("photography") {
+            return Color(red: 0.95, green: 0.77, blue: 0.06)  // Golden yellow
+        }
+
+        // Financial & Legal - Steel Gray
+        if categoryName.contains("emergency fund") || categoryName.contains("retirement") ||
+           categoryName.contains("investment") || categoryName.contains("brokerage") ||
+           categoryName.contains("crypto") || categoryName.contains("credit card payment") ||
+           categoryName.contains("student loan") || categoryName.contains("personal loan") ||
+           categoryName.contains("bank fee") || categoryName.contains("overdraft") ||
+           categoryName.contains("credit card interest") || categoryName.contains("income tax") ||
+           categoryName.contains("tax prep") || categoryName.contains("legal fee") {
+            return Color(red: 0.50, green: 0.55, blue: 0.55)  // Steel gray
+        }
+
+        // Family & Education - Warm Orange
+        if categoryName.contains("tuition") || categoryName.contains("textbook") ||
+           categoryName.contains("online course") || categoryName.contains("student loan interest") ||
+           categoryName.contains("daycare") || categoryName.contains("babysit") ||
+           categoryName.contains("toy") || categoryName.contains("extracurricular") ||
+           categoryName.contains("baby supplies") || categoryName.contains("diaper") ||
+           categoryName.contains("veterinary") || categoryName.contains("pet groom") ||
+           categoryName.contains("pet sit") || categoryName.contains("boarding") {
+            return Color(red: 0.90, green: 0.49, blue: 0.13)  // Warm orange
+        }
+
+        // Travel & Vacation - Sky Blue
+        if categoryName.contains("airfare") || categoryName.contains("flight") ||
+           categoryName.contains("hotel") || categoryName.contains("resort") ||
+           categoryName.contains("airbnb") || categoryName.contains("vacation rental") ||
+           categoryName.contains("car rental") || categoryName.contains("cruise") ||
+           categoryName.contains("vacation dining") || categoryName.contains("sightseeing") ||
+           categoryName.contains("tour") || categoryName.contains("souvenir") ||
+           categoryName.contains("travel insurance") {
+            return Color(red: 0.36, green: 0.68, blue: 0.88)  // Sky blue
+        }
+
+        // Gifts & Donations - Rose Pink
+        if categoryName.contains("birthday gift") || categoryName.contains("holiday gift") ||
+           categoryName.contains("wedding") || categoryName.contains("party gift") ||
+           categoryName.contains("charitable") || categoryName.contains("donation") ||
+           categoryName.contains("tithing") || categoryName.contains("political contribution") {
+            return Color(red: 0.94, green: 0.38, blue: 0.57)  // Rose pink
+        }
+
+        // Restaurants & Dining Out - Sunset Orange
+        if categoryName.contains("fast food") || categoryName.contains("quick service") ||
+           categoryName.contains("sit-down restaurant") || categoryName.contains("restaurant") ||
+           categoryName.contains("coffee shop") || categoryName.contains("cafe") ||
+           categoryName.contains("bar") || categoryName.contains("nightlife") ||
+           categoryName.contains("food delivery") || categoryName.contains("delivery (apps)") {
+            return Color(red: 1.0, green: 0.50, blue: 0.30)  // Sunset orange
+        }
+
+        // Shopping - Magenta Pink
+        if categoryName.contains("apparel") || categoryName.contains("clothing") ||
+           categoryName.contains("shoes") || categoryName.contains("footwear") ||
+           categoryName.contains("jewelry") || categoryName.contains("watch") ||
+           categoryName.contains("dry cleaning") || categoryName.contains("tailoring") ||
+           categoryName.contains("computer") || categoryName.contains("tablet") ||
+           categoryName.contains("software subscription") || categoryName.contains("gaming") ||
+           categoryName.contains("console") {
+            return Color(red: 0.91, green: 0.12, blue: 0.55)  // Magenta pink
+        }
+
+        // Salon & Personal Care Services - Vivid Magenta
+        if categoryName.contains("hair salon") || categoryName.contains("barber") ||
+           categoryName.contains("spa") || categoryName.contains("massage") ||
+           categoryName.contains("cosmetic") || categoryName.contains("makeup") ||
+           categoryName.contains("nail salon") {
+            return Color(red: 0.95, green: 0.35, blue: 0.65)  // Magenta pink
         }
 
         // Premium fallback colors for uncategorized items

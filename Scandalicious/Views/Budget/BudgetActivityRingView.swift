@@ -123,7 +123,7 @@ struct BudgetActivityRingView: View {
 
 // MARK: - Budget Activity Rings Grid
 
-/// Grid layout showing budget activity rings for all categories
+/// Grid layout showing budget activity rings grouped by spending category group
 struct BudgetActivityRingsGrid: View {
     let items: [BudgetProgressItem]
     var ringSize: CGFloat = 80
@@ -131,6 +131,26 @@ struct BudgetActivityRingsGrid: View {
 
     private var gridColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: 16), count: columns)
+    }
+
+    /// Group items by their category group using CategoryRegistryManager
+    private var groupedItems: [(group: String, items: [BudgetProgressItem])] {
+        let registry = CategoryRegistryManager.shared
+        var groups: [String: [BudgetProgressItem]] = [:]
+
+        for item in items {
+            let group = registry.groupForSubCategory(item.name)
+            groups[group, default: []].append(item)
+        }
+
+        // Sort groups by total spend (highest first), only include non-empty
+        return groups
+            .map { (group: $0.key, items: $0.value) }
+            .sorted { group1, group2 in
+                let total1 = group1.items.reduce(0) { $0 + $1.spentAmount }
+                let total2 = group2.items.reduce(0) { $0 + $1.spentAmount }
+                return total1 > total2
+            }
     }
 
     var body: some View {
@@ -149,13 +169,51 @@ struct BudgetActivityRingsGrid: View {
             }
             .padding(.horizontal, 4)
 
-            // Grid of rings
+            // Grouped rings
             if items.isEmpty {
                 emptyState
             } else {
-                LazyVGrid(columns: gridColumns, spacing: 20) {
-                    ForEach(items) { item in
-                        BudgetActivityRingView(item: item, size: ringSize)
+                let grouped = groupedItems
+                if grouped.count == 1 {
+                    // Single group — no need for section headers
+                    LazyVGrid(columns: gridColumns, spacing: 20) {
+                        ForEach(grouped[0].items) { item in
+                            BudgetActivityRingView(item: item, size: ringSize)
+                        }
+                    }
+                } else {
+                    // Multiple groups — show section headers
+                    VStack(spacing: 20) {
+                        ForEach(grouped, id: \.group) { section in
+                            VStack(alignment: .leading, spacing: 12) {
+                                // Group header
+                                HStack(spacing: 8) {
+                                    let registry = CategoryRegistryManager.shared
+                                    Image(systemName: registry.iconForGroup(section.group))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(registry.colorForGroup(section.group))
+
+                                    Text(section.group)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(.white.opacity(0.7))
+
+                                    Spacer()
+
+                                    let groupTotal = section.items.reduce(0) { $0 + $1.spentAmount }
+                                    Text(String(format: "€%.0f", groupTotal))
+                                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.white.opacity(0.5))
+                                }
+                                .padding(.horizontal, 4)
+
+                                // Rings for this group
+                                LazyVGrid(columns: gridColumns, spacing: 20) {
+                                    ForEach(section.items) { item in
+                                        BudgetActivityRingView(item: item, size: ringSize)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

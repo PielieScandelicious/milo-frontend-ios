@@ -163,12 +163,8 @@ struct CategoryBudgetProgress: Identifiable {
         max(0, currentSpend - budgetAmount)
     }
 
-    var analyticsCategory: AnalyticsCategory? {
-        AnalyticsCategory.allCases.first { $0.displayName == category }
-    }
-
     var icon: String {
-        analyticsCategory?.icon ?? "shippingbox.fill"
+        category.categoryIcon
     }
 }
 
@@ -505,27 +501,9 @@ struct BudgetProgressItem: Codable, Identifiable {
         name.categoryColor
     }
 
-    /// SF Symbol icon for this category
+    /// SF Symbol icon for this category (uses dynamic keyword-based matching)
     var icon: String {
-        // Map category ID to SF Symbol
-        switch categoryId {
-        case "MEAT_FISH": return "fish.fill"
-        case "ALCOHOL": return "wineglass.fill"
-        case "DRINKS_SOFT_SODA": return "cup.and.saucer.fill"
-        case "DRINKS_WATER": return "waterbottle.fill"
-        case "HOUSEHOLD": return "house.fill"
-        case "SNACKS_SWEETS": return "birthday.cake.fill"
-        case "FRESH_PRODUCE": return "leaf.fill"
-        case "DAIRY_EGGS": return "carton.fill"
-        case "READY_MEALS": return "takeoutbag.and.cup.and.straw.fill"
-        case "BAKERY": return "croissant.fill"
-        case "PANTRY": return "cabinet.fill"
-        case "PERSONAL_CARE": return "sparkles"
-        case "FROZEN": return "snowflake"
-        case "BABY_KIDS": return "figure.and.child.holdinghands"
-        case "PET_SUPPLIES": return "pawprint.fill"
-        default: return "shippingbox.fill"
-        }
+        name.categoryIcon
     }
 }
 

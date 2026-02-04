@@ -92,7 +92,7 @@ struct BankTransactionReviewView: View {
                     BankTransactionRow(
                         transaction: transaction,
                         isSelected: viewModel.selectedTransactionIds.contains(transaction.id),
-                        category: viewModel.getCategory(for: transaction),
+                        category: viewModel.getCategoryString(for: transaction),
                         customDescription: viewModel.getCustomDescription(for: transaction.id),
                         onToggleSelection: {
                             viewModel.toggleTransactionSelection(transaction.id)

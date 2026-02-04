@@ -54,7 +54,7 @@ class BankingViewModel: ObservableObject {
     // Transactions for review
     @Published var pendingTransactionsState: BankingLoadingState<[BankTransactionResponse]> = .idle
     @Published var selectedTransactionIds: Set<String> = []
-    @Published var categoryOverrides: [String: GroceryCategory] = [:]
+    @Published var categoryOverrides: [String: String] = [:]
     @Published var descriptionOverrides: [String: String] = [:]
     @Published var pendingTransactionsTotal: Int = 0
 
@@ -441,19 +441,18 @@ class BankingViewModel: ObservableObject {
         selectedTransactionIds.removeAll()
     }
 
-    func setCategoryOverride(for transactionId: String, category: GroceryCategory) {
+    func setCategoryOverride(for transactionId: String, category: String) {
         categoryOverrides[transactionId] = category
     }
 
-    func getCategory(for transaction: BankTransactionResponse) -> GroceryCategory {
+    func getCategoryString(for transaction: BankTransactionResponse) -> String {
         if let override = categoryOverrides[transaction.id] {
             return override
         }
-        if let suggested = transaction.suggestedCategory,
-           let category = GroceryCategory.from(string: suggested) {
-            return category
+        if let suggested = transaction.suggestedCategory, !suggested.isEmpty {
+            return suggested
         }
-        return .other
+        return "Unknown Transaction"
     }
 
     func setDescriptionOverride(for transactionId: String, description: String) {
@@ -486,12 +485,12 @@ class BankingViewModel: ObservableObject {
                 return nil
             }
 
-            let category = getCategory(for: transaction)
+            let category = getCategoryString(for: transaction)
             let customDescription = descriptionOverrides[transactionId]
 
             return TransactionImportItem(
                 bankTransactionId: transactionId,
-                category: category.rawValue,
+                category: category,
                 storeName: transaction.counterpartyName,
                 itemName: customDescription ?? transaction.description
             )
