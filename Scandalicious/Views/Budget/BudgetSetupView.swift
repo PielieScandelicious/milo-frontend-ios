@@ -142,7 +142,18 @@ struct BudgetSetupView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             if viewModel.aiSuggestionState.data == nil {
-                Task { await viewModel.loadAISuggestion() }
+                Task {
+                    await viewModel.loadAISuggestion()
+                    // Set default custom amount to -10% after data loads
+                    if customAmount == 500 && averageSpending > 0 {
+                        customAmount = averageSpending * 0.9
+                    }
+                }
+            } else {
+                // Data already loaded, set default if needed
+                if customAmount == 500 && averageSpending > 0 {
+                    customAmount = averageSpending * 0.9
+                }
             }
         }
         .fullScreenCover(isPresented: $showSuccessSheet) {
