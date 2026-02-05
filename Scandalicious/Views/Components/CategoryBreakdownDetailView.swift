@@ -546,19 +546,21 @@ struct CategoryBreakdownDetailView: View {
                 let friendsOnly = splitParticipants.filter { !$0.isMe }
 
                 HStack(spacing: 10) {
-                    // Sleek Nutri-Score badge
-                    Text(item.healthScore.nutriScoreLetter)
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundColor(item.healthScore.healthScoreColor)
-                        .frame(width: 16, height: 16)
-                        .background(
-                            Circle()
-                                .fill(item.healthScore.healthScoreColor.opacity(0.15))
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(item.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
-                        )
+                    // Nutri-Score badge (only shown when score exists)
+                    if item.healthScore != nil {
+                        Text(item.healthScore.nutriScoreLetter)
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundColor(item.healthScore.healthScoreColor)
+                            .frame(width: 16, height: 16)
+                            .background(
+                                Circle()
+                                    .fill(item.healthScore.healthScoreColor.opacity(0.15))
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(item.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
+                            )
+                    }
 
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {

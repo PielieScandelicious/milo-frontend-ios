@@ -552,19 +552,21 @@ struct EditableLineItemRow: View {
                 ))
             }
 
-            // Sleek Nutri-Score letter badge
-            Text(item.displayHealthScore.nutriScoreLetter)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
-                .foregroundColor(item.displayHealthScore.healthScoreColor)
-                .frame(width: 16, height: 16)
-                .background(
-                    Circle()
-                        .fill(item.displayHealthScore.healthScoreColor.opacity(0.15))
-                )
-                .overlay(
-                    Circle()
-                        .stroke(item.displayHealthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
-                )
+            // Nutri-Score letter badge (only shown when score exists)
+            if item.displayHealthScore != nil {
+                Text(item.displayHealthScore.nutriScoreLetter)
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundColor(item.displayHealthScore.healthScoreColor)
+                    .frame(width: 16, height: 16)
+                    .background(
+                        Circle()
+                            .fill(item.displayHealthScore.healthScoreColor.opacity(0.15))
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(item.displayHealthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
+                    )
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {

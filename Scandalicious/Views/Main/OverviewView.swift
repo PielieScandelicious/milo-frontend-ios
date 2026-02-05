@@ -2244,15 +2244,17 @@ struct OverviewView: View {
         let friendsOnly = splitParticipants.filter { !$0.isMe }
 
         return HStack(spacing: 10) {
-            // Health score badge
-            Text(item.healthScore.nutriScoreLetter)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(item.healthScore.healthScoreColor)
-                .frame(width: 22, height: 22)
-                .background(
-                    Circle()
-                        .fill(item.healthScore.healthScoreColor.opacity(0.15))
-                )
+            // Health score badge (only shown when score exists)
+            if item.healthScore != nil {
+                Text(item.healthScore.nutriScoreLetter)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(item.healthScore.healthScoreColor)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        Circle()
+                            .fill(item.healthScore.healthScoreColor.opacity(0.15))
+                    )
+            }
 
             // Item details
             VStack(alignment: .leading, spacing: 2) {
