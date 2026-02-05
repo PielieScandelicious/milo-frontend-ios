@@ -346,6 +346,99 @@ extension String {
     }
 }
 
+// MARK: - Grocery Sub-Category Health Theming
+extension String {
+    /// Health-gradient color for grocery sub-categories (green=healthy → red=unhealthy).
+    /// Returns nil if this name is not a recognized grocery sub-category.
+    var groceryHealthColor: Color? {
+        let name = self.lowercased()
+
+        // Very healthy → emerald green
+        if name.contains("produce") || name.contains("fruit") || name.contains("veg") {
+            return Color(red: 0.18, green: 0.80, blue: 0.44)
+        }
+        // Healthy → soft green
+        if name.contains("baby food") || name.contains("formula") || name == "baby & kids" {
+            return Color(red: 0.40, green: 0.78, blue: 0.47)
+        }
+        // Healthy → teal-green
+        if name.contains("beverage") || name.contains("non-alcoholic") || name.contains("drink") && name.contains("water") {
+            return Color(red: 0.15, green: 0.78, blue: 0.68)
+        }
+        // Healthy → blue-green
+        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") {
+            return Color(red: 0.30, green: 0.75, blue: 0.65)
+        }
+        // Moderately healthy → yellow-green
+        if name.contains("meat") || name.contains("poultry") || name.contains("seafood") || name.contains("fish") {
+            return Color(red: 0.55, green: 0.78, blue: 0.35)
+        }
+        // Moderate → golden yellow
+        if name.contains("bakery") || name.contains("bread") {
+            return Color(red: 0.92, green: 0.78, blue: 0.28)
+        }
+        // Moderate → warm amber
+        if name.contains("pantry") || name.contains("pasta") || name.contains("rice") {
+            return Color(red: 0.88, green: 0.68, blue: 0.30)
+        }
+        // Neutral → icy blue
+        if name.contains("frozen") {
+            return Color(red: 0.40, green: 0.80, blue: 0.95)
+        }
+        // Non-food → muted brown
+        if name.contains("pet food") || name.contains("pet supplies") || name == "pet supplies" {
+            return Color(red: 0.65, green: 0.55, blue: 0.40)
+        }
+        // Non-food → muted purple
+        if name.contains("household consumable") || name.contains("paper/cleaning") || name == "household" {
+            return Color(red: 0.58, green: 0.48, blue: 0.78)
+        }
+        // Non-food → lavender pink
+        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") || name == "personal care" {
+            return Color(red: 0.75, green: 0.48, blue: 0.72)
+        }
+        // Less healthy → orange
+        if name.contains("ready meal") || name.contains("prepared food") || name == "ready meals" {
+            return Color(red: 1.0, green: 0.55, blue: 0.25)
+        }
+        // Unhealthy → coral red
+        if name.contains("snack") || name.contains("candy") || name.contains("sweet") {
+            return Color(red: 1.0, green: 0.36, blue: 0.36)
+        }
+        // Drinks (soft/soda) → teal (not alcohol)
+        if name.contains("drink") && (name.contains("soft") || name.contains("soda")) {
+            return Color(red: 0.15, green: 0.78, blue: 0.68)
+        }
+        // Very unhealthy → dark red
+        if name.contains("tobacco") {
+            return Color(red: 0.80, green: 0.20, blue: 0.20)
+        }
+        return nil
+    }
+
+    /// Health-themed SF Symbol icon for grocery sub-categories.
+    /// Returns nil if this name is not a recognized grocery sub-category.
+    var groceryHealthIcon: String? {
+        let name = self.lowercased()
+        if name.contains("produce") || name.contains("fruit") || name.contains("veg") { return "leaf.fill" }
+        if name.contains("meat") || name.contains("poultry") || name.contains("seafood") || name.contains("fish") { return "fish.fill" }
+        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "mug.fill" }
+        if name.contains("bakery") || name.contains("bread") { return "croissant.fill" }
+        if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "cabinet.fill" }
+        if name.contains("frozen") { return "snowflake" }
+        if name.contains("snack") || name.contains("candy") || name.contains("sweet") { return "birthday.cake.fill" }
+        if name.contains("beverage") || name.contains("non-alcoholic") { return "cup.and.saucer.fill" }
+        if name.contains("drink") && (name.contains("soft") || name.contains("soda") || name.contains("water")) { return "cup.and.saucer.fill" }
+        if name.contains("baby food") || name.contains("formula") || name.contains("baby") { return "figure.and.child.holdinghands" }
+        if name.contains("pet food") || name.contains("pet supplies") || name.contains("pet") { return "pawprint.fill" }
+        if name.contains("household") || name.contains("paper/cleaning") || name.contains("cleaning") { return "house.fill" }
+        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") || name == "personal care" { return "sparkles" }
+        if name.contains("ready meal") || name.contains("prepared food") || name == "ready meals" { return "takeoutbag.and.cup.and.straw.fill" }
+        if name.contains("tobacco") { return "smoke.fill" }
+        return nil
+    }
+}
+
 // MARK: - Color to Hex Extension
 extension Color {
     /// Convert SwiftUI Color to hex string

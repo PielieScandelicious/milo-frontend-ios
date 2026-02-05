@@ -14,6 +14,9 @@ struct ReceiptTransactionsView: View {
     @State private var searchText: String = ""
     @FocusState private var isSearchFocused: Bool
 
+    /// Tracks which grocery sub-categories are collapsed (hidden items)
+    @State private var collapsedGrocerySubCategories: Set<String> = []
+
     private var filteredTransactions: [APIReceiptItem] {
         if searchText.isEmpty {
             return receipt.transactions
@@ -24,13 +27,75 @@ struct ReceiptTransactionsView: View {
         }
     }
 
-    private var groupedByCategory: [(String, [APIReceiptItem])] {
-        let grouped = Dictionary(grouping: filteredTransactions) { $0.categoryDisplayName }
+    /// Grocery items grouped by sub-category, sorted by total spend
+    private var grocerySubGroups: [(String, [APIReceiptItem])] {
+        let groceryItems = filteredTransactions.filter {
+            $0.categoryDisplayName.groceryHealthColor != nil
+        }
+        guard !groceryItems.isEmpty else { return [] }
+
+        let grouped = Dictionary(grouping: groceryItems) { $0.categoryDisplayName }
         return grouped.sorted { first, second in
             let firstTotal = first.value.reduce(0) { $0 + $1.totalPrice }
             let secondTotal = second.value.reduce(0) { $0 + $1.totalPrice }
             return firstTotal > secondTotal
         }
+    }
+
+    /// Non-grocery items grouped by sub-category (original behavior), sorted by total spend
+    private var nonGroceryGroups: [(String, [APIReceiptItem])] {
+        let nonGroceryItems = filteredTransactions.filter {
+            $0.categoryDisplayName.groceryHealthColor == nil
+        }
+        guard !nonGroceryItems.isEmpty else { return [] }
+
+        let grouped = Dictionary(grouping: nonGroceryItems) { $0.categoryDisplayName }
+        return grouped.sorted { first, second in
+            let firstTotal = first.value.reduce(0) { $0 + $1.totalPrice }
+            let secondTotal = second.value.reduce(0) { $0 + $1.totalPrice }
+            return firstTotal > secondTotal
+        }
+    }
+
+    /// Total grocery spend (for sorting Groceries section among others)
+    private var groceryTotal: Double {
+        grocerySubGroups.flatMap { $0.1 }.reduce(0) { $0 + $1.totalPrice }
+    }
+
+    /// All sections combined: Groceries as one section + individual non-grocery sub-categories
+    /// Sorted by total spend descending
+    private enum SectionItem: Identifiable {
+        case groceries
+        case subCategory(name: String, items: [APIReceiptItem])
+
+        var id: String {
+            switch self {
+            case .groceries: return "__groceries__"
+            case .subCategory(let name, _): return name
+            }
+        }
+
+        var totalSpent: Double {
+            switch self {
+            case .groceries: return 0 // handled separately
+            case .subCategory(_, let items): return items.reduce(0) { $0 + $1.totalPrice }
+            }
+        }
+    }
+
+    private var orderedSections: [SectionItem] {
+        var sections: [(Double, SectionItem)] = []
+
+        if !grocerySubGroups.isEmpty {
+            sections.append((groceryTotal, .groceries))
+        }
+
+        for (name, items) in nonGroceryGroups {
+            let total = items.reduce(0) { $0 + $1.totalPrice }
+            sections.append((total, .subCategory(name: name, items: items)))
+        }
+
+        return sections.sorted { $0.0 > $1.0 }.map { $0.1 }
     }
 
     var body: some View {
@@ -46,8 +111,13 @@ struct ReceiptTransactionsView: View {
                         emptySearchState
                     } else {
                         LazyVStack(spacing: 24) {
-                            ForEach(groupedByCategory, id: \.0) { category, transactions in
-                                categorySection(category: category, transactions: transactions)
+                            ForEach(orderedSections) { section in
+                                switch section {
+                                case .groceries:
+                                    groceriesCategorySection()
+                                case .subCategory(let name, let items):
+                                    categorySection(category: name, transactions: items)
+                                }
                             }
                         }
                         .padding(.top, 20)
@@ -210,6 +280,8 @@ struct ReceiptTransactionsView: View {
         .padding(.vertical, 40)
     }
 
+    // MARK: - Non-Groceries Section (original behavior)
+
     private func categorySection(category: String, transactions: [APIReceiptItem]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // Category header
@@ -242,18 +314,122 @@ struct ReceiptTransactionsView: View {
         }
     }
 
-    private func transactionRow(_ transaction: APIReceiptItem) -> some View {
-        HStack(spacing: 12) {
+    // MARK: - Groceries Section (collapsible sub-categories)
+
+    private func groceriesCategorySection() -> some View {
+        let registry = CategoryRegistryManager.shared
+        let parentGroup = registry.groupForCategory("Groceries")
+        let color = registry.colorForGroup(parentGroup)
+        let icon = registry.iconForGroup(parentGroup)
+        let allGroceryItems = grocerySubGroups.flatMap { $0.1 }
+        let totalSpent = allGroceryItems.reduce(0) { $0 + $1.totalPrice }
+
+        return VStack(alignment: .leading, spacing: 12) {
+            // Main "Groceries" header
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(color)
+
+                Text("Groceries")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+
+                Spacer()
+
+                Text(String(format: "€%.2f", totalSpent))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(.horizontal, 24)
+
+            // Collapsible sub-sections by sub-category
+            VStack(spacing: 4) {
+                ForEach(grocerySubGroups, id: \.0) { subCategory, items in
+                    let isCollapsed = collapsedGrocerySubCategories.contains(subCategory)
+                    let subTotal = items.reduce(0) { $0 + $1.totalPrice }
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        let subColor = subCategory.groceryHealthColor ?? .white.opacity(0.5)
+                        let subIcon = subCategory.groceryHealthIcon ?? "cart.fill"
+
+                        // Tappable sub-category header
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                if isCollapsed {
+                                    collapsedGrocerySubCategories.remove(subCategory)
+                                } else {
+                                    collapsedGrocerySubCategories.insert(subCategory)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: subIcon)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(subColor)
+                                    .frame(width: 20)
+
+                                Text(subCategory)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.6))
+
+                                Spacer()
+
+                                Text("\(items.count)")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.35))
+
+                                Text(String(format: "€%.2f", subTotal))
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.6))
+
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.3))
+                                    .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        // Items (shown when not collapsed)
+                        if !isCollapsed {
+                            VStack(spacing: 8) {
+                                ForEach(items) { transaction in
+                                    transactionRow(transaction, colorOverride: subColor)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 4)
+                            .padding(.bottom, 8)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func transactionRow(_ transaction: APIReceiptItem, colorOverride: Color? = nil) -> some View {
+        let itemColor = colorOverride ?? transaction.categoryDisplayName.categoryColor
+        let itemIcon = colorOverride != nil
+            ? (transaction.categoryDisplayName.groceryHealthIcon ?? categoryIcon(for: transaction.categoryDisplayName))
+            : categoryIcon(for: transaction.categoryDisplayName)
+
+        return HStack(spacing: 12) {
             // Icon with quantity badge
             ZStack(alignment: .topTrailing) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(transaction.categoryDisplayName.categoryColor.opacity(0.2))
+                        .fill(itemColor.opacity(0.2))
                         .frame(width: 50, height: 50)
 
-                    Image(systemName: categoryIcon(for: transaction.categoryDisplayName))
+                    Image(systemName: itemIcon)
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(transaction.categoryDisplayName.categoryColor)
+                        .foregroundColor(itemColor)
                 }
 
                 if transaction.quantity > 1 {
@@ -264,7 +440,7 @@ struct ReceiptTransactionsView: View {
                         .padding(.vertical, 2)
                         .background(
                             Capsule()
-                                .fill(transaction.categoryDisplayName.categoryColor)
+                                .fill(itemColor)
                         )
                         .offset(x: 6, y: -4)
                 }
@@ -351,6 +527,7 @@ struct ReceiptTransactionsView: View {
         default: return "cart.fill"
         }
     }
+
 }
 
 // MARK: - Preview

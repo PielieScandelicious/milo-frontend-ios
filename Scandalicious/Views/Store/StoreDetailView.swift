@@ -430,17 +430,25 @@ struct StoreDetailView: View {
             // Category rows within this group
             ForEach(group.categories) { category in
                 let segment = categoryToSegment(category: category)
-                expandableCategoryRow(segment: segment, isOther: false)
+                expandableCategoryRow(segment: segment, isOther: false, icon: category.name.groceryHealthIcon)
             }
         }
     }
 
-    /// Convert a Category to a ChartSegment for use in expandableCategoryRow
+    /// Convert a Category to a ChartSegment for use in expandableCategoryRow.
+    /// Grocery sub-categories get health-themed colors instead of the parent group color.
     private func categoryToSegment(category: Category) -> ChartSegment {
-        ChartSegment(
+        let color: Color
+        if let healthColor = category.name.groceryHealthColor {
+            color = healthColor
+        } else {
+            color = category.groupColorHex.flatMap { Color(hex: $0) } ?? category.name.categoryColor
+        }
+
+        return ChartSegment(
             startAngle: .degrees(0),
             endAngle: .degrees(0),
-            color: category.groupColorHex.flatMap { Color(hex: $0) } ?? category.name.categoryColor,
+            color: color,
             value: category.spent,
             label: category.name,
             percentage: category.percentage
@@ -802,7 +810,7 @@ struct StoreDetailView: View {
 
     // MARK: - Expandable Category Row
 
-    private func expandableCategoryRow(segment: ChartSegment, isOther: Bool) -> some View {
+    private func expandableCategoryRow(segment: ChartSegment, isOther: Bool, icon: String? = nil) -> some View {
         VStack(spacing: 0) {
             // Category header button
             Button {
@@ -820,6 +828,14 @@ struct StoreDetailView: View {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(isOther ? segment.color.opacity(0.5) : segment.color)
                         .frame(width: 4, height: 32)
+
+                    // Health-themed icon for grocery sub-categories
+                    if let icon = icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(segment.color)
+                            .frame(width: 20)
+                    }
 
                     Text(segment.label)
                         .font(.system(size: 15, weight: .semibold))
