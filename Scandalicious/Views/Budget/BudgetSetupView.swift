@@ -3,13 +3,14 @@
 //  Scandalicious
 //
 //  Created by Claude on 31/01/2026.
+//  Simplified on 05/02/2026 - Removed AI features
 //
 
 import SwiftUI
 
 // MARK: - Budget Setup View
 
-/// Smart budget setup with AI-powered category allocations
+/// Smart budget setup with category allocations
 struct BudgetSetupView: View {
     @ObservedObject var viewModel: BudgetViewModel
     @Environment(\.dismiss) private var dismiss
@@ -20,7 +21,6 @@ struct BudgetSetupView: View {
     @State private var customAmount: Double = 500
     @State private var showSuccessSheet = false
     @State private var showAllCategories = false
-    @State private var expandedOpportunityIds = Set<String>()
 
     // Category editing state
     @State private var showCategoryEditor = false
@@ -58,13 +58,13 @@ struct BudgetSetupView: View {
 
     private var navigationTitle: String {
         guard let suggestion = viewModel.aiSuggestionState.data else {
-            return "Smart Budget"
+            return "Budget"
         }
         return suggestion.dataCollectionPhase.title
     }
 
     private var averageSpending: Double {
-        viewModel.aiSuggestionState.data?.rawData.monthlyAverage ?? 500
+        viewModel.aiSuggestionState.data?.monthlyAverage ?? 500
     }
 
     private var targetBudget: Double {
@@ -86,7 +86,7 @@ struct BudgetSetupView: View {
         return (savingsAmount / averageSpending) * 100
     }
 
-    /// Scale AI category allocations to match the target budget
+    /// Scale category allocations to match the target budget
     /// If categories have been customized, return those instead
     private var scaledCategoryAllocations: [CategoryAllocation] {
         // If user has customized categories, use those
@@ -100,15 +100,15 @@ struct BudgetSetupView: View {
             }
         }
 
-        // Otherwise, scale AI suggestions
-        guard let aiSuggestion = viewModel.aiSuggestionState.data else { return [] }
+        // Otherwise, scale suggestions
+        guard let suggestion = viewModel.aiSuggestionState.data else { return [] }
 
-        let originalTotal = aiSuggestion.categoryAllocations.reduce(0) { $0 + $1.suggestedAmount }
+        let originalTotal = suggestion.categoryAllocations.reduce(0) { $0 + $1.suggestedAmount }
         guard originalTotal > 0 else { return [] }
 
         let scaleFactor = targetBudget / originalTotal
 
-        return aiSuggestion.categoryAllocations.map { allocation in
+        return suggestion.categoryAllocations.map { allocation in
             CategoryAllocation(
                 category: allocation.category,
                 amount: allocation.suggestedAmount * scaleFactor,
@@ -238,17 +238,17 @@ struct BudgetSetupView: View {
                     .rotationEffect(.degrees(-90))
                     .modifier(RotatingAnimation())
 
-                Image(systemName: "sparkles")
+                Image(systemName: "chart.bar.fill")
                     .font(.system(size: 28))
                     .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
             }
 
             VStack(spacing: 8) {
-                Text("Milo is Analyzing Your Spending")
+                Text("Analyzing Your Spending")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
 
-                Text("Finding patterns and optimization opportunities...")
+                Text("Calculating your personalized budget...")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
             }
@@ -259,15 +259,15 @@ struct BudgetSetupView: View {
 
     // MARK: - Onboarding Content (No Data)
 
-    private func onboardingContent(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func onboardingContent(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         ScrollView {
             VStack(spacing: 24) {
                 // Welcome header with progress
                 onboardingHeader(suggestion)
                     .padding(.horizontal, 20)
 
-                // AI Recommended Budget - Best Effort (even with no data)
-                aiRecommendedBudgetCardForOnboarding(suggestion)
+                // Recommended Budget
+                recommendedBudgetCardForOnboarding(suggestion)
                     .padding(.horizontal, 20)
 
                 // Scan receipt CTA
@@ -282,7 +282,7 @@ struct BudgetSetupView: View {
         }
     }
 
-    private func onboardingHeader(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func onboardingHeader(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         HStack(spacing: 16) {
             // Progress ring showing 0 of 3
             DataCollectionProgressRing(
@@ -302,7 +302,7 @@ struct BudgetSetupView: View {
                     .foregroundColor(.white.opacity(0.5))
 
                 HStack(spacing: 4) {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "chart.bar.fill")
                         .font(.system(size: 12))
 
                     Text("We've prepared a starting point for you")
@@ -333,12 +333,12 @@ struct BudgetSetupView: View {
         )
     }
 
-    private func aiRecommendedBudgetCardForOnboarding(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func recommendedBudgetCardForOnboarding(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         VStack(spacing: 16) {
             // Header
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: "lightbulb.fill")
+                    Image(systemName: "chart.bar.fill")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.yellow.opacity(0.8))
 
@@ -435,7 +435,7 @@ struct BudgetSetupView: View {
         }
     }
 
-    private func useAnywaySuggestionSection(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func useAnywaySuggestionSection(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         VStack(spacing: 16) {
             // Divider with "or"
             HStack {
@@ -458,7 +458,7 @@ struct BudgetSetupView: View {
                 selectionMode = .custom
             }) {
                 HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "chart.bar.fill")
                         .font(.system(size: 14))
 
                     Text("Use Suggested Budget (€\(Int(suggestion.recommendedBudget.amount)))")
@@ -489,7 +489,7 @@ struct BudgetSetupView: View {
         }
     }
 
-    private func simplifiedBudgetSetup(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func simplifiedBudgetSetup(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         VStack(spacing: 20) {
             // Amount display
             Text(String(format: "€%.0f", customAmount))
@@ -559,35 +559,20 @@ struct BudgetSetupView: View {
 
     // MARK: - Building Profile Content (1-2 Months Data)
 
-    private func buildingProfileContent(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func buildingProfileContent(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         ScrollView {
             VStack(spacing: 24) {
                 // Header with progress
                 buildingProfileHeader(suggestion)
 
-                // AI Recommended Budget - Best Effort (prominent display)
-                aiRecommendedBudgetCardForPartialData(suggestion)
+                // Recommended Budget
+                recommendedBudgetCardForPartialData(suggestion)
 
-                // AI Insight if available
-                if !suggestion.summary.isEmpty {
-                    aiInsightCard(suggestion.summary)
-                }
+                // Budget target section
+                budgetTargetSection
 
-                // Budget target section (same as full, but with confidence indicator)
-                budgetTargetSectionWithConfidence(suggestion)
-
-                // Category preview (with muted styling indicator)
-                categoryPreviewSectionForPartialData(suggestion)
-
-                // Savings opportunities preview
-                if !suggestion.savingsOpportunities.isEmpty {
-                    savingsOpportunitiesPreview(suggestion)
-                }
-
-                // Tips
-                if !suggestion.personalizedTips.isEmpty {
-                    tipsSection(suggestion.personalizedTips)
-                }
+                // Category preview
+                categoryPreviewSection
 
                 // Create budget button
                 createBudgetButton
@@ -597,7 +582,7 @@ struct BudgetSetupView: View {
         }
     }
 
-    private func buildingProfileHeader(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func buildingProfileHeader(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         HStack(spacing: 16) {
             // Progress ring
             DataCollectionProgressRing(
@@ -650,236 +635,7 @@ struct BudgetSetupView: View {
         )
     }
 
-    private func budgetTargetSectionWithConfidence(_ suggestion: AIBudgetSuggestionResponse) -> some View {
-        VStack(spacing: 20) {
-            // Section header with confidence badge
-            HStack {
-                Image(systemName: "target")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-                Text("Set Your Target")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-
-                Spacer()
-
-                ConfidenceBadge(confidence: suggestion.recommendedBudget.confidence, style: .compact)
-            }
-
-            // Mode toggle and selection (reuse existing)
-            HStack(spacing: 0) {
-                modeToggleButton(mode: .percentage, label: "Save %", icon: "percent")
-                modeToggleButton(mode: .custom, label: "Custom", icon: "slider.horizontal.3")
-            }
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.05))
-            )
-
-            if selectionMode == .percentage {
-                percentageSelector
-            } else {
-                customAmountSelector
-            }
-
-            resultDisplay
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-        )
-    }
-
-    private func categoryPreviewSectionForPartialData(_ suggestion: AIBudgetSuggestionResponse) -> some View {
-        VStack(spacing: 16) {
-            // Header with "Preliminary" indicator
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-
-                    Text("Milo's Category Budgets")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                }
-
-                Spacer()
-
-                // Preliminary badge
-                Text("Building")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.5))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.08))
-                    )
-            }
-
-            // Category bars with slightly muted styling
-            VStack(spacing: 10) {
-                ForEach(categoryListExpanded ? scaledCategoryAllocations : Array(scaledCategoryAllocations.prefix(5)), id: \.category) { allocation in
-                    categoryBarForPartialData(allocation)
-                }
-
-                // Expand/collapse button
-                if scaledCategoryAllocations.count > 5 {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            categoryListExpanded.toggle()
-                        }
-                    }) {
-                        HStack(spacing: 6) {
-                            if !categoryListExpanded {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text("Show \(scaledCategoryAllocations.count - 5) more categories")
-                                    .font(.system(size: 12, weight: .semibold))
-                            } else {
-                                Image(systemName: "minus.circle.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text("Show less")
-                                    .font(.system(size: 12, weight: .semibold))
-                            }
-                        }
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.08))
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-
-            // Note about improving accuracy
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.4))
-
-                Text("Category allocations will improve with more data")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.06))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                )
-        )
-    }
-
-    private func categoryBarForPartialData(_ allocation: CategoryAllocation) -> some View {
-        let percentage = targetBudget > 0 ? (allocation.amount / targetBudget) : 0
-
-        return HStack(spacing: 12) {
-            // Category icon with slightly muted opacity
-            ZStack {
-                Circle()
-                    .fill(allocation.category.categoryColor.opacity(0.15))
-                    .frame(width: 32, height: 32)
-
-                Image(systemName: categoryIcon(for: allocation.category))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(allocation.category.categoryColor.opacity(0.8))
-            }
-
-            // Name and bar
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(allocation.category)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Text(String(format: "€%.0f", allocation.amount))
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.7))
-                }
-
-                // Progress bar with muted styling
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.white.opacity(0.08))
-                            .frame(height: 6)
-
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(allocation.category.categoryColor.opacity(0.7))
-                            .frame(width: geometry.size.width * CGFloat(percentage), height: 6)
-                    }
-                }
-                .frame(height: 6)
-            }
-        }
-    }
-
-    private func savingsOpportunitiesPreview(_ suggestion: AIBudgetSuggestionResponse) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Potential Savings")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
-
-                Spacer()
-
-                Text("Early insight")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-
-            // Show first 2 opportunities
-            ForEach(suggestion.savingsOpportunities.prefix(2)) { opportunity in
-                HStack(spacing: 12) {
-                    Image(systemName: opportunity.difficultyIcon)
-                        .font(.system(size: 14))
-                        .foregroundColor(opportunity.difficultyColor.opacity(0.8))
-                        .frame(width: 28)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(opportunity.title)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.9))
-
-                        Text(opportunity.description)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    Text(String(format: "€%.0f/mo", opportunity.potentialSavings))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5).opacity(0.8))
-                }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white.opacity(0.03))
-                )
-            }
-        }
-    }
-
-    // MARK: - Main Content
+    // MARK: - Main Content (3+ Months Data)
 
     private var mainContent: some View {
         ScrollView {
@@ -889,29 +645,14 @@ struct BudgetSetupView: View {
                     dataCollectionPhaseHeader(suggestion)
                 }
 
-                // AI Recommended Budget - PROMINENT
-                aiRecommendedBudgetCard
-
-                // AI Insight Summary
-                if let summary = viewModel.aiSuggestionState.data?.summary, !summary.isEmpty {
-                    aiInsightCard(summary)
-                }
+                // Recommended Budget - PROMINENT
+                recommendedBudgetCard
 
                 // Budget Target Section
                 budgetTargetSection
 
                 // Category Allocations Preview
                 categoryPreviewSection
-
-                // Savings opportunities
-                if let opportunities = viewModel.aiSuggestionState.data?.savingsOpportunities, !opportunities.isEmpty {
-                    savingsOpportunitiesSection(opportunities)
-                }
-
-                // Tips from AI
-                if let tips = viewModel.aiSuggestionState.data?.personalizedTips, !tips.isEmpty {
-                    tipsSection(tips)
-                }
 
                 // Create Budget Button
                 createBudgetButton
@@ -923,7 +664,7 @@ struct BudgetSetupView: View {
 
     // MARK: - Data Collection Phase Header
 
-    private func dataCollectionPhaseHeader(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func dataCollectionPhaseHeader(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         HStack(spacing: 16) {
             // Progress ring
             DataCollectionProgressRing(
@@ -990,27 +731,23 @@ struct BudgetSetupView: View {
         )
     }
 
-    // MARK: - AI Recommended Budget Card
+    // MARK: - Recommended Budget Card
 
-    private var aiRecommendedBudgetCard: some View {
+    private var recommendedBudgetCard: some View {
         VStack(spacing: 16) {
             // Header
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "chart.bar.fill")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
 
-                    Text("Milo's Recommended Budget")
+                    Text("Recommended Budget")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
                 }
 
                 Spacer()
-
-                if let confidence = viewModel.aiSuggestionState.data?.recommendedBudget.confidence {
-                    ConfidenceBadge(confidence: confidence, style: .compact)
-                }
             }
 
             // Recommended amount - VERY PROMINENT
@@ -1026,38 +763,8 @@ struct BudgetSetupView: View {
                 }
             }
 
-            // Health score and average spend row
+            // Stats row
             HStack(spacing: 0) {
-                // Health Score
-                if let score = viewModel.aiSuggestionState.data?.budgetHealthScore {
-                    VStack(spacing: 4) {
-                        ZStack {
-                            Circle()
-                                .stroke(Color.white.opacity(0.1), lineWidth: 4)
-                                .frame(width: 44, height: 44)
-
-                            Circle()
-                                .trim(from: 0, to: CGFloat(score) / 100)
-                                .stroke(healthScoreColor(score), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                                .frame(width: 44, height: 44)
-                                .rotationEffect(.degrees(-90))
-
-                            Text("\(score)")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-
-                        Text("Health")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 1, height: 50)
-
                 // Average Spend
                 VStack(spacing: 4) {
                     Text(String(format: "€%.0f", averageSpending))
@@ -1074,7 +781,7 @@ struct BudgetSetupView: View {
                     .fill(Color.white.opacity(0.1))
                     .frame(width: 1, height: 50)
 
-                // Potential Savings
+                // Estimated Savings
                 if let recommended = viewModel.aiSuggestionState.data?.recommendedBudget.amount {
                     let savings = averageSpending - recommended
                     VStack(spacing: 4) {
@@ -1082,7 +789,25 @@ struct BudgetSetupView: View {
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .foregroundColor(savings > 0 ? Color(red: 0.3, green: 0.8, blue: 0.5) : .white.opacity(0.5))
 
-                        Text("Savings")
+                        Text("Est. Savings")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 1, height: 50)
+
+                // Months of data
+                if let months = viewModel.aiSuggestionState.data?.basedOnMonths {
+                    VStack(spacing: 4) {
+                        Text("\(months)")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.9))
+
+                        Text(months == 1 ? "Month" : "Months")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.white.opacity(0.4))
                     }
@@ -1124,41 +849,37 @@ struct BudgetSetupView: View {
         )
     }
 
-    // MARK: - AI Recommended Budget Card for Partial Data
+    // MARK: - Recommended Budget Card for Partial Data
 
-    private func aiRecommendedBudgetCardForPartialData(_ suggestion: AIBudgetSuggestionResponse) -> some View {
+    private func recommendedBudgetCardForPartialData(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
         VStack(spacing: 16) {
-            // Header with "Best Effort" indicator
+            // Header
             HStack {
                 HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "chart.bar.fill")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.8))
 
-                    Text("Milo's Recommended Budget")
+                    Text("Recommended Budget")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white.opacity(0.9))
                 }
 
                 Spacer()
 
-                // Best effort badge
-                HStack(spacing: 4) {
-                    Image(systemName: "wand.and.stars")
-                        .font(.system(size: 10))
-                    Text("Best Effort")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .foregroundColor(.white.opacity(0.5))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(Color.white.opacity(0.08))
-                )
+                // Building badge
+                Text("Building")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.5))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.08))
+                    )
             }
 
-            // Recommended amount - prominent but with muted styling
+            // Recommended amount
             VStack(spacing: 8) {
                 Text(String(format: "€%.0f", suggestion.recommendedBudget.amount))
                     .font(.system(size: 48, weight: .bold, design: .rounded))
@@ -1169,10 +890,7 @@ struct BudgetSetupView: View {
                     .foregroundColor(.white.opacity(0.4))
             }
 
-            // Confidence badge
-            ConfidenceBadge(confidence: suggestion.recommendedBudget.confidence, style: .compact)
-
-            // Stats row with muted styling
+            // Stats row
             HStack(spacing: 0) {
                 // Average Spend (if available)
                 if suggestion.totalSpendAnalyzed > 0 {
@@ -1192,7 +910,7 @@ struct BudgetSetupView: View {
                         .frame(width: 1, height: 40)
                 }
 
-                // Potential Savings
+                // Estimated Savings
                 let savings = averageSpending - suggestion.recommendedBudget.amount
                 VStack(spacing: 4) {
                     Text(String(format: "€%.0f", max(0, savings)))
@@ -1227,7 +945,7 @@ struct BudgetSetupView: View {
                     .fill(Color.white.opacity(0.03))
             )
 
-            // Reasoning with note about improving accuracy
+            // Reasoning
             VStack(spacing: 8) {
                 Text(suggestion.recommendedBudget.reasoning)
                     .font(.system(size: 13, weight: .medium))
@@ -1264,165 +982,11 @@ struct BudgetSetupView: View {
         )
     }
 
-    // MARK: - Savings Opportunities Section
-
-    private func savingsOpportunitiesSection(_ opportunities: [SavingsOpportunity]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
-
-                    Text("Savings Opportunities")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                }
-
-                Spacer()
-
-                let totalSavings = opportunities.reduce(0) { $0 + $1.potentialSavings }
-                Text(String(format: "Up to €%.0f/mo", totalSavings))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
-            }
-
-            ForEach(opportunities.prefix(3)) { opportunity in
-                let isExpanded = expandedOpportunityIds.contains(opportunity.id)
-
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: opportunity.difficultyIcon)
-                        .font(.system(size: 16))
-                        .foregroundColor(opportunity.difficultyColor)
-                        .frame(width: 28)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(opportunity.title)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-
-                        Text(opportunity.description)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                            .lineLimit(isExpanded ? nil : 2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(String(format: "€%.0f", opportunity.potentialSavings))
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
-
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.3))
-                    }
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.05))
-                )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        if isExpanded {
-                            expandedOpportunityIds.remove(opportunity.id)
-                        } else {
-                            expandedOpportunityIds.insert(opportunity.id)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.3, green: 0.8, blue: 0.5).opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color(red: 0.3, green: 0.8, blue: 0.5).opacity(0.15), lineWidth: 1)
-                )
-        )
-    }
-
-    // MARK: - AI Insight Card
-
-    private func aiInsightCard(_ summary: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            // AI Icon
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.3),
-                                Color(red: 0.4, green: 0.3, blue: 0.9).opacity(0.2)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 36, height: 36)
-
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-            }
-
-            // Summary Text
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Milo's Insight")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-                    .textCase(.uppercase)
-                    .tracking(0.5)
-
-                Text(summary)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineSpacing(4)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.08),
-                            Color(red: 0.5, green: 0.3, blue: 0.9).opacity(0.04)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.25),
-                                    Color(red: 0.5, green: 0.3, blue: 0.9).opacity(0.1)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-        )
-    }
-
     // MARK: - Budget Target Section
 
     private var budgetTargetSection: some View {
         VStack(spacing: 20) {
-            // Section Header
+            // Section Header - NO badge
             HStack {
                 Image(systemName: "target")
                     .font(.system(size: 16, weight: .semibold))
@@ -1630,11 +1194,11 @@ struct BudgetSetupView: View {
             // Header
             HStack {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "chart.pie.fill")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
 
-                    Text("Milo's Category Budgets")
+                    Text("Category Budgets")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
 
@@ -1773,40 +1337,6 @@ struct BudgetSetupView: View {
         }
     }
 
-    // MARK: - Tips Section
-
-    private func tipsSection(_ tips: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "lightbulb.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(.yellow)
-
-                Text("Milo's Tips")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(tips.prefix(2), id: \.self) { tip in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("•")
-                            .foregroundColor(.white.opacity(0.5))
-                        Text(tip)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.yellow.opacity(0.08))
-        )
-    }
-
     // MARK: - Create Budget Button
 
     private var createBudgetButton: some View {
@@ -1816,10 +1346,10 @@ struct BudgetSetupView: View {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .semibold))
 
-                    Text("Create Smart Budget")
+                    Text("Create Budget")
                         .font(.system(size: 17, weight: .bold))
                 }
             }
@@ -1855,7 +1385,7 @@ struct BudgetSetupView: View {
                 .foregroundColor(.orange)
 
             VStack(spacing: 8) {
-                Text("Couldn't Load Analysis")
+                Text("Couldn't Load Data")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
 
@@ -1883,15 +1413,6 @@ struct BudgetSetupView: View {
     }
 
     // MARK: - Helper Functions
-
-    private func healthScoreColor(_ score: Int) -> Color {
-        switch score {
-        case 80...100: return Color(red: 0.3, green: 0.8, blue: 0.5)
-        case 60..<80: return Color(red: 0.3, green: 0.7, blue: 1.0)
-        case 40..<60: return Color(red: 1.0, green: 0.75, blue: 0.3)
-        default: return Color(red: 1.0, green: 0.4, blue: 0.4)
-        }
-    }
 
     private func categoryIcon(for category: String) -> String {
         category.categoryIcon

@@ -14,9 +14,8 @@ struct BudgetPulseView: View {
     @ObservedObject var viewModel: BudgetViewModel
     @State private var isExpanded = false
     @State private var showingCategoryDetail = false
-    @State private var showingAIReport = false
-    @State private var showingAIInsight = false
     @State private var showDeleteConfirmation = false
+    @State private var showingInsights = false
 
     var body: some View {
         let stateDescription: String
@@ -45,8 +44,6 @@ struct BudgetPulseView: View {
                 print("🎨 [BudgetPulseView] Before reset - isExpanded: \(isExpanded)")
                 isExpanded = false
                 showingCategoryDetail = false
-                showingAIReport = false
-                showingAIInsight = false
                 print("🎨 [BudgetPulseView] After reset - isExpanded: \(isExpanded)")
             }
         .sheet(isPresented: $viewModel.showingSetupSheet) {
@@ -57,15 +54,8 @@ struct BudgetPulseView: View {
                 CategoryBudgetDetailView(progress: progress)
             }
         }
-        .sheet(isPresented: $showingAIReport) {
-            if let report = viewModel.aiMonthlyReportState.data {
-                AIMonthlyReportView(report: report)
-            }
-        }
-        .sheet(isPresented: $showingAIInsight) {
-            if case .loaded(let checkIn) = viewModel.aiCheckInState {
-                AIInsightSheetView(checkIn: checkIn)
-            }
+        .sheet(isPresented: $showingInsights) {
+            BudgetInsightsView(viewModel: viewModel)
         }
         .alert("Remove Budget?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
@@ -81,7 +71,7 @@ struct BudgetPulseView: View {
                 }
             }
         } message: {
-            Text("This will remove your budget tracking. You can set a new AI budget anytime.")
+            Text("This will remove your budget tracking. You can set a new budget anytime.")
         }
     }
 
@@ -135,7 +125,7 @@ struct BudgetPulseView: View {
         return Group {
             if viewModel.isCurrentMonth {
                 // Current month: Show setup button
-                let _ = print("🎨 [BudgetPulseView.noBudgetView] ✅ Showing 'Set Smart Budget' button")
+                let _ = print("🎨 [BudgetPulseView.noBudgetView] ✅ Showing 'Set Budget' button")
                 Button(action: { viewModel.startSetup() }) {
                     HStack(spacing: 12) {
                         ZStack {
@@ -149,7 +139,7 @@ struct BudgetPulseView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Set Smart Budget")
+                            Text("Set Budget")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
 
@@ -191,7 +181,7 @@ struct BudgetPulseView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "sparkles")
                                         .font(.system(size: 10, weight: .semibold))
-                                    Text("Smart Budget")
+                                    Text("Budget")
                                         .font(.system(size: 11, weight: .semibold))
                                 }
                                 .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
@@ -451,83 +441,32 @@ struct BudgetPulseView: View {
         }
     }
 
-    // MARK: - AI Insight Section
+    // MARK: - Insight Section (Non-AI)
 
     private var aiInsightSection: some View {
-        Group {
-            switch viewModel.aiCheckInState {
-            case .idle:
-                Button(action: {
-                    Task {
-                        await viewModel.loadAICheckIn()
-                    }
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 13, weight: .semibold))
-
-                        Text("Get Milo's Insight")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(
-                        Capsule()
-                            .fill(Color(red: 0.3, green: 0.7, blue: 1.0))
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                .frame(maxWidth: .infinity)
-
-            case .loading:
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .tint(.white)
-
-                    Text("Getting insight...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                .frame(maxWidth: .infinity)
-
-            case .loaded(let checkIn):
-                Button(action: { showingAIInsight = true }) {
-                    HStack(spacing: 10) {
-                        Text(checkIn.statusSummary.emoji)
-                            .font(.system(size: 20))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(checkIn.statusSummary.headline)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            Text(checkIn.statusSummary.detail)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                                .lineLimit(2)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.3))
-                    }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white.opacity(0.03))
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                .padding(.horizontal, 16)
-
-            case .error:
-                EmptyView()
+        Button(action: {
+            showingInsights = true
+            Task {
+                await viewModel.loadInsights()
             }
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Text("View Insights")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(Color(red: 0.3, green: 0.7, blue: 1.0))
+            )
         }
+        .buttonStyle(PlainButtonStyle())
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Bottom Action Bar
@@ -553,30 +492,16 @@ struct BudgetPulseView: View {
 
             Spacer()
 
-            // AI Report button
-            Button(action: {
-                Task {
-                    await viewModel.loadAIMonthlyReport()
-                    if viewModel.aiMonthlyReportState.data != nil {
-                        showingAIReport = true
-                    }
-                }
-            }) {
+            // History button (replaced AI Report)
+            Button(action: { showingCategoryDetail = true }) {
                 HStack(spacing: 4) {
-                    if viewModel.aiMonthlyReportState.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .tint(.white.opacity(0.6))
-                    } else {
-                        Image(systemName: "chart.bar.doc.horizontal")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    Text("Report")
+                    Image(systemName: "chart.bar.doc.horizontal")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Details")
                         .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(.white.opacity(0.6))
             }
-            .disabled(viewModel.aiMonthlyReportState.isLoading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

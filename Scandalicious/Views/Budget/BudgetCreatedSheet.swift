@@ -168,7 +168,7 @@ struct BudgetCreatedSheet: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
 
-                Text("Smart Budget Created!")
+                Text("Budget Created!")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(.white)
             }
@@ -246,7 +246,7 @@ struct BudgetCreatedSheet: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
 
-                    Text("Milo's Category Budgets")
+                    Text("Category Budgets")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                 }

@@ -165,7 +165,7 @@ struct BudgetHistoryView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 11, weight: .semibold))
-                            Text("Smart Budget")
+                            Text("Budget")
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))

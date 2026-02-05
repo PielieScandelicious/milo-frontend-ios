@@ -18,7 +18,6 @@ struct ProfileView: View {
     @State private var lastName = ""
     @State private var selectedGender: Gender = .notSpecified
     @State private var showManageSubscription = false
-    @State private var showBankingView = false
     @State private var isLoading = false
     @State private var isSaving = false
     @State private var showSaveSuccess = false
@@ -176,32 +175,6 @@ struct ProfileView: View {
                 Text("Subscription")
             }
 
-            // Bank Accounts
-            Section {
-                Button {
-                    showBankingView = true
-                } label: {
-                    HStack {
-                        Image(systemName: "building.columns.fill")
-                            .foregroundStyle(Color(red: 0.3, green: 0.7, blue: 1.0))
-                            .frame(width: 28)
-
-                        Text("Link Bank Account")
-                            .foregroundStyle(.primary)
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Open Banking")
-            } footer: {
-                Text("Connect your bank to automatically import transactions")
-            }
-
             // Sign Out
             Section {
                 Button(role: .destructive) {
@@ -251,9 +224,6 @@ struct ProfileView: View {
             Text(errorMessage ?? "An unknown error occurred")
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
-        .sheet(isPresented: $showBankingView) {
-            BankingMainView()
-        }
         .onAppear {
             Task {
                 // Load products first, then check status

@@ -84,9 +84,9 @@ class CategoryRegistryManager: ObservableObject {
     private var groupLookup: [String: (icon: String, colorHex: String)] = [:]
     // Sub-category -> group name
     private var subCategoryToGroup: [String: String] = [:]
-    // Sub-category -> mid-level category name (e.g., "Phones & Accessories" -> "Electronics")
+    // Sub-category -> mid-level category name (e.g., "Fresh Produce (Fruit & Veg)" -> "Fruits & Vegetables")
     private var subCategoryToCategory: [String: String] = [:]
-    // Mid-level category -> group name (e.g., "Electronics" -> "Shopping & Personal Care")
+    // Mid-level category -> group name (e.g., "Fruits & Vegetables" -> "Fresh Food")
     private var categoryToGroup: [String: String] = [:]
 
     private var baseURL: String { AppConfiguration.apiBase }
@@ -150,7 +150,7 @@ class CategoryRegistryManager: ObservableObject {
     // MARK: - Lookup Helpers
 
     func groupForSubCategory(_ subCategory: String) -> String {
-        subCategoryToGroup[subCategory] ?? "Miscellaneous"
+        subCategoryToGroup[subCategory] ?? "Other"
     }
 
     /// Get the mid-level category for a sub-category (e.g., "Phones & Accessories" -> "Electronics")
@@ -158,9 +158,9 @@ class CategoryRegistryManager: ObservableObject {
         subCategoryToCategory[subCategory] ?? subCategory
     }
 
-    /// Get the group for a mid-level category (e.g., "Electronics" -> "Shopping & Personal Care")
+    /// Get the group for a mid-level category (e.g., "Snacks" -> "Snacks & Beverages")
     func groupForCategory(_ category: String) -> String {
-        categoryToGroup[category] ?? "Miscellaneous"
+        categoryToGroup[category] ?? "Other"
     }
 
     func iconForSubCategory(_ subCategory: String) -> String {
@@ -177,17 +177,11 @@ class CategoryRegistryManager: ObservableObject {
     func iconForGroup(_ group: String) -> String {
         if let cached = groupLookup[group]?.icon { return cached }
         switch group {
-        case "Housing & Utilities": return "house.fill"
-        case "Food & Dining": return "fork.knife"
-        case "Transportation": return "car.fill"
-        case "Health & Wellness": return "heart.fill"
-        case "Shopping & Personal Care": return "bag.fill"
-        case "Entertainment & Leisure": return "film.fill"
-        case "Financial & Legal": return "banknote.fill"
-        case "Family & Education": return "book.fill"
-        case "Travel & Vacation": return "airplane"
-        case "Gifts & Donations": return "gift.fill"
-        case "Miscellaneous": return "square.grid.2x2.fill"
+        case "Fresh Food": return "leaf.fill"
+        case "Pantry & Frozen": return "cabinet.fill"
+        case "Snacks & Beverages": return "cup.and.saucer.fill"
+        case "Household & Care": return "house.fill"
+        case "Other": return "square.grid.2x2.fill"
         default: return "square.grid.2x2.fill"
         }
     }
@@ -195,17 +189,11 @@ class CategoryRegistryManager: ObservableObject {
     func colorHexForGroup(_ group: String) -> String {
         if let cached = groupLookup[group]?.colorHex { return cached }
         switch group {
-        case "Housing & Utilities": return "#8E44AD"
-        case "Food & Dining": return "#2ECC71"
-        case "Transportation": return "#3498DB"
-        case "Health & Wellness": return "#E74C3C"
-        case "Shopping & Personal Care": return "#E91E8C"
-        case "Entertainment & Leisure": return "#F1C40F"
-        case "Financial & Legal": return "#7F8C8D"
-        case "Family & Education": return "#E67E22"
-        case "Travel & Vacation": return "#5DADE2"
-        case "Gifts & Donations": return "#F06292"
-        case "Miscellaneous": return "#95A5A6"
+        case "Fresh Food": return "#2ECC71"
+        case "Pantry & Frozen": return "#E67E22"
+        case "Snacks & Beverages": return "#E74C3C"
+        case "Household & Care": return "#8E44AD"
+        case "Other": return "#95A5A6"
         default: return "#95A5A6"
         }
     }
@@ -219,17 +207,11 @@ class CategoryRegistryManager: ObservableObject {
     private func setupFallbackData() {
         // Pre-populate lookups with hardcoded values so the app works before API loads
         let fallbackGroups: [(String, String, String)] = [
-            ("Housing & Utilities", "house.fill", "#8E44AD"),
-            ("Food & Dining", "fork.knife", "#2ECC71"),
-            ("Transportation", "car.fill", "#3498DB"),
-            ("Health & Wellness", "heart.fill", "#E74C3C"),
-            ("Shopping & Personal Care", "bag.fill", "#E91E8C"),
-            ("Entertainment & Leisure", "film.fill", "#F1C40F"),
-            ("Financial & Legal", "banknote.fill", "#7F8C8D"),
-            ("Family & Education", "book.fill", "#E67E22"),
-            ("Travel & Vacation", "airplane", "#5DADE2"),
-            ("Gifts & Donations", "gift.fill", "#F06292"),
-            ("Miscellaneous", "square.grid.2x2.fill", "#95A5A6"),
+            ("Fresh Food", "leaf.fill", "#2ECC71"),
+            ("Pantry & Frozen", "cabinet.fill", "#E67E22"),
+            ("Snacks & Beverages", "cup.and.saucer.fill", "#E74C3C"),
+            ("Household & Care", "house.fill", "#8E44AD"),
+            ("Other", "square.grid.2x2.fill", "#95A5A6"),
         ]
         for (name, icon, colorHex) in fallbackGroups {
             groupLookup[name] = (icon: icon, colorHex: colorHex)

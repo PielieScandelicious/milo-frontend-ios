@@ -3,6 +3,7 @@
 //  Scandalicious
 //
 //  Created by Claude on 31/01/2026.
+//  Simplified on 05/02/2026 - Removed AI features
 //
 
 import Foundation
@@ -47,15 +48,6 @@ class BudgetViewModel: ObservableObject {
     @Published var selectedPeriod: String = ""  // "January 2026" format
     @Published var availablePeriods: [String] = []
 
-    // Past month report state (for viewing historical budget performance)
-    @Published var pastMonthReport: AIMonthlyReportResponse?
-    @Published var isLoadingPastMonth = false
-    @Published var pastMonthError: String?
-
-    // Last month summary state
-    @Published var lastMonthSummary: LastMonthSummary?
-    @Published var isLoadingLastMonth = false
-
     // Setup flow state
     @Published var setupBudgetAmount: Double = 0
     @Published var showingSetupSheet = false
@@ -66,22 +58,25 @@ class BudgetViewModel: ObservableObject {
     @Published var editingCategoryAllocations: [CategoryAllocation] = []
     @Published var showingCategoryEditor = false
 
-    // MARK: - AI-Powered State
+    // MARK: - Budget Suggestion State
 
-    @Published var aiSuggestionState: AILoadingState<AIBudgetSuggestionResponse> = .idle
-    @Published var aiCheckInState: AILoadingState<AICheckInResponse> = .idle
-    @Published var aiReceiptAnalysisState: AILoadingState<AIReceiptAnalysisResponse> = .idle
-    @Published var aiMonthlyReportState: AILoadingState<AIMonthlyReportResponse> = .idle
+    @Published var suggestionState: SimpleLoadingState<SimpleBudgetSuggestionResponse> = .idle
 
-    // AI UI state
-    @Published var showingAICheckIn = false
-    @Published var showingAIMonthlyReport = false
+    // Legacy alias for backward compatibility
+    var aiSuggestionState: SimpleLoadingState<SimpleBudgetSuggestionResponse> {
+        get { suggestionState }
+        set { suggestionState = newValue }
+    }
 
     // MARK: - Budget History State
 
     @Published var budgetHistory: [BudgetHistory] = []
     @Published var isLoadingHistory = false
     @Published var historyError: String?
+
+    // MARK: - Budget Insights State
+
+    @Published var insightsState: SimpleLoadingState<BudgetInsightsResponse> = .idle
 
     // MARK: - Private Properties
 
@@ -173,9 +168,8 @@ class BudgetViewModel: ObservableObject {
 
         await loadBudgetForPeriod(selectedPeriod)
 
-        // Load last month summary and budget history in background
+        // Load budget history in background
         Task {
-            await loadLastMonthSummary()
             await loadBudgetHistory()
         }
     }
@@ -189,16 +183,14 @@ class BudgetViewModel: ObservableObject {
             // Current month: Load real-time budget progress
             await loadCurrentMonthProgress()
         } else {
-            // Past month: Load AI monthly report
-            await loadPastMonthReport(period: period)
+            // Past month: Show no budget state (removed AI monthly report)
+            state = .noBudget
         }
     }
 
     /// Load current month's budget progress (real-time tracking)
     private func loadCurrentMonthProgress() async {
         state = .loading
-        pastMonthReport = nil
-        pastMonthError = nil
 
         do {
             let progressResponse = try await apiService.getBudgetProgress()
@@ -215,116 +207,11 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    /// Load past month's AI report (historical performance)
-    private func loadPastMonthReport(period: String) async {
-        isLoadingPastMonth = true
-        pastMonthError = nil
-        state = .loading
-
-        let monthString = convertToAPIFormat(period)
-
-        do {
-            let report = try await apiService.getAIMonthlyReport(month: monthString)
-            pastMonthReport = report
-
-            // Check if budget was actually set (budget amount > 0)
-            // A budget of 0 means no budget was set for that month
-            guard report.budgetAmount > 0 else {
-                state = .noBudget
-                isLoadingPastMonth = false
-                return
-            }
-
-            // Create a synthetic BudgetProgress for consistent UI handling
-            // This allows the UI to use the same state pattern
-            let syntheticBudget = UserBudget(
-                id: "historical",
-                userId: "",
-                monthlyAmount: report.budgetAmount,
-                categoryAllocations: nil,
-                notificationsEnabled: false,
-                alertThresholds: []
-            )
-
-            // Get days in that month
-            if let date = displayFormatter.date(from: period) {
-                let calendar = Calendar.current
-                let daysInMonth = calendar.range(of: .day, in: .month, for: date)?.count ?? 30
-
-                let syntheticProgress = BudgetProgress(
-                    budget: syntheticBudget,
-                    currentSpend: report.totalSpent,
-                    daysElapsed: daysInMonth,
-                    daysInMonth: daysInMonth,
-                    categoryProgress: report.categoryGrades.map { grade in
-                        CategoryBudgetProgress(
-                            category: grade.category,
-                            budgetAmount: grade.budget ?? 0,
-                            currentSpend: grade.spent,
-                            isLocked: false
-                        )
-                    }
-                )
-                state = .active(syntheticProgress)
-            } else {
-                state = .noBudget
-            }
-        } catch {
-            pastMonthError = error.localizedDescription
-            pastMonthReport = nil
-            state = .noBudget  // Show no budget state for past months without data
-        }
-
-        isLoadingPastMonth = false
-    }
-
     /// Switch to a different period
     func selectPeriod(_ period: String) async {
         guard period != selectedPeriod else { return }
         selectedPeriod = period
         await loadBudgetForPeriod(period)
-    }
-
-    /// Load last month's summary for the "How did last month go?" card
-    func loadLastMonthSummary() async {
-        // Get last month
-        guard let lastMonth = Calendar.current.date(byAdding: .month, value: -1, to: Date()) else { return }
-        let lastMonthAPI = apiFormatter.string(from: lastMonth)
-        let lastMonthDisplay = displayFormatter.string(from: lastMonth)
-
-        isLoadingLastMonth = true
-
-        do {
-            let report = try await apiService.getAIMonthlyReport(month: lastMonthAPI)
-
-            // Try to get last month's budget progress too
-            var totalSpent: Double = 0
-            var budgetAmount: Double = 0
-
-            if let progress = try? await apiService.getBudgetProgress(month: lastMonthAPI) {
-                totalSpent = progress.currentSpend
-                budgetAmount = progress.budget.monthlyAmount
-            }
-
-            let wasUnder = totalSpent <= budgetAmount
-            let difference = abs(budgetAmount - totalSpent)
-
-            lastMonthSummary = LastMonthSummary(
-                month: lastMonthDisplay,
-                totalSpent: totalSpent,
-                budgetAmount: budgetAmount,
-                grade: report.grade,
-                score: report.score,
-                headline: report.headline,
-                wasUnderBudget: wasUnder,
-                difference: difference
-            )
-        } catch {
-            // Silently fail - last month summary is optional
-            lastMonthSummary = nil
-        }
-
-        isLoadingLastMonth = false
     }
 
     // MARK: - Period Helpers
@@ -407,7 +294,7 @@ class BudgetViewModel: ObservableObject {
         isLoadingHistory = false
     }
 
-    /// Create a new budget (always uses AI-calculated allocations)
+    /// Create a new budget
     /// Smart budget is enabled by default, which means it will automatically roll over to next month
     func createBudget(amount: Double, categoryAllocations: [CategoryAllocation]? = nil, isSmartBudget: Bool = true) async -> Bool {
         isSaving = true
@@ -527,15 +414,8 @@ class BudgetViewModel: ObservableObject {
             try await apiService.removeBudget(month: monthParam)
             print("🗑️ [BudgetViewModel] API deletion successful, setting state to .noBudget")
 
-            // Reset all AI states FIRST before changing main state
-            aiCheckInState = .idle
-            aiSuggestionState = .idle
-            aiMonthlyReportState = .idle
-
-            // Clear past month report if deleting a past month
-            if !isCurrentMonth {
-                pastMonthReport = nil
-            }
+            // Reset suggestion state
+            suggestionState = .idle
 
             // Then update main state - this will trigger SwiftUI view updates
             state = .noBudget
@@ -561,22 +441,22 @@ class BudgetViewModel: ObservableObject {
 
     // MARK: - Setup Helpers
 
-    /// Start the budget setup flow (uses AI-powered suggestions)
+    /// Start the budget setup flow
     func startSetup() {
         showingSetupSheet = true
         Task {
-            await loadAISuggestion()
+            await loadBudgetSuggestion()
         }
     }
 
-    /// Prepare category allocations for editing based on AI suggestion or current budget
+    /// Prepare category allocations for editing based on suggestion or current budget
     func prepareCategoryAllocationsForEditing() {
         if let progress = state.progress {
             // Use current allocations
             editingCategoryAllocations = progress.budget.categoryAllocations ?? []
-        } else if let aiSuggestion = aiSuggestionState.data {
-            // Use AI-suggested allocations
-            editingCategoryAllocations = aiSuggestion.categoryAllocations.map {
+        } else if let suggestion = suggestionState.data {
+            // Use suggested allocations
+            editingCategoryAllocations = suggestion.categoryAllocations.map {
                 CategoryAllocation(category: $0.category, amount: $0.suggestedAmount, isLocked: false)
             }
         }
@@ -612,81 +492,67 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    // MARK: - AI-Powered Methods
+    // MARK: - Budget Suggestion Methods
 
-    /// Load AI-powered budget suggestion with personalized insights
+    /// Load budget suggestion based on historical spending
+    func loadBudgetSuggestion() async {
+        suggestionState = .loading
+
+        do {
+            let response = try await apiService.getBudgetSuggestion(basedOnMonths: 3)
+            suggestionState = .loaded(response)
+            // Also update the setup amount from suggestion
+            setupBudgetAmount = response.recommendedBudget.amount
+        } catch {
+            suggestionState = .error(error.localizedDescription)
+        }
+    }
+
+    // Legacy alias for backward compatibility
     func loadAISuggestion() async {
-        aiSuggestionState = .loading
-
-        do {
-            let response = try await apiService.getAISuggestion(basedOnMonths: 3)
-            aiSuggestionState = .loaded(response)
-            // Also update the setup amount from AI suggestion
-            setupBudgetAmount = response.aiAnalysis.recommendedBudget.amount
-        } catch {
-            aiSuggestionState = .error(error.localizedDescription)
-        }
+        await loadBudgetSuggestion()
     }
 
-    /// Load weekly AI check-in
-    func loadAICheckIn() async {
-        aiCheckInState = .loading
-
-        do {
-            let response = try await apiService.getAICheckIn()
-            aiCheckInState = .loaded(response)
-        } catch {
-            aiCheckInState = .error(error.localizedDescription)
-        }
-    }
-
-    /// Analyze a receipt for budget impact (call after scanning)
-    func analyzeReceiptForBudget(receiptId: String) async {
-        aiReceiptAnalysisState = .loading
-
-        do {
-            let response = try await apiService.getAIReceiptAnalysis(receiptId: receiptId)
-            aiReceiptAnalysisState = .loaded(response)
-        } catch {
-            aiReceiptAnalysisState = .error(error.localizedDescription)
-        }
-    }
-
-    /// Clear receipt analysis (after dismissing)
-    func clearReceiptAnalysis() {
-        aiReceiptAnalysisState = .idle
-    }
-
-    /// Load AI monthly report
-    func loadAIMonthlyReport(month: String? = nil) async {
-        aiMonthlyReportState = .loading
-
-        // Default to current month
-        let monthString = month ?? {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM"
-            return formatter.string(from: Date())
-        }()
-
-        do {
-            let response = try await apiService.getAIMonthlyReport(month: monthString)
-            aiMonthlyReportState = .loaded(response)
-        } catch {
-            aiMonthlyReportState = .error(error.localizedDescription)
-        }
-    }
-
-    /// Check if weekly check-in should be shown
-    var shouldShowWeeklyCheckIn: Bool {
-        guard case .active = state else { return false }
-        return true
-    }
-
-    /// Start AI setup flow (with AI-powered suggestions)
+    /// Start setup flow (legacy alias)
     func startAISetup() {
-        showingSetupSheet = true
-        Task {
-            await loadAISuggestion()
+        startSetup()
+    }
+
+    // MARK: - Budget Insights
+
+    /// Load budget insights (deterministic, no AI)
+    func loadInsights() async {
+        insightsState = .loading
+
+        do {
+            let response = try await apiService.getBudgetInsights()
+            insightsState = .loaded(response)
+        } catch {
+            insightsState = .error(error.localizedDescription)
+        }
+    }
+
+    /// Load insights with specific options
+    func loadInsights(
+        includeBenchmarks: Bool = true,
+        includeFlags: Bool = true,
+        includeQuickWins: Bool = true,
+        includeVolatility: Bool = true,
+        includeProgress: Bool = true
+    ) async {
+        insightsState = .loading
+
+        do {
+            let response = try await apiService.getBudgetInsights(
+                includeBenchmarks: includeBenchmarks,
+                includeFlags: includeFlags,
+                includeQuickWins: includeQuickWins,
+                includeVolatility: includeVolatility,
+                includeProgress: includeProgress
+            )
+            insightsState = .loaded(response)
+        } catch {
+            insightsState = .error(error.localizedDescription)
         }
     }
 }

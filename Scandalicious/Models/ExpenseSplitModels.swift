@@ -8,6 +8,13 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Split Mode
+
+enum SplitMode: String, CaseIterable {
+    case equal = "Equal"
+    case custom = "Custom"
+}
+
 // MARK: - Friend Color Palette
 
 /// 8 vibrant colors for friend avatars

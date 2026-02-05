@@ -9,7 +9,6 @@ import SwiftUI
 import FirebaseCore
 import GoogleSignIn
 import StoreKit
-import UserNotifications
 
 @main
 struct ScandaLiciousApp: App {
@@ -17,11 +16,7 @@ struct ScandaLiciousApp: App {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var hasCheckedSubscription = false
-    @State private var hasPerformedInitialSync = false
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-
-    /// Background sync manager singleton (not observable, uses NotificationCenter)
-    private var backgroundSyncManager: BackgroundSyncManager { BackgroundSyncManager.shared }
 
     init() {
         // Configure Firebase FIRST
@@ -57,14 +52,7 @@ struct ScandaLiciousApp: App {
             .environmentObject(subscriptionManager)
             .onOpenURL { url in
                 // Handle Google Sign-In OAuth callback
-                if GIDSignIn.sharedInstance.handle(url) {
-                    return
-                }
-
-                // Handle banking deep links (milo://banking/callback or milo://banking/error)
-                if url.scheme == "milo" {
-                    handleBankingDeepLink(url)
-                }
+                GIDSignIn.sharedInstance.handle(url)
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 handleScenePhaseChange(from: oldPhase, to: newPhase)
@@ -95,74 +83,6 @@ struct ScandaLiciousApp: App {
         }
     }
 
-    // MARK: - Banking Deep Link Handling
-
-    private func handleBankingDeepLink(_ url: URL) {
-        guard let host = url.host else {
-            return
-        }
-
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return
-        }
-
-        let queryItems = components.queryItems ?? []
-        let path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-
-        switch host {
-        case "banking":
-            handleBankingPath(path: path, queryItems: queryItems)
-        default:
-            break
-        }
-    }
-
-    private func handleBankingPath(path: String, queryItems: [URLQueryItem]) {
-        switch path {
-        case "callback":
-            // Success callback: milo://banking/callback?connection_id=xxx&status=success&accounts=2
-            let connectionId = queryItems.first { $0.name == "connection_id" }?.value
-            let status = queryItems.first { $0.name == "status" }?.value
-            let accountsCount = Int(queryItems.first { $0.name == "accounts" }?.value ?? "0") ?? 0
-
-            let result = BankingCallbackResult(
-                connectionId: connectionId,
-                status: status == "success" ? .success : .error,
-                accountCount: accountsCount,
-                errorMessage: nil
-            )
-
-            NotificationCenter.default.post(
-                name: .bankConnectionCompleted,
-                object: nil,
-                userInfo: ["result": result]
-            )
-
-        case "error":
-            // Error callback: milo://banking/error?error=authorization_failed&message=User%20cancelled
-            let error = queryItems.first { $0.name == "error" }?.value ?? "unknown_error"
-            let message = queryItems.first { $0.name == "message" }?.value?.removingPercentEncoding
-
-            let callbackStatus: BankingCallbackResult.CallbackStatus = error == "user_cancelled" ? .cancelled : .error
-
-            let result = BankingCallbackResult(
-                connectionId: nil,
-                status: callbackStatus,
-                accountCount: 0,
-                errorMessage: message ?? error
-            )
-
-            NotificationCenter.default.post(
-                name: .bankConnectionFailed,
-                object: nil,
-                userInfo: ["result": result]
-            )
-
-        default:
-            break
-        }
-    }
-
     // MARK: - Scene Phase Handling
 
     private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
@@ -176,21 +96,8 @@ struct ScandaLiciousApp: App {
                 await subscriptionManager.updateSubscriptionStatus()
             }
 
-            // Auto-sync bank transactions when app becomes active
-            if authManager.isAuthenticated && authManager.profileCompleted {
-                Task {
-                    await performAutoSync()
-                }
-            }
-
-            // Clear badge when app opens
-            backgroundSyncManager.clearBadge()
-
         case .background:
-            // Schedule background refresh when app goes to background
-            if authManager.isAuthenticated {
-                backgroundSyncManager.scheduleBackgroundRefresh()
-            }
+            break
 
         case .inactive:
             break
@@ -199,84 +106,17 @@ struct ScandaLiciousApp: App {
             break
         }
     }
-
-    /// Perform auto-sync of bank transactions
-    private func performAutoSync() async {
-        // Skip if we've already done initial sync this session and it's been less than 5 minutes
-        if hasPerformedInitialSync && !backgroundSyncManager.shouldRefresh {
-            return
-        }
-
-        let result = await backgroundSyncManager.performForegroundSync()
-
-        hasPerformedInitialSync = true
-    }
 }
 
 // MARK: - App Delegate
 
-/// AppDelegate for registering background tasks early in app lifecycle
-class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+/// AppDelegate for app lifecycle handling
+class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Register background tasks
-        BackgroundSyncManager.shared.registerBackgroundTasks()
-
-        // Configure notification categories
-        BackgroundSyncManager.shared.configureNotificationCategories()
-
-        // Set notification delegate
-        UNUserNotificationCenter.current().delegate = self
-
-        // Request notification permissions
-        Task {
-            _ = await BackgroundSyncManager.shared.requestNotificationPermissions()
-        }
-
         return true
-    }
-
-    // MARK: - UNUserNotificationCenterDelegate
-
-    /// Handle notification when app is in foreground
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        // Show notification even when app is in foreground
-        completionHandler([.banner, .sound, .badge])
-    }
-
-    /// Handle notification tap
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
-    ) {
-        let userInfo = response.notification.request.content.userInfo
-
-        if let type = userInfo["type"] as? String, type == "bank_transactions" {
-            // Post notification for app to navigate to banking/review
-            NotificationCenter.default.post(
-                name: .bankTransactionsPendingReview,
-                object: nil,
-                userInfo: userInfo
-            )
-
-            // If review action tapped, signal immediate navigation
-            if response.actionIdentifier == "REVIEW_ACTION" {
-                NotificationCenter.default.post(
-                    name: .bankTransactionsPendingReview,
-                    object: nil,
-                    userInfo: ["shouldNavigate": true]
-                )
-            }
-        }
-
-        completionHandler()
     }
 }

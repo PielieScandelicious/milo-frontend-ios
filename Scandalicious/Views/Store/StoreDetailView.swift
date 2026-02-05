@@ -33,9 +33,6 @@ struct StoreDetailView: View {
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
 
-    // Expandable transactions section (for bank-imported transactions)
-    @State private var isTransactionsSectionExpanded = false
-
     // Split expense
     @State private var receiptToSplit: APIReceipt?
 
@@ -250,11 +247,20 @@ struct StoreDetailView: View {
                     )
                     .padding(.top, 24)
 
-                    // Grouped category sections
-                    if !categoriesByGroup.isEmpty {
-                        VStack(spacing: 20) {
-                            ForEach(categoriesByGroup) { group in
-                                groupSection(group: group)
+                    // Category section with single header
+                    if !currentCategories.isEmpty {
+                        VStack(spacing: 8) {
+                            // Single "Categories" header
+                            categoriesSectionHeader(categoryCount: currentCategories.count)
+
+                            // Flat list of category rows
+                            ForEach(currentCategories) { category in
+                                let segment = categoryToSegment(category: category)
+                                let normalizedName = category.name.normalizedCategoryName
+                                // Use groceryHealthIcon if available, fall back to categoryIcon for guaranteed icon
+                                let icon = normalizedName.groceryHealthIcon ?? normalizedName.categoryIcon
+                                // Pass original category name for API filtering (not normalized)
+                                expandableCategoryRow(segment: segment, isOther: false, icon: icon, originalCategoryName: category.name)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -265,11 +271,6 @@ struct StoreDetailView: View {
                     receiptsSection
                         .padding(.horizontal, 16)
                         .padding(.top, 24)
-
-                    // Expandable Transactions Section (Bank-Imported)
-                    transactionsSection
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
 
                     // Bottom spacing
                     Color.clear.frame(height: 32)
@@ -343,8 +344,19 @@ struct StoreDetailView: View {
             // Handle "All" period - no date filtering
             if storeBreakdown.period == "All" {
                 filters.period = .all
+            } else if let year = Int(storeBreakdown.period), year >= 2000 && year <= 2100 {
+                // Handle year period (e.g., "2025")
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: "UTC")!
+
+                let startOfYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
+                let endOfYear = calendar.date(from: DateComponents(year: year, month: 12, day: 31))!
+
+                filters.period = .year
+                filters.startDate = startOfYear
+                filters.endDate = endOfYear
             } else {
-                // Parse the period to get date range
+                // Parse the period as month (e.g., "January 2026")
                 let dateFormatter = DateFormatter()
                 dateFormatter.dateFormat = "MMMM yyyy"
                 dateFormatter.locale = Locale(identifier: "en_US")
@@ -400,49 +412,43 @@ struct StoreDetailView: View {
         }
     }
 
-    // MARK: - Grouped Category Section
+    // MARK: - Categories Section Header
 
-    private func groupSection(group: CategoryGroup) -> some View {
-        VStack(spacing: 8) {
-            // Group header
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(group.groupColor.opacity(0.15))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: group.groupIcon)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(group.groupColor)
-                }
+    private func categoriesSectionHeader(categoryCount: Int) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+            }
 
-                Text(group.groupName)
-                    .font(.system(size: 15, weight: .bold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Categories")
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
-
-                Spacer()
-
-                Text(String(format: "€%.0f", group.totalSpent))
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.5))
+                Text("\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
             }
-            .padding(.bottom, 4)
 
-            // Category rows within this group
-            ForEach(group.categories) { category in
-                let segment = categoryToSegment(category: category)
-                expandableCategoryRow(segment: segment, isOther: false, icon: category.name.groceryHealthIcon)
-            }
+            Spacer()
         }
     }
 
     /// Convert a Category to a ChartSegment for use in expandableCategoryRow.
     /// Grocery sub-categories get health-themed colors instead of the parent group color.
     private func categoryToSegment(category: Category) -> ChartSegment {
+        // Normalize name in case backend returns enum-style names (e.g., "MEAT_FISH" -> "Meat & Fish")
+        let normalizedName = category.name.normalizedCategoryName
+
         let color: Color
-        if let healthColor = category.name.groceryHealthColor {
+        if let healthColor = normalizedName.groceryHealthColor {
             color = healthColor
         } else {
-            color = category.groupColorHex.flatMap { Color(hex: $0) } ?? category.name.categoryColor
+            color = category.groupColorHex.flatMap { Color(hex: $0) } ?? normalizedName.categoryColor
         }
 
         return ChartSegment(
@@ -450,7 +456,7 @@ struct StoreDetailView: View {
             endAngle: .degrees(0),
             color: color,
             value: category.spent,
-            label: category.name,
+            label: normalizedName,
             percentage: category.percentage
         )
     }
@@ -608,23 +614,11 @@ struct StoreDetailView: View {
         }
     }
 
-    // MARK: - Filtered Receipts and Transactions
+    // MARK: - Filtered Receipts
 
-    /// Actual scanned receipts (source == receiptUpload)
+    /// All receipts (no longer filtering by source)
     private var actualReceipts: [APIReceipt] {
         receiptsViewModel.receipts
-            .filter { $0.source == .receiptUpload }
-            .sorted { receipt1, receipt2 in
-                let date1 = receipt1.dateParsed ?? Date.distantPast
-                let date2 = receipt2.dateParsed ?? Date.distantPast
-                return date1 > date2
-            }
-    }
-
-    /// Bank-imported transactions (source == bankImport)
-    private var bankTransactions: [APIReceipt] {
-        receiptsViewModel.receipts
-            .filter { $0.source == .bankImport }
             .sorted { receipt1, receipt2 in
                 let date1 = receipt1.dateParsed ?? Date.distantPast
                 let date2 = receipt2.dateParsed ?? Date.distantPast
@@ -634,146 +628,6 @@ struct StoreDetailView: View {
 
     private var sortedReceipts: [APIReceipt] {
         actualReceipts
-    }
-
-    // MARK: - Transactions Section (Bank-Imported)
-
-    private var transactionsSection: some View {
-        VStack(spacing: 0) {
-            // Header button with glass-morphism
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    isTransactionsSectionExpanded.toggle()
-                }
-                if isTransactionsSectionExpanded && receiptsViewModel.receipts.isEmpty {
-                    loadReceipts()
-                }
-            } label: {
-                HStack(spacing: 14) {
-                    // Transaction icon
-                    ZStack {
-                        Circle()
-                            .fill(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.15))
-                            .frame(width: 40, height: 40)
-
-                        Image(systemName: "creditcard.fill")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-                    }
-
-                    // Title
-                    Text("Transactions")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    Spacer()
-
-                    // Count badge
-                    if bankTransactions.count > 0 {
-                        Text("\(bankTransactions.count)")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.2))
-                            )
-                    }
-
-                    // Chevron
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.4))
-                        .rotationEffect(.degrees(isTransactionsSectionExpanded ? 180 : 0))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(
-                    ZStack {
-                        // Glass base
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.white.opacity(0.04))
-
-                        // Gradient overlay
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.07), Color.white.opacity(0.02)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    }
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.3), Color.white.opacity(0.04)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-            }
-            .buttonStyle(ReceiptsHeaderButtonStyle())
-
-            // Expanded transactions list
-            if isTransactionsSectionExpanded {
-                VStack(spacing: 12) {
-                    if receiptsViewModel.state.isLoading && bankTransactions.isEmpty {
-                        HStack(spacing: 12) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.0)
-                            Text("Loading transactions...")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-                    } else if bankTransactions.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "creditcard.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(.white.opacity(0.3))
-                            Text("No Transactions")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.white)
-                            Text("No bank transactions found for this store")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
-                    } else {
-                        LazyVStack(spacing: 12) {
-                            ForEach(bankTransactions) { transaction in
-                                BankTransactionCard(
-                                    receipt: transaction,
-                                    onDelete: {
-                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                            deleteReceipt(transaction)
-                                        }
-                                    },
-                                    onSplit: {
-                                        receiptToSplit = transaction
-                                    }
-                                )
-                                .transition(.asymmetric(
-                                    insertion: .opacity,
-                                    removal: .move(edge: .leading).combined(with: .opacity)
-                                ))
-                            }
-                        }
-                        .animation(.easeInOut(duration: 0.3), value: bankTransactions.count)
-                    }
-                }
-                .padding(.top, 12)
-                .transition(.opacity)
-            }
-        }
     }
 
     private func loadReceipts() {
@@ -810,8 +664,11 @@ struct StoreDetailView: View {
 
     // MARK: - Expandable Category Row
 
-    private func expandableCategoryRow(segment: ChartSegment, isOther: Bool, icon: String? = nil) -> some View {
-        VStack(spacing: 0) {
+    private func expandableCategoryRow(segment: ChartSegment, isOther: Bool, icon: String? = nil, originalCategoryName: String? = nil) -> some View {
+        // Use original category name for API filtering, fall back to segment.label
+        let categoryForAPI = originalCategoryName ?? segment.label
+
+        return VStack(spacing: 0) {
             // Category header button
             Button {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -819,7 +676,8 @@ struct StoreDetailView: View {
                         expandedCategoryName = nil
                     } else {
                         expandedCategoryName = segment.label
-                        loadCategoryTransactions(category: segment.label)
+                        // Use original category name for API filtering, but store under display key
+                        loadCategoryTransactions(category: categoryForAPI, displayKey: segment.label)
                     }
                 }
             } label: {
@@ -958,28 +816,41 @@ struct StoreDetailView: View {
         )
     }
 
-    private func loadCategoryTransactions(category: String) {
-        guard categoryTransactions[category] == nil else { return }
+    private func loadCategoryTransactions(category: String, displayKey: String) {
+        // Use displayKey for storage/retrieval (matches segment.label used in UI)
+        guard categoryTransactions[displayKey] == nil else { return }
 
-        loadingCategories.insert(category)
+        loadingCategories.insert(displayKey)
 
         Task {
             do {
                 var filters = TransactionFilters()
                 filters.storeName = storeBreakdown.storeName
-                filters.category = category
+                filters.category = category  // Use original category for API filtering
                 filters.pageSize = 100
 
-                // Handle "All" period - no date filtering
-                if storeBreakdown.period != "All" {
-                    // Parse the period to get date range
+                // Handle period filtering
+                if storeBreakdown.period == "All" {
+                    // No date filtering for "All" period
+                } else if let year = Int(storeBreakdown.period), year >= 2000 && year <= 2100 {
+                    // Handle year period (e.g., "2025")
+                    var calendar = Calendar(identifier: .gregorian)
+                    calendar.timeZone = TimeZone(identifier: "UTC")!
+
+                    let startOfYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
+                    let endOfYear = calendar.date(from: DateComponents(year: year, month: 12, day: 31))!
+
+                    filters.startDate = startOfYear
+                    filters.endDate = endOfYear
+                } else {
+                    // Parse the period as month (e.g., "January 2026")
                     let dateFormatter = DateFormatter()
                     dateFormatter.dateFormat = "MMMM yyyy"
                     dateFormatter.locale = Locale(identifier: "en_US")
                     dateFormatter.timeZone = TimeZone(identifier: "UTC")
 
                     guard let parsedDate = dateFormatter.date(from: storeBreakdown.period) else {
-                        loadingCategories.remove(category)
+                        loadingCategories.remove(displayKey)
                         return
                     }
 
@@ -996,12 +867,12 @@ struct StoreDetailView: View {
                 let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
 
                 await MainActor.run {
-                    categoryTransactions[category] = response.transactions
-                    loadingCategories.remove(category)
+                    categoryTransactions[displayKey] = response.transactions  // Store under display key
+                    loadingCategories.remove(displayKey)
                 }
             } catch {
                 await MainActor.run {
-                    loadingCategories.remove(category)
+                    loadingCategories.remove(displayKey)
                 }
             }
         }

@@ -151,7 +151,7 @@ struct CategoryBreakdown: Codable, Identifiable {
     }
 
     var icon: String {
-        name.categoryIcon
+        name.normalizedCategoryName.categoryIcon
     }
 }
 
@@ -454,7 +454,7 @@ struct APITransaction: Codable, Identifiable {
     }
 
     var icon: String {
-        category.categoryIcon
+        category.normalizedCategoryName.categoryIcon
     }
 
     var totalPrice: Double {
@@ -563,7 +563,6 @@ struct ReceiptsListResponse: Codable {
 
 enum APIReceiptSource: String, Codable {
     case receiptUpload = "receipt_upload"
-    case bankImport = "bank_import"
 }
 
 struct APIReceipt: Codable, Identifiable {
@@ -573,7 +572,7 @@ struct APIReceipt: Codable, Identifiable {
     let totalAmount: Double?
     let itemsCount: Int
     let averageHealthScore: Double?
-    let source: APIReceiptSource  // receipt_upload or bank_import
+    let source: APIReceiptSource
     let transactions: [APIReceiptItem]
 
     var id: String { receiptId }
@@ -613,11 +612,6 @@ struct APIReceipt: Codable, Identifiable {
         // Default to receiptUpload for backwards compatibility
         source = try container.decodeIfPresent(APIReceiptSource.self, forKey: .source) ?? .receiptUpload
         transactions = try container.decode([APIReceiptItem].self, forKey: .transactions)
-    }
-
-    /// Whether this is a bank-imported transaction (vs scanned receipt)
-    var isBankImport: Bool {
-        source == .bankImport
     }
 
     var dateParsed: Date? {
@@ -1026,7 +1020,7 @@ struct TopCategory: Codable, Identifiable {
 
     /// Get the SF Symbol icon for this category
     var icon: String {
-        name.categoryIcon
+        name.normalizedCategoryName.categoryIcon
     }
 }
 
@@ -1268,14 +1262,23 @@ struct CategorySpendItem: Codable, Identifiable {
 
     // MARK: - Computed Properties
 
-    /// Color from hex string, falls back to category-based color
+    /// Normalized display name (handles enum-style names like "MEAT_FISH" → "Meat & Fish")
+    var normalizedName: String {
+        name.normalizedCategoryName
+    }
+
+    /// Color from health-based gradient (green=healthy → red=unhealthy) if available,
+    /// otherwise falls back to hex string or category-based color
     var color: Color {
-        Color(hex: colorHex) ?? name.categoryColor
+        if let healthColor = normalizedName.groceryHealthColor {
+            return healthColor
+        }
+        return Color(hex: colorHex) ?? normalizedName.categoryColor
     }
 
     /// SF Symbol icon for this category
     var icon: String {
-        name.categoryIcon
+        normalizedName.categoryIcon
     }
 
     /// Formatted percentage string
@@ -1294,7 +1297,7 @@ struct CategorySpendItem: Codable, Identifiable {
             value: totalSpent,
             color: color,
             iconName: icon,
-            label: name
+            label: normalizedName
         )
     }
 }

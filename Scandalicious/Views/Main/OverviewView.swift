@@ -83,7 +83,6 @@ struct OverviewView: View {
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
     @State private var storeRowsAppeared = false // Track staggered animation state
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
-    @State private var isTransactionsSectionExpanded = false // Track bank transactions section expansion
     @State private var allTimeTotalSpend: Double = 0 // Cached all-time total spend from backend
     @State private var allTimeTotalReceipts: Int = 0 // Cached all-time receipt count from backend
     @State private var allTimeHealthScore: Double? = nil // Cached all-time health score from backend
@@ -497,14 +496,8 @@ struct OverviewView: View {
                 CategoryBreakdownDetailView(month: components.month, year: components.year)
             }
             .sheet(item: $receiptToSplit) { receipt in
-                // Use appropriate split view based on receipt source
-                if receipt.source == .bankImport {
-                    // Bank-imported transactions use custom/equal split
-                    SplitBankTransactionView(receipt: receipt)
-                } else {
-                    // Scanned receipts use line item splitting
-                    SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
-                }
+                // Scanned receipts use line item splitting
+                SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
             }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
@@ -903,18 +896,32 @@ struct OverviewView: View {
     private func categoryDataForPeriod(_ period: String) -> [CategorySpendItem] {
         // Month periods: use pieChartSummaryCache
         if !isAllPeriod(period) && !isYearPeriod(period) {
-            return pieChartSummaryCache[period]?.categories ?? []
+            // Normalize category names in case backend returns enum-style names
+            return (pieChartSummaryCache[period]?.categories ?? []).map { category in
+                let normalizedName = category.name.normalizedCategoryName
+                return CategorySpendItem(
+                    categoryId: category.categoryId,
+                    name: normalizedName,
+                    totalSpent: category.totalSpent,
+                    colorHex: normalizedName.categoryColorHex,
+                    percentage: category.percentage,
+                    transactionCount: category.transactionCount,
+                    averageHealthScore: category.averageHealthScore
+                )
+            }
         }
 
         // Year periods: convert from YearSummaryResponse topCategories
         if isYearPeriod(period), let yearSummary = yearSummaryCache[period], let categories = yearSummary.topCategories {
             return categories.map { category in
                 // Convert CategoryBreakdown to CategorySpendItem
+                // Normalize name in case backend returns enum-style names (e.g., "MEAT_FISH" -> "Meat & Fish")
+                let normalizedName = category.name.normalizedCategoryName
                 return CategorySpendItem(
                     categoryId: category.name,
-                    name: category.name,
+                    name: normalizedName,
                     totalSpent: category.spent,
-                    colorHex: category.name.categoryColorHex,
+                    colorHex: normalizedName.categoryColorHex,
                     percentage: category.percentage,
                     transactionCount: category.transactionCount,
                     averageHealthScore: category.averageHealthScore
@@ -926,11 +933,13 @@ struct OverviewView: View {
         if isAllPeriod(period) {
             return allTimeCategories.map { category in
                 // Convert AggregateCategory to CategorySpendItem
+                // Normalize name in case backend returns enum-style names (e.g., "MEAT_FISH" -> "Meat & Fish")
+                let normalizedName = category.name.normalizedCategoryName
                 return CategorySpendItem(
                     categoryId: category.name,
-                    name: category.name,
+                    name: normalizedName,
                     totalSpent: category.totalSpent,
-                    colorHex: category.name.categoryColorHex,
+                    colorHex: normalizedName.categoryColorHex,
                     percentage: category.percentage,
                     transactionCount: category.transactionCount,
                     averageHealthScore: category.averageHealthScore
@@ -1374,7 +1383,6 @@ struct OverviewView: View {
             VStack(spacing: 12) {
                 overviewContentForPeriod(selectedPeriod)
                 receiptsSection
-                transactionsSection
             }
             .padding(.top, 16)
             .padding(.bottom, bottomSafeArea + 90)
@@ -1738,63 +1746,40 @@ struct OverviewView: View {
                     let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
                     let hasMoreCategories = categories.count > maxVisibleRows
 
-                    // Category rows grouped by mid-level category (e.g., "Groceries", "Electronics")
+                    // Category rows with single "Categories" header (no grouping)
                     VStack(spacing: 6) {
-                        let registry = CategoryRegistryManager.shared
-                        let groupedCategories = Dictionary(grouping: displayCategories, by: { registry.categoryForSubCategory($0.name) })
-                        let sortedMidCategories = groupedCategories.keys.sorted { a, b in
-                            let totalA = groupedCategories[a]!.reduce(0.0) { $0 + $1.totalSpent }
-                            let totalB = groupedCategories[b]!.reduce(0.0) { $0 + $1.totalSpent }
-                            return totalA > totalB
-                        }
+                        // Single "Categories" section header
+                        categoriesSectionHeader(
+                            categoryCount: categories.count,
+                            isAllTime: isAllPeriod(period),
+                            isYear: isYearPeriod(period)
+                        )
 
-                        // Track cumulative index for staggered animation
-                        let allCategoriesInOrder: [(midCategory: String, category: CategorySpendItem)] = sortedMidCategories.flatMap { midCat in
-                            (groupedCategories[midCat] ?? []).map { (midCategory: midCat, category: $0) }
-                        }
-
-                        ForEach(sortedMidCategories, id: \.self) { midCategoryName in
-                            if let groupCats = groupedCategories[midCategoryName], !groupCats.isEmpty {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    // Mid-level category header (icon/color from parent group)
-                                    let parentGroup = registry.groupForCategory(midCategoryName)
-                                    groupSectionHeader(
-                                        groupName: midCategoryName,
-                                        icon: registry.iconForGroup(parentGroup),
-                                        colorHex: registry.colorHexForGroup(parentGroup)
-                                    )
-
-                                    // Category rows in this group
-                                    ForEach(groupCats, id: \.id) { category in
-                                        let globalIndex = allCategoriesInOrder.firstIndex(where: { $0.category.id == category.id }) ?? 0
-
-                                        VStack(spacing: 0) {
-                                            // Category row header (tappable to expand)
-                                            ExpandableCategoryRowHeader(
-                                                category: category,
-                                                isExpanded: expandedCategoryId == category.id,
-                                                onTap: {
-                                                    toggleCategoryExpansion(category, period: period)
-                                                }
-                                            )
-
-                                            // Expanded items section
-                                            if expandedCategoryId == category.id {
-                                                expandedCategoryItemsSection(category)
-                                                    .transition(.opacity.combined(with: .move(edge: .top)))
-                                            }
-                                        }
-                                        .opacity(storeRowsAppeared ? 1 : 0)
-                                        .offset(y: storeRowsAppeared ? 0 : 15)
-                                        .animation(
-                                            Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                                .delay(Double(globalIndex) * 0.08),
-                                            value: storeRowsAppeared
-                                        )
+                        // Category rows (flat list, no grouping)
+                        ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
+                            VStack(spacing: 0) {
+                                // Category row header (tappable to expand)
+                                ExpandableCategoryRowHeader(
+                                    category: category,
+                                    isExpanded: expandedCategoryId == category.id,
+                                    onTap: {
+                                        toggleCategoryExpansion(category, period: period)
                                     }
+                                )
+
+                                // Expanded items section
+                                if expandedCategoryId == category.id {
+                                    expandedCategoryItemsSection(category)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
                                 }
-                                .padding(.top, 4)
                             }
+                            .opacity(storeRowsAppeared ? 1 : 0)
+                            .offset(y: storeRowsAppeared ? 0 : 15)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.08),
+                                value: storeRowsAppeared
+                            )
                         }
 
                         // Show All / Show Less button
@@ -1819,53 +1804,32 @@ struct OverviewView: View {
                     let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
                     let hasMoreSegments = segments.count > maxVisibleRows
 
-                    // Store rows grouped by category group
+                    // Store rows with single "Stores" header (no grouping)
                     VStack(spacing: 6) {
-                        let groupedSegments = Dictionary(grouping: displaySegments, by: { $0.group ?? "Other" })
-                        let sortedGroups = groupedSegments.keys.sorted { a, b in
-                            let totalA = groupedSegments[a]!.reduce(0.0) { $0 + $1.amount }
-                            let totalB = groupedSegments[b]!.reduce(0.0) { $0 + $1.amount }
-                            return totalA > totalB
-                        }
+                        // Single "Stores" section header
+                        storesSectionHeader(
+                            storeCount: segments.count,
+                            isAllTime: isAllPeriod(period),
+                            isYear: isYearPeriod(period)
+                        )
 
-                        // Track cumulative index for staggered animation
-                        let allSegmentsInOrder: [(group: String, segment: StoreChartSegment)] = sortedGroups.flatMap { group in
-                            (groupedSegments[group] ?? []).map { (group: group, segment: $0) }
-                        }
-
-                        ForEach(sortedGroups, id: \.self) { groupName in
-                            if let groupStores = groupedSegments[groupName], !groupStores.isEmpty {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    // Group header
-                                    groupSectionHeader(
-                                        groupName: groupName,
-                                        icon: groupStores.first?.groupIcon ?? "square.grid.2x2.fill",
-                                        colorHex: groupStores.first?.groupColorHex ?? "#95A5A6"
-                                    )
-
-                                    // Store rows in this group
-                                    ForEach(groupStores, id: \.id) { segment in
-                                        let globalIndex = allSegmentsInOrder.firstIndex(where: { $0.segment.storeName == segment.storeName }) ?? 0
-
-                                        StoreRowButton(
-                                            segment: segment,
-                                            breakdowns: breakdowns,
-                                            onSelect: { breakdown, color in
-                                                selectedStoreColor = color
-                                                selectedBreakdown = breakdown
-                                            }
-                                        )
-                                        .opacity(storeRowsAppeared ? 1 : 0)
-                                        .offset(y: storeRowsAppeared ? 0 : 15)
-                                        .animation(
-                                            Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                                .delay(Double(globalIndex) * 0.08),
-                                            value: storeRowsAppeared
-                                        )
-                                    }
+                        // Store rows (flat list, no grouping)
+                        ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
+                            StoreRowButton(
+                                segment: segment,
+                                breakdowns: breakdowns,
+                                onSelect: { breakdown, color in
+                                    selectedStoreColor = color
+                                    selectedBreakdown = breakdown
                                 }
-                                .padding(.top, 4)
-                            }
+                            )
+                            .opacity(storeRowsAppeared ? 1 : 0)
+                            .offset(y: storeRowsAppeared ? 0 : 15)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index) * 0.08),
+                                value: storeRowsAppeared
+                            )
                         }
 
                         // Show All / Show Less button
@@ -1962,6 +1926,22 @@ struct OverviewView: View {
         return segments
     }
 
+    /// Look up a store's group info from cached month period data
+    /// Used as fallback for year/all-time periods where StoreBreakdown has no categories
+    private func lookupStoreGroup(_ storeName: String) -> (group: String, colorHex: String, icon: String)? {
+        for (period, breakdowns) in cachedBreakdownsByPeriod {
+            // Only look in month periods (not year or all-time)
+            guard !isAllPeriod(period) && !isYearPeriod(period) else { continue }
+            if let match = breakdowns.first(where: { $0.storeName == storeName }),
+               let group = match.primaryGroup,
+               let colorHex = match.primaryGroupColorHex,
+               let icon = match.primaryGroupIcon {
+                return (group, colorHex, icon)
+            }
+        }
+        return nil
+    }
+
     /// Compute store segments for a period (expensive - cache result)
     private func computeStoreSegments(for period: String) -> [StoreChartSegment] {
         let breakdowns = getCachedBreakdowns(for: period)
@@ -1989,6 +1969,18 @@ struct OverviewView: View {
         return uniqueBreakdowns.enumerated().map { index, breakdown in
             let percentage = breakdown.totalStoreSpend / totalSpend
             let angleRange = 360.0 * percentage
+
+            // Use breakdown's own group info, or fall back to cached month data
+            var group = breakdown.primaryGroup
+            var groupColorHex = breakdown.primaryGroupColorHex
+            var groupIcon = breakdown.primaryGroupIcon
+
+            if group == nil, let cached = lookupStoreGroup(breakdown.storeName) {
+                group = cached.group
+                groupColorHex = cached.colorHex
+                groupIcon = cached.icon
+            }
+
             let segment = StoreChartSegment(
                 startAngle: .degrees(currentAngle),
                 endAngle: .degrees(currentAngle + angleRange),
@@ -1997,9 +1989,9 @@ struct OverviewView: View {
                 amount: breakdown.totalStoreSpend,
                 percentage: Int(percentage * 100),
                 healthScore: breakdown.averageHealthScore,
-                group: breakdown.primaryGroup,
-                groupColorHex: breakdown.primaryGroupColorHex,
-                groupIcon: breakdown.primaryGroupIcon
+                group: group,
+                groupColorHex: groupColorHex,
+                groupIcon: groupIcon
             )
             currentAngle += angleRange
             return segment
@@ -2037,7 +2029,7 @@ struct OverviewView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Stores & Businesses")
+                Text("Stores")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                 let subtitle: String = {
@@ -2053,29 +2045,6 @@ struct OverviewView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
             }
-
-            Spacer()
-        }
-    }
-
-    // MARK: - Group Section Header
-
-    private func groupSectionHeader(groupName: String, icon: String, colorHex: String) -> some View {
-        let groupColor = Color(hex: colorHex) ?? .white.opacity(0.7)
-
-        return HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(groupColor.opacity(0.15))
-                    .frame(width: 30, height: 30)
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(groupColor)
-            }
-
-            Text(groupName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white.opacity(0.85))
 
             Spacer()
         }
@@ -2391,25 +2360,9 @@ struct OverviewView: View {
         let hasError = receiptsViewModel.state.error != nil
         let hasFinishedLoading = hasLoadedSuccessfully || hasError
 
-        if (isLoading || !hasFinishedLoading) && scannedReceipts.isEmpty {
+        if (isLoading || !hasFinishedLoading) && sortedReceipts.isEmpty {
             return .loading
-        } else if hasFinishedLoading && scannedReceipts.isEmpty {
-            return .empty
-        } else {
-            return .hasData
-        }
-    }
-
-    // MARK: - Transactions Section State (bank imports only)
-    private var transactionsSectionState: SectionState {
-        let isLoading = receiptsViewModel.state.isLoading
-        let hasLoadedSuccessfully = receiptsViewModel.state.value != nil
-        let hasError = receiptsViewModel.state.error != nil
-        let hasFinishedLoading = hasLoadedSuccessfully || hasError
-
-        if (isLoading || !hasFinishedLoading) && bankTransactions.isEmpty {
-            return .loading
-        } else if hasFinishedLoading && bankTransactions.isEmpty {
+        } else if hasFinishedLoading && sortedReceipts.isEmpty {
             return .empty
         } else {
             return .hasData
@@ -2448,7 +2401,7 @@ struct OverviewView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         } else {
-                            Text("\(scannedReceipts.count) \(isAllPeriod(selectedPeriod) ? "total" : "this period")")
+                            Text("\(sortedReceipts.count) \(isAllPeriod(selectedPeriod) ? "total" : "this period")")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.4))
                         }
@@ -2457,8 +2410,8 @@ struct OverviewView: View {
                     Spacer()
 
                     // Count badge
-                    if !scannedReceipts.isEmpty {
-                        Text("\(scannedReceipts.count)")
+                    if !sortedReceipts.isEmpty {
+                        Text("\(sortedReceipts.count)")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .frame(width: 32, height: 32)
@@ -2580,7 +2533,7 @@ struct OverviewView: View {
                     case .hasData:
                         // Expandable receipt cards (scanned receipts only)
                         LazyVStack(spacing: 8) {
-                            ForEach(scannedReceipts) { receipt in
+                            ForEach(sortedReceipts) { receipt in
                                 ExpandableReceiptCard(
                                     receipt: receipt,
                                     isExpanded: expandedReceiptId == receipt.id,
@@ -2665,167 +2618,6 @@ struct OverviewView: View {
     }
 
     // MARK: - Transactions Section (Collapsible with glass design - Bank Imports)
-    private var transactionsSection: some View {
-        VStack(spacing: 0) {
-            // Collapsible header button
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    isTransactionsSectionExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 14) {
-                    // Bank icon
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.15))
-                            .frame(width: 40, height: 40)
-
-                        Image(systemName: "building.columns.fill")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.blue.opacity(0.8))
-                    }
-
-                    // Title and count
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Transactions")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-
-                        if transactionsSectionState == .loading {
-                            Text("Loading...")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
-                        } else {
-                            Text("\(bankTransactions.count) \(isAllPeriod(selectedPeriod) ? "total" : "this period")")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
-                        }
-                    }
-
-                    Spacer()
-
-                    // Count badge
-                    if !bankTransactions.isEmpty {
-                        Text("\(bankTransactions.count)")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(Color.blue.opacity(0.2))
-                            )
-                    }
-
-                    // Chevron
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.4))
-                        .rotationEffect(.degrees(isTransactionsSectionExpanded ? 180 : 0))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(
-                    ZStack {
-                        // Glass base
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.white.opacity(0.04))
-
-                        // Gradient overlay with subtle blue tint
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.blue.opacity(0.08),
-                                        Color.white.opacity(0.02)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    }
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.blue.opacity(0.2),
-                                    Color.white.opacity(0.04)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-            }
-            .buttonStyle(ReceiptsHeaderButtonStyle())
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-
-            // Expandable content
-            if isTransactionsSectionExpanded {
-                VStack(spacing: 12) {
-                    switch transactionsSectionState {
-                    case .loading:
-                        // Loading state
-                        HStack(spacing: 12) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
-                                .scaleEffect(0.8)
-                            Text("Loading transactions...")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 30)
-
-                    case .empty:
-                        // Empty state
-                        VStack(spacing: 12) {
-                            Image(systemName: "building.columns")
-                                .font(.system(size: 28))
-                                .foregroundColor(.white.opacity(0.2))
-                            Text(isAllPeriod(selectedPeriod) ? "No bank transactions yet" : "No transactions for this period")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
-                            Text("Import transactions from your bank")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.3))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-
-                    case .hasData:
-                        // Bank transaction cards (non-expandable)
-                        LazyVStack(spacing: 8) {
-                            ForEach(bankTransactions) { transaction in
-                                BankTransactionCard(
-                                    receipt: transaction,
-                                    onDelete: {
-                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                            deleteReceiptFromOverview(transaction)
-                                        }
-                                    },
-                                    onSplit: {
-                                        receiptToSplit = transaction
-                                    }
-                                )
-                                .transition(.asymmetric(
-                                    insertion: .opacity,
-                                    removal: .move(edge: .leading).combined(with: .opacity)
-                                ))
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .transition(.opacity)
-            }
-        }
-    }
-
     /// Receipts sorted from newest to oldest
     private var sortedReceipts: [APIReceipt] {
         receiptsViewModel.receipts.sorted { receipt1, receipt2 in
@@ -2834,16 +2626,6 @@ struct OverviewView: View {
             let date2 = receipt2.dateParsed ?? Date.distantPast
             return date1 > date2
         }
-    }
-
-    /// Scanned receipts only (excludes bank imports)
-    private var scannedReceipts: [APIReceipt] {
-        sortedReceipts.filter { $0.source == .receiptUpload }
-    }
-
-    /// Bank-imported transactions only
-    private var bankTransactions: [APIReceipt] {
-        sortedReceipts.filter { $0.source == .bankImport }
     }
 
     /// Delete a receipt from the overview

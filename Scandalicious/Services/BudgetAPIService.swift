@@ -3,6 +3,7 @@
 //  Scandalicious
 //
 //  Created by Claude on 31/01/2026.
+//  Simplified on 05/02/2026 - Removed AI features
 //
 
 import Foundation
@@ -119,15 +120,15 @@ actor BudgetAPIService {
         )
     }
 
-    // MARK: - AI-Powered Endpoints (All budget calculations are AI-powered)
+    // MARK: - Budget Suggestion Endpoint
 
-    /// Get AI-powered budget suggestion with personalized insights
-    func fetchAISuggestion(basedOnMonths: Int = 3) async throws -> AIBudgetSuggestionResponse {
+    /// Get budget suggestion based on historical spending
+    func fetchBudgetSuggestion(basedOnMonths: Int = 3) async throws -> SimpleBudgetSuggestionResponse {
         let queryItems = [
             URLQueryItem(name: "months", value: String(basedOnMonths))
         ]
 
-        let response: AIBudgetSuggestionResponse = try await performRequest(
+        let response: SimpleBudgetSuggestionResponse = try await performRequest(
             endpoint: "/budgets/ai-suggestion",
             method: "GET",
             queryItems: queryItems
@@ -136,40 +137,27 @@ actor BudgetAPIService {
         return response
     }
 
-    /// Get weekly AI check-in with budget progress analysis
-    func fetchAICheckIn() async throws -> AICheckInResponse {
-        let response: AICheckInResponse = try await performRequest(
-            endpoint: "/budgets/ai-check-in",
-            method: "GET"
-        )
-
-        return response
-    }
-
-    /// Analyze a receipt for budget impact
-    func fetchAIReceiptAnalysis(receiptId: String) async throws -> AIReceiptAnalysisResponse {
-        let response: AIReceiptAnalysisResponse = try await performRequestWithBody(
-            endpoint: "/budgets/ai-analyze-receipt",
-            method: "POST",
-            body: ["receipt_id": receiptId]
-        )
-
-        return response
-    }
-
-    /// Get AI-generated monthly budget report
-    func fetchAIMonthlyReport(month: String) async throws -> AIMonthlyReportResponse {
-        let queryItems = [
-            URLQueryItem(name: "month", value: month)
+    /// Get budget insights based on spending history (no AI)
+    func fetchBudgetInsights(
+        includeBenchmarks: Bool = true,
+        includeFlags: Bool = true,
+        includeQuickWins: Bool = true,
+        includeVolatility: Bool = true,
+        includeProgress: Bool = true
+    ) async throws -> BudgetInsightsResponse {
+        var queryItems = [
+            URLQueryItem(name: "include_benchmarks", value: String(includeBenchmarks)),
+            URLQueryItem(name: "include_flags", value: String(includeFlags)),
+            URLQueryItem(name: "include_quick_wins", value: String(includeQuickWins)),
+            URLQueryItem(name: "include_volatility", value: String(includeVolatility)),
+            URLQueryItem(name: "include_progress", value: String(includeProgress))
         ]
 
-        let response: AIMonthlyReportResponse = try await performRequest(
-            endpoint: "/budgets/ai-month-report",
+        return try await performRequest(
+            endpoint: "/budgets/insights",
             method: "GET",
             queryItems: queryItems
         )
-
-        return response
     }
 
     // MARK: - Budget History Endpoints
@@ -434,25 +422,36 @@ extension BudgetAPIService {
         return try await fetchBudgetProgress(month: month)
     }
 
-    // MARK: - AI Nonisolated Methods (All budget suggestions are AI-powered)
+    // MARK: - Budget Suggestion
 
-    nonisolated func getAISuggestion(basedOnMonths: Int = 3) async throws -> AIBudgetSuggestionResponse {
-        return try await fetchAISuggestion(basedOnMonths: basedOnMonths)
+    nonisolated func getBudgetSuggestion(basedOnMonths: Int = 3) async throws -> SimpleBudgetSuggestionResponse {
+        return try await fetchBudgetSuggestion(basedOnMonths: basedOnMonths)
     }
 
-    nonisolated func getAICheckIn() async throws -> AICheckInResponse {
-        return try await fetchAICheckIn()
+    // Legacy alias for backward compatibility
+    nonisolated func getAISuggestion(basedOnMonths: Int = 3) async throws -> SimpleBudgetSuggestionResponse {
+        return try await fetchBudgetSuggestion(basedOnMonths: basedOnMonths)
     }
 
-    nonisolated func getAIReceiptAnalysis(receiptId: String) async throws -> AIReceiptAnalysisResponse {
-        return try await fetchAIReceiptAnalysis(receiptId: receiptId)
+    // MARK: - Budget Insights
+
+    nonisolated func getBudgetInsights(
+        includeBenchmarks: Bool = true,
+        includeFlags: Bool = true,
+        includeQuickWins: Bool = true,
+        includeVolatility: Bool = true,
+        includeProgress: Bool = true
+    ) async throws -> BudgetInsightsResponse {
+        return try await fetchBudgetInsights(
+            includeBenchmarks: includeBenchmarks,
+            includeFlags: includeFlags,
+            includeQuickWins: includeQuickWins,
+            includeVolatility: includeVolatility,
+            includeProgress: includeProgress
+        )
     }
 
-    nonisolated func getAIMonthlyReport(month: String) async throws -> AIMonthlyReportResponse {
-        return try await fetchAIMonthlyReport(month: month)
-    }
-
-    // MARK: - Budget History Nonisolated Methods
+    // MARK: - Budget History
 
     nonisolated func getBudgetHistory() async throws -> BudgetHistoryResponse {
         return try await fetchBudgetHistory()

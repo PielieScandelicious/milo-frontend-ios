@@ -532,11 +532,13 @@ extension Array where Element == CategoryBreakdown {
     /// Convert CategoryBreakdown array to ChartData for IconDonutChartView
     func toIconChartData() -> [ChartData] {
         return map { category in
-            ChartData(
+            // Normalize name in case backend returns enum-style names (e.g., "BAKERY" -> "Bakery")
+            let normalizedName = category.name.normalizedCategoryName
+            return ChartData(
                 value: category.spent,
-                color: category.name.categoryColor,
-                iconName: category.icon,
-                label: category.name
+                color: normalizedName.categoryColor,
+                iconName: normalizedName.categoryIcon,
+                label: normalizedName
             )
         }
     }
@@ -548,14 +550,15 @@ extension Array where Element == Category {
     /// Convert Category array to ChartData for IconDonutChartView
     func toIconChartData() -> [ChartData] {
         return map { category in
-            // Get icon from category name
-            let icon = category.name.categoryIcon
+            // Normalize name in case backend returns enum-style names (e.g., "BAKERY" -> "Bakery")
+            let normalizedName = category.name.normalizedCategoryName
+            let icon = normalizedName.categoryIcon
 
             return ChartData(
                 value: category.spent,
-                color: category.name.categoryColor,
+                color: normalizedName.categoryColor,
                 iconName: icon,
-                label: category.name
+                label: normalizedName
             )
         }
     }

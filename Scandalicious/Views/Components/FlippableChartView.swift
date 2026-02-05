@@ -21,14 +21,15 @@ struct FlippableDonutChartView: View {
     /// Convert ChartSegments to ChartData for IconDonutChartView
     private var chartData: [ChartData] {
         segments.map { segment in
-            // Get icon from category name
-            let icon = segment.label.categoryIcon
+            // Normalize name and get icon from category name
+            let normalizedName = segment.label.normalizedCategoryName
+            let icon = normalizedName.categoryIcon
 
             return ChartData(
                 value: segment.value,
                 color: segment.color,
                 iconName: icon,
-                label: segment.label
+                label: normalizedName
             )
         }
     }

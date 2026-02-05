@@ -107,16 +107,18 @@ struct ChartSegment: Identifiable {
 extension Array where Element == Category {
     func toChartSegments() -> [ChartSegment] {
         var currentAngle: Double = 0
-        
+
         return enumerated().map { index, category in
             let percentage = Double(category.percentage) / 100.0
             let angleRange = 360.0 * percentage
+            // Normalize name in case backend returns enum-style names
+            let normalizedName = category.name.normalizedCategoryName
             let segment = ChartSegment(
                 startAngle: .degrees(currentAngle),
                 endAngle: .degrees(currentAngle + angleRange),
-                color: category.intelligentColor,
+                color: normalizedName.categoryColor,
                 value: category.spent,
-                label: category.name,
+                label: normalizedName,
                 percentage: category.percentage
             )
             currentAngle += angleRange
@@ -128,8 +130,8 @@ extension Array where Element == Category {
 extension Category {
     /// Intelligently assigns colors to categories based on their names and health characteristics
     var intelligentColor: Color {
-        // Use the centralized category color logic
-        return name.categoryColor
+        // Use the centralized category color logic with normalized name
+        return name.normalizedCategoryName.categoryColor
     }
 }
 
@@ -141,12 +143,14 @@ extension Array where Element == CategoryBreakdown {
         return enumerated().map { index, category in
             let percentage = category.percentage / 100.0
             let angleRange = 360.0 * percentage
+            // Normalize name in case backend returns enum-style names
+            let normalizedName = category.name.normalizedCategoryName
             let segment = ChartSegment(
                 startAngle: .degrees(currentAngle),
                 endAngle: .degrees(currentAngle + angleRange),
-                color: category.name.categoryColor,
+                color: normalizedName.categoryColor,
                 value: category.spent,
-                label: category.name,
+                label: normalizedName,
                 percentage: Int(category.percentage)
             )
             currentAngle += angleRange

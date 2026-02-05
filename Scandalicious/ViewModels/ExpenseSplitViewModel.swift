@@ -310,6 +310,9 @@ class ExpenseSplitViewModel: ObservableObject {
                 userInfo: ["split": savedSplit, "receiptId": receipt.receiptId]
             )
 
+            // Also notify analytics to refresh (split changes "My Share" amounts)
+            NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
+
         } catch {
             self.error = error.localizedDescription
         }

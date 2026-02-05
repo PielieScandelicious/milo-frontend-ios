@@ -93,37 +93,20 @@ struct AllStoresBreakdownView: View {
                         .padding(.top, 24)
                         .padding(.bottom, 12)
                         
-                        // Legend grouped by category group
-                        VStack(spacing: 20) {
-                            let groupedSegments = Dictionary(grouping: storeSegments, by: { $0.group ?? "Other" })
-                            let sortedGroups = groupedSegments.keys.sorted { a, b in
-                                let totalA = groupedSegments[a]!.reduce(0.0) { $0 + $1.amount }
-                                let totalB = groupedSegments[b]!.reduce(0.0) { $0 + $1.amount }
-                                return totalA > totalB
-                            }
+                        // Legend with single "Stores" header (no grouping)
+                        VStack(spacing: 10) {
+                            // Single "Stores" section header
+                            storesSectionHeader(storeCount: storeSegments.count)
 
-                            ForEach(sortedGroups, id: \.self) { groupName in
-                                if let groupStores = groupedSegments[groupName], !groupStores.isEmpty {
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        // Group header
-                                        groupSectionHeader(
-                                            groupName: groupName,
-                                            icon: groupStores.first?.groupIcon ?? "square.grid.2x2.fill",
-                                            colorHex: groupStores.first?.groupColorHex ?? "#95A5A6"
-                                        )
-
-                                        // Store rows in this group
-                                        ForEach(groupStores, id: \.id) { segment in
-                                            Button {
-                                                selectedStoreName = segment.storeName
-                                                showingStoreTransactions = true
-                                            } label: {
-                                                storeRow(segment: segment)
-                                            }
-                                            .buttonStyle(StoreRowButtonStyle())
-                                        }
-                                    }
+                            // Store rows (flat list)
+                            ForEach(storeSegments, id: \.id) { segment in
+                                Button {
+                                    selectedStoreName = segment.storeName
+                                    showingStoreTransactions = true
+                                } label: {
+                                    storeRow(segment: segment)
                                 }
+                                .buttonStyle(StoreRowButtonStyle())
                             }
                         }
                         .padding(.horizontal)
@@ -144,26 +127,28 @@ struct AllStoresBreakdownView: View {
         }
     }
 
-    private func groupSectionHeader(groupName: String, icon: String, colorHex: String) -> some View {
-        HStack(spacing: 10) {
-            let groupColor = Color(hex: colorHex) ?? .white.opacity(0.7)
-
+    private func storesSectionHeader(storeCount: Int) -> some View {
+        HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(groupColor.opacity(0.15))
-                    .frame(width: 30, height: 30)
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(groupColor)
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "storefront.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
             }
 
-            Text(groupName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white.opacity(0.85))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Stores")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                Text("\(storeCount) store\(storeCount == 1 ? "" : "s")")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            }
 
             Spacer()
         }
-        .padding(.top, 4)
     }
 
     private func storeRow(segment: StoreChartSegment) -> some View {
