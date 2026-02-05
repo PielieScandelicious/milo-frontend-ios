@@ -1714,6 +1714,18 @@ struct OverviewView: View {
             .contentShape(Rectangle())
             .simultaneousGesture(periodSwipeGesture)
 
+            // Tap hint for the flippable donut chart
+            if !segments.isEmpty && !isWaitingForAllTimeData && !isWaitingForYearData {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 10, weight: .medium))
+                    Text(isPieChartFlipped ? "Tap chart for stores" : "Tap chart for categories")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(.white.opacity(0.3))
+                .padding(.top, -8)
+            }
+
             // Store/Category rows - NOT swipeable, only tappable
             // These are the legend/details for the pie chart, so they appear directly below it
             // Show store rows when not flipped, category rows when flipped
