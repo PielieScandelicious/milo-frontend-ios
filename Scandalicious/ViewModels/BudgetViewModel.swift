@@ -103,6 +103,14 @@ class BudgetViewModel: ObservableObject {
         // Initialize periods synchronously so UI can render immediately
         initializePeriodsSync()
 
+        // Set initial state from cache so first render shows correct state (no skeleton flash)
+        let cache = AppDataCache.shared
+        if let cached = cache.budgetProgressCache {
+            state = .active(cached.toBudgetProgress())
+        } else if cache.budgetStatusChecked {
+            state = .noBudget
+        }
+
         // Listen for data changes that might affect budget progress
         notificationObserver = NotificationCenter.default.addObserver(
             forName: .receiptsDataDidChange,
@@ -190,15 +198,54 @@ class BudgetViewModel: ObservableObject {
 
     /// Load current month's budget progress (real-time tracking)
     private func loadCurrentMonthProgress() async {
+        let cache = AppDataCache.shared
+
+        // Check AppDataCache for instant display (no spinner)
+        if let cached = cache.budgetProgressCache {
+            state = .active(cached.toBudgetProgress())
+            // Background refresh for fresh data
+            Task {
+                do {
+                    let progressResponse = try await apiService.getBudgetProgress()
+                    state = .active(progressResponse.toBudgetProgress())
+                    cache.updateBudgetProgress(progressResponse)
+                } catch {
+                    // Keep cached data on refresh failure
+                }
+            }
+            return
+        }
+
+        // If we already checked and there's no budget, show noBudget instantly
+        if cache.budgetStatusChecked {
+            state = .noBudget
+            // Background refresh in case user set a budget elsewhere
+            Task {
+                do {
+                    let progressResponse = try await apiService.getBudgetProgress()
+                    state = .active(progressResponse.toBudgetProgress())
+                    cache.updateBudgetProgress(progressResponse)
+                } catch {
+                    // Still no budget — keep .noBudget state
+                }
+            }
+            return
+        }
+
         state = .loading
 
         do {
             let progressResponse = try await apiService.getBudgetProgress()
             state = .active(progressResponse.toBudgetProgress())
+            cache.updateBudgetProgress(progressResponse)
+            cache.budgetStatusChecked = true
+            cache.scheduleSaveToDisk()
         } catch let error as BudgetAPIError {
             switch error {
             case .noBudgetSet, .notFound:
                 state = .noBudget
+                cache.budgetStatusChecked = true
+                cache.scheduleSaveToDisk()
             default:
                 state = .error(error.localizedDescription)
             }
@@ -255,6 +302,7 @@ class BudgetViewModel: ObservableObject {
         do {
             let progressResponse = try await apiService.getBudgetProgress()
             state = .active(progressResponse.toBudgetProgress())
+            AppDataCache.shared.updateBudgetProgress(progressResponse)
             print("🔄 [BudgetViewModel] refreshProgress completed - state updated to .active")
         } catch {
             print("🔄 [BudgetViewModel] refreshProgress failed: \(error)")
@@ -310,6 +358,11 @@ class BudgetViewModel: ObservableObject {
 
         do {
             let _ = try await apiService.saveBudget(request: request)
+            // Invalidate cache so fresh data is fetched
+            AppDataCache.shared.budgetProgressCache = nil
+            AppDataCache.shared.budgetInsightsCache = nil
+            AppDataCache.shared.budgetStatusChecked = false
+            AppDataCache.shared.scheduleSaveToDisk()
             // Reload to get fresh progress
             await loadBudget()
             NotificationCenter.default.post(name: .budgetUpdated, object: nil)
@@ -337,6 +390,10 @@ class BudgetViewModel: ObservableObject {
 
         do {
             let _ = try await apiService.modifyBudget(request: request)
+            // Invalidate cache so fresh data is fetched
+            AppDataCache.shared.budgetProgressCache = nil
+            AppDataCache.shared.budgetInsightsCache = nil
+            AppDataCache.shared.scheduleSaveToDisk()
             await loadBudget()
             NotificationCenter.default.post(name: .budgetUpdated, object: nil)
             isSaving = false
@@ -418,6 +475,11 @@ class BudgetViewModel: ObservableObject {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             state = .noBudget
         }
+        // Invalidate cache
+        AppDataCache.shared.budgetProgressCache = nil
+        AppDataCache.shared.budgetInsightsCache = nil
+        AppDataCache.shared.budgetStatusChecked = false
+        AppDataCache.shared.scheduleSaveToDisk()
         NotificationCenter.default.post(name: .budgetDeleted, object: nil)
         print("🗑️ [BudgetViewModel] Optimistic UI updated, now calling API...")
 
@@ -521,11 +583,28 @@ class BudgetViewModel: ObservableObject {
 
     /// Load budget insights (deterministic, no AI)
     func loadInsights() async {
+        // Check AppDataCache for instant display
+        if let cached = AppDataCache.shared.budgetInsightsCache {
+            insightsState = .loaded(cached)
+            // Background refresh for fresh data
+            Task {
+                do {
+                    let response = try await apiService.getBudgetInsights()
+                    insightsState = .loaded(response)
+                    AppDataCache.shared.updateBudgetInsights(response)
+                } catch {
+                    // Keep cached data on refresh failure
+                }
+            }
+            return
+        }
+
         insightsState = .loading
 
         do {
             let response = try await apiService.getBudgetInsights()
             insightsState = .loaded(response)
+            AppDataCache.shared.updateBudgetInsights(response)
         } catch {
             insightsState = .error(error.localizedDescription)
         }
@@ -539,6 +618,13 @@ class BudgetViewModel: ObservableObject {
         includeVolatility: Bool = true,
         includeProgress: Bool = true
     ) async {
+        // Use cache for default params, skip for custom requests
+        let isDefaultParams = includeBenchmarks && includeFlags && includeQuickWins && includeVolatility && includeProgress
+        if isDefaultParams, let cached = AppDataCache.shared.budgetInsightsCache {
+            insightsState = .loaded(cached)
+            return
+        }
+
         insightsState = .loading
 
         do {
@@ -550,6 +636,9 @@ class BudgetViewModel: ObservableObject {
                 includeProgress: includeProgress
             )
             insightsState = .loaded(response)
+            if isDefaultParams {
+                AppDataCache.shared.updateBudgetInsights(response)
+            }
         } catch {
             insightsState = .error(error.localizedDescription)
         }

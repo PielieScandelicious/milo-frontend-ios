@@ -99,11 +99,11 @@ struct ContentView: View {
 
     // MARK: - Full Data Loading
 
-    /// Loads ALL data needed for smooth browsing.
+    /// Loads data needed for smooth browsing (last 12 months).
     /// When showLoading=true, keeps loading screen visible until done.
     /// When showLoading=false, runs silently in background.
     private func loadAllData(cache: AppDataCache, showLoading: Bool) async {
-        // Phase 1: Period metadata + store breakdowns for ALL periods
+        // Phase 1: Period metadata + store breakdowns for recent periods
         await dataManager.fetchPeriodMetadata()
 
         guard !dataManager.periodMetadata.isEmpty else {
@@ -113,27 +113,28 @@ struct ContentView: View {
             return
         }
 
-        // Load store breakdowns for ALL periods in parallel
-        let allPeriods = dataManager.periodMetadata
+        // Only preload the last 12 months of data for fast startup
+        let recentPeriods = cache.recentMonthPeriods
+
+        // Load store breakdowns for recent periods in parallel
         await withTaskGroup(of: Void.self) { group in
-            for periodMeta in allPeriods {
+            for period in recentPeriods {
                 group.addTask {
-                    await dataManager.fetchPeriodDetails(periodMeta.period)
+                    await dataManager.fetchPeriodDetails(period)
                 }
             }
         }
 
-        // Phase 2: Receipts + category data for ALL month periods in parallel
-        let monthPeriods = allPeriods.map { $0.period }
+        // Phase 2: Receipts + category data for recent month periods in parallel
         await withTaskGroup(of: Void.self) { group in
-            for period in monthPeriods {
+            for period in recentPeriods {
                 group.addTask { await cache.preloadReceipts(for: period) }
                 group.addTask { await cache.preloadCategoryData(for: period) }
             }
         }
 
-        // Phase 3: Year summaries for all distinct years + all-time data in parallel
-        let distinctYears = Set(monthPeriods.compactMap { period -> String? in
+        // Phase 3: Year summaries for years in recent periods + all-time data in parallel
+        let distinctYears = Set(recentPeriods.compactMap { period -> String? in
             let parts = period.split(separator: " ")
             return parts.count == 2 ? String(parts[1]) : nil
         })
@@ -142,12 +143,14 @@ struct ContentView: View {
                 group.addTask { await cache.preloadYearSummary(for: year) }
             }
             group.addTask { await cache.preloadAllTimeAggregate() }
+            group.addTask { await cache.preloadBudgetInsights() }
+            group.addTask { await cache.preloadBudgetProgress() }
         }
 
-        // Phase 4: Category items (transactions per category) for ALL month periods
+        // Phase 4: Category items (transactions per category) for recent periods
         // Must run after Phase 2 since preloadCategoryItems reads pieChartSummaryByPeriod
         await withTaskGroup(of: Void.self) { group in
-            for period in monthPeriods {
+            for period in recentPeriods {
                 group.addTask { await cache.preloadCategoryItems(for: period) }
             }
         }

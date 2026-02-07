@@ -26,29 +26,36 @@ class AppDataCache: ObservableObject {
     @Published var allTimeAggregate: AggregateResponse?
     /// Category items (transactions) keyed by "period|categoryName"
     @Published var categoryItemsCache: [String: [APITransaction]] = [:]
+    /// Budget insights (preloaded for instant display)
+    @Published var budgetInsightsCache: BudgetInsightsResponse?
+    /// Budget progress (preloaded for instant display)
+    @Published var budgetProgressCache: BudgetProgressResponse?
+    /// Whether budget status has been checked (true = we know if user has budget or not)
+    @Published var budgetStatusChecked: Bool = false
     @Published var lastRefreshDate: Date?
 
     var hasDiskCache: Bool { lastRefreshDate != nil }
 
-    /// Returns true if the cache has ALL data needed for smooth browsing
+    /// Returns true if the cache has data needed for smooth browsing (last 12 months)
     var isComplete: Bool {
         guard hasDiskCache, !periodMetadata.isEmpty else { return false }
-        let monthPeriods = periodMetadata.map { $0.period }
-        // Check all month periods have breakdowns, receipts, and category data
-        for period in monthPeriods {
+        let recentPeriods = recentMonthPeriods
+        guard !recentPeriods.isEmpty else { return false }
+        // Check recent month periods have breakdowns, receipts, and category data
+        for period in recentPeriods {
             if breakdownsByPeriod[period] == nil { return false }
             if receiptsByPeriod[period] == nil { return false }
             if pieChartSummaryByPeriod[period] == nil { return false }
         }
-        // Check year summaries exist for all distinct years
-        let years = Set(monthPeriods.compactMap { extractYear(from: $0) })
+        // Check year summaries exist for distinct years in recent periods
+        let years = Set(recentPeriods.compactMap { extractYear(from: $0) })
         for year in years {
             if yearSummaryCache[year] == nil { return false }
         }
         // Check all-time data
         if allTimeAggregate == nil { return false }
-        // Check category items are loaded for all periods
-        for period in monthPeriods {
+        // Check category items are loaded for recent periods
+        for period in recentPeriods {
             if let pieChart = pieChartSummaryByPeriod[period] {
                 for category in pieChart.categories {
                     if categoryItemsCache[categoryItemsKey(period: period, category: category.name)] == nil { return false }
@@ -56,6 +63,18 @@ class AppDataCache: ObservableObject {
             }
         }
         return true
+    }
+
+    /// Returns month period strings for the last 12 months only
+    var recentMonthPeriods: [String] {
+        let cutoff = Calendar.current.date(byAdding: .month, value: -12, to: Date()) ?? Date()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM yyyy"
+        dateFormatter.locale = Locale(identifier: "en_US")
+        return periodMetadata.compactMap { meta -> String? in
+            guard let date = dateFormatter.date(from: meta.period) else { return meta.period }
+            return date >= cutoff ? meta.period : nil
+        }
     }
 
     private func extractYear(from period: String) -> String? {
@@ -91,6 +110,9 @@ class AppDataCache: ObservableObject {
         var yearSummaryCache: [String: YearSummaryResponse]
         var allTimeAggregate: AggregateResponse?
         var categoryItemsCache: [String: [APITransaction]]
+        var budgetInsightsCache: BudgetInsightsResponse?
+        var budgetProgressCache: BudgetProgressResponse?
+        var budgetStatusChecked: Bool?
         var lastRefreshDate: Date?
     }
 
@@ -109,6 +131,9 @@ class AppDataCache: ObservableObject {
             self.yearSummaryCache = payload.yearSummaryCache
             self.allTimeAggregate = payload.allTimeAggregate
             self.categoryItemsCache = payload.categoryItemsCache
+            self.budgetInsightsCache = payload.budgetInsightsCache
+            self.budgetProgressCache = payload.budgetProgressCache
+            self.budgetStatusChecked = payload.budgetStatusChecked ?? false
             self.lastRefreshDate = payload.lastRefreshDate
         } catch {
             // Cache corrupted or schema changed — start fresh
@@ -136,6 +161,9 @@ class AppDataCache: ObservableObject {
             yearSummaryCache: yearSummaryCache,
             allTimeAggregate: allTimeAggregate,
             categoryItemsCache: categoryItemsCache,
+            budgetInsightsCache: budgetInsightsCache,
+            budgetProgressCache: budgetProgressCache,
+            budgetStatusChecked: budgetStatusChecked,
             lastRefreshDate: lastRefreshDate
         )
         do {
@@ -201,6 +229,16 @@ class AppDataCache: ObservableObject {
 
     func updateCategoryItems(period: String, category: String, items: [APITransaction]) {
         categoryItemsCache[categoryItemsKey(period: period, category: category)] = items
+        scheduleSaveToDisk()
+    }
+
+    func updateBudgetInsights(_ insights: BudgetInsightsResponse) {
+        budgetInsightsCache = insights
+        scheduleSaveToDisk()
+    }
+
+    func updateBudgetProgress(_ progress: BudgetProgressResponse) {
+        budgetProgressCache = progress
         scheduleSaveToDisk()
     }
 
@@ -315,6 +353,38 @@ class AppDataCache: ObservableObject {
         }
     }
 
+    func preloadBudgetInsights() async {
+        guard budgetInsightsCache == nil else { return }
+        do {
+            let insights = try await BudgetAPIService.shared.getBudgetInsights()
+            await MainActor.run {
+                budgetInsightsCache = insights
+                scheduleSaveToDisk()
+            }
+        } catch {
+            // Non-critical — insights will load on demand
+        }
+    }
+
+    func preloadBudgetProgress() async {
+        guard !budgetStatusChecked else { return }
+        do {
+            let progress = try await BudgetAPIService.shared.getBudgetProgress()
+            await MainActor.run {
+                budgetProgressCache = progress
+                budgetStatusChecked = true
+                scheduleSaveToDisk()
+            }
+        } catch {
+            // Mark as checked even on failure (noBudgetSet, notFound, etc.)
+            // so we don't show a loading spinner when we know there's no budget
+            await MainActor.run {
+                budgetStatusChecked = true
+                scheduleSaveToDisk()
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private func parsePeriodDates(_ period: String) -> (Date?, Date?) {
@@ -353,6 +423,9 @@ class AppDataCache: ObservableObject {
         yearSummaryCache = [:]
         allTimeAggregate = nil
         categoryItemsCache = [:]
+        budgetInsightsCache = nil
+        budgetProgressCache = nil
+        budgetStatusChecked = false
         lastRefreshDate = nil
         try? FileManager.default.removeItem(at: cacheFileURL)
     }

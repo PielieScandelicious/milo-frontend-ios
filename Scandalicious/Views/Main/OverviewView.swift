@@ -607,6 +607,14 @@ struct OverviewView: View {
         let cache = AppDataCache.shared
         if let cachedPieChart = cache.pieChartSummaryByPeriod[initialPeriod] {
             pieChartSummaryCache[initialPeriod] = cachedPieChart
+
+            // Pre-populate categoryItems from cache for instant expansion
+            for category in cachedPieChart.categories {
+                let key = cache.categoryItemsKey(period: initialPeriod, category: category.name)
+                if let items = cache.categoryItemsCache[key] {
+                    categoryItems[category.id] = items
+                }
+            }
         }
 
         // Pre-populate year summary caches from AppDataCache
@@ -803,6 +811,17 @@ struct OverviewView: View {
 
             if let cachedPieChart = cache.pieChartSummaryByPeriod[newValue] {
                 pieChartSummaryCache[newValue] = cachedPieChart
+
+                // Pre-populate categoryItems from cache for instant expansion
+                categoryItems.removeAll()
+                for category in cachedPieChart.categories {
+                    let key = cache.categoryItemsKey(period: newValue, category: category.name)
+                    if let items = cache.categoryItemsCache[key] {
+                        categoryItems[category.id] = items
+                    }
+                }
+            } else {
+                categoryItems.removeAll()
             }
 
             // Breakdowns should already be loaded; if not, fetch
@@ -2340,6 +2359,15 @@ struct OverviewView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
                 }
+            } else {
+                // Fallback: items not yet available, show skeleton briefly
+                VStack(spacing: 8) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        SkeletonTransactionRow()
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
             }
         }
         .padding(.horizontal, 12)

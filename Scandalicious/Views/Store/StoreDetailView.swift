@@ -304,6 +304,19 @@ struct StoreDetailView: View {
                 currentHealthScore = storeBreakdown.averageHealthScore
                 currentTotalItems = 0  // Will be populated when we fetch detailed data
                 hasInitialized = true
+
+                // Pre-populate categoryTransactions from cache for instant expansion
+                let cache = AppDataCache.shared
+                let period = storeBreakdown.period
+                for category in storeBreakdown.categories {
+                    let cacheKey = cache.categoryItemsKey(period: period, category: category.name)
+                    if let cachedItems = cache.categoryItemsCache[cacheKey] {
+                        let storeFiltered = cachedItems.filter { $0.storeName == storeBreakdown.storeName }
+                        let normalizedName = category.name.normalizedCategoryName
+                        categoryTransactions[normalizedName] = storeFiltered
+                    }
+                }
+
                 // Fetch detailed data to get item count
                 Task {
                     await refreshStoreData()
@@ -548,16 +561,12 @@ struct StoreDetailView: View {
             if isReceiptsSectionExpanded {
                 VStack(spacing: 12) {
                     if receiptsViewModel.state.isLoading && actualReceipts.isEmpty {
-                        HStack(spacing: 12) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.0)
-                            Text("Loading receipts...")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
+                        VStack(spacing: 12) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                SkeletonReceiptCard()
+                            }
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
+                        .padding(.vertical, 8)
                     } else if actualReceipts.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "doc.text.fill")
@@ -671,12 +680,25 @@ struct StoreDetailView: View {
         return VStack(spacing: 0) {
             // Category header button
             Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    if expandedCategoryName == segment.label {
+                if expandedCategoryName == segment.label {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         expandedCategoryName = nil
-                    } else {
+                    }
+                } else {
+                    // Pre-populate data BEFORE animation so content appears instantly
+                    if categoryTransactions[segment.label] == nil {
+                        let period = storeBreakdown.period
+                        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: categoryForAPI)
+                        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
+                            let storeFiltered = cachedItems.filter { $0.storeName == storeBreakdown.storeName }
+                            categoryTransactions[segment.label] = storeFiltered
+                        }
+                    }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                         expandedCategoryName = segment.label
-                        // Use original category name for API filtering, but store under display key
+                    }
+                    // Fallback: fetch from API if not in cache
+                    if categoryTransactions[segment.label] == nil {
                         loadCategoryTransactions(category: categoryForAPI, displayKey: segment.label)
                     }
                 }
@@ -739,15 +761,17 @@ struct StoreDetailView: View {
 
                     VStack(spacing: 8) {
                         if loadingCategories.contains(segment.label) {
-                            HStack(spacing: 10) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
-                                    .scaleEffect(0.7)
-                                Text("Loading...")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.5))
+                            // Skeleton rows while loading
+                            ForEach(0..<3, id: \.self) { _ in
+                                HStack(spacing: 10) {
+                                    SkeletonRect(width: 16, height: 16, cornerRadius: 8)
+                                    SkeletonRect(width: 100, height: 13)
+                                    Spacer()
+                                    SkeletonRect(width: 50, height: 13)
+                                }
                             }
-                            .padding(.vertical, 16)
+                            .shimmer()
+                            .padding(.vertical, 4)
                         } else if let transactions = categoryTransactions[segment.label], !transactions.isEmpty {
                             CategoryTransactionsContent(transactions: transactions)
                         } else {
@@ -819,6 +843,15 @@ struct StoreDetailView: View {
     private func loadCategoryTransactions(category: String, displayKey: String) {
         // Use displayKey for storage/retrieval (matches segment.label used in UI)
         guard categoryTransactions[displayKey] == nil else { return }
+
+        // Try to serve from AppDataCache first (filter cached category items by store name)
+        let period = storeBreakdown.period
+        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category)
+        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
+            let storeFiltered = cachedItems.filter { $0.storeName == storeBreakdown.storeName }
+            categoryTransactions[displayKey] = storeFiltered
+            return
+        }
 
         loadingCategories.insert(displayKey)
 

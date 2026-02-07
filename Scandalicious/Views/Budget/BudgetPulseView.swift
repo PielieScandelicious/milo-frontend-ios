@@ -108,17 +108,25 @@ struct BudgetPulseView: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        HStack(spacing: 12) {
-            ProgressView()
-                .tint(.white.opacity(0.6))
+        HStack(spacing: 14) {
+            // Skeleton mini ring
+            SkeletonCircle(size: 44)
 
-            Text("Loading budget...")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    SkeletonRect(width: 60, height: 18)
+                    SkeletonRect(width: 20, height: 14)
+                    SkeletonRect(width: 50, height: 16)
+                }
+                SkeletonRect(width: 120, height: 12)
+            }
 
             Spacer()
+
+            SkeletonRect(width: 14, height: 14, cornerRadius: 4)
         }
         .padding(16)
+        .shimmer()
     }
 
     // MARK: - No Budget View

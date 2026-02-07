@@ -56,14 +56,9 @@ struct BudgetInsightsView: View {
     // MARK: - States
 
     private var idleView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "chart.bar.fill")
-                .font(.system(size: 48))
-                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-            Text("Loading insights...")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+        VStack(spacing: 20) {
+            SkeletonInsightsCard()
+            SkeletonStoreList(count: 3)
         }
         .frame(maxWidth: .infinity, minHeight: 200)
     }
