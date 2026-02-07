@@ -9,8 +9,8 @@ import SwiftUI
 
 // MARK: - Edit Category Budgets Sheet
 
-/// Full-screen sheet allowing users to customize their category budget allocations
-/// Features auto-adjustment of non-locked categories to maintain target budget
+/// Full-screen sheet for editing category budget allocations.
+/// Compact rows expand on tap for slider editing. Sort order is fixed to prevent layout jumps.
 struct EditCategoryBudgetsSheet: View {
     let initialBudget: UserBudget
     let onSave: ([CategoryAllocation]) -> Void
@@ -19,31 +19,37 @@ struct EditCategoryBudgetsSheet: View {
     @State private var categoryAllocations: [EditableCategoryAllocation] = []
     @State private var targetBudget: Double = 0
     @State private var isSaving = false
+    @State private var expandedCategoryId: UUID?
 
     var body: some View {
         NavigationView {
             ZStack {
                 Color(white: 0.05).ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Target Budget Header
-                        targetBudgetHeader
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            targetBudgetHeader
 
-                        // Instructions
-                        instructionsCard
+                            categoryList
 
-                        // Category List
-                        categoryList
-
-                        Spacer().frame(height: 100)
+                            Spacer().frame(height: 100)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .padding(.bottom, 40)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-                    .padding(.bottom, 40)
+                    .onChange(of: expandedCategoryId) { newId in
+                        if let newId {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    proxy.scrollTo(newId, anchor: .center)
+                                }
+                            }
+                        }
+                    }
                 }
 
-                // Floating Save Button
                 VStack {
                     Spacer()
                     saveButton
@@ -51,16 +57,14 @@ struct EditCategoryBudgetsSheet: View {
                         .padding(.bottom, 30)
                 }
             }
-            .navigationTitle("Edit Category Budgets")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(.white.opacity(0.7))
                 }
-
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { resetAllCategories() }) {
+                    Button(action: resetAllCategories) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.system(size: 14, weight: .semibold))
@@ -74,21 +78,19 @@ struct EditCategoryBudgetsSheet: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear {
-            setupInitialState()
-        }
+        .onAppear { setupInitialState() }
     }
 
     // MARK: - Target Budget Header
 
     private var targetBudgetHeader: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             Text("Target Monthly Budget")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
 
             Text(String(format: "€%.0f", targetBudget))
-                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .font(.system(size: 42, weight: .bold, design: .rounded))
                 .foregroundStyle(
                     LinearGradient(
                         colors: [
@@ -100,158 +102,58 @@ struct EditCategoryBudgetsSheet: View {
                     )
                 )
 
-            // Total validation
             let currentTotal = categoryAllocations.reduce(0) { $0 + $1.amount }
             let difference = currentTotal - targetBudget
 
             if abs(difference) < 0.5 {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: 12))
                     Text("Budgets balanced")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
                 .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
             } else {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: 12))
                     Text(String(format: "€%.0f %@", abs(difference), difference > 0 ? "over budget" : "under budget"))
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
                 .foregroundColor(Color(red: 1.0, green: 0.75, blue: 0.3))
             }
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 12)
     }
 
-    // MARK: - Instructions Card
-
-    private var instructionsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-                Text("How it works")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                instructionRow(icon: "slider.horizontal.3", text: "Tap any category to edit its budget")
-                instructionRow(icon: "arrow.triangle.2.circlepath", text: "Other categories adjust automatically")
-                instructionRow(icon: "lock.fill", text: "Edited categories show a blue badge")
-                instructionRow(icon: "arrow.counterclockwise", text: "Reset individual or all categories")
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.2), lineWidth: 1)
-                )
-        )
-    }
-
-    private func instructionRow(icon: String, text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-                .frame(width: 16)
-
-            Text(text)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.7))
-        }
-    }
-
-    // MARK: - Category List (Grouped)
-
-    /// Group categories by their parent group using CategoryRegistryManager
-    private var groupedCategoryIndices: [(group: String, indices: [Int])] {
-        let registry = CategoryRegistryManager.shared
-        var groups: [String: [Int]] = [:]
-
-        for index in categoryAllocations.indices {
-            let group = registry.groupForSubCategory(categoryAllocations[index].category)
-            groups[group, default: []].append(index)
-        }
-
-        return groups
-            .map { (group: $0.key, indices: $0.value) }
-            .sorted { group1, group2 in
-                let total1 = group1.indices.reduce(0.0) { $0 + categoryAllocations[$1].amount }
-                let total2 = group2.indices.reduce(0.0) { $0 + categoryAllocations[$1].amount }
-                return total1 > total2
-            }
-    }
+    // MARK: - Category List (Flat, Fixed Order)
 
     private var categoryList: some View {
-        let grouped = groupedCategoryIndices
+        VStack(spacing: 6) {
+            ForEach(categoryAllocations.indices, id: \.self) { index in
+                let isExpanded = categoryAllocations[index].id == expandedCategoryId
 
-        return VStack(spacing: 20) {
-            if grouped.count <= 1 {
-                VStack(spacing: 12) {
-                    ForEach(categoryAllocations.indices, id: \.self) { index in
-                        EditableCategoryCard(
-                            allocation: $categoryAllocations[index],
-                            totalBudget: targetBudget,
-                            onAmountChanged: { newAmount in
-                                handleCategoryEdit(at: index, newAmount: newAmount)
-                            },
-                            onReset: {
-                                resetCategory(at: index)
+                CompactCategoryRow(
+                    allocation: $categoryAllocations[index],
+                    isExpanded: isExpanded,
+                    totalBudget: targetBudget,
+                    onTap: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            if isExpanded {
+                                expandedCategoryId = nil
+                            } else {
+                                expandedCategoryId = categoryAllocations[index].id
                             }
-                        )
-                    }
-                }
-            } else {
-                ForEach(grouped, id: \.group) { section in
-                    VStack(alignment: .leading, spacing: 12) {
-                        let registry = CategoryRegistryManager.shared
-                        let groupTotal = section.indices.reduce(0.0) { $0 + categoryAllocations[$1].amount }
-
-                        HStack(spacing: 8) {
-                            Image(systemName: registry.iconForGroup(section.group))
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(registry.colorForGroup(section.group))
-
-                            Text(section.group)
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.white)
-
-                            Text("(\(section.indices.count))")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
-
-                            Spacer()
-
-                            Text(String(format: "€%.0f", groupTotal))
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundColor(.white.opacity(0.6))
                         }
-                        .padding(.horizontal, 4)
-                        .padding(.top, 4)
-
-                        ForEach(section.indices, id: \.self) { index in
-                            EditableCategoryCard(
-                                allocation: $categoryAllocations[index],
-                                totalBudget: targetBudget,
-                                onAmountChanged: { newAmount in
-                                    handleCategoryEdit(at: index, newAmount: newAmount)
-                                },
-                                onReset: {
-                                    resetCategory(at: index)
-                                }
-                            )
-                        }
+                    },
+                    onAmountChanged: { newAmount in
+                        handleCategoryEdit(at: index, newAmount: newAmount)
+                    },
+                    onReset: {
+                        resetCategory(at: index)
                     }
-                }
+                )
+                .id(categoryAllocations[index].id)
             }
         }
     }
@@ -267,7 +169,6 @@ struct EditCategoryBudgetsSheet: View {
                 } else {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .semibold))
-
                     Text("Save Changes")
                         .font(.system(size: 17, weight: .bold))
                 }
@@ -308,37 +209,58 @@ struct EditCategoryBudgetsSheet: View {
                     category: allocation.category,
                     amount: allocation.amount,
                     originalAmount: allocation.amount,
-                    isLocked: false  // Always start fresh - user can re-lock by editing
+                    isLocked: false
                 )
             }
+        }
+
+        // Ensure ALL categories from the registry are present (add missing ones with €0)
+        let existingCategories = Set(categoryAllocations.map { $0.category })
+        let registry = CategoryRegistryManager.shared
+        for subCategory in registry.allSubCategories {
+            if !existingCategories.contains(subCategory) {
+                categoryAllocations.append(
+                    EditableCategoryAllocation(
+                        category: subCategory,
+                        amount: 0,
+                        originalAmount: 0,
+                        isLocked: false
+                    )
+                )
+            }
+        }
+
+        // Sort ONCE: categories with budget first (by amount desc), then €0 categories (registry order)
+        let registryOrder = registry.allSubCategories
+        categoryAllocations.sort { a, b in
+            if a.originalAmount > 0 && b.originalAmount > 0 {
+                return a.originalAmount > b.originalAmount
+            }
+            if a.originalAmount > 0 { return true }
+            if b.originalAmount > 0 { return false }
+            let aIdx = registryOrder.firstIndex(of: a.category) ?? Int.max
+            let bIdx = registryOrder.firstIndex(of: b.category) ?? Int.max
+            return aIdx < bIdx
         }
     }
 
     private func handleCategoryEdit(at index: Int, newAmount: Double) {
-        // Mark this category as edited (locked)
         categoryAllocations[index].amount = newAmount
         categoryAllocations[index].isLocked = true
 
-        // Calculate how much we need to redistribute
         let lockedTotal = categoryAllocations.filter { $0.isLocked }.reduce(0) { $0 + $1.amount }
         let remainingBudget = targetBudget - lockedTotal
 
-        // Get non-locked categories
         let nonLockedIndices = categoryAllocations.indices.filter { !categoryAllocations[$0].isLocked }
 
-        guard !nonLockedIndices.isEmpty && remainingBudget > 0 else {
-            // If all are locked or no budget remaining, just return
-            return
-        }
+        guard !nonLockedIndices.isEmpty && remainingBudget > 0 else { return }
 
-        // Calculate total original amount for non-locked categories
         let nonLockedOriginalTotal = nonLockedIndices.reduce(0.0) { total, idx in
             total + categoryAllocations[idx].originalAmount
         }
 
         guard nonLockedOriginalTotal > 0 else { return }
 
-        // Redistribute proportionally based on original amounts
         for idx in nonLockedIndices {
             let proportion = categoryAllocations[idx].originalAmount / nonLockedOriginalTotal
             categoryAllocations[idx].amount = max(0, remainingBudget * proportion)
@@ -348,8 +270,6 @@ struct EditCategoryBudgetsSheet: View {
     private func resetCategory(at index: Int) {
         categoryAllocations[index].amount = categoryAllocations[index].originalAmount
         categoryAllocations[index].isLocked = false
-
-        // Recalculate all non-locked categories
         recalculateNonLockedCategories()
     }
 
@@ -383,7 +303,6 @@ struct EditCategoryBudgetsSheet: View {
     private func handleSave() {
         isSaving = true
 
-        // Convert back to CategoryAllocation
         let allocations = categoryAllocations.map { editable in
             CategoryAllocation(
                 category: editable.category,
@@ -415,167 +334,185 @@ struct EditableCategoryAllocation: Identifiable {
     }
 }
 
-// MARK: - Editable Category Card
+// MARK: - Compact Category Row (Accordion)
 
-struct EditableCategoryCard: View {
+/// A compact row that shows category info at a glance, expanding to reveal a slider on tap.
+struct CompactCategoryRow: View {
     @Binding var allocation: EditableCategoryAllocation
+    let isExpanded: Bool
     let totalBudget: Double
+    let onTap: () -> Void
     let onAmountChanged: (Double) -> Void
     let onReset: () -> Void
-
-    @State private var isEditing = false
-    @State private var localAmount: Double = 0
-    @FocusState private var isFocused: Bool
 
     private var percentage: Double {
         guard totalBudget > 0 else { return 0 }
         return (allocation.amount / totalBudget) * 100
     }
 
-    /// Slider max must be at least the step size (5) to avoid SwiftUI crash
     private var sliderMax: Double {
-        max(10, min(totalBudget, allocation.originalAmount * 3))
-    }
-
-    private var categoryIcon: String {
-        allocation.category.categoryIcon
+        let base = allocation.originalAmount > 0 ? allocation.originalAmount * 3 : totalBudget * 0.25
+        return max(50, min(totalBudget, base))
     }
 
     var body: some View {
-        VStack(spacing: 14) {
-            // Header
-            HStack(spacing: 12) {
-                // Category icon
-                ZStack {
-                    Circle()
-                        .fill(allocation.category.categoryColor.opacity(0.2))
-                        .frame(width: 44, height: 44)
+        VStack(spacing: 0) {
+            // Compact header - always visible
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    // Category icon
+                    ZStack {
+                        Circle()
+                            .fill(allocation.category.categoryColor.opacity(0.2))
+                            .frame(width: 36, height: 36)
 
-                    Image(systemName: categoryIcon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(allocation.category.categoryColor)
-                }
+                        Image(systemName: allocation.category.categoryIcon)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(allocation.category.categoryColor)
+                    }
 
-                // Category name and percentage
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(allocation.category.normalizedCategoryName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white)
+                    // Name + bar
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 5) {
+                            Text(allocation.category.normalizedCategoryName)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
 
-                        // Edited badge
-                        if allocation.isEdited {
-                            HStack(spacing: 3) {
+                            if allocation.isEdited {
                                 Image(systemName: "pencil.circle.fill")
                                     .font(.system(size: 10))
-                                Text("Edited")
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
                             }
-                            .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule()
-                                    .fill(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.15))
-                            )
                         }
-                    }
 
-                    Text(String(format: "%.1f%% of budget", percentage))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                }
+                        // Thin progress bar
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(Color.white.opacity(0.08))
+                                    .frame(height: 4)
 
-                Spacer()
-
-                // Reset button (only show if edited)
-                if allocation.isEdited {
-                    Button(action: onReset) {
-                        Image(systemName: "arrow.counterclockwise.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                }
-            }
-
-            // Amount Editor
-            HStack(spacing: 12) {
-                // Minus button
-                Button(action: { decrementAmount() }) {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-                }
-                .disabled(allocation.amount <= 5)
-
-                // Amount display (tappable to edit)
-                Button(action: { startEditing() }) {
-                    Text(String(format: "€%.0f", allocation.amount))
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .frame(minWidth: 120)
-                }
-
-                // Plus button
-                Button(action: { incrementAmount() }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-                }
-                .disabled(allocation.amount >= totalBudget)
-            }
-            .frame(maxWidth: .infinity)
-
-            // Slider
-            VStack(spacing: 6) {
-                Slider(
-                    value: Binding(
-                        get: { min(allocation.amount, sliderMax) },
-                        set: { newValue in
-                            let roundedValue = round(newValue / 5) * 5
-                            onAmountChanged(roundedValue)
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(allocation.category.categoryColor)
+                                    .frame(width: max(0, geometry.size.width * CGFloat(min(1.0, percentage / 100))), height: 4)
+                            }
                         }
-                    ),
-                    in: 0...sliderMax,
-                    step: 5
-                )
-                .tint(allocation.category.categoryColor)
-
-                // Min/Max labels
-                HStack {
-                    Text("€0")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.3))
+                        .frame(height: 4)
+                    }
 
                     Spacer()
 
-                    Text(String(format: "€%.0f", sliderMax))
-                        .font(.system(size: 11, weight: .medium))
+                    // Amount + percentage
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(String(format: "€%.0f", allocation.amount))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+
+                        Text(String(format: "%.0f%%", percentage))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+
+                    // Expand chevron
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white.opacity(0.3))
+                        .frame(width: 16)
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            // Expanded controls
+            if isExpanded {
+                VStack(spacing: 12) {
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                        .padding(.horizontal, 14)
+
+                    // Stepper: [-] amount [+]
+                    HStack(spacing: 16) {
+                        Button(action: decrementAmount) {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                        }
+                        .disabled(allocation.amount <= 0)
+
+                        Text(String(format: "€%.0f", allocation.amount))
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(minWidth: 90)
+
+                        Button(action: incrementAmount) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                        }
+                        .disabled(allocation.amount >= totalBudget)
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    // Slider
+                    VStack(spacing: 4) {
+                        Slider(
+                            value: Binding(
+                                get: { min(allocation.amount, sliderMax) },
+                                set: { newValue in
+                                    let rounded = round(newValue / 5) * 5
+                                    onAmountChanged(rounded)
+                                }
+                            ),
+                            in: 0...sliderMax,
+                            step: 5
+                        )
+                        .tint(allocation.category.categoryColor)
+
+                        HStack {
+                            Text("€0")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.white.opacity(0.25))
+                            Spacer()
+                            Text(String(format: "€%.0f", sliderMax))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.white.opacity(0.25))
+                        }
+                    }
+                    .padding(.horizontal, 14)
+
+                    // Reset button
+                    if allocation.isEdited {
+                        Button(action: onReset) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("Reset to €\(String(format: "%.0f", allocation.originalAmount))")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.white.opacity(0.5))
+                            .padding(.vertical, 6)
+                        }
+                    }
+                }
+                .padding(.bottom, 12)
             }
         }
-        .padding(18)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
         .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.05))
+            RoundedRectangle(cornerRadius: 14)
+                .fill(isExpanded ? Color.white.opacity(0.07) : Color.white.opacity(0.04))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: 14)
                 .stroke(
-                    allocation.isEdited ? Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.4) : Color.white.opacity(0.08),
-                    lineWidth: allocation.isEdited ? 2 : 1
+                    allocation.isEdited
+                        ? Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.3)
+                        : (isExpanded ? Color.white.opacity(0.12) : Color.white.opacity(0.06)),
+                    lineWidth: 1
                 )
         )
-        .onAppear {
-            localAmount = allocation.amount
-        }
-    }
-
-    private func startEditing() {
-        isEditing = true
-        localAmount = allocation.amount
-        isFocused = true
     }
 
     private func incrementAmount() {

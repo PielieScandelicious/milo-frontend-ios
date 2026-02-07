@@ -147,6 +147,16 @@ class CategoryRegistryManager: ObservableObject {
         }
     }
 
+    // MARK: - All Sub-Categories
+
+    /// Returns all sub-category names from the loaded hierarchy
+    var allSubCategories: [String] {
+        guard let hierarchy = hierarchy else { return [] }
+        return hierarchy.groups.flatMap { group in
+            group.categories.flatMap { $0.subCategories }
+        }
+    }
+
     // MARK: - Lookup Helpers
 
     func groupForSubCategory(_ subCategory: String) -> String {

@@ -95,7 +95,6 @@ struct CategoryBudgetDetailView: View {
                     .padding(.bottom, 40)
                 }
             }
-            .navigationTitle("Category Budgets")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
