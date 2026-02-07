@@ -69,14 +69,9 @@ struct BudgetInsightsView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.2)
-                .tint(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-            Text("Analyzing your spending...")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+        VStack(spacing: 20) {
+            SkeletonInsightsCard()
+            SkeletonStoreList(count: 3)
         }
         .frame(maxWidth: .infinity, minHeight: 200)
     }

@@ -135,6 +135,48 @@ class StoreDataManager: ObservableObject {
         self.transactionManager = transactionManager
     }
 
+    // MARK: - Cache Integration
+
+    /// Populate from disk cache for instant launch (no network calls)
+    func populateFromCache(_ cache: AppDataCache) {
+        guard cache.hasDiskCache else { return }
+        self.periodMetadata = cache.periodMetadata
+        self.periodTotalSpends = cache.periodTotalSpends
+        self.periodReceiptCounts = cache.periodReceiptCounts
+
+        // Restore breakdowns from cache
+        var allBreakdowns: [StoreBreakdown] = []
+        for (period, breakdowns) in cache.breakdownsByPeriod {
+            allBreakdowns.append(contentsOf: breakdowns)
+            loadedPeriods.insert(period)
+        }
+        self.storeBreakdowns = allBreakdowns
+
+        if let latestPeriod = cache.periodMetadata.first {
+            self.averageHealthScore = latestPeriod.averageHealthScore
+        }
+
+        self.hasInitiallyFetched = true
+        self.lastFetchDate = cache.lastRefreshDate
+    }
+
+    /// Write current state to AppDataCache after a successful fetch
+    private func syncToCache() {
+        let cache = AppDataCache.shared
+        cache.updatePeriodMetadata(periodMetadata)
+        // Sync breakdowns by period
+        let grouped = Dictionary(grouping: storeBreakdowns) { $0.period }
+        for (period, breakdowns) in grouped {
+            cache.updateBreakdowns(for: period, breakdowns: breakdowns)
+        }
+        for (period, spend) in periodTotalSpends {
+            cache.updatePeriodTotalSpend(period, totalSpend: spend)
+        }
+        for (period, count) in periodReceiptCounts {
+            cache.updatePeriodReceiptCount(period, count: count)
+        }
+    }
+
     // MARK: - Fetch Data from Backend
 
     /// Fetch analytics data from backend API - Initial load
@@ -246,6 +288,9 @@ class StoreDataManager: ObservableObject {
                 self.isRefreshing = false
                 self.lastFetchDate = Date()
                 self.hasInitiallyFetched = true
+
+                // Sync to disk cache
+                self.syncToCache()
             }
 
         } catch let apiError as AnalyticsAPIError {
@@ -333,6 +378,9 @@ class StoreDataManager: ObservableObject {
                 self.isLoadingPeriods = false
                 self.hasInitiallyFetched = true
                 self.lastFetchDate = Date()
+
+                // Sync to disk cache
+                AppDataCache.shared.updatePeriodMetadata(response.periods)
             }
 
         } catch {
@@ -402,6 +450,9 @@ class StoreDataManager: ObservableObject {
                 }
 
                 self.isRefreshing = false
+
+                // Sync breakdowns to disk cache
+                AppDataCache.shared.updateBreakdowns(for: periodString, breakdowns: breakdowns)
             }
 
         } catch {
@@ -517,6 +568,9 @@ class StoreDataManager: ObservableObject {
                 self.isLoading = false
                 self.hasInitiallyFetched = true
                 self.lastFetchDate = Date()
+
+                // Sync to disk cache
+                self.syncToCache()
             }
 
         } catch let apiError as AnalyticsAPIError {

@@ -10,6 +10,7 @@ import SwiftUI
 struct ReceiptsListView: View {
     let period: String
     let storeName: String?
+    var initialReceipts: [APIReceipt]? = nil
 
     @StateObject private var viewModel = ReceiptsViewModel()
     @Environment(\.dismiss) private var dismiss
@@ -26,7 +27,12 @@ struct ReceiptsListView: View {
             Color(white: 0.05).ignoresSafeArea()
 
             if viewModel.state.isLoading && viewModel.receipts.isEmpty {
-                loadingView
+                // Skeleton loading instead of spinner
+                ScrollView {
+                    SkeletonReceiptList(count: 5)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                }
             } else if viewModel.receipts.isEmpty {
                 emptyState
             } else {
@@ -110,7 +116,23 @@ struct ReceiptsListView: View {
             SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
         }
         .task {
-            await viewModel.loadReceipts(period: period, storeName: storeName)
+            // Use initial/cached receipts for instant display
+            if let initial = initialReceipts, !initial.isEmpty, viewModel.receipts.isEmpty {
+                viewModel.receipts = initial
+                viewModel.state = .success(initial)
+                // Background refresh for fresh data
+                Task {
+                    await viewModel.loadReceipts(period: period, storeName: storeName, reset: true)
+                }
+            } else if let cached = AppDataCache.shared.receiptsByPeriod[period], !cached.isEmpty, viewModel.receipts.isEmpty, storeName == nil {
+                viewModel.receipts = cached
+                viewModel.state = .success(cached)
+                Task {
+                    await viewModel.loadReceipts(period: period, storeName: storeName, reset: true)
+                }
+            } else {
+                await viewModel.loadReceipts(period: period, storeName: storeName)
+            }
         }
         .alert("Error", isPresented: .constant(viewModel.state.error != nil)) {
             Button("OK") { }
@@ -196,19 +218,6 @@ struct ReceiptsListView: View {
     }
 
     // MARK: - Components
-
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                .scaleEffect(1.5)
-
-            Text("Loading receipts...")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-        }
-        .frame(maxHeight: .infinity)
-    }
 
     private var emptyState: some View {
         VStack(spacing: 16) {

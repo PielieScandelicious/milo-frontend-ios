@@ -62,54 +62,23 @@ struct ContentView: View {
             if !hasLoadedInitialData {
                 dataManager.configure(with: transactionManager)
 
-                // Optimized loading: fetch lightweight period metadata first (1 API call)
-                // Falls back to fetchAllHistoricalData if /analytics/periods is not available
-                Task {
-                    // Step 1: Fetch lightweight period metadata (falls back if endpoint unavailable)
-                    await dataManager.fetchPeriodMetadata()
+                let cache = AppDataCache.shared
 
-                    // Step 2: Load current period + adjacent periods BEFORE showing UI
-                    // This ensures smooth swiping without lag on first launch
-                    // If fallback was used, all data is already loaded via fetchAllHistoricalData()
-                    if !dataManager.periodMetadata.isEmpty {
-                        // Get periods to preload - we need current + 2 before + 2 after for smooth swiping
-                        // Since periodMetadata is sorted most recent first, we preload first 5 periods
-                        let periodsToPreload = Array(dataManager.periodMetadata.prefix(8))
+                // INSTANT LAUNCH: If cache has ALL data, show UI immediately
+                if cache.isComplete {
+                    dataManager.populateFromCache(cache)
+                    hasLoadedInitialData = true
 
-                        // Load current period + immediate neighbors first (blocking)
-                        // These are critical for smooth UX - load in parallel but wait for all
-                        let criticalPeriods = Array(periodsToPreload.prefix(5))
-
-                        await withTaskGroup(of: Void.self) { group in
-                            for periodMeta in criticalPeriods {
-                                group.addTask {
-                                    await dataManager.fetchPeriodDetails(periodMeta.period)
-                                }
-                            }
-                        }
-
-                        // Show UI after critical periods are loaded
-                        await MainActor.run {
-                            hasLoadedInitialData = true
-                        }
-
-                        // Then load remaining periods in background
-                        if periodsToPreload.count > criticalPeriods.count {
-                            let remainingPeriods = Array(periodsToPreload.dropFirst(criticalPeriods.count))
-                            await withTaskGroup(of: Void.self) { group in
-                                for periodMeta in remainingPeriods {
-                                    group.addTask {
-                                        await dataManager.fetchPeriodDetails(periodMeta.period)
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        await MainActor.run {
-                            hasLoadedInitialData = true
-                        }
+                    // Silent background refresh (no UI impact)
+                    Task(priority: .utility) {
+                        try? await Task.sleep(for: .seconds(2))
+                        await loadAllData(cache: cache, showLoading: false)
                     }
-
+                } else {
+                    // Loading screen stays until ALL data is fetched
+                    Task {
+                        await loadAllData(cache: cache, showLoading: true)
+                    }
                 }
             }
         }
@@ -125,6 +94,67 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to sign out?")
+        }
+    }
+
+    // MARK: - Full Data Loading
+
+    /// Loads ALL data needed for smooth browsing.
+    /// When showLoading=true, keeps loading screen visible until done.
+    /// When showLoading=false, runs silently in background.
+    private func loadAllData(cache: AppDataCache, showLoading: Bool) async {
+        // Phase 1: Period metadata + store breakdowns for ALL periods
+        await dataManager.fetchPeriodMetadata()
+
+        guard !dataManager.periodMetadata.isEmpty else {
+            if showLoading {
+                await MainActor.run { hasLoadedInitialData = true }
+            }
+            return
+        }
+
+        // Load store breakdowns for ALL periods in parallel
+        let allPeriods = dataManager.periodMetadata
+        await withTaskGroup(of: Void.self) { group in
+            for periodMeta in allPeriods {
+                group.addTask {
+                    await dataManager.fetchPeriodDetails(periodMeta.period)
+                }
+            }
+        }
+
+        // Phase 2: Receipts + category data for ALL month periods in parallel
+        let monthPeriods = allPeriods.map { $0.period }
+        await withTaskGroup(of: Void.self) { group in
+            for period in monthPeriods {
+                group.addTask { await cache.preloadReceipts(for: period) }
+                group.addTask { await cache.preloadCategoryData(for: period) }
+            }
+        }
+
+        // Phase 3: Year summaries for all distinct years + all-time data in parallel
+        let distinctYears = Set(monthPeriods.compactMap { period -> String? in
+            let parts = period.split(separator: " ")
+            return parts.count == 2 ? String(parts[1]) : nil
+        })
+        await withTaskGroup(of: Void.self) { group in
+            for year in distinctYears {
+                group.addTask { await cache.preloadYearSummary(for: year) }
+            }
+            group.addTask { await cache.preloadAllTimeAggregate() }
+        }
+
+        // Phase 4: Category items (transactions per category) for ALL month periods
+        // Must run after Phase 2 since preloadCategoryItems reads pieChartSummaryByPeriod
+        await withTaskGroup(of: Void.self) { group in
+            for period in monthPeriods {
+                group.addTask { await cache.preloadCategoryItems(for: period) }
+            }
+        }
+
+        // All data loaded — dismiss loading screen
+        if showLoading {
+            await MainActor.run { hasLoadedInitialData = true }
         }
     }
 }

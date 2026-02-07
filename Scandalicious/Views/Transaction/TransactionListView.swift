@@ -121,16 +121,16 @@ struct TransactionListView: View {
             Color(white: 0.05).ignoresSafeArea()
 
             if viewModel.state.isLoading && transactions.isEmpty {
-                // Loading state
+                // Skeleton loading state
                 VStack(spacing: 0) {
                     if sortOrder != .healthScoreDescending {
                         headerSection
                     }
 
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
-                        .frame(maxHeight: .infinity)
+                    SkeletonTransactionList(count: 5)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
             } else if transactions.isEmpty {
                 VStack(spacing: 0) {

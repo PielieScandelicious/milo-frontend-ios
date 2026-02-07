@@ -403,37 +403,37 @@ class BudgetViewModel: ObservableObject {
     }
 
     /// Delete the budget for the currently selected period
+    /// Optimistic: animate first, then call API in background for snappy UX
     func deleteBudget() async -> Bool {
         // Convert selected period to API format (yyyy-MM)
         let monthParam = isCurrentMonth ? nil : convertToAPIFormat(selectedPeriod)
         print("🗑️ [BudgetViewModel] Starting budget deletion for \(monthParam ?? "current month")...")
-        isSaving = true
-        saveError = nil
 
+        // Save current state in case we need to roll back
+        let previousState = state
+        let previousSuggestionState = suggestionState
+
+        // 1. Animate immediately — don't wait for network
+        suggestionState = .idle
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            state = .noBudget
+        }
+        NotificationCenter.default.post(name: .budgetDeleted, object: nil)
+        print("🗑️ [BudgetViewModel] Optimistic UI updated, now calling API...")
+
+        // 2. Call API in the background
         do {
             try await apiService.removeBudget(month: monthParam)
-            print("🗑️ [BudgetViewModel] API deletion successful, setting state to .noBudget")
-
-            // Reset suggestion state
-            suggestionState = .idle
-            isSaving = false
-
-            // Animate the state transition so the widget smoothly goes from active → noBudget
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                state = .noBudget
-            }
-
-            print("🗑️ [BudgetViewModel] State is now: \(state), refresh trigger: \(forceRefreshTrigger)")
-
-            // Post notification for any other observers - this will trigger view reset
-            NotificationCenter.default.post(name: .budgetDeleted, object: nil)
-
-            print("🗑️ [BudgetViewModel] Budget deletion complete, notification posted")
+            print("🗑️ [BudgetViewModel] API deletion confirmed")
             return true
         } catch {
-            print("🗑️ [BudgetViewModel] Budget deletion failed: \(error.localizedDescription)")
+            // Roll back to previous state on failure
+            print("🗑️ [BudgetViewModel] Budget deletion failed: \(error.localizedDescription), rolling back")
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                state = previousState
+                suggestionState = previousSuggestionState
+            }
             saveError = error.localizedDescription
-            isSaving = false
             return false
         }
     }

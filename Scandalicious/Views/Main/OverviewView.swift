@@ -578,13 +578,14 @@ struct OverviewView: View {
             }
         }
 
-        // Load receipts only if not already loaded for this period
-        // Mark as loading IMMEDIATELY to prevent duplicate concurrent loads
+        // Load receipts from pre-populated cache (all data loaded during startup)
         let periodToLoad = selectedPeriod
         if !loadedReceiptPeriods.contains(periodToLoad) {
-            loadedReceiptPeriods.insert(periodToLoad) // Mark immediately to prevent race conditions
-            Task {
-                await receiptsViewModel.loadReceipts(period: periodToLoad, storeName: nil, reset: true)
+            loadedReceiptPeriods.insert(periodToLoad)
+            let cache = AppDataCache.shared
+            if let cachedReceipts = cache.receiptsByPeriod[periodToLoad], !cachedReceipts.isEmpty {
+                receiptsViewModel.receipts = cachedReceipts
+                receiptsViewModel.state = .success(cachedReceipts)
             }
         }
 
@@ -601,12 +602,24 @@ struct OverviewView: View {
             await budgetViewModel.loadBudget()
         }
 
-        // Load category data for initial period (needed since categories show by default)
+        // Load category data from pre-populated cache
         let initialPeriod = selectedPeriod
-        if !isAllPeriod(initialPeriod) && !isYearPeriod(initialPeriod) && pieChartSummaryCache[initialPeriod] == nil {
-            Task {
-                await fetchCategoryData(for: initialPeriod)
-            }
+        let cache = AppDataCache.shared
+        if let cachedPieChart = cache.pieChartSummaryByPeriod[initialPeriod] {
+            pieChartSummaryCache[initialPeriod] = cachedPieChart
+        }
+
+        // Pre-populate year summary caches from AppDataCache
+        for (year, summary) in cache.yearSummaryCache {
+            yearSummaryCache[year] = summary
+        }
+
+        // Pre-populate all-time data from AppDataCache
+        if let aggregate = cache.allTimeAggregate {
+            allTimeTotalSpend = aggregate.totals.totalSpend
+            allTimeTotalReceipts = aggregate.totals.totalReceipts
+            allTimeHealthScore = aggregate.averages.averageHealthScore
+            allTimeCategories = aggregate.topCategories
         }
     }
 
@@ -732,16 +745,17 @@ struct OverviewView: View {
             cachedChartDataByPeriod[Self.allPeriodIdentifier] = chartData
         }
 
-        // IMPORTANT: Set loading state BEFORE view renders when switching to "All" or Year period
-        // This must be synchronous to prevent the chart from rendering with fallback data first
+        // Check caches before setting loading state — data should be pre-loaded
+        let appCache = AppDataCache.shared
         if isAllPeriod(newValue) {
             let hasBackendData = cachedBreakdownsByPeriod[Self.allPeriodIdentifier] != nil &&
                                  !(cachedBreakdownsByPeriod[Self.allPeriodIdentifier]?.isEmpty ?? true)
-            if !hasBackendData {
+            let hasCachedAggregate = appCache.allTimeAggregate != nil
+            if !hasBackendData && !hasCachedAggregate {
                 isLoadingAllTimeData = true
             }
         } else if isYearPeriod(newValue) {
-            let hasCachedYear = yearSummaryCache[newValue] != nil
+            let hasCachedYear = yearSummaryCache[newValue] != nil || appCache.yearSummaryCache[newValue] != nil
             if !hasCachedYear {
                 isLoadingYearData = true
                 currentLoadingYear = newValue
@@ -757,41 +771,88 @@ struct OverviewView: View {
             cacheSegmentsForPeriod(newValue)
         }
 
-        Task {
-            // Prefetch insights
-            await MainActor.run { prefetchInsights() }
+        // All data pre-loaded at startup — use caches directly
+        let cache = AppDataCache.shared
 
-            // Always reload receipts when period changes
-            // (receiptsViewModel only holds one period's data at a time)
-            await receiptsViewModel.loadReceipts(period: newValue, storeName: nil, reset: true)
+        // Receipts: instant from cache
+        if let cachedReceipts = cache.receiptsByPeriod[newValue], !cachedReceipts.isEmpty {
+            receiptsViewModel.receipts = cachedReceipts
+            receiptsViewModel.state = .success(cachedReceipts)
+        } else {
+            receiptsViewModel.receipts = []
+            receiptsViewModel.state = .success([])
+        }
 
-            // Handle "All" period - fetch all-time data from backend
-            if isAllPeriod(newValue) {
-                await fetchAllTimeData()
-            } else if isYearPeriod(newValue) {
-                // Handle Year period - fetch year summary from backend
-                await fetchYearData(year: newValue)
+        // Handle "All" period — use cached all-time aggregate
+        if isAllPeriod(newValue) {
+            if let aggregate = cache.allTimeAggregate {
+                applyAllTimeDataFromCache(aggregate)
             } else {
-                // Load budget data for the selected month period
-                await budgetViewModel.selectPeriod(newValue)
+                Task { await fetchAllTimeData() }
+            }
+        } else if isYearPeriod(newValue) {
+            // Handle Year period — use cached year summary
+            if let cachedYear = yearSummaryCache[newValue] ?? cache.yearSummaryCache[newValue] {
+                applyYearSummaryFromCache(cachedYear, year: newValue)
+            } else {
+                Task { await fetchYearData(year: newValue) }
+            }
+        } else {
+            // Month period: budget + breakdowns + categories all from cache
+            Task { await budgetViewModel.selectPeriod(newValue) }
 
-                if !dataManager.periodMetadata.isEmpty {
-                    if !dataManager.isPeriodLoaded(newValue) {
-                        await dataManager.fetchPeriodDetails(newValue)
-                        await MainActor.run {
-                            updateCacheForPeriod(newValue)
-                            cacheSegmentsForPeriod(newValue)
-                        }
+            if let cachedPieChart = cache.pieChartSummaryByPeriod[newValue] {
+                pieChartSummaryCache[newValue] = cachedPieChart
+            }
+
+            // Breakdowns should already be loaded; if not, fetch
+            if !dataManager.isPeriodLoaded(newValue) {
+                Task {
+                    await dataManager.fetchPeriodDetails(newValue)
+                    await MainActor.run {
+                        updateCacheForPeriod(newValue)
+                        cacheSegmentsForPeriod(newValue)
                     }
-                    await prefetchAdjacentPeriods(around: newValue)
-                }
-
-                // Fetch category data for the period (needed since categories show by default)
-                if pieChartSummaryCache[newValue] == nil {
-                    await fetchCategoryData(for: newValue)
                 }
             }
         }
+
+        // Prefetch insights
+        prefetchInsights()
+    }
+
+    // MARK: - Apply All-Time Data from Cache
+
+    /// Applies pre-loaded all-time aggregate data without any network call
+    private func applyAllTimeDataFromCache(_ aggregate: AggregateResponse) {
+        let stores = aggregate.topStores
+        let breakdowns: [StoreBreakdown] = stores.map { store in
+            StoreBreakdown(
+                storeName: store.storeName,
+                period: Self.allPeriodIdentifier,
+                totalStoreSpend: store.totalSpent,
+                categories: [],
+                visitCount: store.visitCount,
+                averageHealthScore: store.averageHealthScore
+            )
+        }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
+
+        allTimeTotalSpend = aggregate.totals.totalSpend
+        allTimeTotalReceipts = aggregate.totals.totalReceipts
+        allTimeHealthScore = aggregate.averages.averageHealthScore
+        allTimeCategories = aggregate.topCategories
+
+        cachedBreakdownsByPeriod[Self.allPeriodIdentifier] = breakdowns
+        cachedSegmentsByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+        cachedChartDataByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+
+        if isAllPeriod(selectedPeriod) {
+            displayedBreakdowns = breakdowns
+            displayedBreakdownsPeriod = Self.allPeriodIdentifier
+            cacheSegmentsForPeriod(Self.allPeriodIdentifier)
+        }
+
+        isLoadingAllTimeData = false
     }
 
     // MARK: - Fetch All-Time Data
@@ -856,6 +917,9 @@ struct OverviewView: View {
 
                 // Loading complete - chart can now render with backend data
                 isLoadingAllTimeData = false
+
+                // Sync to disk cache
+                AppDataCache.shared.updateAllTimeAggregate(aggregate)
             }
         } catch {
             await MainActor.run {
@@ -892,6 +956,9 @@ struct OverviewView: View {
             await MainActor.run {
                 pieChartSummaryCache[period] = response
                 isLoadingCategoryData = false
+
+                // Sync to disk cache
+                AppDataCache.shared.updatePieChartSummary(for: period, summary: response)
             }
         } catch {
             await MainActor.run {
@@ -1036,6 +1103,9 @@ struct OverviewView: View {
                 // Loading complete
                 isLoadingYearData = false
                 currentLoadingYear = nil
+
+                // Sync to disk cache
+                AppDataCache.shared.updateYearSummary(for: year, summary: yearSummary)
             }
         } catch {
 
@@ -1222,6 +1292,59 @@ struct OverviewView: View {
                 }
             }
         }
+    }
+
+    /// Prefetch receipts + category data for adjacent periods (background, non-blocking)
+    private func prefetchAdjacentBrowsingData(around period: String) async {
+        guard !availablePeriods.isEmpty else { return }
+        guard let currentIndex = availablePeriods.firstIndex(of: period) else { return }
+
+        let cache = AppDataCache.shared
+        var periodsToPreload: [String] = []
+
+        for offset in [-1, 1, -2, 2] {
+            let index = currentIndex + offset
+            if index >= 0 && index < availablePeriods.count {
+                let p = availablePeriods[index]
+                if !isAllPeriod(p) && !isYearPeriod(p) {
+                    periodsToPreload.append(p)
+                }
+            }
+        }
+
+        await withTaskGroup(of: Void.self) { group in
+            for p in periodsToPreload {
+                group.addTask { await cache.preloadReceipts(for: p) }
+                group.addTask { await cache.preloadCategoryData(for: p) }
+            }
+        }
+    }
+
+    /// Apply cached year summary without network call (for instant period switching)
+    private func applyYearSummaryFromCache(_ yearSummary: YearSummaryResponse, year: String) {
+        yearSummaryCache[year] = yearSummary
+
+        let breakdowns: [StoreBreakdown] = yearSummary.stores.map { store in
+            StoreBreakdown(
+                storeName: store.storeName,
+                period: year,
+                totalStoreSpend: store.amountSpent,
+                categories: [],
+                visitCount: store.storeVisits,
+                averageHealthScore: store.averageHealthScore
+            )
+        }.sorted { $0.totalStoreSpend > $1.totalStoreSpend }
+
+        cachedBreakdownsByPeriod[year] = breakdowns
+
+        if selectedPeriod == year {
+            displayedBreakdowns = breakdowns
+            displayedBreakdownsPeriod = year
+            cacheSegmentsForPeriod(year)
+        }
+
+        isLoadingYearData = false
+        currentLoadingYear = nil
     }
 
     // MARK: - Share Extension Upload Detection
@@ -1573,33 +1696,11 @@ struct OverviewView: View {
 
                 spendingAndHealthCardForPeriod(period)
 
-                if isWaitingForAllTimeData {
-                    // Show loading indicator while fetching all-time data
-                    // This prevents the chart from animating twice
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
-                            .scaleEffect(1.2)
-                        Text("Loading all-time data...")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .frame(width: 200, height: 200)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                } else if isWaitingForYearData {
-                    // Show loading indicator while fetching year data
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
-                            .scaleEffect(1.2)
-                        Text("Loading \(period) data...")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .frame(width: 200, height: 200)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
+                if isWaitingForAllTimeData || isWaitingForYearData {
+                    // Skeleton placeholder while fetching data
+                    SkeletonDonutChart()
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
                 } else if !segments.isEmpty {
                     // Flippable pie chart - front shows stores, back shows categories
                     // Tap to flip between the two views
@@ -1620,15 +1721,7 @@ struct OverviewView: View {
                                     showAllSegments: showAllRows
                                 )
                             } else if isLoadingCategoryData {
-                                VStack(spacing: 12) {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
-                                        .scaleEffect(1.0)
-                                    Text("Loading categories...")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.5))
-                                }
-                                .frame(width: 200, height: 200)
+                                SkeletonDonutChart()
                             } else {
                                 VStack(spacing: 12) {
                                     Image(systemName: "square.grid.2x2")
@@ -1787,12 +1880,16 @@ struct OverviewView: View {
                                     }
                                 )
 
-                                // Expanded items section
+                                // Expanded items section — always in tree, height-animated
                                 if expandedCategoryId == category.id {
                                     expandedCategoryItemsSection(category)
-                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                        .transition(.asymmetric(
+                                            insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
+                                            removal: .opacity
+                                        ))
                                 }
                             }
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
                             .opacity(storeRowsAppeared ? 1 : 0)
                             .offset(y: storeRowsAppeared ? 0 : 15)
                             .animation(
@@ -1810,7 +1907,7 @@ struct OverviewView: View {
                             )
                         }
                     }
-                    .id("\(period)-categories-\(showAllRows)-\(expandedCategoryId ?? "")")
+                    .id("\(period)-categories-\(showAllRows)")
                     .padding(.horizontal, 16)
                     .onAppear {
                         if !storeRowsAppeared {
@@ -2108,25 +2205,39 @@ struct OverviewView: View {
     // MARK: - Expandable Category Functions
 
     private func toggleCategoryExpansion(_ category: CategorySpendItem, period: String) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            if expandedCategoryId == category.id {
-                // Collapse
+        if expandedCategoryId == category.id {
+            // Collapse
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                 expandedCategoryId = nil
-            } else {
-                // Expand and load items
-                expandedCategoryId = category.id
+            }
+        } else {
+            // Pre-populate items from cache BEFORE animating expansion
+            let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
+            if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
+                categoryItems[category.id] = cachedItems
+            }
 
-                // Load items if not already loaded
-                if categoryItems[category.id] == nil && loadingCategoryId != category.id {
-                    Task {
-                        await loadCategoryItems(category, period: period)
-                    }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                expandedCategoryId = category.id
+            }
+
+            // Fallback: load from API if not in cache or local state
+            if categoryItems[category.id] == nil && loadingCategoryId != category.id {
+                Task {
+                    await loadCategoryItems(category, period: period)
                 }
             }
         }
     }
 
     private func loadCategoryItems(_ category: CategorySpendItem, period: String) async {
+        // Check cache first
+        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
+        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
+            categoryItems[category.id] = cachedItems
+            return
+        }
+
         loadingCategoryId = category.id
         categoryLoadError[category.id] = nil
 
@@ -2160,6 +2271,8 @@ struct OverviewView: View {
             await MainActor.run {
                 categoryItems[category.id] = response.transactions
                 loadingCategoryId = nil
+                // Update cache
+                AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: response.transactions)
             }
         } catch {
             await MainActor.run {
@@ -2172,18 +2285,14 @@ struct OverviewView: View {
     private func expandedCategoryItemsSection(_ category: CategorySpendItem) -> some View {
         VStack(spacing: 0) {
             if loadingCategoryId == category.id {
-                // Loading state
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .tint(.white)
-                    Text("Loading items...")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.5))
-                        .padding(.leading, 8)
-                    Spacer()
+                // Skeleton loading state
+                VStack(spacing: 8) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        SkeletonTransactionRow()
+                    }
                 }
-                .padding(.vertical, 16)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
             } else if let errorMsg = categoryLoadError[category.id] {
                 // Error state
                 VStack(spacing: 8) {
@@ -2216,10 +2325,16 @@ struct OverviewView: View {
                     }
                     .padding(.vertical, 16)
                 } else {
-                    // Items list
+                    // Items list with staggered appearance
                     VStack(spacing: 0) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                             expandedCategoryItemRow(item, category: category, isLast: index == items.count - 1)
+                                .transition(.opacity.combined(with: .offset(y: -4)))
+                                .animation(
+                                    .spring(response: 0.3, dampingFraction: 0.85)
+                                        .delay(Double(index) * 0.03),
+                                    value: expandedCategoryId
+                                )
                         }
                     }
                     .padding(.top, 8)
@@ -2493,17 +2608,8 @@ struct OverviewView: View {
                 VStack(spacing: 12) {
                     switch receiptsSectionState {
                     case .loading:
-                        // Loading state
-                        HStack(spacing: 12) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
-                                .scaleEffect(0.8)
-                            Text("Loading receipts...")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 30)
+                        // Skeleton loading state
+                        SkeletonReceiptList(count: 3)
 
                     case .empty:
                         // Empty state - different messaging based on context
@@ -3203,9 +3309,11 @@ private struct ExpandableCategoryRowHeader: View {
                     .frame(width: 65, alignment: .trailing)
 
                 // Chevron for expand/collapse
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                Image(systemName: "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.4))
+                    .rotationEffect(.degrees(isExpanded ? -180 : 0))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)

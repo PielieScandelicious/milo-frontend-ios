@@ -1370,7 +1370,6 @@ struct BudgetSetupView: View {
             .shadow(color: Color(red: 0.5, green: 0.3, blue: 1.0).opacity(0.4), radius: 12, y: 4)
         }
         .disabled(viewModel.isSaving)
-        .padding(.top, 8)
         .padding(.bottom, 20)
     }
 

@@ -493,7 +493,7 @@ struct CategoryBudgetGrid: View {
     private var displayCategories: [CategoryBudgetProgress] {
         categories
             .sorted { $0.currentSpend > $1.currentSpend }
-            .prefix(6)
+            .prefix(5)
             .map { $0 }
     }
 
@@ -510,7 +510,7 @@ struct CategoryBudgetGrid: View {
                 if let onSeeAll = onSeeAll, !categories.isEmpty {
                     Button(action: onSeeAll) {
                         HStack(spacing: 4) {
-                            Text(categories.count > 6 ? "See All (\(categories.count))" : "Details")
+                            Text(categories.count > 5 ? "See All (\(categories.count))" : "Details")
                                 .font(.system(size: 13, weight: .semibold))
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 11, weight: .semibold))

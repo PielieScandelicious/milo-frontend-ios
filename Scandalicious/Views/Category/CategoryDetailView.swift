@@ -67,14 +67,43 @@ struct CategoryDetailView: View {
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.3)
-                .tint(.white)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Skeleton header matching categoryHeader layout
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 10) {
+                            SkeletonCircle(size: 36)
+                            SkeletonRect(width: 120, height: 20)
+                        }
+                        SkeletonRect(width: 80, height: 12)
+                        SkeletonRect(width: 100, height: 28)
+                        SkeletonRect(width: 60, height: 11)
+                    }
+                    Spacer()
+                    VStack(spacing: 8) {
+                        SkeletonCircle(size: 64)
+                        SkeletonRect(width: 70, height: 10)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(Color.white.opacity(0.04))
+                )
+                .padding(.horizontal, 16)
 
-            Text("Loading items...")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+                // Skeleton store sections
+                ForEach(0..<2, id: \.self) { _ in
+                    VStack(spacing: 8) {
+                        SkeletonRect(height: 50, cornerRadius: 16)
+                        SkeletonTransactionList(count: 3)
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+            .padding(.top, 16)
         }
     }
 
@@ -433,6 +462,16 @@ struct CategoryDetailView: View {
     // MARK: - Load Transactions
 
     private func loadTransactions() async {
+        // Check AppDataCache first for instant display
+        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
+        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey], !cachedItems.isEmpty {
+            await MainActor.run {
+                self.transactions = cachedItems
+                self.isLoading = false
+            }
+            return
+        }
+
         isLoading = true
         error = nil
 
@@ -468,6 +507,8 @@ struct CategoryDetailView: View {
             await MainActor.run {
                 self.transactions = response.transactions
                 self.isLoading = false
+                // Update cache for future use
+                AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: response.transactions)
             }
         } catch {
             await MainActor.run {
