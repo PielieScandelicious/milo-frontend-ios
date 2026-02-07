@@ -17,6 +17,7 @@ struct FlippableDonutChartView: View {
     var accentColor: Color = Color(red: 0.95, green: 0.25, blue: 0.3) // Modern red
     var selectedPeriod: String? = nil  // e.g., "January 2026"
     var averageItemPrice: Double? = nil  // Average price per item for store detail view
+    var showAllSegments: Bool = true
 
     /// Convert ChartSegments to ChartData for IconDonutChartView
     private var chartData: [ChartData] {
@@ -41,7 +42,8 @@ struct FlippableDonutChartView: View {
             size: size,
             currencySymbol: ["visits", "receipt", "receipts"].contains(subtitle) ? "" : "€",
             subtitle: ["visits", "receipt", "receipts"].contains(subtitle) ? subtitle : nil,
-            averageItemPrice: averageItemPrice
+            averageItemPrice: averageItemPrice,
+            showAllSegments: showAllSegments
         )
         .frame(width: size * 1.33, height: size * 1.09)
     }

@@ -47,9 +47,10 @@ struct IconDonutChartView: View {
     /// Stroke width as proportion of size
     private let strokeWidthRatio: CGFloat = 0.08
 
-    @State private var globalScale: CGFloat = 0.6
-    @State private var globalRotation: Double = -90 // Quarter turn back
+    @State private var animationProgress: CGFloat = 0 // 0 = hidden, 1 = fully visible
     @State private var selectedSegmentIndex: Int? = nil
+    @State private var isSettling = false // Guards against backend refresh re-animation
+    @State private var centerRevealed = false // Controls center content reveal animation
 
     /// Whether the data needs grouping (more than maxVisibleSegments)
     private var needsGrouping: Bool {
@@ -83,15 +84,24 @@ struct IconDonutChartView: View {
         return visibleSegments + [othersSegment]
     }
 
-    /// Unique identifier to track data changes and trigger re-animation
+    /// Track structural data changes (labels/count) to trigger re-animation.
+    /// Uses labels instead of values so backend refresh with same categories won't restart animation.
     private var dataFingerprint: String {
-        let baseFingerprint = displayData.map { "\($0.value)" }.joined(separator: "-")
-        return "\(baseFingerprint)-\(showAllSegments)"
+        let labelFingerprint = displayData.map { $0.label }.joined(separator: "-")
+        return "\(displayData.count)-\(labelFingerprint)-\(showAllSegments)"
     }
 
     /// Skip animation for small charts (store cards) to improve swipe performance
     private var shouldAnimate: Bool {
         size > 120
+    }
+
+    /// Whether there is actual text content to show in the center
+    private var hasCenterContent: Bool {
+        if centerIcon != nil && centerLabel != nil { return true }
+        if let avgPrice = averageItemPrice, avgPrice > 0 { return true }
+        if totalItems != nil { return true }
+        return false
     }
 
     init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil, showAllSegments: Bool = true) {
@@ -190,9 +200,15 @@ struct IconDonutChartView: View {
             // All segments visible, rotate and scale together
             ZStack {
                 ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
-                    // Segment - clean, solid color
+                    // Clockwise sweep: each segment draws as the sweep passes it
+                    let sweepDegrees = animationProgress * 360.0
+                    let segStartDeg = segment.startAngle
+                    let segEndDeg = segment.endAngle
+                    // Clamp visible end to sweep position
+                    let visibleEndDeg = max(segStartDeg, min(segEndDeg, sweepDegrees))
+
                     Circle()
-                        .trim(from: segment.startAngle / 360.0, to: segment.endAngle / 360.0)
+                        .trim(from: segStartDeg / 360.0, to: visibleEndDeg / 360.0)
                         .stroke(
                             segment.data.color,
                             style: StrokeStyle(
@@ -224,54 +240,101 @@ struct IconDonutChartView: View {
                     )
                 }
             }
-            .scaleEffect(globalScale)
-            .rotationEffect(.degrees(-90 + globalRotation)) // -90 starts from top
+            .rotationEffect(.degrees(-90)) // Start from top
 
-            // Center content - shows segment info when selected, otherwise default
-            if let selected = selectedSegment {
-                selectedSegmentContent(selected)
-            } else {
-                centerContent
+            // Center content - premium reveal with spring animation
+            Group {
+                if let selected = selectedSegment {
+                    selectedSegmentContent(selected)
+                } else {
+                    centerContent
+                }
             }
+            .opacity(shouldAnimate ? (centerRevealed ? 1 : 0) : 1)
+            .scaleEffect(shouldAnimate ? (centerRevealed ? 1 : 0.85) : 1)
         }
         .frame(width: size, height: size)
         .onAppear {
             if shouldAnimate {
-                // Start animation immediately for snappier feel
-                withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
-                    globalScale = 1.0
-                    globalRotation = 0
+                if !segments.isEmpty {
+                    // We have data — play the sweep and guard against backend refresh
+                    isSettling = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        isSettling = false
+                    }
+                    withAnimation(.easeInOut(duration: 0.8)) {
+                        animationProgress = 1.0
+                    }
+                    // Reveal center early in the sweep (gradient bg appears;
+                    // text content fades in via its own animation when data arrives)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            centerRevealed = true
+                        }
+                    }
                 }
+                // If segments are empty, leave animationProgress at 0
+                // and wait for data to arrive via onChange
             } else {
-                globalScale = 1.0
-                globalRotation = 0
+                animationProgress = 1.0
+                centerRevealed = true
             }
         }
         .onChange(of: dataFingerprint) { _, _ in
             // Clear selection when data changes
             selectedSegmentIndex = nil
 
-            // Re-animate when data changes (e.g., period switch)
-            if shouldAnimate {
-                // Reset to starting position
-                globalScale = 0.6
-                globalRotation = -90
+            // Skip re-animation if the initial animation just played with real data
+            guard !isSettling else { return }
 
-                // Expand and rotate to final position
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
-                        globalScale = 1.0
-                        globalRotation = 0
+            if shouldAnimate {
+                centerRevealed = false
+                if animationProgress == 0 {
+                    // First time receiving data (was empty on appear) — clean sweep from 0
+                    isSettling = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        isSettling = false
                     }
+                    withAnimation(.easeInOut(duration: 0.8)) {
+                        animationProgress = 1.0
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        guard !centerRevealed else { return }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            centerRevealed = true
+                        }
+                    }
+                } else {
+                    // Structural change (period switch, etc.) — reset and re-sweep
+                    animationProgress = 0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            animationProgress = 1.0
+                        }
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        guard !centerRevealed else { return }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            centerRevealed = true
+                        }
+                    }
+                }
+            }
+        }
+        // Reveal center when data arrives after sweep already completed (e.g., avg price from backend)
+        .onChange(of: hasCenterContent) { _, hasContent in
+            if hasContent && shouldAnimate && !centerRevealed {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    centerRevealed = true
                 }
             }
         }
         .onDisappear {
             // Reset animation state so it plays again on next appearance
             if shouldAnimate {
-                globalScale = 0.6
-                globalRotation = -90
+                animationProgress = 0
                 selectedSegmentIndex = nil
+                centerRevealed = false
             }
         }
     }
@@ -295,82 +358,82 @@ struct IconDonutChartView: View {
                 )
                 .frame(width: size * 0.58, height: size * 0.58)
 
-            // Custom center icon and label - clean and simple
-            if let icon = centerIcon, let label = centerLabel {
-                VStack(spacing: 8) {
-                    // Icon with gradient styling
-                    Image(systemName: icon)
-                        .font(.system(size: size * 0.18, weight: .semibold))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.95),
-                                    Color.white.opacity(0.65)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
+            // Text content — fades in smoothly when data arrives
+            Group {
+                // Custom center icon and label - clean and simple
+                if let icon = centerIcon, let label = centerLabel {
+                    VStack(spacing: 8) {
+                        Image(systemName: icon)
+                            .font(.system(size: size * 0.18, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.95),
+                                        Color.white.opacity(0.65)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
-                        )
 
-                    // Label (e.g., "Stores & Businesses" or "Categories")
-                    Text(label)
-                        .font(.system(size: size * 0.07, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.6))
-                        .tracking(0.5)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
+                        Text(label)
+                            .font(.system(size: size * 0.07, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.6))
+                            .tracking(0.5)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+                // Display average item price if available
+                else if let avgPrice = averageItemPrice, avgPrice > 0 {
+                    VStack(spacing: 2) {
+                        Text("AVG PRICE")
+                            .font(.system(size: size * 0.045, weight: .bold))
+                            .tracking(0.5)
+                            .foregroundColor(.white.opacity(0.4))
+                            .lineLimit(1)
+
+                        Text(String(format: "€%.2f", avgPrice))
+                            .font(.system(size: size * 0.14, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+                            .contentTransition(.numericText())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+
+                        Text("per item")
+                            .font(.system(size: size * 0.05, weight: .medium))
+                            .foregroundColor(.white.opacity(0.45))
+                            .lineLimit(1)
+                    }
+                } else if let items = totalItems {
+                    VStack(spacing: 2) {
+                        Image(systemName: "cart.fill")
+                            .font(.system(size: size * 0.14, weight: .medium))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.9),
+                                        Color.white.opacity(0.6)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+
+                        Text("\(items)")
+                            .font(.system(size: size * 0.12, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.85))
+                            .contentTransition(.numericText())
+                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: items)
+
+                        Text("items purchased")
+                            .font(.system(size: size * 0.045, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
                 }
             }
-            // Display average item price if available
-            else if let avgPrice = averageItemPrice, avgPrice > 0 {
-                // Average item price display
-                VStack(spacing: 2) {
-                    Text("AVG PRICE")
-                        .font(.system(size: size * 0.045, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundColor(.white.opacity(0.4))
-                        .lineLimit(1)
-
-                    Text(String(format: "€%.2f", avgPrice))
-                        .font(.system(size: size * 0.14, weight: .heavy, design: .rounded))
-                        .foregroundColor(.white)
-                        .contentTransition(.numericText())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-
-                    Text("per item")
-                        .font(.system(size: size * 0.05, weight: .medium))
-                        .foregroundColor(.white.opacity(0.45))
-                        .lineLimit(1)
-                }
-            } else if let items = totalItems {
-                // Items count with cart icon
-                VStack(spacing: 2) {
-                    Image(systemName: "cart.fill")
-                        .font(.system(size: size * 0.14, weight: .medium))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.9),
-                                    Color.white.opacity(0.6)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-
-                    Text("\(items)")
-                        .font(.system(size: size * 0.12, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.85))
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: items)
-
-                    Text("items purchased")
-                        .font(.system(size: size * 0.045, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-            }
+            .animation(.easeOut(duration: 0.35), value: hasCenterContent)
         }
         .frame(maxWidth: size * 0.55)
     }

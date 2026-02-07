@@ -18,13 +18,27 @@ struct StoreDetailView: View {
     @State private var showingReceipts = false
 
     // Live data that can be refreshed from backend
-    @State private var currentTotalSpend: Double = 0
-    @State private var currentVisitCount: Int = 0
-    @State private var currentCategories: [Category] = []
+    @State private var currentTotalSpend: Double
+    @State private var currentVisitCount: Int
+    @State private var currentCategories: [Category]
     @State private var currentHealthScore: Double?
     @State private var currentTotalItems: Int = 0
     @State private var isRefreshing = false
     @State private var hasInitialized = false
+    @State private var categoriesRevealed = false
+    @State private var receiptsRevealed = false
+    @State private var showAllCategories = false
+    private let maxVisibleCategories = 5
+
+    init(storeBreakdown: StoreBreakdown, storeColor: Color = Color(red: 0.3, green: 0.7, blue: 1.0)) {
+        self.storeBreakdown = storeBreakdown
+        self.storeColor = storeColor
+        // Initialize live data from breakdown so donut chart has data on first render
+        _currentTotalSpend = State(initialValue: storeBreakdown.totalStoreSpend)
+        _currentVisitCount = State(initialValue: storeBreakdown.visitCount)
+        _currentCategories = State(initialValue: storeBreakdown.categories)
+        _currentHealthScore = State(initialValue: storeBreakdown.averageHealthScore)
+    }
 
     // Expandable receipts section
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
@@ -116,27 +130,17 @@ struct StoreDetailView: View {
         .sorted { $0.totalSpent > $1.totalSpent }
     }
 
-    // Top 5 categories + "Other" grouping - uses refreshable currentCategories
-    private var groupedChartSegments: [ChartSegment] {
-        let sortedCategories = currentCategories.sorted { $0.spent > $1.spent }
+    // Categories limited for display (top 5 or all)
+    private var sortedCategories: [Category] {
+        currentCategories.sorted { $0.spent > $1.spent }
+    }
 
-        if sortedCategories.count <= 5 {
-            return sortedCategories.toChartSegments()
-        }
+    private var displayCategories: [Category] {
+        showAllCategories ? sortedCategories : Array(sortedCategories.prefix(maxVisibleCategories))
+    }
 
-        // Take top 5 and sum the rest into "Other"
-        let top5 = Array(sortedCategories.prefix(5))
-        let remaining = Array(sortedCategories.dropFirst(5))
-        let otherSpent = remaining.reduce(0) { $0 + $1.spent }
-        let totalSpent = sortedCategories.reduce(0) { $0 + $1.spent }
-        let otherPercentage = totalSpent > 0 ? Int((otherSpent / totalSpent) * 100) : 0
-
-        // Create a Category for "Other"
-        let otherCategory = Category(name: "Other", spent: otherSpent, percentage: otherPercentage)
-
-        // Combine top 5 + Other and convert to segments
-        let combinedCategories = top5 + [otherCategory]
-        return combinedCategories.toChartSegments()
+    private var hasMoreCategories: Bool {
+        currentCategories.count > maxVisibleCategories
     }
 
     // MARK: - Store Header with Nutri Score
@@ -239,38 +243,50 @@ struct StoreDetailView: View {
                         title: "",
                         subtitle: currentVisitCount == 1 ? "receipt" : "receipts",
                         totalAmount: Double(currentVisitCount),
-                        segments: groupedChartSegments,
+                        segments: sortedCategories.toChartSegments(),
                         size: 200,
                         accentColor: chartAccentColor,
                         selectedPeriod: storeBreakdown.period,
-                        averageItemPrice: averageItemPrice
+                        averageItemPrice: averageItemPrice,
+                        showAllSegments: showAllCategories
                     )
                     .padding(.top, 24)
 
-                    // Category section with single header
+                    // Category section with staggered reveal
                     if !currentCategories.isEmpty {
                         VStack(spacing: 8) {
-                            // Single "Categories" header
                             categoriesSectionHeader(categoryCount: currentCategories.count)
 
-                            // Flat list of category rows
-                            ForEach(currentCategories) { category in
+                            ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                                 let segment = categoryToSegment(category: category)
                                 let normalizedName = category.name.normalizedCategoryName
-                                // Use groceryHealthIcon if available, fall back to categoryIcon for guaranteed icon
                                 let icon = normalizedName.groceryHealthIcon ?? normalizedName.categoryIcon
-                                // Pass original category name for API filtering (not normalized)
                                 expandableCategoryRow(segment: segment, isOther: false, icon: icon, originalCategoryName: category.name)
+                                    .opacity(categoriesRevealed ? 1 : 0)
+                                    .offset(y: categoriesRevealed ? 0 : 14)
+                                    .animation(
+                                        .easeOut(duration: 0.35).delay(Double(index) * 0.06),
+                                        value: categoriesRevealed
+                                    )
+                            }
+
+                            // Show All / Show Less button
+                            if hasMoreCategories {
+                                showAllCategoriesButton
                             }
                         }
+                        .id("categories-\(showAllCategories)")
                         .padding(.horizontal, 16)
                         .padding(.top, 24)
                     }
 
-                    // Expandable Receipts Section
+                    // Expandable Receipts Section — revealed last
                     receiptsSection
                         .padding(.horizontal, 16)
                         .padding(.top, 24)
+                        .opacity(receiptsRevealed ? 1 : 0)
+                        .offset(y: receiptsRevealed ? 0 : 14)
+                        .animation(.easeOut(duration: 0.35), value: receiptsRevealed)
 
                     // Bottom spacing
                     Color.clear.frame(height: 32)
@@ -297,12 +313,6 @@ struct StoreDetailView: View {
         }
         .onAppear {
             if !hasInitialized {
-                // First appearance: initialize state from the passed-in breakdown
-                currentTotalSpend = storeBreakdown.totalStoreSpend
-                currentVisitCount = storeBreakdown.visitCount
-                currentCategories = storeBreakdown.categories
-                currentHealthScore = storeBreakdown.averageHealthScore
-                currentTotalItems = 0  // Will be populated when we fetch detailed data
                 hasInitialized = true
 
                 // Pre-populate categoryTransactions from cache for instant expansion
@@ -316,21 +326,48 @@ struct StoreDetailView: View {
                         categoryTransactions[normalizedName] = storeFiltered
                     }
                 }
+            }
 
-                // Fetch detailed data to get item count
-                Task {
-                    await refreshStoreData()
+            // Reveal category cards with staggered animation
+            // Slight delay so donut sweep gets a head start
+            if !currentCategories.isEmpty && !categoriesRevealed {
+                let categoryDelay = 0.3
+                DispatchQueue.main.asyncAfter(deadline: .now() + categoryDelay) {
+                    categoriesRevealed = true
                 }
-                // Load receipts and transactions on first appearance
-                loadReceipts()
-            } else {
-                // Subsequent appearances (navigating back): refresh from backend
-                // This handles the case where a receipt was deleted in ReceiptsListView
-                Task {
-                    await refreshStoreData()
+                // Receipts section appears after last category card finishes
+                let receiptsDelay = categoryDelay + 0.35 + Double(currentCategories.count) * 0.06
+                DispatchQueue.main.asyncAfter(deadline: .now() + receiptsDelay) {
+                    receiptsRevealed = true
                 }
-                // Reload receipts when returning to view
-                loadReceipts()
+            } else if currentCategories.isEmpty {
+                // No categories — reveal receipts after donut sweep
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    receiptsRevealed = true
+                }
+            }
+
+            // Fetch detailed data (item count, avg price) from backend immediately.
+            // The chart's isSettling guard prevents mid-sweep re-animation.
+            Task {
+                await refreshStoreData()
+            }
+            // Load receipts
+            loadReceipts()
+        }
+        .onChange(of: currentCategories.isEmpty) { _, isEmpty in
+            // Trigger staggered reveal when categories arrive from backend (past periods)
+            if !isEmpty && !categoriesRevealed {
+                let categoryDelay = 0.15
+                DispatchQueue.main.asyncAfter(deadline: .now() + categoryDelay) {
+                    categoriesRevealed = true
+                }
+                // Receipts after last category card
+                let receiptsDelay = categoryDelay + 0.35 + Double(currentCategories.count) * 0.06
+                DispatchQueue.main.asyncAfter(deadline: .now() + receiptsDelay) {
+                    guard !receiptsRevealed else { return }
+                    receiptsRevealed = true
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
@@ -410,7 +447,7 @@ struct StoreDetailView: View {
             // Use backend totalItems if available, otherwise calculate from category transaction counts
             let totalItems = storeDetails.totalItems ?? storeDetails.categories.reduce(0) { $0 + $1.transactionCount }
 
-            // Update state on main thread
+            // Update state on main thread (no withAnimation — it causes layout slide artifacts)
             await MainActor.run {
                 currentTotalSpend = storeDetails.totalSpend
                 currentVisitCount = storeDetails.visitCount
@@ -449,6 +486,42 @@ struct StoreDetailView: View {
 
             Spacer()
         }
+    }
+
+    // MARK: - Show All Categories Button
+
+    private var showAllCategoriesButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                showAllCategories.toggle()
+                // Reset animation state to trigger staggered animation for new rows
+                if showAllCategories {
+                    categoriesRevealed = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation {
+                            categoriesRevealed = true
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: showAllCategories ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+
+                Text(showAllCategories ? "Show Less" : "Show All \(currentCategories.count)")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(.white.opacity(0.6))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.white.opacity(0.06))
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
     }
 
     /// Convert a Category to a ChartSegment for use in expandableCategoryRow.
