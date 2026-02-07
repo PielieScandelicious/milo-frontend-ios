@@ -163,15 +163,9 @@ struct BudgetCreatedSheet: View {
 
     private var budgetAmountSection: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-
-                Text("Budget Created!")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white)
-            }
+            Text("Budget Created!")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(.white)
 
             Text(String(format: "€%.0f", budgetAmount))
                 .font(.system(size: 56, weight: .bold, design: .rounded))
@@ -241,17 +235,17 @@ struct BudgetCreatedSheet: View {
         VStack(spacing: 16) {
             // Header
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-
-                    Text("Category Budgets")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                }
+                Text("Category Budgets")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
 
                 Spacer()
+
+                if categoryAllocations.count > 5 {
+                    Image(systemName: categoryListExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                }
 
                 Text("\(categoryAllocations.count) categories")
                     .font(.system(size: 13, weight: .medium))
@@ -260,39 +254,8 @@ struct BudgetCreatedSheet: View {
 
             // Category list
             VStack(spacing: 8) {
-                ForEach(Array((categoryListExpanded ? categoryAllocations : Array(categoryAllocations.prefix(6))).enumerated()), id: \.element.category) { index, allocation in
+                ForEach(Array((categoryListExpanded ? categoryAllocations : Array(categoryAllocations.prefix(5))).enumerated()), id: \.element.category) { index, allocation in
                     categoryRow(allocation, index: index)
-                }
-
-                // Expandable button
-                if categoryAllocations.count > 6 {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            categoryListExpanded.toggle()
-                        }
-                    }) {
-                        HStack(spacing: 6) {
-                            if !categoryListExpanded {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 14, weight: .semibold))
-                                Text("Show \(categoryAllocations.count - 6) more categories")
-                                    .font(.system(size: 14, weight: .semibold))
-                            } else {
-                                Image(systemName: "minus.circle.fill")
-                                    .font(.system(size: 14, weight: .semibold))
-                                Text("Show less")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                        }
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.white.opacity(0.03))
-                        )
-                    }
-                    .padding(.top, 4)
                 }
             }
         }
@@ -305,6 +268,14 @@ struct BudgetCreatedSheet: View {
                         .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.2), lineWidth: 1)
                 )
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if categoryAllocations.count > 5 {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    categoryListExpanded.toggle()
+                }
+            }
+        }
     }
 
     private func categoryRow(_ allocation: CategoryAllocation, index: Int) -> some View {

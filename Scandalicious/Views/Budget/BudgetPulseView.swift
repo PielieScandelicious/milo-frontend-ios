@@ -464,18 +464,22 @@ struct BudgetPulseView: View {
                 }
             }) {
                 HStack(spacing: 6) {
-                    Image(systemName: "lightbulb.max.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 12, weight: .semibold))
 
                     Text("Budget Insights")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
+                .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(Color(red: 0.3, green: 0.7, blue: 1.0))
+                        .fill(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.15))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.3), lineWidth: 1)
                 )
             }
             .buttonStyle(PlainButtonStyle())
