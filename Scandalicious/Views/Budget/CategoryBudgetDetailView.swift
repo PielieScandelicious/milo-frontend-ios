@@ -372,7 +372,7 @@ struct CategoryBudgetCard: View {
 
                 // Category info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(categoryProgress.category)
+                    Text(categoryProgress.category.normalizedCategoryName)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
 
@@ -600,7 +600,7 @@ struct CompactCategoryBudgetItem: View {
 
             // Category name and status
             VStack(alignment: .leading, spacing: 3) {
-                Text(categoryProgress.category)
+                Text(categoryProgress.category.normalizedCategoryName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)

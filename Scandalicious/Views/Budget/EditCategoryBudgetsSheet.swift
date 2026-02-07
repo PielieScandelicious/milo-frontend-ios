@@ -18,7 +18,6 @@ struct EditCategoryBudgetsSheet: View {
 
     @State private var categoryAllocations: [EditableCategoryAllocation] = []
     @State private var targetBudget: Double = 0
-    @State private var showResetAllConfirmation = false
     @State private var isSaving = false
 
     var body: some View {
@@ -61,7 +60,7 @@ struct EditCategoryBudgetsSheet: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showResetAllConfirmation = true }) {
+                    Button(action: { resetAllCategories() }) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.system(size: 14, weight: .semibold))
@@ -77,14 +76,6 @@ struct EditCategoryBudgetsSheet: View {
         .preferredColorScheme(.dark)
         .onAppear {
             setupInitialState()
-        }
-        .alert("Reset All Changes?", isPresented: $showResetAllConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Reset All", role: .destructive) {
-                resetAllCategories()
-            }
-        } message: {
-            Text("This will reset all category budgets to their AI-suggested amounts.")
         }
     }
 
@@ -317,7 +308,7 @@ struct EditCategoryBudgetsSheet: View {
                     category: allocation.category,
                     amount: allocation.amount,
                     originalAmount: allocation.amount,
-                    isLocked: allocation.isLocked
+                    isLocked: false  // Always start fresh - user can re-lock by editing
                 )
             }
         }
@@ -441,6 +432,11 @@ struct EditableCategoryCard: View {
         return (allocation.amount / totalBudget) * 100
     }
 
+    /// Slider max must be at least the step size (5) to avoid SwiftUI crash
+    private var sliderMax: Double {
+        max(10, min(totalBudget, allocation.originalAmount * 3))
+    }
+
     private var categoryIcon: String {
         allocation.category.categoryIcon
     }
@@ -463,7 +459,7 @@ struct EditableCategoryCard: View {
                 // Category name and percentage
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(allocation.category)
+                        Text(allocation.category.normalizedCategoryName)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
 
@@ -534,13 +530,13 @@ struct EditableCategoryCard: View {
             VStack(spacing: 6) {
                 Slider(
                     value: Binding(
-                        get: { allocation.amount },
+                        get: { min(allocation.amount, sliderMax) },
                         set: { newValue in
                             let roundedValue = round(newValue / 5) * 5
                             onAmountChanged(roundedValue)
                         }
                     ),
-                    in: 0...min(totalBudget, allocation.originalAmount * 3),
+                    in: 0...sliderMax,
                     step: 5
                 )
                 .tint(allocation.category.categoryColor)
@@ -553,7 +549,7 @@ struct EditableCategoryCard: View {
 
                     Spacer()
 
-                    Text(String(format: "€%.0f", min(totalBudget, allocation.originalAmount * 3)))
+                    Text(String(format: "€%.0f", sliderMax))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.3))
                 }

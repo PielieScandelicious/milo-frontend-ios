@@ -1463,6 +1463,13 @@ struct OverviewView: View {
                     .font(.system(size: 13, weight: .bold, design: .default))
                     .foregroundColor(.white)
                     .tracking(1.5)
+
+                // Subtle "now" dot when viewing the current period
+                if isCurrentPeriod && !isNewMonthStart {
+                    Circle()
+                        .fill(.white.opacity(0.5))
+                        .frame(width: 5, height: 5)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
@@ -2847,9 +2854,8 @@ struct OverviewView: View {
                 }
 
                 // Modern health score display
-                // Note: averageHealthScore is on 0-5 scale, ModernHealthScoreBadge expects 0-10
                 if let score = healthScore {
-                    ModernHealthScoreBadge(score: score * 2)
+                    ModernHealthScoreBadge(score: score)
                 }
 
                 // Syncing indicator
@@ -3600,32 +3606,32 @@ struct SyncingArrowsView: View {
 struct ModernHealthScoreBadge: View {
     let score: Double
 
-    // Color based on score: red (poor) → orange → yellow → green (excellent)
+    // Color based on score (0-5): red (poor) → orange → yellow → green (excellent)
     private var scoreColor: Color {
         switch score {
-        case 0..<3:
+        case 0..<1.5:
             return Color(red: 0.95, green: 0.3, blue: 0.3) // Red - E
-        case 3..<5:
+        case 1.5..<2.5:
             return Color(red: 1.0, green: 0.55, blue: 0.2) // Orange - D
-        case 5..<6.5:
+        case 2.5..<3.25:
             return Color(red: 1.0, green: 0.8, blue: 0.2) // Yellow - C
-        case 6.5..<8:
+        case 3.25..<4:
             return Color(red: 0.5, green: 0.85, blue: 0.4) // Light green - B
         default:
             return Color(red: 0.2, green: 0.8, blue: 0.4) // Green - A
         }
     }
 
-    // Grade letter based on score (A, B, C, D, E)
+    // Grade letter based on score (A, B, C, D, E) on 0-5 scale
     private var gradeLabel: String {
         switch score {
-        case 8...:
+        case 4...:
             return "A"
-        case 6.5..<8:
+        case 3.25..<4:
             return "B"
-        case 5..<6.5:
+        case 2.5..<3.25:
             return "C"
-        case 3..<5:
+        case 1.5..<2.5:
             return "D"
         default:
             return "E"
@@ -3633,7 +3639,7 @@ struct ModernHealthScoreBadge: View {
     }
 
     private var scoreProgress: Double {
-        score / 10.0
+        score / 5.0
     }
 
     var body: some View {

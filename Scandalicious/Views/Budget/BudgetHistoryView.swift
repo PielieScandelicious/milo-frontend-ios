@@ -221,7 +221,7 @@ struct BudgetHistoryView: View {
                                     .fill(allocation.category.categoryColor)
                                     .frame(width: 8, height: 8)
 
-                                Text(allocation.category)
+                                Text(allocation.category.normalizedCategoryName)
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(.white.opacity(0.8))
 

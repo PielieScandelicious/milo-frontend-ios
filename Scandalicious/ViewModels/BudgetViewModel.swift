@@ -416,13 +416,12 @@ class BudgetViewModel: ObservableObject {
 
             // Reset suggestion state
             suggestionState = .idle
-
-            // Then update main state - this will trigger SwiftUI view updates
-            state = .noBudget
             isSaving = false
 
-            // Force view refresh by incrementing trigger
-            forceRefreshTrigger += 1
+            // Animate the state transition so the widget smoothly goes from active → noBudget
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                state = .noBudget
+            }
 
             print("🗑️ [BudgetViewModel] State is now: \(state), refresh trigger: \(forceRefreshTrigger)")
 

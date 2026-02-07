@@ -38,7 +38,7 @@ struct BudgetPulseView: View {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color(white: 0.12))
             )
-            .id("\(stateDescription)-\(viewModel.forceRefreshTrigger)")
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: stateDescription)
             .onReceive(NotificationCenter.default.publisher(for: .budgetDeleted)) { _ in
                 print("🎨 [BudgetPulseView] ⚡️ Received budgetDeleted notification, resetting local state")
                 print("🎨 [BudgetPulseView] Before reset - isExpanded: \(isExpanded)")
@@ -85,18 +85,22 @@ struct BudgetPulseView: View {
             case .idle, .loading:
                 let _ = print("🎨 [BudgetPulseView.contentView] Showing loadingView")
                 loadingView
+                    .transition(.opacity)
 
             case .noBudget:
                 let _ = print("🎨 [BudgetPulseView.contentView] 🎯 Showing noBudgetView")
                 noBudgetView
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
 
             case .active(let progress):
                 let _ = print("🎨 [BudgetPulseView.contentView] Showing activeBudgetView for budget: \(progress.budget.id)")
                 activeBudgetView(progress)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
 
             case .error(let message):
                 let _ = print("🎨 [BudgetPulseView.contentView] Showing errorView: \(message)")
                 errorView(message)
+                    .transition(.opacity)
             }
         }
     }
@@ -233,7 +237,7 @@ struct BudgetPulseView: View {
                                             .fill(allocation.category.categoryColor)
                                             .frame(width: 6, height: 6)
 
-                                        Text(allocation.category)
+                                        Text(allocation.category.normalizedCategoryName)
                                             .font(.system(size: 12, weight: .medium))
                                             .foregroundColor(.white.opacity(0.8))
 

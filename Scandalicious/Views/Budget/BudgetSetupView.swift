@@ -1301,7 +1301,7 @@ struct BudgetSetupView: View {
             // Name and bar
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(allocation.category)
+                    Text(allocation.category.normalizedCategoryName)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white)
                         .lineLimit(1)
@@ -1588,7 +1588,7 @@ struct AllCategoriesSheet: View {
                 .fill(allocation.category.categoryColor)
                 .frame(width: 12, height: 12)
 
-            Text(allocation.category)
+            Text(allocation.category.normalizedCategoryName)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white)
 
