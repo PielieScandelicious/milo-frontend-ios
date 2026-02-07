@@ -749,7 +749,7 @@ struct ReceiptScanView: View {
                 .frame(width: 24)
 
             // Category name
-            Text(category.name)
+            Text(category.name.normalizedCategoryName)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -1069,7 +1069,7 @@ struct ReceiptScanView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
 
-                    Text("Create apple wallet passes for stores to receive digital receipts")
+                    Text("Create Apple Wallet loyalty cards to receive digital receipts")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                         .lineLimit(2)
