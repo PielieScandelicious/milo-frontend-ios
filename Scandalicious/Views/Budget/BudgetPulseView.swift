@@ -360,11 +360,21 @@ struct BudgetPulseView: View {
 
                 Spacer()
 
+                // Delete button
+                if isExpanded {
+                    Button(action: { showDeleteConfirmation = true }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.3))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.trailing, 4)
+                }
+
                 // Expand chevron
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.4))
-                    .rotationEffect(.degrees(isExpanded ? 0 : 0))
             }
             .padding(16)
         }
@@ -435,76 +445,45 @@ struct BudgetPulseView: View {
 
             // AI Insight section
             aiInsightSection
-
-            // Bottom action bar
-            bottomActionBar(progress)
         }
+        .padding(.bottom, 16)
     }
 
     // MARK: - Insight Section (Non-AI)
 
     private var aiInsightSection: some View {
-        Button(action: {
-            showingInsights = true
-            Task {
-                await viewModel.loadInsights()
+        VStack(spacing: 8) {
+            Button(action: {
+                showingInsights = true
+                Task {
+                    await viewModel.loadInsights()
+                }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb.max.fill")
+                        .font(.system(size: 13, weight: .semibold))
+
+                    Text("Budget Insights")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(Color(red: 0.3, green: 0.7, blue: 1.0))
+                )
             }
-        }) {
-            HStack(spacing: 6) {
-                Image(systemName: "chart.bar.fill")
-                    .font(.system(size: 13, weight: .semibold))
+            .buttonStyle(PlainButtonStyle())
 
-                Text("View Insights")
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(Color(red: 0.3, green: 0.7, blue: 1.0))
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Bottom Action Bar
-
-    private func bottomActionBar(_ progress: BudgetProgress) -> some View {
-        HStack(spacing: 0) {
-            // Remove button
-            Button(action: { showDeleteConfirmation = true }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-            .frame(width: 44, height: 36)
-
-            Spacer()
-
-            // Projection text in center
-            if let projection = viewModel.projectionText {
+            if let projection = viewModel.projectionText,
+               let progress = viewModel.state.progress {
                 Text(projection)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(progress.projectedOverUnder > 0 ? .orange : .green)
             }
-
-            Spacer()
-
-            // History button (replaced AI Report)
-            Button(action: { showingCategoryDetail = true }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "chart.bar.doc.horizontal")
-                        .font(.system(size: 14, weight: .medium))
-                    Text("Details")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundColor(.white.opacity(0.6))
-            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
     }
 
     private func statItem(title: String, value: String, color: Color) -> some View {

@@ -353,9 +353,9 @@ struct CategoryProgressResponse: Codable {
 
     // MARK: - Computed Properties for Compatibility
 
-    /// Display name (prefers new `name` field, falls back to `category`)
+    /// Display name (prefers new `name` field, falls back to `category`), normalized from ALL_CAPS enum style
     var displayName: String {
-        name ?? category ?? "Unknown"
+        (name ?? category ?? "Unknown").normalizedCategoryName
     }
 
     /// Budget limit amount (prefers new field, falls back to legacy)
