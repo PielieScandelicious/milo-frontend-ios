@@ -93,8 +93,8 @@ struct OverviewView: View {
     @State private var isLoadingYearData = false // Track if fetching year data for first time
     @State private var currentLoadingYear: String? = nil // Track which year is currently loading
     @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
-    @State private var isPieChartFlipped = false // Track if pie chart is showing categories (flipped) or stores
-    @State private var pieChartFlipDegrees: Double = 0 // Animation degrees for flip
+    @State private var isPieChartFlipped = true // Track if pie chart is showing categories (true) or stores (false)
+    @State private var pieChartFlipDegrees: Double = 180 // Animation degrees for flip (starts at 180 for categories)
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
@@ -600,6 +600,14 @@ struct OverviewView: View {
         Task {
             await budgetViewModel.loadBudget()
         }
+
+        // Load category data for initial period (needed since categories show by default)
+        let initialPeriod = selectedPeriod
+        if !isAllPeriod(initialPeriod) && !isYearPeriod(initialPeriod) && pieChartSummaryCache[initialPeriod] == nil {
+            Task {
+                await fetchCategoryData(for: initialPeriod)
+            }
+        }
     }
 
     private func loadShareExtensionTimestamps() {
@@ -776,6 +784,11 @@ struct OverviewView: View {
                         }
                     }
                     await prefetchAdjacentPeriods(around: newValue)
+                }
+
+                // Fetch category data for the period (needed since categories show by default)
+                if pieChartSummaryCache[newValue] == nil {
+                    await fetchCategoryData(for: newValue)
                 }
             }
         }
@@ -1668,9 +1681,9 @@ struct OverviewView: View {
                         }
                     }
                     .onChange(of: period) { _, newPeriod in
-                        // Reset flip state and row expansion when period changes
-                        isPieChartFlipped = false
-                        pieChartFlipDegrees = 0
+                        // Reset flip state and row expansion when period changes (default to categories)
+                        isPieChartFlipped = true
+                        pieChartFlipDegrees = 180
                         showAllRows = false
                     }
                 } else {
@@ -1712,9 +1725,9 @@ struct OverviewView: View {
                         }
                     }
                     .onChange(of: period) { _, _ in
-                        // Reset flip state when period changes
-                        isPieChartFlipped = false
-                        pieChartFlipDegrees = 0
+                        // Reset flip state when period changes (default to categories)
+                        isPieChartFlipped = true
+                        pieChartFlipDegrees = 180
                         showAllRows = false
                     }
                 }
