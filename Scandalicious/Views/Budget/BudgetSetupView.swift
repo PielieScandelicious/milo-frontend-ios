@@ -28,9 +28,6 @@ struct BudgetSetupView: View {
     @State private var hasCustomizedCategories = false
     @State private var categoryListExpanded = false
 
-    // Callback to switch to scan tab
-    var onScanReceipt: (() -> Void)?
-
     enum SelectionMode {
         case percentage
         case custom
@@ -60,7 +57,9 @@ struct BudgetSetupView: View {
         guard let suggestion = viewModel.aiSuggestionState.data else {
             return "Budget"
         }
-        return suggestion.dataCollectionPhase.title
+        let phase = suggestion.dataCollectionPhase
+        if phase == .onboarding { return "Budget" }
+        return phase.title
     }
 
     private var averageSpending: Double {
@@ -270,15 +269,18 @@ struct BudgetSetupView: View {
                 recommendedBudgetCardForOnboarding(suggestion)
                     .padding(.horizontal, 20)
 
-                // Scan receipt CTA
-                scanReceiptCTASection
-                    .padding(.horizontal, 20)
-
-                // Option to use suggested budget anyway
-                useAnywaySuggestionSection(suggestion)
+                // Budget setup with slider and create button
+                simplifiedBudgetSetup(suggestion)
                     .padding(.horizontal, 20)
             }
             .padding(.vertical, 16)
+        }
+        .onAppear {
+            // Default to the suggested budget amount
+            if customAmount == 500 || selectionMode == .percentage {
+                customAmount = suggestion.recommendedBudget.amount
+                selectionMode = .custom
+            }
         }
     }
 
@@ -397,96 +399,6 @@ struct BudgetSetupView: View {
                         .stroke(Color.white.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
                 )
         )
-    }
-
-    private var scanReceiptCTASection: some View {
-        VStack(spacing: 12) {
-            Button(action: {
-                dismiss()
-                onScanReceipt?()
-            }) {
-                HStack(spacing: 10) {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 18, weight: .semibold))
-
-                    Text("Scan Your First Receipt")
-                        .font(.system(size: 17, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.3, green: 0.7, blue: 1.0),
-                            Color(red: 0.25, green: 0.6, blue: 0.95)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(16)
-                .shadow(color: Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.4), radius: 12, y: 4)
-            }
-
-            Text("Start building your personalized budget profile")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.4))
-        }
-    }
-
-    private func useAnywaySuggestionSection(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        VStack(spacing: 16) {
-            // Divider with "or"
-            HStack {
-                Rectangle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(height: 1)
-
-                Text("or")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(height: 1)
-            }
-
-            // Use suggested amount button
-            Button(action: {
-                customAmount = suggestion.recommendedBudget.amount
-                selectionMode = .custom
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 14))
-
-                    Text("Use Suggested Budget (€\(Int(suggestion.recommendedBudget.amount)))")
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                .foregroundColor(.white.opacity(0.7))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.05))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                        )
-                )
-            }
-
-            Text("You can always adjust later as you scan more receipts")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.4))
-                .multilineTextAlignment(.center)
-
-            // If they want to proceed anyway, show a simplified setup
-            if selectionMode == .custom {
-                simplifiedBudgetSetup(suggestion)
-            }
-        }
     }
 
     private func simplifiedBudgetSetup(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {

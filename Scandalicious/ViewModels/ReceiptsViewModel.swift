@@ -104,13 +104,24 @@ class ReceiptsViewModel: ObservableObject {
 
     /// Delete a receipt by ID and update the list
     func deleteReceipt(_ receipt: APIReceipt, period: String, storeName: String?) async throws {
-        // Delete from server
-        try await apiService.removeReceipt(receiptId: receipt.receiptId)
+        let receiptId = receipt.receiptId
+        print("[ReceiptsVM] deleteReceipt called for id=\(receiptId), period=\(period), count before=\(receipts.count)")
 
-        // Remove from local array - notify observers explicitly
-        objectWillChange.send()
-        receipts.removeAll { $0.receiptId == receipt.receiptId }
-        state = .success(receipts)
+        // Delete from server
+        try await apiService.removeReceipt(receiptId: receiptId)
+        print("[ReceiptsVM] Server deletion succeeded for id=\(receiptId)")
+
+        // Remove from local array using explicit filter (not in-place mutation)
+        let updatedReceipts = receipts.filter { $0.receiptId != receiptId }
+        print("[ReceiptsVM] Filtered receipts: before=\(receipts.count), after=\(updatedReceipts.count)")
+        receipts = updatedReceipts
+        state = .success(updatedReceipts)
+
+        // Sync deletion to AppDataCache so stale cache doesn't restore the receipt
+        AppDataCache.shared.receiptsByPeriod[period]?.removeAll { $0.receiptId == receiptId }
+        AppDataCache.shared.scheduleSaveToDisk()
+
+        print("[ReceiptsVM] deleteReceipt done, receipts.count=\(receipts.count)")
 
         // Notify other views to refresh their data
         NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
@@ -154,6 +165,19 @@ class ReceiptsViewModel: ObservableObject {
             }
 
             state = .success(receipts)
+
+            // Sync changes to AppDataCache so stale cache doesn't restore old data
+            for (period, var periodReceipts) in AppDataCache.shared.receiptsByPeriod {
+                if let cacheIndex = periodReceipts.firstIndex(where: { $0.receiptId == receiptId }) {
+                    if let updatedReceipt = receipts.first(where: { $0.receiptId == receiptId }) {
+                        periodReceipts[cacheIndex] = updatedReceipt
+                    } else {
+                        periodReceipts.remove(at: cacheIndex)
+                    }
+                    AppDataCache.shared.receiptsByPeriod[period] = periodReceipts
+                }
+            }
+            AppDataCache.shared.scheduleSaveToDisk()
         }
 
         // Notify other views to refresh their data

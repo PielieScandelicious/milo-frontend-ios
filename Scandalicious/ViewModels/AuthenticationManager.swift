@@ -53,6 +53,7 @@ class AuthenticationManager: ObservableObject {
                 // Clear token from shared storage on logout
                 self?.clearTokenFromSharedStorage()
                 self?.clearProfileStatus()
+                self?.clearAllCachedData()
             }
         }
     }
@@ -132,6 +133,7 @@ class AuthenticationManager: ObservableObject {
         try Auth.auth().signOut()
         self.user = nil
         clearTokenFromSharedStorage()
+        clearAllCachedData()
     }
 
     // MARK: - Google Sign In
@@ -205,5 +207,13 @@ class AuthenticationManager: ObservableObject {
         self.profileCompleted = false
         self.isCheckingProfile = false
         UserDefaults.standard.removeObject(forKey: profileCompletedKey)
+    }
+
+    /// Clear all cached user data (disk cache, split cache) on sign-out or account switch
+    private func clearAllCachedData() {
+        Task { @MainActor in
+            AppDataCache.shared.invalidateAll()
+            SplitCacheManager.shared.clearCache()
+        }
     }
 }

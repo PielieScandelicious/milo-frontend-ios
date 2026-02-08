@@ -1162,7 +1162,7 @@ struct DonutChartButtonStyle: ButtonStyle {
                 totalStoreSpend: 189.90,
                 categories: [
                     Category(name: "Meat Poultry & Seafood", spent: 65.40, percentage: 34, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife"),
-                    Category(name: "Beer & Wine (Retail)", spent: 42.50, percentage: 22, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife"),
+                    Category(name: "Alcohol", spent: 42.50, percentage: 22, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife"),
                     Category(name: "Beverages (Non-Alcoholic)", spent: 28.00, percentage: 15, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife"),
                     Category(name: "Household Consumables (Paper/Cleaning)", spent: 35.00, percentage: 18, group: "Housing & Utilities", groupColorHex: "#8E44AD", groupIcon: "house.fill"),
                     Category(name: "Snacks & Candy", spent: 19.00, percentage: 11, group: "Food & Dining", groupColorHex: "#2ECC71", groupIcon: "fork.knife")

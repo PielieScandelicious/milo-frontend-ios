@@ -586,6 +586,9 @@ struct OverviewView: View {
             if let cachedReceipts = cache.receiptsByPeriod[periodToLoad], !cachedReceipts.isEmpty {
                 receiptsViewModel.receipts = cachedReceipts
                 receiptsViewModel.state = .success(cachedReceipts)
+            } else {
+                receiptsViewModel.receipts = []
+                receiptsViewModel.state = .success([])
             }
         }
 
@@ -660,6 +663,7 @@ struct OverviewView: View {
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US")
         let currentMonthPeriod = dateFormatter.string(from: Date())
+        let currentYear = String(Calendar.current.component(.year, from: Date()))
 
         // Keep period in loadedReceiptPeriods to prevent duplicate loads
         // The loadReceipts call with reset:true will refresh the data
@@ -667,13 +671,46 @@ struct OverviewView: View {
         Task {
             try? await Task.sleep(for: .seconds(1))
 
+            // Refresh current month data
             await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
 
+            // Invalidate caches that are affected by the new receipt:
+            // 1. Year summary (new receipt changes year totals)
+            yearSummaryCache.removeValue(forKey: currentYear)
+            AppDataCache.shared.yearSummaryCache.removeValue(forKey: currentYear)
+            cachedBreakdownsByPeriod.removeValue(forKey: currentYear)
+            cachedSegmentsByPeriod.removeValue(forKey: currentYear)
+            cachedChartDataByPeriod.removeValue(forKey: currentYear)
+
+            // 2. All-time aggregate (new receipt changes all-time totals)
+            cachedBreakdownsByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+            cachedSegmentsByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+            cachedChartDataByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+            AppDataCache.shared.allTimeAggregate = nil
+
+            // 3. Pie chart cache for current month (categories may change)
+            pieChartSummaryCache.removeValue(forKey: currentMonthPeriod)
+            AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: currentMonthPeriod)
+
+            // 4. Category items cache for current month (transactions changed)
+            let keysToRemove = AppDataCache.shared.categoryItemsCache.keys.filter { $0.hasPrefix("\(currentMonthPeriod)|") }
+            for key in keysToRemove {
+                AppDataCache.shared.categoryItemsCache.removeValue(forKey: key)
+            }
+
+            // 5. Refresh period metadata (totals and receipt counts change)
+            await dataManager.fetchPeriodMetadata()
+
+            // Re-fetch data if user is currently viewing an affected period
             if selectedPeriod == currentMonthPeriod {
                 updateDisplayedBreakdowns()
-                // Reload receipts for current month (reset:true will clear and reload)
                 await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
+            } else if isYearPeriod(selectedPeriod) && selectedPeriod == currentYear {
+                await fetchYearData(year: currentYear)
+            } else if isAllPeriod(selectedPeriod) {
+                await fetchAllTimeData()
             }
+
             await rateLimitManager.syncFromBackend()
 
             // Show "Synced" confirmation briefly
@@ -703,6 +740,24 @@ struct OverviewView: View {
 
             // Also refresh the period metadata to get updated totals
             await dataManager.fetchPeriodMetadata()
+
+            // Invalidate year and all-time caches (deletion affects aggregates)
+            let deletedYear = String(selectedPeriod.suffix(4))
+            if deletedYear.count == 4 && deletedYear.allSatisfy({ $0.isNumber }) {
+                yearSummaryCache.removeValue(forKey: deletedYear)
+                AppDataCache.shared.yearSummaryCache.removeValue(forKey: deletedYear)
+                cachedBreakdownsByPeriod.removeValue(forKey: deletedYear)
+                cachedSegmentsByPeriod.removeValue(forKey: deletedYear)
+                cachedChartDataByPeriod.removeValue(forKey: deletedYear)
+            }
+            cachedBreakdownsByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+            cachedSegmentsByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+            cachedChartDataByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
+            AppDataCache.shared.allTimeAggregate = nil
+
+            // Invalidate pie chart and category caches for the affected period
+            pieChartSummaryCache.removeValue(forKey: selectedPeriod)
+            AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: selectedPeriod)
 
             await MainActor.run {
                 // Update caches with fresh data
@@ -862,12 +917,11 @@ struct OverviewView: View {
         allTimeCategories = aggregate.topCategories
 
         cachedBreakdownsByPeriod[Self.allPeriodIdentifier] = breakdowns
-        cachedSegmentsByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
-        cachedChartDataByPeriod.removeValue(forKey: Self.allPeriodIdentifier)
 
         if isAllPeriod(selectedPeriod) {
             displayedBreakdowns = breakdowns
             displayedBreakdownsPeriod = Self.allPeriodIdentifier
+            // Rebuild segment cache (overwrites any stale segments)
             cacheSegmentsForPeriod(Self.allPeriodIdentifier)
         }
 
@@ -1699,7 +1753,10 @@ struct OverviewView: View {
 
         // Check if we're loading All-time or Year data for the first time (no backend data yet)
         // This prevents double animation: first with local data, then with backend data
-        let isWaitingForAllTimeData = isAllPeriod(period) && isLoadingAllTimeData
+        // For "All" period: only show skeleton if we have NO stale data to display.
+        // Stale segments from a previous visit are preserved across period transitions,
+        // so we can render them immediately while refreshing in the background.
+        let isWaitingForAllTimeData = isAllPeriod(period) && isLoadingAllTimeData && segments.isEmpty
         let isWaitingForYearData = isYearPeriod(period) && isLoadingYearData && currentLoadingYear == period
 
         // All Overview components fade in together at the same time
@@ -2785,11 +2842,15 @@ struct OverviewView: View {
     /// Delete a receipt from the overview
     private func deleteReceiptFromOverview(_ receipt: APIReceipt) {
         isDeletingReceipt = true
+        print("[Overview] deleteReceiptFromOverview called, receiptId=\(receipt.receiptId), selectedPeriod=\(selectedPeriod)")
+        print("[Overview] receiptsVM.receipts.count BEFORE=\(receiptsViewModel.receipts.count)")
 
         Task {
             do {
                 try await receiptsViewModel.deleteReceipt(receipt, period: selectedPeriod, storeName: nil)
+                print("[Overview] deleteReceipt succeeded, receiptsVM.receipts.count AFTER=\(receiptsViewModel.receipts.count)")
             } catch {
+                print("[Overview] deleteReceipt FAILED: \(error.localizedDescription)")
                 receiptDeleteError = error.localizedDescription
             }
 
