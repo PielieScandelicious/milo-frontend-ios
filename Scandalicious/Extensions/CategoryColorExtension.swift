@@ -46,8 +46,10 @@ extension String {
         let name = self.lowercased()
 
         // Fresh Food
-        if name.contains("produce") || name.contains("fruit") || name.contains("veg") { return "leaf.fill" }
-        if name.contains("meat") || name.contains("poultry") || name.contains("seafood") || name.contains("fish") { return "fork.knife" }
+        if name == "fruits" || name.contains("fruit") { return "leaf.fill" }
+        if name == "vegetables" || name.contains("veg") || name.contains("produce") { return "carrot.fill" }
+        if name == "seafood" || name.contains("seafood") || name.contains("fish") { return "fish.fill" }
+        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "fork.knife" }
         if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "mug.fill" }
         if name.contains("bakery") || name.contains("bread") { return "croissant.fill" }
 
@@ -57,7 +59,8 @@ extension String {
         if name.contains("ready meal") || name.contains("prepared food") { return "takeoutbag.and.cup.and.straw.fill" }
 
         // Snacks & Beverages
-        if name.contains("snack") || name.contains("candy") { return "birthday.cake.fill" }
+        if name == "candy" || name.contains("candy") || name.contains("chocolate") || name.contains("sweet") { return "gift.fill" }
+        if name.contains("snack") { return "birthday.cake.fill" }
         if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "cup.and.saucer.fill" }
         if name.contains("beer") || name.contains("wine") || name.contains("alcohol") { return "wineglass.fill" }
 
@@ -91,16 +94,27 @@ extension String {
     var categoryColor: Color {
         let categoryName = self.lowercased()
 
-        // Fresh Produce - Vibrant Emerald Green
-        if categoryName.contains("fruit") || categoryName.contains("vegetable") ||
-           categoryName.contains("salad") || categoryName.contains("produce") {
+        // Fruits - Vibrant Emerald Green
+        if categoryName == "fruits" || categoryName.contains("fruit") {
             return Color(red: 0.18, green: 0.80, blue: 0.44)
         }
 
-        // Meat & Seafood - Warm Amber Orange
-        if categoryName.contains("meat") || categoryName.contains("fish") ||
-           categoryName.contains("poultry") || categoryName.contains("seafood") ||
-           categoryName.contains("chicken") || categoryName.contains("beef") {
+        // Vegetables - Fresh Teal Green
+        if categoryName == "vegetables" || categoryName.contains("vegetable") ||
+           categoryName.contains("salad") || categoryName.contains("produce") {
+            return Color(red: 0.20, green: 0.70, blue: 0.55)
+        }
+
+        // Seafood - Ocean Blue
+        if categoryName == "seafood" || categoryName.contains("seafood") ||
+           categoryName.contains("fish") || categoryName.contains("shrimp") {
+            return Color(red: 0.20, green: 0.55, blue: 0.85)
+        }
+
+        // Meat - Warm Amber Orange
+        if categoryName == "meat" || categoryName.contains("meat") ||
+           categoryName.contains("poultry") || categoryName.contains("chicken") ||
+           categoryName.contains("beef") {
             return Color(red: 1.0, green: 0.58, blue: 0.20)
         }
 
@@ -132,10 +146,15 @@ extension String {
             return Color(red: 1.0, green: 0.50, blue: 0.30)
         }
 
-        // Snacks & Candy - Vivid Coral Red
-        if categoryName.contains("snack") || categoryName.contains("sweet") ||
-           categoryName.contains("candy") || categoryName.contains("chocolate") ||
-           categoryName.contains("chips") || categoryName.contains("cookie") {
+        // Candy - Vivid Pink
+        if categoryName == "candy" || categoryName.contains("candy") ||
+           categoryName.contains("chocolate") || categoryName.contains("sweet") {
+            return Color(red: 0.92, green: 0.30, blue: 0.65)
+        }
+
+        // Snacks - Vivid Coral Red
+        if categoryName.contains("snack") || categoryName.contains("chips") ||
+           categoryName.contains("cookie") {
             return Color(red: 1.0, green: 0.36, blue: 0.42)
         }
 
@@ -210,8 +229,12 @@ extension String {
         let name = self.lowercased()
 
         // Very healthy → emerald green
-        if name.contains("produce") || name.contains("fruit") || name.contains("veg") {
+        if name == "fruits" || name.contains("fruit") {
             return Color(red: 0.18, green: 0.80, blue: 0.44)
+        }
+        // Very healthy → teal green
+        if name == "vegetables" || name.contains("veg") || name.contains("produce") {
+            return Color(red: 0.20, green: 0.78, blue: 0.50)
         }
         // Healthy → soft green
         if name.contains("baby food") || name.contains("formula") || name == "baby & kids" {
@@ -226,8 +249,12 @@ extension String {
             return Color(red: 0.30, green: 0.75, blue: 0.65)
         }
         // Moderately healthy → yellow-green
-        if name.contains("meat") || name.contains("poultry") || name.contains("seafood") || name.contains("fish") {
+        if name == "meat" || name.contains("meat") || name.contains("poultry") {
             return Color(red: 0.55, green: 0.78, blue: 0.35)
+        }
+        // Moderately healthy → blue-green
+        if name == "seafood" || name.contains("seafood") || name.contains("fish") {
+            return Color(red: 0.40, green: 0.72, blue: 0.55)
         }
         // Moderate → golden yellow
         if name.contains("bakery") || name.contains("bread") {
@@ -257,8 +284,12 @@ extension String {
         if name.contains("ready meal") || name.contains("prepared food") || name == "ready meals" {
             return Color(red: 1.0, green: 0.55, blue: 0.25)
         }
+        // Unhealthy → pink
+        if name == "candy" || name.contains("candy") || name.contains("sweet") {
+            return Color(red: 0.92, green: 0.30, blue: 0.65)
+        }
         // Unhealthy → coral red
-        if name.contains("snack") || name.contains("candy") || name.contains("sweet") {
+        if name.contains("snack") {
             return Color(red: 1.0, green: 0.36, blue: 0.36)
         }
         // Very unhealthy → dark red
@@ -272,13 +303,16 @@ extension String {
     /// Returns nil if this name is not a recognized grocery sub-category.
     var groceryHealthIcon: String? {
         let name = self.lowercased()
-        if name.contains("produce") || name.contains("fruit") || name.contains("veg") { return "leaf.fill" }
-        if name.contains("meat") || name.contains("poultry") || name.contains("seafood") || name.contains("fish") { return "fish.fill" }
+        if name == "fruits" || name.contains("fruit") { return "leaf.fill" }
+        if name == "vegetables" || name.contains("veg") || name.contains("produce") { return "carrot.fill" }
+        if name == "seafood" || name.contains("seafood") || name.contains("fish") { return "fish.fill" }
+        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "fork.knife" }
         if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "mug.fill" }
         if name.contains("bakery") || name.contains("bread") { return "croissant.fill" }
         if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "cabinet.fill" }
         if name.contains("frozen") { return "snowflake" }
-        if name.contains("snack") || name.contains("candy") || name.contains("sweet") || name.contains("confectionery") { return "birthday.cake.fill" }
+        if name == "candy" || name.contains("candy") || name.contains("sweet") || name.contains("confectionery") { return "gift.fill" }
+        if name.contains("snack") { return "birthday.cake.fill" }
         if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "cup.and.saucer.fill" }
         if name.contains("alcohol") || name.contains("beer") || name.contains("wine") || name.contains("spirit") { return "wineglass.fill" }
         if name.contains("baby food") || name.contains("formula") || name.contains("baby") { return "figure.and.child.holdinghands" }
