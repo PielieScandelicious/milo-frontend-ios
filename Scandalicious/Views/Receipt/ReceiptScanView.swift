@@ -1154,8 +1154,8 @@ struct ReceiptScanView: View {
     /// Load all-time stats from the new backend endpoint
     /// Falls back to the old multi-request approach if the new endpoint isn't available yet
     private func loadTotalReceiptsCount() {
-        // Now handled by loadAllTimeStats() via the new /analytics/all-time endpoint
-        // Keeping this method for backwards compatibility during transition
+        // Refresh all-time stats (total receipts, top stores, top categories)
+        loadAllTimeStats()
     }
 
     private func loadAllTimeStats() {
