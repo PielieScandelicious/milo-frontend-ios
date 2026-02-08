@@ -58,7 +58,7 @@ extension String {
 
         // Snacks & Beverages
         if name.contains("snack") || name.contains("candy") { return "birthday.cake.fill" }
-        if name.contains("beverage") || name.contains("non-alcoholic") { return "cup.and.saucer.fill" }
+        if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "cup.and.saucer.fill" }
         if name.contains("beer") || name.contains("wine") || name.contains("alcohol") { return "wineglass.fill" }
 
         // Household & Care
@@ -218,7 +218,7 @@ extension String {
             return Color(red: 0.40, green: 0.78, blue: 0.47)
         }
         // Healthy → teal-green
-        if name.contains("beverage") || name.contains("non-alcoholic") || name.contains("drink") && name.contains("water") {
+        if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" {
             return Color(red: 0.15, green: 0.78, blue: 0.68)
         }
         // Healthy → blue-green
@@ -261,10 +261,6 @@ extension String {
         if name.contains("snack") || name.contains("candy") || name.contains("sweet") {
             return Color(red: 1.0, green: 0.36, blue: 0.36)
         }
-        // Drinks (soft/soda) → teal (not alcohol)
-        if name.contains("drink") && (name.contains("soft") || name.contains("soda")) {
-            return Color(red: 0.15, green: 0.78, blue: 0.68)
-        }
         // Very unhealthy → dark red
         if name.contains("tobacco") {
             return Color(red: 0.80, green: 0.20, blue: 0.20)
@@ -283,8 +279,7 @@ extension String {
         if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "cabinet.fill" }
         if name.contains("frozen") { return "snowflake" }
         if name.contains("snack") || name.contains("candy") || name.contains("sweet") || name.contains("confectionery") { return "birthday.cake.fill" }
-        if name.contains("beverage") || name.contains("non-alcoholic") { return "cup.and.saucer.fill" }
-        if name.contains("drink") && (name.contains("soft") || name.contains("soda") || name.contains("water")) { return "cup.and.saucer.fill" }
+        if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "cup.and.saucer.fill" }
         if name.contains("alcohol") || name.contains("beer") || name.contains("wine") || name.contains("spirit") { return "wineglass.fill" }
         if name.contains("baby food") || name.contains("formula") || name.contains("baby") { return "figure.and.child.holdinghands" }
         if name.contains("pet food") || name.contains("pet supplies") || name.contains("pet") { return "pawprint.fill" }
