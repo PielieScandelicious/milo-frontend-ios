@@ -90,7 +90,9 @@ struct OverviewView: View {
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
-    @State private var activeCardPage = 0 // Track which card page is showing (0=budget, 1=promos)
+    @State private var budgetExpanded = false // Track if budget widget is expanded
+    @State private var activeCardPage = 0 // 0=budget, 1=promos
+    @State private var cardDragOffset: CGFloat = 0 // Live drag offset for carousel
     private let maxVisibleRows = 4 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
 
@@ -1303,29 +1305,71 @@ struct OverviewView: View {
         .id(period)
     }
 
-    /// Horizontal paging carousel for Budget + Promos
+    /// Swipeable carousel: Budget + Promos
+    /// Uses a single BudgetPulseView instance with offset-based paging (no TabView)
+    /// so expanding/collapsing is smooth with no flash.
     private var cardCarousel: some View {
-        VStack(spacing: 8) {
-            TabView(selection: $activeCardPage) {
-                BudgetPulseView(viewModel: budgetViewModel)
-                    .padding(.horizontal, 16)
-                    .tag(0)
+        let screenWidth = UIScreen.main.bounds.width
 
-                PromoBannerCard(viewModel: promosViewModel)
+        return VStack(spacing: 8) {
+            // Carousel area
+            ZStack(alignment: .top) {
+                // Budget widget - single instance, always rendered
+                BudgetPulseView(viewModel: budgetViewModel, isExpanded: $budgetExpanded)
                     .padding(.horizontal, 16)
-                    .tag(1)
+                    .offset(x: budgetExpanded ? 0 : CGFloat(-activeCardPage) * screenWidth + cardDragOffset)
+                    .allowsHitTesting(budgetExpanded || activeCardPage == 0)
+
+                // Promo card
+                if !budgetExpanded {
+                    PromoBannerCard(viewModel: promosViewModel)
+                        .padding(.horizontal, 16)
+                        .offset(x: CGFloat(1 - activeCardPage) * screenWidth + cardDragOffset)
+                        .allowsHitTesting(activeCardPage == 1)
+                }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 72)
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: activeCardPage)
+            .clipped()
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                budgetExpanded ? nil :
+                DragGesture(minimumDistance: 20, coordinateSpace: .local)
+                    .onChanged { value in
+                        if abs(value.translation.width) > abs(value.translation.height) {
+                            cardDragOffset = value.translation.width
+                        }
+                    }
+                    .onEnded { value in
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            if value.translation.width < -50 && activeCardPage < 1 {
+                                activeCardPage = 1
+                            } else if value.translation.width > 50 && activeCardPage > 0 {
+                                activeCardPage = 0
+                            }
+                            cardDragOffset = 0
+                        }
+                    }
+            )
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
 
-            // Page dots + swipe hint
-            HStack(spacing: 6) {
-                ForEach(0..<2, id: \.self) { index in
-                    Capsule()
-                        .fill(activeCardPage == index ? Color.white.opacity(0.5) : Color.white.opacity(0.15))
-                        .frame(width: activeCardPage == index ? 16 : 6, height: 4)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
+            // Page dots
+            if !budgetExpanded {
+                HStack(spacing: 6) {
+                    ForEach(0..<2, id: \.self) { index in
+                        Capsule()
+                            .fill(activeCardPage == index ? Color.white.opacity(0.5) : Color.white.opacity(0.15))
+                            .frame(width: activeCardPage == index ? 16 : 6, height: 4)
+                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: budgetExpanded)
+        .onChange(of: budgetExpanded) { _, expanded in
+            if expanded {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    activeCardPage = 0
+                    cardDragOffset = 0
                 }
             }
         }
@@ -2687,22 +2731,18 @@ private struct StoreRowButton: View {
                     .fill(segment.color)
                     .frame(width: 4, height: 32)
 
-                Text(segment.storeName.localizedCapitalized)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(segment.storeName.localizedCapitalized)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
 
-                Spacer()
+                    Text("\(segment.percentage)%")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(segment.color)
+                }
 
-                Text("\(segment.percentage)%")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(segment.color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(segment.color.opacity(0.15))
-                    )
+                Spacer(minLength: 4)
 
                 Text(String(format: "€%.0f", segment.amount))
                     .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -2794,24 +2834,19 @@ private struct ExpandableCategoryRowHeader: View {
                         .foregroundColor(category.color)
                 }
 
-                // Category name
-                Text(category.name)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+                // Category name + percentage
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(category.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
 
-                Spacer()
+                    Text("\(Int(category.percentage))%")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(category.color)
+                }
 
-                // Percentage badge
-                Text("\(Int(category.percentage))%")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(category.color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(category.color.opacity(0.15))
-                    )
+                Spacer(minLength: 4)
 
                 // Amount
                 Text(String(format: "€%.0f", category.totalSpent))
@@ -2905,24 +2940,19 @@ private struct CategoryRowButton: View {
                         .foregroundColor(category.color)
                 }
 
-                // Category name
-                Text(category.name)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+                // Category name + percentage
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(category.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
 
-                Spacer()
+                    Text("\(Int(category.percentage))%")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(category.color)
+                }
 
-                // Percentage badge
-                Text("\(Int(category.percentage))%")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(category.color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(category.color.opacity(0.15))
-                    )
+                Spacer(minLength: 4)
 
                 // Amount
                 Text(String(format: "€%.0f", category.totalSpent))

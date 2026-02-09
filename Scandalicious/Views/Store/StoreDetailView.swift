@@ -761,23 +761,19 @@ struct StoreDetailView: View {
                             .frame(width: 20)
                     }
 
-                    Text(segment.label)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(isOther ? .white.opacity(0.5) : .white)
-                        .lineLimit(1)
+                    // Category name + percentage
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(segment.label)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(isOther ? .white.opacity(0.5) : .white)
+                            .lineLimit(1)
 
-                    Spacer()
+                        Text("\(segment.percentage)%")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundColor(isOther ? .white.opacity(0.4) : segment.color)
+                    }
 
-                    // Percentage badge with colored background (matching StoreRowButton)
-                    Text("\(segment.percentage)%")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(isOther ? .white.opacity(0.4) : segment.color)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(isOther ? Color.white.opacity(0.05) : segment.color.opacity(0.15))
-                        )
+                    Spacer(minLength: 4)
 
                     Text(String(format: "€%.0f", segment.value))
                         .font(.system(size: 15, weight: .bold, design: .rounded))

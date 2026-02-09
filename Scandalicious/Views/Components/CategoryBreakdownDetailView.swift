@@ -353,24 +353,19 @@ struct CategoryBreakdownDetailView: View {
                 .foregroundStyle(category.color)
                 .frame(width: 24)
 
-            // Category name
-            Text(category.name)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
-                .lineLimit(1)
+            // Category name + percentage
+            VStack(alignment: .leading, spacing: 2) {
+                Text(category.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
 
-            Spacer()
+                Text(category.percentageText)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(category.color)
+            }
 
-            // Percentage badge with colored background
-            Text(category.percentageText)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundColor(category.color)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(category.color.opacity(0.15))
-                )
+            Spacer(minLength: 4)
 
             // Amount
             Text(String(format: "€%.2f", category.totalSpent))
