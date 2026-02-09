@@ -175,6 +175,17 @@ struct ProfileView: View {
                 Text("Subscription")
             }
 
+            // Insights
+            Section {
+                NavigationLink {
+                    YearInReviewView()
+                } label: {
+                    Label("Year in Review", systemImage: "calendar.badge.clock")
+                }
+            } header: {
+                Text("Insights")
+            }
+
             // Sign Out
             Section {
                 Button(role: .destructive) {
