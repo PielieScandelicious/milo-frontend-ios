@@ -18,6 +18,7 @@ private extension Color {
     static let miloBackground = Color(white: 0.05)
     static let miloCardBackground = Color.white.opacity(0.06)
     static let miloCardBackgroundHover = Color.white.opacity(0.10)
+    static let miloHeaderIndigo = Color(red: 0.15, green: 0.05, blue: 0.30)
 }
 
 struct ScandaLiciousAIChatView: View {
@@ -100,16 +101,27 @@ struct ScandaLiciousAIChatView: View {
     // MARK: - View Components
     
     private var backgroundView: some View {
-        ZStack {
-            Color.miloBackground
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                Color.miloBackground
 
-            // Subtle purple ambient glow at top (animated)
-            RadialGradient(
-                colors: [Color.miloPurple.opacity(0.08 * backgroundGlowOpacity), Color.clear],
-                center: .top,
-                startRadius: 0,
-                endRadius: 400
-            )
+                // Indigo gradient header (fades in with entrance animation)
+                LinearGradient(
+                    stops: [
+                        .init(color: Color.miloHeaderIndigo, location: 0.0),
+                        .init(color: Color.miloHeaderIndigo.opacity(0.7), location: 0.25),
+                        .init(color: Color.miloHeaderIndigo.opacity(0.3), location: 0.5),
+                        .init(color: Color.clear, location: 0.75)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
+                .frame(maxWidth: .infinity)
+                .offset(y: -geometry.safeAreaInsets.top)
+                .opacity(backgroundGlowOpacity)
+                .allowsHitTesting(false)
+            }
         }
         .ignoresSafeArea()
     }

@@ -35,6 +35,7 @@ struct OverviewView: View {
     @ObservedObject var rateLimitManager = RateLimitManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @StateObject private var budgetViewModel = BudgetViewModel()
+    @StateObject private var promosViewModel = PromosViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
     // Track the last time we checked for Share Extension uploads
@@ -320,39 +321,37 @@ struct OverviewView: View {
     // MARK: - Extracted Body Components
 
     private var mainBodyContent: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .top) {
-                if let error = dataManager.error {
-                    errorStateView(error: error)
-                } else {
-                    swipeableContentView
-                }
-            }
-            .background(
-                ZStack(alignment: .top) {
-                    // Base background
-                    appBackgroundColor
+        ZStack(alignment: .top) {
+            // Base background
+            appBackgroundColor.ignoresSafeArea()
 
-                    // Purple gradient - strictly in background, fades on scroll
-                    LinearGradient(
-                        stops: [
-                            .init(color: headerPurpleColor, location: 0.0),
-                            .init(color: headerPurpleColor.opacity(0.7), location: 0.25),
-                            .init(color: headerPurpleColor.opacity(0.3), location: 0.5),
-                            .init(color: Color.clear, location: 0.75)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
-                    .frame(maxWidth: .infinity)
-                    .offset(y: -geometry.safeAreaInsets.top)
-                    .opacity(purpleGradientOpacity)
-                    .animation(.linear(duration: 0.1), value: scrollOffset)
-                    .allowsHitTesting(false)
-                }
-                .ignoresSafeArea()
-            )
+            // Teal gradient header (fades on scroll)
+            GeometryReader { geometry in
+                LinearGradient(
+                    stops: [
+                        .init(color: headerPurpleColor, location: 0.0),
+                        .init(color: headerPurpleColor.opacity(0.7), location: 0.25),
+                        .init(color: headerPurpleColor.opacity(0.3), location: 0.5),
+                        .init(color: Color.clear, location: 0.75)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
+                .frame(maxWidth: .infinity)
+                .offset(y: -geometry.safeAreaInsets.top)
+                .opacity(purpleGradientOpacity)
+                .animation(.linear(duration: 0.1), value: scrollOffset)
+                .allowsHitTesting(false)
+            }
+            .ignoresSafeArea()
+
+            // Content
+            if let error = dataManager.error {
+                errorStateView(error: error)
+            } else {
+                swipeableContentView
+            }
         }
     }
 
@@ -534,6 +533,11 @@ struct OverviewView: View {
         // Load budget data
         Task {
             await budgetViewModel.loadBudget()
+        }
+
+        // Load promo recommendations
+        Task {
+            await promosViewModel.loadPromos()
         }
 
         // Load category data from pre-populated cache
@@ -1161,9 +1165,9 @@ struct OverviewView: View {
         }
     }
 
-    // MARK: - Header Purple Color
+    // MARK: - Header Gradient Color
     private var headerPurpleColor: Color {
-        Color(red: 0.35, green: 0.10, blue: 0.60) // Deeper, richer purple
+        Color(red: 0.03, green: 0.18, blue: 0.25) // Deep teal - modern, premium
     }
 
     // MARK: - Background Color
@@ -1295,6 +1299,9 @@ struct OverviewView: View {
             // Both swipe (change period) and tap (toggle trendline) work simultaneously
             VStack(spacing: 16) {
                 BudgetPulseView(viewModel: budgetViewModel)
+                    .padding(.horizontal, 16)
+
+                PromoBannerCard(viewModel: promosViewModel)
                     .padding(.horizontal, 16)
 
                 spendingAndHealthCardForPeriod(period)

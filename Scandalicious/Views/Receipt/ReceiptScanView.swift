@@ -210,6 +210,9 @@ struct ReceiptScanView: View {
         Color(red: 0.35, green: 0.10, blue: 0.60)
     }
 
+    // Deep ocean blue header gradient color for scan tab
+    private let headerBlueColor = Color(red: 0.04, green: 0.15, blue: 0.30)
+
     private var floatingScanButton: some View {
         Button {
             if rateLimitManager.canUploadReceipt() {
@@ -380,7 +383,29 @@ struct ReceiptScanView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(white: 0.05))
+        .background(
+            GeometryReader { geometry in
+                ZStack(alignment: .top) {
+                    Color(white: 0.05)
+
+                    LinearGradient(
+                        stops: [
+                            .init(color: headerBlueColor, location: 0.0),
+                            .init(color: headerBlueColor.opacity(0.7), location: 0.25),
+                            .init(color: headerBlueColor.opacity(0.3), location: 0.5),
+                            .init(color: Color.clear, location: 0.75)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
+                    .frame(maxWidth: .infinity)
+                    .offset(y: -geometry.safeAreaInsets.top)
+                    .allowsHitTesting(false)
+                }
+            }
+            .ignoresSafeArea()
+        )
         .opacity(contentOpacity)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSyncing)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
