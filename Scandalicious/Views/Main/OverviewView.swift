@@ -90,7 +90,8 @@ struct OverviewView: View {
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
-    private let maxVisibleRows = 5 // Maximum rows to show before "Show All" button
+    @State private var activeCardPage = 0 // Track which card page is showing (0=budget, 1=promos)
+    private let maxVisibleRows = 4 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
 
     // Entrance animation states
@@ -1290,304 +1291,44 @@ struct OverviewView: View {
 
     // MARK: - Overview Content
     private func overviewContentForPeriod(_ period: String) -> some View {
-        let breakdowns = getCachedBreakdowns(for: period)
-        let segments = storeSegmentsForPeriod(period)
-
-        // All Overview components fade in together at the same time
         return VStack(spacing: 16) {
-            // Swipeable area: spending card + pie chart
-            // Both swipe (change period) and tap (toggle trendline) work simultaneously
-            VStack(spacing: 16) {
+            // Swipeable carousel: Budget + Promos
+            cardCarousel
+
+            // Spending card with period swipe
+            unifiedSpendingCardForPeriod(period)
+                .contentShape(Rectangle())
+                .simultaneousGesture(periodSwipeGesture)
+        }
+        .id(period)
+    }
+
+    /// Horizontal paging carousel for Budget + Promos
+    private var cardCarousel: some View {
+        VStack(spacing: 8) {
+            TabView(selection: $activeCardPage) {
                 BudgetPulseView(viewModel: budgetViewModel)
                     .padding(.horizontal, 16)
+                    .tag(0)
 
                 PromoBannerCard(viewModel: promosViewModel)
                     .padding(.horizontal, 16)
+                    .tag(1)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 72)
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: activeCardPage)
 
-                spendingAndHealthCardForPeriod(period)
-
-                if !segments.isEmpty {
-                    // Flippable pie chart - front shows stores, back shows categories
-                    // Tap to flip between the two views
-                    ZStack {
-                        // Back side - Category breakdown (shown when flipped)
-                        Group {
-                            if !categoryDataForPeriod(period).isEmpty {
-                                IconDonutChartView(
-                                    data: categoryChartData(for: period),
-                                    totalAmount: totalSpendForPeriod(period),
-                                    size: 200,
-                                    currencySymbol: "€",
-                                    subtitle: nil,
-                                    totalItems: nil,
-                                    averageItemPrice: nil,
-                                    centerIcon: "square.grid.2x2.fill",
-                                    centerLabel: "Categories",
-                                    showAllSegments: showAllRows
-                                )
-                            } else if isLoadingCategoryData {
-                                SkeletonDonutChart()
-                            } else {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "square.grid.2x2")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.white.opacity(0.3))
-                                    Text("No category data")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.4))
-                                    Text("Tap to flip back")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.white.opacity(0.25))
-                                }
-                                .frame(width: 200, height: 200)
-                            }
-                        }
-                        .opacity(isPieChartFlipped ? 1 : 0)
-                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-
-                        // Front side - Store breakdown (shown by default)
-                        IconDonutChartView(
-                            data: chartDataForPeriod(period),
-                            totalAmount: Double(totalReceiptsForPeriod(period)),
-                            size: 200,
-                            currencySymbol: "",
-                            subtitle: "receipts",
-                            totalItems: nil,
-                            averageItemPrice: nil,
-                            centerIcon: "storefront.fill",
-                            centerLabel: "Stores",
-                            showAllSegments: showAllRows
-                        )
-                        .opacity(isPieChartFlipped ? 0 : 1)
-                    }
-                    .rotation3DEffect(
-                        .degrees(pieChartFlipDegrees),
-                        axis: (x: 0, y: 1, z: 0),
-                        perspective: 0.5
-                    )
-                    .id(period)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                    .contentShape(Circle())
-                    .onTapGesture {
-                        // Load category data if not already loaded
-                        if pieChartSummaryCache[period] == nil {
-                            Task {
-                                await fetchCategoryData(for: period)
-                            }
-                        }
-                        // Flip the chart and reset row expansion (works for all period types)
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                            isPieChartFlipped.toggle()
-                            pieChartFlipDegrees += 180
-                            showAllRows = false // Reset to collapsed state when flipping
-                        }
-                    }
-                    .onChange(of: period) { _, newPeriod in
-                        // Reset flip state and row expansion when period changes (default to categories)
-                        isPieChartFlipped = true
-                        pieChartFlipDegrees = 180
-                        showAllRows = false
-                    }
-                } else {
-                    // Empty pie chart state - flippable between stores and categories
-                    let isNewMonth = isNewMonthStart && isCurrentPeriod
-
-                    ZStack {
-                        // Back side - Empty Categories view
-                        EmptyPieChartView(
-                            isNewMonth: isNewMonth,
-                            icon: "square.grid.2x2.fill",
-                            label: "Categories"
-                        )
-                        .opacity(isPieChartFlipped ? 1 : 0)
-                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-
-                        // Front side - Empty Stores view
-                        EmptyPieChartView(
-                            isNewMonth: isNewMonth,
-                            icon: "storefront.fill",
-                            label: "Stores"
-                        )
-                        .opacity(isPieChartFlipped ? 0 : 1)
-                    }
-                    .rotation3DEffect(
-                        .degrees(pieChartFlipDegrees),
-                        axis: (x: 0, y: 1, z: 0),
-                        perspective: 0.5
-                    )
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                    .contentShape(Circle())
-                    .onTapGesture {
-                        // Allow flip for empty periods (all period types)
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                            isPieChartFlipped.toggle()
-                            pieChartFlipDegrees += 180
-                            showAllRows = false
-                        }
-                    }
-                    .onChange(of: period) { _, _ in
-                        // Reset flip state when period changes (default to categories)
-                        isPieChartFlipped = true
-                        pieChartFlipDegrees = 180
-                        showAllRows = false
-                    }
+            // Page dots + swipe hint
+            HStack(spacing: 6) {
+                ForEach(0..<2, id: \.self) { index in
+                    Capsule()
+                        .fill(activeCardPage == index ? Color.white.opacity(0.5) : Color.white.opacity(0.15))
+                        .frame(width: activeCardPage == index ? 16 : 6, height: 4)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
                 }
             }
-            .contentShape(Rectangle())
-            .simultaneousGesture(periodSwipeGesture)
-
-            // Tap hint for the flippable donut chart
-            if !segments.isEmpty {
-                HStack(spacing: 5) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 10, weight: .medium))
-                    Text(isPieChartFlipped ? "Tap chart for stores" : "Tap chart for categories")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundStyle(.white.opacity(0.3))
-                .padding(.top, -8)
-            }
-
-            // Store/Category rows - NOT swipeable, only tappable
-            // These are the legend/details for the pie chart, so they appear directly below it
-            // Show store rows when not flipped, category rows when flipped
-            let categories = categoryDataForPeriod(period)
-
-                if isPieChartFlipped && !categories.isEmpty {
-                    // Determine which categories to display
-                    let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
-                    let hasMoreCategories = categories.count > maxVisibleRows
-
-                    // Category rows with single "Categories" header (no grouping)
-                    VStack(spacing: 6) {
-                        // Single "Categories" section header
-                        categoriesSectionHeader(
-                            categoryCount: categories.count,
-                            isAllTime: false,
-                            isYear: false
-                        )
-
-                        // Category rows (flat list, no grouping)
-                        ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
-                            VStack(spacing: 0) {
-                                // Category row header (tappable to expand)
-                                ExpandableCategoryRowHeader(
-                                    category: category,
-                                    isExpanded: expandedCategoryId == category.id,
-                                    onTap: {
-                                        toggleCategoryExpansion(category, period: period)
-                                    }
-                                )
-
-                                // Expanded items section — always in tree, height-animated
-                                if expandedCategoryId == category.id {
-                                    expandedCategoryItemsSection(category)
-                                        .transition(.asymmetric(
-                                            insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
-                                            removal: .opacity
-                                        ))
-                                }
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .opacity(storeRowsAppeared ? 1 : 0)
-                            .offset(y: storeRowsAppeared ? 0 : 15)
-                            .animation(
-                                Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index) * 0.08),
-                                value: storeRowsAppeared
-                            )
-                        }
-
-                        // Show All / Show Less button
-                        if hasMoreCategories {
-                            showAllRowsButton(
-                                isExpanded: showAllRows,
-                                totalCount: categories.count
-                            )
-                        }
-                    }
-                    .id("\(period)-categories-\(showAllRows)")
-                    .padding(.horizontal, 16)
-                    .onAppear {
-                        if !storeRowsAppeared {
-                            withAnimation {
-                                storeRowsAppeared = true
-                            }
-                        }
-                    }
-                } else if !isPieChartFlipped && !segments.isEmpty {
-                    // Determine which segments to display
-                    let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
-                    let hasMoreSegments = segments.count > maxVisibleRows
-
-                    // Store rows with single "Stores" header (no grouping)
-                    VStack(spacing: 6) {
-                        // Single "Stores" section header
-                        storesSectionHeader(
-                            storeCount: segments.count,
-                            isAllTime: false,
-                            isYear: false
-                        )
-
-                        // Store rows (flat list, no grouping)
-                        ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
-                            StoreRowButton(
-                                segment: segment,
-                                breakdowns: breakdowns,
-                                onSelect: { breakdown, color in
-                                    selectedStoreColor = color
-                                    selectedBreakdown = breakdown
-                                }
-                            )
-                            .opacity(storeRowsAppeared ? 1 : 0)
-                            .offset(y: storeRowsAppeared ? 0 : 15)
-                            .animation(
-                                Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index) * 0.08),
-                                value: storeRowsAppeared
-                            )
-                        }
-
-                        // Show All / Show Less button
-                        if hasMoreSegments {
-                            showAllRowsButton(
-                                isExpanded: showAllRows,
-                                totalCount: segments.count
-                            )
-                        }
-                    }
-                    .id("\(period)-\(showAllRows)") // Force complete view recreation when period or expansion changes
-                    .padding(.horizontal, 16)
-                    .onAppear {
-                        // Trigger staggered animation immediately when view appears
-                        if !storeRowsAppeared {
-                            withAnimation {
-                                storeRowsAppeared = true
-                            }
-                        }
-                    }
-                } else if isPieChartFlipped && categories.isEmpty {
-                    // Empty categories state - shown when flipped but no category data
-                    emptyRowsSection(
-                        icon: "square.grid.2x2",
-                        title: "Categories",
-                        subtitle: "No category data yet",
-                        isNewMonth: isNewMonthStart && isCurrentPeriod
-                    )
-                } else if !isPieChartFlipped && segments.isEmpty {
-                    // Empty stores state - shown when no store data
-                    emptyRowsSection(
-                        icon: "storefront",
-                        title: "Stores",
-                        subtitle: "No stores visited yet",
-                        isNewMonth: isNewMonthStart && isCurrentPeriod
-                    )
-                }
-
         }
-        .id(period) // Ensure entire overview content is recreated for each period
     }
 
     /// Empty rows section for when there's no data
@@ -2441,91 +2182,379 @@ struct OverviewView: View {
         return nil
     }
 
-    /// Combined spending and health score card with dynamic color accent
-    private func spendingAndHealthCardForPeriod(_ period: String) -> some View {
-        let spending = totalSpendForPeriod(period)
-        let healthScore = healthScoreForPeriod(period)
-        let accentColor = healthScore?.healthScoreColor ?? Color.white.opacity(0.5)
+    // MARK: - Unified Spending Card Components
 
-        return VStack(spacing: 0) {
-            // Total spending view with health score
-            VStack(spacing: 16) {
-                // Spending section
-                VStack(spacing: 4) {
-                    Text("SPENT THIS MONTH")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                        .tracking(1.2)
-
-                    Text(String(format: "€%.0f", spending))
-                        .font(.system(size: 44, weight: .heavy, design: .rounded))
-                        .foregroundColor(.white)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
-                }
-
-                // Modern health score display
-                if let score = healthScore {
-                    ModernHealthScoreBadge(score: score)
-                }
-
-                // Syncing indicator
-                if isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
-                    HStack(spacing: 4) {
-                        SyncingArrowsView()
-                            .font(.system(size: 11))
-                        Text("Syncing")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundColor(.blue)
-                } else if showSyncedConfirmation {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.icloud.fill")
-                            .font(.system(size: 11))
-                        Text("Synced")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundColor(.green)
-                }
-            }
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity)
-        }
-        .background(
-            ZStack {
-                // Solid base layer - opaque dark background to block purple gradient
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(Color(white: 0.08))
-
-                // Subtle gradient overlay for glass effect
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.04),
-                                Color.white.opacity(0.02)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
+    /// Premium card background with glass morphism
+    private var premiumCardBackground: some View {
+        ZStack {
             RoundedRectangle(cornerRadius: 28)
-                .stroke(
+                .fill(Color(white: 0.08))
+            RoundedRectangle(cornerRadius: 28)
+                .fill(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.15),
-                            Color.white.opacity(0.05)
+                            Color.white.opacity(0.05),
+                            Color.white.opacity(0.02),
+                            Color.white.opacity(0.01)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
+                    )
                 )
-        )
-        .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
+        }
+    }
+
+    /// Premium card border with gradient stroke
+    private var premiumCardBorder: some View {
+        RoundedRectangle(cornerRadius: 28)
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.15),
+                        Color.white.opacity(0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+    }
+
+    /// Subtle divider within the unified card
+    private func cardDivider() -> some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.06))
+            .frame(height: 1)
+            .padding(.horizontal, 20)
+    }
+
+    /// Spending header: amount + inline health badge + syncing
+    private func spendingHeaderSection(spending: Double, healthScore: Double?) -> some View {
+        VStack(spacing: 8) {
+            Text("SPENT THIS MONTH")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
+                .tracking(1.2)
+
+            Text(String(format: "€%.0f", spending))
+                .font(.system(size: 44, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
+
+            if let score = healthScore {
+                CompactNutriBadge(score: score)
+            }
+
+            syncingIndicator()
+        }
+        .padding(.top, 20)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Syncing/synced status indicator
+    @ViewBuilder
+    private func syncingIndicator() -> some View {
+        if isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
+            HStack(spacing: 4) {
+                SyncingArrowsView()
+                    .font(.system(size: 11))
+                Text("Syncing")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundColor(.blue)
+        } else if showSyncedConfirmation {
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.icloud.fill")
+                    .font(.system(size: 11))
+                Text("Synced")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundColor(.green)
+        }
+    }
+
+    /// Flip hint label
+    private func flipHintLabel() -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 9, weight: .medium))
+            Text(isPieChartFlipped ? "Tap for stores" : "Tap for categories")
+                .font(.system(size: 10, weight: .medium))
+        }
+        .foregroundStyle(.white.opacity(0.25))
+        .padding(.bottom, 4)
+    }
+
+    /// Flippable donut chart section with recessed dark well
+    private func flippableChartSection(period: String, segments: [StoreChartSegment]) -> some View {
+        Group {
+            if !segments.isEmpty {
+                ZStack {
+                    // Back side - Category breakdown
+                    Group {
+                        if !categoryDataForPeriod(period).isEmpty {
+                            IconDonutChartView(
+                                data: categoryChartData(for: period),
+                                totalAmount: totalSpendForPeriod(period),
+                                size: 170,
+                                currencySymbol: "€",
+                                subtitle: nil,
+                                totalItems: nil,
+                                averageItemPrice: nil,
+                                centerIcon: "square.grid.2x2.fill",
+                                centerLabel: "Categories",
+                                showAllSegments: showAllRows
+                            )
+                        } else if isLoadingCategoryData {
+                            SkeletonDonutChart()
+                        } else {
+                            VStack(spacing: 12) {
+                                Image(systemName: "square.grid.2x2")
+                                    .font(.system(size: 36))
+                                    .foregroundColor(.white.opacity(0.3))
+                                Text("No category data")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                                Text("Tap to flip back")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.25))
+                            }
+                            .frame(width: 170, height: 170)
+                        }
+                    }
+                    .opacity(isPieChartFlipped ? 1 : 0)
+                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+
+                    // Front side - Store breakdown
+                    IconDonutChartView(
+                        data: chartDataForPeriod(period),
+                        totalAmount: Double(totalReceiptsForPeriod(period)),
+                        size: 170,
+                        currencySymbol: "",
+                        subtitle: "receipts",
+                        totalItems: nil,
+                        averageItemPrice: nil,
+                        centerIcon: "storefront.fill",
+                        centerLabel: "Stores",
+                        showAllSegments: showAllRows
+                    )
+                    .opacity(isPieChartFlipped ? 0 : 1)
+                }
+                .rotation3DEffect(
+                    .degrees(pieChartFlipDegrees),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.5
+                )
+                .contentShape(Circle())
+                .onTapGesture {
+                    if pieChartSummaryCache[period] == nil {
+                        Task {
+                            await fetchCategoryData(for: period)
+                        }
+                    }
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                        isPieChartFlipped.toggle()
+                        pieChartFlipDegrees += 180
+                        showAllRows = false
+                    }
+                }
+                .onChange(of: period) { _, newPeriod in
+                    isPieChartFlipped = true
+                    pieChartFlipDegrees = 180
+                    showAllRows = false
+                }
+            } else {
+                // Empty state
+                let isNewMonth = isNewMonthStart && isCurrentPeriod
+                ZStack {
+                    EmptyPieChartView(
+                        isNewMonth: isNewMonth,
+                        icon: "square.grid.2x2.fill",
+                        label: "Categories"
+                    )
+                    .opacity(isPieChartFlipped ? 1 : 0)
+                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+
+                    EmptyPieChartView(
+                        isNewMonth: isNewMonth,
+                        icon: "storefront.fill",
+                        label: "Stores"
+                    )
+                    .opacity(isPieChartFlipped ? 0 : 1)
+                }
+                .rotation3DEffect(
+                    .degrees(pieChartFlipDegrees),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.5
+                )
+                .contentShape(Circle())
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                        isPieChartFlipped.toggle()
+                        pieChartFlipDegrees += 180
+                        showAllRows = false
+                    }
+                }
+                .onChange(of: period) { _, _ in
+                    isPieChartFlipped = true
+                    pieChartFlipDegrees = 180
+                    showAllRows = false
+                }
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
+    /// Category/Store rows section inside the unified card
+    private func rowsSection(
+        period: String,
+        segments: [StoreChartSegment],
+        categories: [CategorySpendItem],
+        breakdowns: [StoreBreakdown]
+    ) -> some View {
+        VStack(spacing: 4) {
+            if isPieChartFlipped && !categories.isEmpty {
+                let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
+                let hasMoreCategories = categories.count > maxVisibleRows
+
+                categoriesSectionHeader(
+                    categoryCount: categories.count,
+                    isAllTime: false,
+                    isYear: false
+                )
+                .padding(.horizontal, 4)
+
+                ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
+                    VStack(spacing: 0) {
+                        ExpandableCategoryRowHeader(
+                            category: category,
+                            isExpanded: expandedCategoryId == category.id,
+                            onTap: {
+                                toggleCategoryExpansion(category, period: period)
+                            }
+                        )
+
+                        if expandedCategoryId == category.id {
+                            expandedCategoryItemsSection(category)
+                                .transition(.asymmetric(
+                                    insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
+                                    removal: .opacity
+                                ))
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .opacity(storeRowsAppeared ? 1 : 0)
+                    .offset(y: storeRowsAppeared ? 0 : 15)
+                    .animation(
+                        Animation.spring(response: 0.5, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.08),
+                        value: storeRowsAppeared
+                    )
+                }
+
+                if hasMoreCategories {
+                    showAllRowsButton(
+                        isExpanded: showAllRows,
+                        totalCount: categories.count
+                    )
+                }
+            } else if !isPieChartFlipped && !segments.isEmpty {
+                let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
+                let hasMoreSegments = segments.count > maxVisibleRows
+
+                storesSectionHeader(
+                    storeCount: segments.count,
+                    isAllTime: false,
+                    isYear: false
+                )
+                .padding(.horizontal, 4)
+
+                ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
+                    StoreRowButton(
+                        segment: segment,
+                        breakdowns: breakdowns,
+                        onSelect: { breakdown, color in
+                            selectedStoreColor = color
+                            selectedBreakdown = breakdown
+                        }
+                    )
+                    .opacity(storeRowsAppeared ? 1 : 0)
+                    .offset(y: storeRowsAppeared ? 0 : 15)
+                    .animation(
+                        Animation.spring(response: 0.5, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.08),
+                        value: storeRowsAppeared
+                    )
+                }
+
+                if hasMoreSegments {
+                    showAllRowsButton(
+                        isExpanded: showAllRows,
+                        totalCount: segments.count
+                    )
+                }
+            } else if isPieChartFlipped && categories.isEmpty {
+                emptyRowsSection(
+                    icon: "square.grid.2x2",
+                    title: "Categories",
+                    subtitle: "No category data yet",
+                    isNewMonth: isNewMonthStart && isCurrentPeriod
+                )
+            } else if !isPieChartFlipped && segments.isEmpty {
+                emptyRowsSection(
+                    icon: "storefront",
+                    title: "Stores",
+                    subtitle: "No stores visited yet",
+                    isNewMonth: isNewMonthStart && isCurrentPeriod
+                )
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .id("\(period)-\(isPieChartFlipped ? "categories" : "stores")-\(showAllRows)")
+        .onAppear {
+            if !storeRowsAppeared {
+                withAnimation {
+                    storeRowsAppeared = true
+                }
+            }
+        }
+    }
+
+    /// Unified spending card combining amount, donut chart, and category/store rows
+    private func unifiedSpendingCardForPeriod(_ period: String) -> some View {
+        let breakdowns = getCachedBreakdowns(for: period)
+        let segments = storeSegmentsForPeriod(period)
+        let categories = categoryDataForPeriod(period)
+        let spending = totalSpendForPeriod(period)
+        let healthScore = healthScoreForPeriod(period)
+
+        return VStack(spacing: 0) {
+            spendingHeaderSection(spending: spending, healthScore: healthScore)
+
+            cardDivider()
+
+            flippableChartSection(period: period, segments: segments)
+
+            if !segments.isEmpty || !categories.isEmpty {
+                flipHintLabel()
+            }
+
+            cardDivider()
+
+            rowsSection(
+                period: period,
+                segments: segments,
+                categories: categories,
+                breakdowns: breakdowns
+            )
+        }
+        .background(premiumCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 28))
+        .overlay(premiumCardBorder)
+        .shadow(color: Color.black.opacity(0.25), radius: 24, x: 0, y: 12)
         .padding(.horizontal, 16)
     }
 
@@ -2565,7 +2594,7 @@ private struct EmptyPieChartView: View {
     let label: String
 
     // Match IconDonutChartView dimensions
-    private let size: CGFloat = 200
+    private let size: CGFloat = 170
     private let strokeWidthRatio: CGFloat = 0.08
 
     private var strokeWidth: CGFloat {
@@ -2663,18 +2692,15 @@ private struct StoreRowButton: View {
 
     var body: some View {
         Button {
-            // Find the matching breakdown - O(n) but only on tap, not on render
             if let breakdown = breakdowns.first(where: { $0.storeName == segment.storeName }) {
                 onSelect(breakdown, segment.color)
             }
         } label: {
             HStack(spacing: 12) {
-                // Color accent bar on the left
                 RoundedRectangle(cornerRadius: 2)
                     .fill(segment.color)
                     .frame(width: 4, height: 32)
 
-                // Store name - use original casing for brand identity
                 Text(segment.storeName.localizedCapitalized)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
@@ -2682,7 +2708,6 @@ private struct StoreRowButton: View {
 
                 Spacer()
 
-                // Percentage badge
                 Text("\(segment.percentage)%")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundColor(segment.color)
@@ -2693,27 +2718,23 @@ private struct StoreRowButton: View {
                             .fill(segment.color.opacity(0.15))
                     )
 
-                // Amount
                 Text(String(format: "€%.0f", segment.amount))
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .frame(width: 65, alignment: .trailing)
 
-                // Chevron
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.25))
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .background(
                 ZStack {
-                    // Base glass effect
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(Color.white.opacity(0.04))
 
-                    // Subtle gradient
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -2725,9 +2746,8 @@ private struct StoreRowButton: View {
                             )
                         )
 
-                    // Colored accent glow on the left
                     HStack {
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: 14)
                             .fill(
                                 LinearGradient(
                                     colors: [
@@ -2744,7 +2764,7 @@ private struct StoreRowButton: View {
                 }
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 14)
                     .stroke(
                         LinearGradient(
                             colors: [
@@ -2820,16 +2840,14 @@ private struct ExpandableCategoryRowHeader: View {
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
                     .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .background(
                 ZStack {
-                    // Base glass effect
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(isExpanded ? category.color.opacity(0.1) : Color.white.opacity(0.04))
 
-                    // Subtle gradient
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -2841,9 +2859,8 @@ private struct ExpandableCategoryRowHeader: View {
                             )
                         )
 
-                    // Colored accent glow on the left
                     HStack {
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: 14)
                             .fill(
                                 LinearGradient(
                                     colors: [
@@ -2860,7 +2877,7 @@ private struct ExpandableCategoryRowHeader: View {
                 }
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 14)
                     .stroke(
                         LinearGradient(
                             colors: isExpanded
@@ -3214,6 +3231,80 @@ struct SyncingArrowsView: View {
 
 // Note: ModernReceiptCard has been replaced with the shared ExpandableReceiptCard component
 // located in Scandalicious/Views/Components/ExpandableReceiptCard.swift
+
+// MARK: - Compact Nutri Badge (inline pill for unified card)
+struct CompactNutriBadge: View {
+    let score: Double
+
+    private var scoreColor: Color {
+        switch score {
+        case 0..<1.5:
+            return Color(red: 0.95, green: 0.3, blue: 0.3)
+        case 1.5..<2.5:
+            return Color(red: 1.0, green: 0.55, blue: 0.2)
+        case 2.5..<3.25:
+            return Color(red: 1.0, green: 0.8, blue: 0.2)
+        case 3.25..<4:
+            return Color(red: 0.5, green: 0.85, blue: 0.4)
+        default:
+            return Color(red: 0.2, green: 0.8, blue: 0.4)
+        }
+    }
+
+    private var gradeLabel: String {
+        switch score {
+        case 4...: return "A"
+        case 3.25..<4: return "B"
+        case 2.5..<3.25: return "C"
+        case 1.5..<2.5: return "D"
+        default: return "E"
+        }
+    }
+
+    private var scoreProgress: Double {
+        score / 5.0
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // Small circular ring with grade
+            ZStack {
+                Circle()
+                    .stroke(scoreColor.opacity(0.25), lineWidth: 2.5)
+                    .frame(width: 28, height: 28)
+                Circle()
+                    .trim(from: 0, to: scoreProgress)
+                    .stroke(scoreColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .frame(width: 28, height: 28)
+                    .rotationEffect(.degrees(-90))
+                Text(gradeLabel)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(scoreColor)
+            }
+
+            Text(String(format: "%.1f", score))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: score)
+
+            Text("NUTRI")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.white.opacity(0.4))
+                .tracking(0.5)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(scoreColor.opacity(0.08))
+                .overlay(
+                    Capsule()
+                        .stroke(scoreColor.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
 
 // MARK: - Modern Health Score Badge
 struct ModernHealthScoreBadge: View {
