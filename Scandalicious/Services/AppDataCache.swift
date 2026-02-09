@@ -85,6 +85,9 @@ class AppDataCache: ObservableObject {
 
     // MARK: - Disk Cache
 
+    /// Bump this version whenever category names change to force cache invalidation
+    private static let cacheVersion = 2
+
     private let cacheFileURL: URL = {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         return caches.appendingPathComponent("scandalicious_app_cache.json")
@@ -101,6 +104,7 @@ class AppDataCache: ObservableObject {
     // MARK: - Disk Persistence
 
     private struct DiskPayload: Codable {
+        var cacheVersion: Int?
         var periodMetadata: [PeriodMetadata]
         var breakdownsByPeriod: [String: [StoreBreakdown]]
         var periodTotalSpends: [String: Double]
@@ -122,6 +126,11 @@ class AppDataCache: ObservableObject {
             let data = try Data(contentsOf: cacheFileURL)
             let decoder = JSONDecoder()
             let payload = try decoder.decode(DiskPayload.self, from: data)
+            // Invalidate cache if version changed (e.g. category names renamed)
+            if (payload.cacheVersion ?? 0) != Self.cacheVersion {
+                try? FileManager.default.removeItem(at: cacheFileURL)
+                return
+            }
             self.periodMetadata = payload.periodMetadata
             self.breakdownsByPeriod = payload.breakdownsByPeriod
             self.periodTotalSpends = payload.periodTotalSpends
@@ -152,6 +161,7 @@ class AppDataCache: ObservableObject {
 
     private func saveToDiskNow() {
         let payload = DiskPayload(
+            cacheVersion: Self.cacheVersion,
             periodMetadata: periodMetadata,
             breakdownsByPeriod: breakdownsByPeriod,
             periodTotalSpends: periodTotalSpends,
