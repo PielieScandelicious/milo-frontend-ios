@@ -143,88 +143,127 @@ struct StoreDetailView: View {
         currentCategories.count > maxVisibleCategories
     }
 
-    // MARK: - Store Header with Nutri Score
+    // MARK: - Compact Store Header (centered, matching Overview style)
 
-    private var storeHeader: some View {
-        let scoreColor = currentHealthScore?.healthScoreColor ?? Color(white: 0.4)
-        let nutriLetter: String = {
-            guard let score = currentHealthScore else { return "-" }
-            return Int(score.rounded()).nutriScoreLetter
-        }()
+    private var storeHeaderSection: some View {
+        VStack(spacing: 8) {
+            Text(storeBreakdown.storeName)
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
 
-        return HStack(spacing: 0) {
-            // Left side: Store info
-            VStack(alignment: .leading, spacing: 6) {
-                Text(storeBreakdown.storeName)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+            Text(storeBreakdown.period == "All" ? "All Time" : storeBreakdown.period)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
 
-                Text(storeBreakdown.period == "All" ? "All Time" : storeBreakdown.period)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
+            Text(String(format: "€%.0f", currentTotalSpend))
+                .font(.system(size: 44, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentTotalSpend)
 
-                Text(String(format: "€%.0f", currentTotalSpend))
-                    .font(.system(size: 28, weight: .heavy, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.top, 2)
-
-                Text("\(currentVisitCount) receipt\(currentVisitCount == 1 ? "" : "s")")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-
-            Spacer()
-
-            // Right side: Nutri Score
-            VStack(spacing: 8) {
-                if currentHealthScore != nil {
-                    // Has score - show the letter grade
-                    ZStack {
-                        Circle()
-                            .fill(scoreColor.opacity(0.15))
-                            .frame(width: 64, height: 64)
-
-                        Circle()
-                            .stroke(scoreColor, lineWidth: 3)
-                            .frame(width: 64, height: 64)
-
-                        Text(nutriLetter)
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(scoreColor)
-                    }
-                } else {
-                    // No score - show clean N/A state
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.white.opacity(0.06))
-                            .frame(width: 64, height: 64)
-
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                            .frame(width: 64, height: 64)
-
-                        Text("N/A")
-                            .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.35))
-                    }
-                }
-
-                Text("NUTRI SCORE")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundColor(currentHealthScore != nil ? scoreColor : .white.opacity(0.35))
+            if let score = currentHealthScore {
+                CompactNutriBadge(score: score)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 20)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(storeAccentColor.opacity(0.25), lineWidth: 1)
-        )
+        .padding(.top, 20)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Premium Card Styling
+
+    private var premiumCardBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 28)
+                .fill(Color(white: 0.08))
+            RoundedRectangle(cornerRadius: 28)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.05),
+                            Color.white.opacity(0.02),
+                            Color.white.opacity(0.01)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
+    }
+
+    private var premiumCardBorder: some View {
+        RoundedRectangle(cornerRadius: 28)
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.15),
+                        Color.white.opacity(0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+    }
+
+    private func cardDivider() -> some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.06))
+            .frame(height: 1)
+            .padding(.horizontal, 20)
+    }
+
+    // MARK: - Unified Store Card
+
+    private var unifiedStoreCard: some View {
+        VStack(spacing: 0) {
+            storeHeaderSection
+
+            cardDivider()
+
+            FlippableDonutChartView(
+                title: "",
+                subtitle: currentVisitCount == 1 ? "receipt" : "receipts",
+                totalAmount: Double(currentVisitCount),
+                segments: sortedCategories.toChartSegments(),
+                size: 170,
+                accentColor: chartAccentColor,
+                selectedPeriod: storeBreakdown.period,
+                averageItemPrice: averageItemPrice,
+                showAllSegments: showAllCategories
+            )
+            .padding(.vertical, 12)
+
+            if !currentCategories.isEmpty {
+                cardDivider()
+
+                VStack(spacing: 8) {
+                    ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
+                        let segment = categoryToSegment(category: category)
+                        let normalizedName = category.name.normalizedCategoryName
+                        let icon = normalizedName.groceryHealthIcon ?? normalizedName.categoryIcon
+                        expandableCategoryRow(segment: segment, isOther: false, icon: icon, originalCategoryName: category.name)
+                            .opacity(categoriesRevealed ? 1 : 0)
+                            .offset(y: categoriesRevealed ? 0 : 14)
+                            .animation(
+                                .easeOut(duration: 0.35).delay(Double(index) * 0.06),
+                                value: categoriesRevealed
+                            )
+                    }
+
+                    if hasMoreCategories {
+                        showAllCategoriesButton
+                    }
+                }
+                .id("categories-\(showAllCategories)")
+                .padding(.horizontal, 12)
+                .padding(.vertical, 16)
+            }
+        }
+        .background(premiumCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 28))
+        .overlay(premiumCardBorder)
+        .shadow(color: .black.opacity(0.25), radius: 24, x: 0, y: 12)
     }
 
     var body: some View {
@@ -233,52 +272,10 @@ struct StoreDetailView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    // Sleek header card with Nutri Score
-                    storeHeader
+                    // Unified premium card (header + donut + categories)
+                    unifiedStoreCard
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
-
-                    // Donut chart section
-                    FlippableDonutChartView(
-                        title: "",
-                        subtitle: currentVisitCount == 1 ? "receipt" : "receipts",
-                        totalAmount: Double(currentVisitCount),
-                        segments: sortedCategories.toChartSegments(),
-                        size: 200,
-                        accentColor: chartAccentColor,
-                        selectedPeriod: storeBreakdown.period,
-                        averageItemPrice: averageItemPrice,
-                        showAllSegments: showAllCategories
-                    )
-                    .padding(.top, 24)
-
-                    // Category section with staggered reveal
-                    if !currentCategories.isEmpty {
-                        VStack(spacing: 8) {
-                            categoriesSectionHeader(categoryCount: currentCategories.count)
-
-                            ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
-                                let segment = categoryToSegment(category: category)
-                                let normalizedName = category.name.normalizedCategoryName
-                                let icon = normalizedName.groceryHealthIcon ?? normalizedName.categoryIcon
-                                expandableCategoryRow(segment: segment, isOther: false, icon: icon, originalCategoryName: category.name)
-                                    .opacity(categoriesRevealed ? 1 : 0)
-                                    .offset(y: categoriesRevealed ? 0 : 14)
-                                    .animation(
-                                        .easeOut(duration: 0.35).delay(Double(index) * 0.06),
-                                        value: categoriesRevealed
-                                    )
-                            }
-
-                            // Show All / Show Less button
-                            if hasMoreCategories {
-                                showAllCategoriesButton
-                            }
-                        }
-                        .id("categories-\(showAllCategories)")
-                        .padding(.horizontal, 16)
-                        .padding(.top, 24)
-                    }
 
                     // Expandable Receipts Section — revealed last
                     receiptsSection
@@ -459,32 +456,6 @@ struct StoreDetailView: View {
 
         } catch {
             // Error refreshing store data - silently ignore
-        }
-    }
-
-    // MARK: - Categories Section Header
-
-    private func categoriesSectionHeader(categoryCount: Int) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 36, height: 36)
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Categories")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                Text("\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-
-            Spacer()
         }
     }
 
@@ -818,7 +789,7 @@ struct StoreDetailView: View {
                         .foregroundColor(.white.opacity(0.25))
                         .rotationEffect(.degrees(expandedCategoryName == segment.label ? 180 : 0))
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 12)
             }
             .buttonStyle(CategoryRowButtonStyle())
@@ -830,7 +801,7 @@ struct StoreDetailView: View {
                     Rectangle()
                         .fill(Color.white.opacity(0.08))
                         .frame(height: 1)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 12)
 
                     VStack(spacing: 8) {
                         if loadingCategories.contains(segment.label) {
@@ -854,7 +825,7 @@ struct StoreDetailView: View {
                                 .padding(.vertical, 12)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 12)
                     .padding(.top, 12)
                     .padding(.bottom, 10)
                 }
@@ -864,11 +835,11 @@ struct StoreDetailView: View {
         .background(
             ZStack {
                 // Base glass effect
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 14)
                     .fill(Color.white.opacity(0.04))
 
                 // Subtle gradient
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 14)
                     .fill(
                         LinearGradient(
                             colors: [Color.white.opacity(0.06), Color.white.opacity(0.02)],
@@ -877,10 +848,10 @@ struct StoreDetailView: View {
                         )
                     )
 
-                // Colored accent glow on the left (matching StoreRowButton)
+                // Colored accent glow on the left
                 if !isOther {
                     HStack {
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: 14)
                             .fill(
                                 LinearGradient(
                                     colors: [
@@ -898,7 +869,7 @@ struct StoreDetailView: View {
             }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 14)
                 .stroke(
                     LinearGradient(
                         colors: [
@@ -984,49 +955,6 @@ struct StoreDetailView: View {
         }
     }
 
-    private func categoryRow(segment: ChartSegment, isOther: Bool = false) -> some View {
-        HStack {
-            Circle()
-                .fill(segment.color)
-                .frame(width: 12, height: 12)
-
-            Text(segment.label)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(isOther ? .white.opacity(0.7) : .white)
-
-            Spacer()
-
-            Text("\(segment.percentage)%")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundColor(.white.opacity(0.6))
-                .frame(width: 45, alignment: .trailing)
-
-            Text(String(format: "€%.0f", segment.value))
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(isOther ? .white.opacity(0.7) : .white)
-                .frame(width: 70, alignment: .trailing)
-
-            if !isOther {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.3))
-            } else {
-                // Placeholder to maintain alignment
-                Color.clear
-                    .frame(width: 12)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-    }
 }
 
 // MARK: - Category Transaction Subviews (Performance-Isolated)

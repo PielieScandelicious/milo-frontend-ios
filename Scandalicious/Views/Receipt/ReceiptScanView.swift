@@ -53,7 +53,7 @@ struct ReceiptScanView: View {
 
     // Top categories (all time) for flippable card
     @State private var topCategories: [TopCategory] = []
-    @State private var isTopStoresCardFlipped = false
+    @State private var isTopStoresCardFlipped = true
 
     var body: some View {
         NavigationStack {
@@ -416,12 +416,6 @@ struct ReceiptScanView: View {
 
     private var statsSection: some View {
         VStack(spacing: 12) {
-            // Hero stats row: Receipts & Items
-            HStack(spacing: 12) {
-                heroReceiptsCard
-                totalItemsCard
-            }
-
             // Top 3 Stores card
             topStoresCard
 
@@ -432,129 +426,74 @@ struct ReceiptScanView: View {
         }
     }
 
-    // MARK: - Hero Receipts Card
+    // MARK: - Insight Strip
 
-    private var heroReceiptsCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [deepPurple.opacity(0.3), Color.blue.opacity(0.15)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 38, height: 38)
-
-                Image(systemName: "doc.text.viewfinder")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-
-            Spacer()
-
-            // Value
-            Text("\(totalReceiptsScanned)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
-
-            // Label
-            Text("Receipts Scanned")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
-                .textCase(.uppercase)
-                .tracking(0.5)
-                .padding(.top, 2)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 125)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.04))
-
-                // Gradient accent
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [deepPurple.opacity(0.15), Color.clear],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+    /// Average items per receipt
+    private var avgBasketSize: Double {
+        guard totalReceiptsScanned > 0 else { return 0 }
+        return Double(totalItemsScanned) / Double(totalReceiptsScanned)
     }
 
-    // MARK: - Total Items Card
+    private var insightStrip: some View {
+        HStack(spacing: 8) {
+            // Avg basket size
+            insightPill(
+                icon: "basket.fill",
+                value: avgBasketSize > 0 ? String(format: "%.1f", avgBasketSize) : "—",
+                label: "AVG BASKET",
+                color: Color(red: 0.4, green: 0.7, blue: 1.0)
+            )
 
-    private var totalItemsCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.orange.opacity(0.15))
-                    .frame(width: 38, height: 38)
+            // Top store
+            insightPill(
+                icon: "storefront.fill",
+                value: topStores.first?.name.localizedCapitalized ?? "—",
+                label: "TOP STORE",
+                color: Color.cyan
+            )
 
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.orange)
-            }
-
-            Spacer()
-
-            // Value
-            Text("\(totalItemsScanned)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
-
-            // Label
-            Text("Items Tracked")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
-                .textCase(.uppercase)
-                .tracking(0.5)
-                .padding(.top, 2)
+            // Top category
+            insightPill(
+                icon: topCategories.first?.icon ?? "square.grid.2x2.fill",
+                value: topCategories.first?.name.normalizedCategoryName ?? "—",
+                label: "#1 CATEGORY",
+                color: topCategories.first?.name.normalizedCategoryName.categoryColor ?? Color.purple
+            )
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 125)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.04))
+    }
 
-                // Subtle gradient
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.orange.opacity(0.08), Color.clear],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+    private func insightPill(icon: String, value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(color)
+
+            Text(value)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(label)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.4))
+                .tracking(0.3)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                )
         )
     }
 
     // MARK: - Top Stores Card (Flippable)
 
-    @State private var flipDegrees: Double = 0
+    @State private var flipDegrees: Double = 180
 
     private var topStoresCard: some View {
         ZStack {

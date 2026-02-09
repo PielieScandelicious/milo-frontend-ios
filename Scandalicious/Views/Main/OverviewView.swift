@@ -2419,13 +2419,6 @@ struct OverviewView: View {
                 let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
                 let hasMoreCategories = categories.count > maxVisibleRows
 
-                categoriesSectionHeader(
-                    categoryCount: categories.count,
-                    isAllTime: false,
-                    isYear: false
-                )
-                .padding(.horizontal, 4)
-
                 ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                     VStack(spacing: 0) {
                         ExpandableCategoryRowHeader(
@@ -2463,13 +2456,6 @@ struct OverviewView: View {
             } else if !isPieChartFlipped && !segments.isEmpty {
                 let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
                 let hasMoreSegments = segments.count > maxVisibleRows
-
-                storesSectionHeader(
-                    storeCount: segments.count,
-                    isAllTime: false,
-                    isYear: false
-                )
-                .padding(.horizontal, 4)
 
                 ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
                     StoreRowButton(
