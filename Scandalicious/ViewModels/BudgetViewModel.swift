@@ -553,6 +553,28 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Category Monthly Spending (Smart Anchor)
+
+    @Published var categoryMonthlySpendState: SimpleLoadingState<CategoryMonthlySpendResponse> = .idle
+
+    /// Load per-category monthly spending for the Smart Anchor modal
+    func loadCategoryMonthlySpend(category: String? = nil) async {
+        categoryMonthlySpendState = .loading
+
+        do {
+            let response = try await apiService.getCategoryMonthlySpend(months: 3, category: category)
+            categoryMonthlySpendState = .loaded(response)
+        } catch {
+            categoryMonthlySpendState = .error(error.localizedDescription)
+        }
+    }
+
+    /// Get monthly spending data for a specific category (from loaded data)
+    func monthlySpendForCategory(_ categoryName: String) -> CategoryMonthlySpend? {
+        guard let data = categoryMonthlySpendState.data else { return nil }
+        return data.categories.first(where: { $0.category == categoryName })
+    }
+
     // MARK: - Budget Suggestion Methods
 
     /// Load budget suggestion based on historical spending

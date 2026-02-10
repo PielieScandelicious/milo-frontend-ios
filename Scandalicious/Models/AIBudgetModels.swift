@@ -154,6 +154,37 @@ enum SimpleLoadingState<T> {
     }
 }
 
+// MARK: - Category Monthly Spend (Smart Anchor)
+
+/// Per-category monthly spending data from the backend
+struct CategoryMonthlySpendResponse: Codable {
+    let categories: [CategoryMonthlySpend]
+    let basedOnMonths: Int
+    let monthLabels: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case categories
+        case basedOnMonths = "based_on_months"
+        case monthLabels = "month_labels"
+    }
+}
+
+struct CategoryMonthlySpend: Codable, Identifiable {
+    let category: String
+    let monthLabels: [String]
+    let monthlyTotals: [Double]
+    let average: Double
+
+    var id: String { category }
+
+    enum CodingKeys: String, CodingKey {
+        case category
+        case monthLabels = "month_labels"
+        case monthlyTotals = "monthly_totals"
+        case average
+    }
+}
+
 // MARK: - Legacy Compatibility Aliases
 
 // Keep these aliases for gradual migration

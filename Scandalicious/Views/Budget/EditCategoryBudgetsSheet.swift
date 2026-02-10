@@ -20,6 +20,8 @@ struct EditCategoryBudgetsSheet: View {
     @State private var targetBudget: Double = 0
     @State private var isSaving = false
     @State private var expandedCategoryId: UUID?
+    @State private var smartAnchorCategory: String?
+    @State private var showSmartAnchorSheet = false
 
     var body: some View {
         NavigationView {
@@ -79,6 +81,19 @@ struct EditCategoryBudgetsSheet: View {
         }
         .preferredColorScheme(.dark)
         .onAppear { setupInitialState() }
+        .sheet(isPresented: $showSmartAnchorSheet) {
+            if let categoryName = smartAnchorCategory {
+                SmartAnchorSheetLoader(
+                    categoryName: categoryName,
+                    onSetBudget: { _, amount in
+                        // Find the category and update its amount
+                        if let index = categoryAllocations.firstIndex(where: { $0.category == categoryName }) {
+                            handleCategoryEdit(at: index, newAmount: amount)
+                        }
+                    }
+                )
+            }
+        }
     }
 
     // MARK: - Target Budget Header
@@ -128,34 +143,74 @@ struct EditCategoryBudgetsSheet: View {
 
     // MARK: - Category List (Flat, Fixed Order)
 
+    private var budgetedIndices: [Int] {
+        categoryAllocations.indices.filter { categoryAllocations[$0].amount > 0 || categoryAllocations[$0].originalAmount > 0 }
+    }
+
+    private var unbudgetedIndices: [Int] {
+        categoryAllocations.indices.filter { categoryAllocations[$0].amount <= 0 && categoryAllocations[$0].originalAmount <= 0 }
+    }
+
     private var categoryList: some View {
         VStack(spacing: 6) {
-            ForEach(categoryAllocations.indices, id: \.self) { index in
-                let isExpanded = categoryAllocations[index].id == expandedCategoryId
+            // Budgeted categories
+            if !budgetedIndices.isEmpty {
+                ForEach(budgetedIndices, id: \.self) { index in
+                    categoryRow(at: index)
+                }
+            }
 
-                CompactCategoryRow(
-                    allocation: $categoryAllocations[index],
-                    isExpanded: isExpanded,
-                    totalBudget: targetBudget,
-                    onTap: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            if isExpanded {
-                                expandedCategoryId = nil
-                            } else {
-                                expandedCategoryId = categoryAllocations[index].id
-                            }
-                        }
-                    },
-                    onAmountChanged: { newAmount in
-                        handleCategoryEdit(at: index, newAmount: newAmount)
-                    },
-                    onReset: {
-                        resetCategory(at: index)
-                    }
-                )
-                .id(categoryAllocations[index].id)
+            // Unbudgeted categories section
+            if !unbudgetedIndices.isEmpty {
+                HStack {
+                    Text("Other Categories")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.35))
+                        .textCase(.uppercase)
+                    Spacer()
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 2)
+                .padding(.horizontal, 4)
+
+                ForEach(unbudgetedIndices, id: \.self) { index in
+                    categoryRow(at: index)
+                }
             }
         }
+    }
+
+    private func categoryRow(at index: Int) -> some View {
+        let isExpanded = categoryAllocations[index].id == expandedCategoryId
+
+        return CompactCategoryRow(
+            allocation: $categoryAllocations[index],
+            isExpanded: isExpanded,
+            totalBudget: targetBudget,
+            onTap: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    if isExpanded {
+                        expandedCategoryId = nil
+                    } else {
+                        expandedCategoryId = categoryAllocations[index].id
+                    }
+                }
+            },
+            onAmountChanged: { newAmount in
+                handleCategoryEdit(at: index, newAmount: newAmount)
+            },
+            onReset: {
+                resetCategory(at: index)
+            },
+            onRemove: {
+                removeCategory(at: index)
+            },
+            onSmartSuggest: {
+                smartAnchorCategory = categoryAllocations[index].category
+                showSmartAnchorSheet = true
+            }
+        )
+        .id(categoryAllocations[index].id)
     }
 
     // MARK: - Save Button
@@ -267,6 +322,15 @@ struct EditCategoryBudgetsSheet: View {
         }
     }
 
+    private func removeCategory(at index: Int) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            categoryAllocations[index].amount = 0
+            categoryAllocations[index].isLocked = true
+            expandedCategoryId = nil
+        }
+        recalculateNonLockedCategories()
+    }
+
     private func resetCategory(at index: Int) {
         categoryAllocations[index].amount = categoryAllocations[index].originalAmount
         categoryAllocations[index].isLocked = false
@@ -303,13 +367,16 @@ struct EditCategoryBudgetsSheet: View {
     private func handleSave() {
         isSaving = true
 
-        let allocations = categoryAllocations.map { editable in
-            CategoryAllocation(
-                category: editable.category,
-                amount: editable.amount,
-                isLocked: editable.isLocked
-            )
-        }
+        // Only save categories where a budget is actually set (amount > 0)
+        let allocations = categoryAllocations
+            .filter { $0.amount > 0 }
+            .map { editable in
+                CategoryAllocation(
+                    category: editable.category,
+                    amount: editable.amount,
+                    isLocked: editable.isLocked
+                )
+            }
 
         onSave(allocations)
 
@@ -344,6 +411,8 @@ struct CompactCategoryRow: View {
     let onTap: () -> Void
     let onAmountChanged: (Double) -> Void
     let onReset: () -> Void
+    var onRemove: (() -> Void)? = nil
+    var onSmartSuggest: (() -> Void)? = nil
 
     private var percentage: Double {
         guard totalBudget > 0 else { return 0 }
@@ -482,19 +551,49 @@ struct CompactCategoryRow: View {
                     }
                     .padding(.horizontal, 14)
 
-                    // Reset button
-                    if allocation.isEdited {
-                        Button(action: onReset) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "arrow.counterclockwise")
-                                    .font(.system(size: 11, weight: .semibold))
-                                Text("Reset to €\(String(format: "%.0f", allocation.originalAmount))")
-                                    .font(.system(size: 12, weight: .semibold))
+                    // Action row: Smart Suggest + Reset + Remove
+                    HStack(spacing: 12) {
+                        if let onSmartSuggest {
+                            Button(action: onSmartSuggest) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("Smart Suggest")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(.yellow.opacity(0.8))
+                                .padding(.vertical, 6)
                             }
-                            .foregroundColor(.white.opacity(0.5))
-                            .padding(.vertical, 6)
+                        }
+
+                        if allocation.isEdited {
+                            Button(action: onReset) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("Reset to €\(String(format: "%.0f", allocation.originalAmount))")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(.white.opacity(0.5))
+                                .padding(.vertical, 6)
+                            }
+                        }
+
+                        if let onRemove, allocation.amount > 0 {
+                            Spacer()
+                            Button(action: onRemove) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("Remove")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(Color(red: 1.0, green: 0.4, blue: 0.4))
+                                .padding(.vertical, 6)
+                            }
                         }
                     }
+                    .padding(.horizontal, 14)
                 }
                 .padding(.bottom, 12)
             }

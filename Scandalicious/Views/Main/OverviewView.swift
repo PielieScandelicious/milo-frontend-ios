@@ -1854,23 +1854,19 @@ struct OverviewView: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
-                    .font(.system(size: 14, weight: .semibold))
+            HStack(spacing: 5) {
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .bold))
 
                 Text(isExpanded ? "Show Less" : "Show All \(totalCount)")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
             }
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle(.white.opacity(0.35))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.white.opacity(0.06))
-            )
+            .padding(.vertical, 10)
         }
         .buttonStyle(.plain)
-        .padding(.top, 4)
+        .padding(.top, 2)
     }
 
     // MARK: - Section State Enum (used for both Receipts and Transactions)
@@ -2458,13 +2454,21 @@ struct OverviewView: View {
         categories: [CategorySpendItem],
         breakdowns: [StoreBreakdown]
     ) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 0) {
             if isPieChartFlipped && !categories.isEmpty {
                 let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
                 let hasMoreCategories = categories.count > maxVisibleRows
 
                 ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                     VStack(spacing: 0) {
+                        // Subtle divider between rows (not before first)
+                        if index > 0 {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.06))
+                                .frame(height: 0.5)
+                                .padding(.leading, 44)
+                        }
+
                         ExpandableCategoryRowHeader(
                             category: category,
                             isExpanded: expandedCategoryId == category.id,
@@ -2481,7 +2485,6 @@ struct OverviewView: View {
                                 ))
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
                     .opacity(storeRowsAppeared ? 1 : 0)
                     .offset(y: storeRowsAppeared ? 0 : 15)
                     .animation(
@@ -2502,14 +2505,24 @@ struct OverviewView: View {
                 let hasMoreSegments = segments.count > maxVisibleRows
 
                 ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
-                    StoreRowButton(
-                        segment: segment,
-                        breakdowns: breakdowns,
-                        onSelect: { breakdown, color in
-                            selectedStoreColor = color
-                            selectedBreakdown = breakdown
+                    VStack(spacing: 0) {
+                        // Subtle divider between rows (not before first)
+                        if index > 0 {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.06))
+                                .frame(height: 0.5)
+                                .padding(.leading, 24)
                         }
-                    )
+
+                        StoreRowButton(
+                            segment: segment,
+                            breakdowns: breakdowns,
+                            onSelect: { breakdown, color in
+                                selectedStoreColor = color
+                                selectedBreakdown = breakdown
+                            }
+                        )
+                    }
                     .opacity(storeRowsAppeared ? 1 : 0)
                     .offset(y: storeRowsAppeared ? 0 : 15)
                     .animation(
@@ -2541,8 +2554,8 @@ struct OverviewView: View {
                 )
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
         .id("\(period)-\(isPieChartFlipped ? "categories" : "stores")-\(showAllRows)")
         .onAppear {
             if !storeRowsAppeared {
@@ -2729,7 +2742,7 @@ private struct StoreRowButton: View {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(segment.color)
-                    .frame(width: 4, height: 32)
+                    .frame(width: 3, height: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(segment.storeName.localizedCapitalized)
@@ -2739,7 +2752,7 @@ private struct StoreRowButton: View {
 
                     Text("\(segment.percentage)%")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(segment.color)
+                        .foregroundColor(segment.color.opacity(0.8))
                 }
 
                 Spacer(minLength: 4)
@@ -2750,59 +2763,11 @@ private struct StoreRowButton: View {
                     .frame(width: 65, alignment: .trailing)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.25))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.2))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.white.opacity(0.04))
-
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.06),
-                                    Color.white.opacity(0.02)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    HStack {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        segment.color.opacity(0.15),
-                                        Color.clear
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: 60)
-                        Spacer()
-                    }
-                }
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.1),
-                                Color.white.opacity(0.03)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
+            .padding(.horizontal, 4)
+            .padding(.vertical, 11)
         }
         .buttonStyle(OverviewStoreRowButtonStyle())
     }
@@ -2822,15 +2787,15 @@ private struct ExpandableCategoryRowHeader: View {
                 // Color accent bar on the left
                 RoundedRectangle(cornerRadius: 2)
                     .fill(category.color)
-                    .frame(width: 4, height: 32)
+                    .frame(width: 3, height: 28)
 
                 // Category icon
                 ZStack {
                     Circle()
-                        .fill(category.color.opacity(0.15))
-                        .frame(width: 32, height: 32)
+                        .fill(category.color.opacity(0.12))
+                        .frame(width: 30, height: 30)
                     Image(systemName: category.icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(category.color)
                 }
 
@@ -2843,7 +2808,7 @@ private struct ExpandableCategoryRowHeader: View {
 
                     Text("\(Int(category.percentage))%")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(category.color)
+                        .foregroundColor(category.color.opacity(0.8))
                 }
 
                 Spacer(minLength: 4)
@@ -2856,60 +2821,13 @@ private struct ExpandableCategoryRowHeader: View {
 
                 // Chevron for expand/collapse
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.4))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
                     .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isExpanded ? category.color.opacity(0.1) : Color.white.opacity(0.04))
-
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.06),
-                                    Color.white.opacity(0.02)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    HStack {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        category.color.opacity(isExpanded ? 0.25 : 0.15),
-                                        Color.clear
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: 80)
-                        Spacer()
-                    }
-                }
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(
-                        LinearGradient(
-                            colors: isExpanded
-                                ? [category.color.opacity(0.4), category.color.opacity(0.2)]
-                                : [Color.white.opacity(0.1), Color.white.opacity(0.03)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
+            .padding(.horizontal, 4)
+            .padding(.vertical, 11)
         }
         .buttonStyle(OverviewCategoryRowButtonStyle())
     }
@@ -2928,15 +2846,15 @@ private struct CategoryRowButton: View {
                 // Color accent bar on the left
                 RoundedRectangle(cornerRadius: 2)
                     .fill(category.color)
-                    .frame(width: 4, height: 32)
+                    .frame(width: 3, height: 28)
 
                 // Category icon
                 ZStack {
                     Circle()
-                        .fill(category.color.opacity(0.15))
-                        .frame(width: 32, height: 32)
+                        .fill(category.color.opacity(0.12))
+                        .frame(width: 30, height: 30)
                     Image(systemName: category.icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(category.color)
                 }
 
@@ -2949,7 +2867,7 @@ private struct CategoryRowButton: View {
 
                     Text("\(Int(category.percentage))%")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(category.color)
+                        .foregroundColor(category.color.opacity(0.8))
                 }
 
                 Spacer(minLength: 4)
@@ -2962,62 +2880,11 @@ private struct CategoryRowButton: View {
 
                 // Chevron for navigation affordance
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.25))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.2))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(
-                ZStack {
-                    // Base glass effect
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white.opacity(0.04))
-
-                    // Subtle gradient
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.06),
-                                    Color.white.opacity(0.02)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    // Colored accent glow on the left
-                    HStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        category.color.opacity(0.15),
-                                        Color.clear
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: 80)
-                        Spacer()
-                    }
-                }
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.1),
-                                Color.white.opacity(0.03)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
+            .padding(.horizontal, 4)
+            .padding(.vertical, 11)
         }
         .buttonStyle(OverviewCategoryRowButtonStyle())
     }

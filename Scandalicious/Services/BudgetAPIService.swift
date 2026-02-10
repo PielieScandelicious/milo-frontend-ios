@@ -160,6 +160,24 @@ actor BudgetAPIService {
         )
     }
 
+    // MARK: - Category Monthly Spending (Smart Anchor)
+
+    /// Get per-category monthly spending for the Smart Anchor modal
+    func fetchCategoryMonthlySpend(months: Int = 3, category: String? = nil) async throws -> CategoryMonthlySpendResponse {
+        var queryItems = [
+            URLQueryItem(name: "months", value: String(months))
+        ]
+        if let category = category {
+            queryItems.append(URLQueryItem(name: "category", value: category))
+        }
+
+        return try await performRequest(
+            endpoint: "/budgets/category-monthly-spend",
+            method: "GET",
+            queryItems: queryItems
+        )
+    }
+
     // MARK: - Budget History Endpoints
 
     /// Get budget history for all past months
@@ -449,6 +467,12 @@ extension BudgetAPIService {
             includeVolatility: includeVolatility,
             includeProgress: includeProgress
         )
+    }
+
+    // MARK: - Category Monthly Spending
+
+    nonisolated func getCategoryMonthlySpend(months: Int = 3, category: String? = nil) async throws -> CategoryMonthlySpendResponse {
+        return try await fetchCategoryMonthlySpend(months: months, category: category)
     }
 
     // MARK: - Budget History

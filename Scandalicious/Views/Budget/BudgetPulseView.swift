@@ -12,7 +12,7 @@ import SwiftUI
 /// The main budget widget - collapsible, showing current budget progress
 struct BudgetPulseView: View {
     @ObservedObject var viewModel: BudgetViewModel
-    @State private var isExpanded = false
+    @Binding var isExpanded: Bool
     @State private var showingCategoryDetail = false
     @State private var showDeleteConfirmation = false
     @State private var showingInsights = false
@@ -491,13 +491,6 @@ struct BudgetPulseView: View {
                 )
             }
             .buttonStyle(PlainButtonStyle())
-
-            if let projection = viewModel.projectionText,
-               let progress = viewModel.state.progress {
-                Text(projection)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(progress.projectedOverUnder > 0 ? .orange : .green)
-            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -584,7 +577,7 @@ struct BudgetPulseView: View {
                 )
                 vm.state = .active(progress)
                 return vm
-            }())
+            }(), isExpanded: .constant(false))
             .padding(.horizontal)
 
             // No budget state
@@ -592,7 +585,7 @@ struct BudgetPulseView: View {
                 let vm = BudgetViewModel()
                 vm.state = .noBudget
                 return vm
-            }())
+            }(), isExpanded: .constant(false))
             .padding(.horizontal)
 
             Spacer()

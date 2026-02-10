@@ -70,10 +70,16 @@ struct BudgetSetupView: View {
         switch selectionMode {
         case .percentage:
             let savings = averageSpending * Double(selectedPercentage.value) / 100
-            return max(100, averageSpending - savings)
+            return max(100, roundToNearest5(averageSpending - savings))
         case .custom:
-            return customAmount
+            return roundToNearest5(customAmount)
         }
+    }
+
+    /// Round to nearest 5 (e.g. 18 -> 20, 22 -> 20)
+    private func roundToNearest5(_ value: Double) -> Double {
+        guard value > 0 else { return 0 }
+        return (value / 5).rounded() * 5
     }
 
     private var savingsAmount: Double {
@@ -110,7 +116,7 @@ struct BudgetSetupView: View {
         return suggestion.categoryAllocations.map { allocation in
             CategoryAllocation(
                 category: allocation.category,
-                amount: allocation.suggestedAmount * scaleFactor,
+                amount: roundToNearest5(allocation.suggestedAmount * scaleFactor),
                 isLocked: false
             )
         }
@@ -164,13 +170,13 @@ struct BudgetSetupView: View {
                     await viewModel.loadAISuggestion()
                     // Set default custom amount to -10% after data loads
                     if customAmount == 500 && averageSpending > 0 {
-                        customAmount = averageSpending * 0.9
+                        customAmount = roundToNearest5(averageSpending * 0.9)
                     }
                 }
             } else {
                 // Data already loaded, set default if needed
                 if customAmount == 500 && averageSpending > 0 {
-                    customAmount = averageSpending * 0.9
+                    customAmount = roundToNearest5(averageSpending * 0.9)
                 }
             }
         }
@@ -413,7 +419,7 @@ struct BudgetSetupView: View {
                 Slider(
                     value: $customAmount,
                     in: 100...1500,
-                    step: 25
+                    step: 5
                 )
                 .tint(Color(red: 0.3, green: 0.7, blue: 1.0))
 
@@ -1012,7 +1018,7 @@ struct BudgetSetupView: View {
                 Slider(
                     value: $customAmount,
                     in: 100...max(averageSpending * 1.5, 2000),
-                    step: 25
+                    step: 5
                 )
                 .tint(Color(red: 0.3, green: 0.7, blue: 1.0))
 
@@ -1038,8 +1044,8 @@ struct BudgetSetupView: View {
     }
 
     private func quickAmountButton(multiplier: Double, label: String) -> some View {
-        let amount = averageSpending * multiplier
-        let isSelected = abs(customAmount - amount) < 1
+        let amount = roundToNearest5(averageSpending * multiplier)
+        let isSelected = abs(customAmount - amount) < 5
 
         return Button(action: { withAnimation { customAmount = amount } }) {
             Text(label)
