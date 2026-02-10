@@ -429,40 +429,7 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                 .transition(.opacity)
             }
         }
-        .background(
-            ZStack {
-                // Glass base
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.04))
-
-                // Gradient overlay
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.06),
-                                Color.white.opacity(0.02)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            (hasAccent ? accentColor : Color.white).opacity(isExpanded ? 0.15 : 0.1),
-                            (hasAccent ? accentColor : Color.white).opacity(isExpanded ? 0.06 : 0.03)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
+        .background(Color.clear)
         .confirmationDialog("Delete Item", isPresented: Binding(
             get: { itemToDelete != nil },
             set: { if !$0 { itemToDelete = nil } }
