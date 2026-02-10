@@ -11,15 +11,15 @@ struct PromosView: View {
     @ObservedObject var viewModel: PromosViewModel
     @State private var scrollOffset: CGFloat = 0
 
-    // Header gradient color
-    private let headerGreen = Color(red: 0.05, green: 0.30, blue: 0.15)
+    // Premium emerald header
+    private let headerGreen = Color(red: 0.04, green: 0.22, blue: 0.13)
 
     var body: some View {
         ZStack(alignment: .top) {
             // Near-black base
             Color(white: 0.05).ignoresSafeArea()
 
-            // Green gradient header (fades on scroll)
+            // Premium green gradient header (fades on scroll)
             GeometryReader { geometry in
                 LinearGradient(
                     stops: [

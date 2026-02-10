@@ -75,13 +75,13 @@ extension View {
 struct PromoBannerCard: View {
     @ObservedObject var viewModel: PromosViewModel
     @State private var appeared = false
+    @State private var shimmerX: CGFloat = -1
+    @State private var iconPulse = false
 
     var body: some View {
         Group {
             switch viewModel.state {
-            case .idle:
-                EmptyView()
-            case .loading:
+            case .idle, .loading:
                 bannerSkeleton
             case .success(let data) where data.dealCount > 0:
                 bannerContent(data)
@@ -183,16 +183,86 @@ struct PromoBannerCard: View {
 
     private var bannerSkeleton: some View {
         HStack(spacing: 12) {
-            SkeletonCircle(size: 40)
-            VStack(alignment: .leading, spacing: 6) {
-                SkeletonRect(width: 180, height: 14)
-                SkeletonRect(width: 130, height: 12)
+            // Pulsing green icon
+            ZStack {
+                Circle()
+                    .fill(promoGreen.opacity(iconPulse ? 0.3 : 0.12))
+                    .frame(width: 40, height: 40)
+                    .scaleEffect(iconPulse ? 1.15 : 1.0)
+
+                Image(systemName: "tag.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(promoGreen)
             }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Loading deals...")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+
+                Text("Scanning promotions")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.3))
+            }
+
             Spacer()
+
+            ProgressView()
+                .tint(promoGreen)
         }
         .padding(16)
-        .glassCard()
-        .shimmer()
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardBackground)
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [promoGreen.opacity(0.06), Color.clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [promoGreen.opacity(0.35), promoGreenDark.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        // Green shimmer sweep
+        .overlay(
+            GeometryReader { geo in
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        promoGreen.opacity(0.15),
+                        Color.white.opacity(0.10),
+                        promoGreen.opacity(0.15),
+                        .clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: geo.size.width * 0.5)
+                .offset(x: shimmerX * geo.size.width)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+        )
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                iconPulse = true
+            }
+            withAnimation(.linear(duration: 1.6).repeatForever(autoreverses: false)) {
+                shimmerX = 1.5
+            }
+        }
     }
 }
 
@@ -766,72 +836,150 @@ struct PromoSummaryFooter: View {
 // MARK: - Skeleton Loading View
 
 struct PromoSkeletonView: View {
+    @State private var pulse = false
+    @State private var shimmerPhase: CGFloat = -1
+    @State private var appeared = false
+
+    private let accentGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
+
     var body: some View {
         VStack(spacing: 16) {
-            // Hero skeleton
-            VStack(spacing: 12) {
-                SkeletonRect(width: 180, height: 12)
-                SkeletonRect(width: 140, height: 44, cornerRadius: 10)
-                HStack(spacing: 10) {
-                    SkeletonRect(width: 80, height: 24, cornerRadius: 12)
-                    SkeletonRect(width: 140, height: 24, cornerRadius: 12)
+            // Hero loading card
+            VStack(spacing: 20) {
+                // Pulsing rings + icon
+                ZStack {
+                    // Outer pulse ring
+                    Circle()
+                        .stroke(accentGreen.opacity(0.3), lineWidth: 2)
+                        .frame(width: 80, height: 80)
+                        .scaleEffect(pulse ? 1.5 : 1.0)
+                        .opacity(pulse ? 0.0 : 0.8)
+
+                    // Inner glow
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [accentGreen.opacity(0.3), accentGreen.opacity(0.05)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 36
+                            )
+                        )
+                        .frame(width: 72, height: 72)
+
+                    // Icon circle
+                    Circle()
+                        .fill(accentGreen.opacity(0.15))
+                        .frame(width: 52, height: 52)
+                        .overlay(
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(accentGreen)
+                        )
+                }
+
+                VStack(spacing: 6) {
+                    Text("Finding your deals...")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+
+                    Text("Scanning promotions across stores")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.35))
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
-            .padding(.horizontal, 16)
-            .glassCard()
-            .shimmer()
+            .padding(.vertical, 32)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white.opacity(0.06))
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [accentGreen.opacity(0.08), Color.clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [accentGreen.opacity(0.4), accentGreen.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                }
+            )
 
-            // Top picks skeleton
-            ForEach(0..<2, id: \.self) { _ in
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        SkeletonCircle(size: 44)
-                        VStack(alignment: .leading, spacing: 6) {
-                            SkeletonRect(width: 140, height: 16)
-                            SkeletonRect(width: 100, height: 12)
-                        }
-                        Spacer()
-                        SkeletonRect(width: 50, height: 24, cornerRadius: 12)
+            // Placeholder cards with shimmer
+            ForEach(0..<3, id: \.self) { index in
+                HStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.10))
+                        .frame(width: 46, height: 46)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.14))
+                            .frame(width: CGFloat([140, 120, 160][index]), height: 14)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: CGFloat([100, 80, 110][index]), height: 10)
                     }
-                    HStack {
-                        SkeletonRect(width: 70, height: 24)
-                        SkeletonRect(width: 50, height: 14)
-                        Spacer()
-                    }
-                    SkeletonRect(height: 12)
+
+                    Spacer()
+
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(accentGreen.opacity(0.15))
+                        .frame(width: 54, height: 28)
                 }
                 .padding(16)
-                .glassCard()
-                .shimmer()
-            }
-
-            // Store skeleton
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    SkeletonCircle(size: 8)
-                    SkeletonRect(width: 100, height: 18)
-                    Spacer()
-                    SkeletonRect(width: 60, height: 14)
-                }
-                ForEach(0..<3, id: \.self) { _ in
-                    HStack(spacing: 12) {
-                        SkeletonCircle(size: 36)
-                        VStack(alignment: .leading, spacing: 4) {
-                            SkeletonRect(width: 120, height: 14)
-                            SkeletonRect(width: 80, height: 10)
-                        }
-                        Spacer()
-                        SkeletonRect(width: 50, height: 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+                .overlay(
+                    // Shimmer sweep
+                    GeometryReader { geo in
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                accentGreen.opacity(0.10),
+                                Color.white.opacity(0.12),
+                                accentGreen.opacity(0.10),
+                                .clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: geo.size.width * 0.6)
+                        .offset(x: shimmerPhase * geo.size.width)
                     }
-                }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                )
             }
-            .padding(16)
-            .glassCard()
-            .shimmer()
         }
         .padding(.horizontal, 16)
+        .opacity(appeared ? 1.0 : 0.0)
+        .offset(y: appeared ? 0 : 16)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.35)) {
+                appeared = true
+            }
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+            withAnimation(.linear(duration: 1.8).repeatForever(autoreverses: false)) {
+                shimmerPhase = 1.5
+            }
+        }
     }
 }
 
