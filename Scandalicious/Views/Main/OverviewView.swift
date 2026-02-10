@@ -1734,12 +1734,7 @@ struct OverviewView: View {
                 .padding(.horizontal, 8)
             }
         }
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(category.color.opacity(0.05))
-        )
-        .padding(.top, 4)
+        .padding(.horizontal, 8)
     }
 
     private func expandedCategoryItemRow(_ item: APITransaction, category: CategorySpendItem, isLast: Bool) -> some View {
@@ -1752,7 +1747,7 @@ struct OverviewView: View {
         let friendsOnly = splitParticipants.filter { !$0.isMe }
 
         return HStack(spacing: 10) {
-            // Health score badge (only shown when score exists)
+            // Health score letter (only shown when score exists)
             if item.healthScore != nil {
                 Text(item.healthScore.nutriScoreLetter)
                     .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -1761,6 +1756,10 @@ struct OverviewView: View {
                     .background(
                         Circle()
                             .fill(item.healthScore.healthScoreColor.opacity(0.15))
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(item.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
                     )
             }
 
@@ -1816,13 +1815,16 @@ struct OverviewView: View {
                     .foregroundStyle(.white.opacity(0.75))
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.03))
-        )
-        .padding(.bottom, isLast ? 0 : 4)
+        .padding(.vertical, 9)
+        .padding(.horizontal, 4)
+        .overlay(alignment: .bottom) {
+            if !isLast {
+                Rectangle()
+                    .fill(Color.white.opacity(0.05))
+                    .frame(height: 0.5)
+                    .padding(.leading, 32)
+            }
+        }
         .task {
             // Fetch split data if we have a receipt ID and it's not cached
             if let receiptId = item.receiptId, !splitCache.hasSplit(for: receiptId) {
@@ -3078,12 +3080,18 @@ struct CompactNutriBadge: View {
     }
 
     private var scoreProgress: Double {
-        score / 5.0
+        switch gradeLabel {
+        case "A": return 1.0
+        case "B": return 0.75
+        case "C": return 0.5
+        case "D": return 0.25
+        default: return 0.0
+        }
     }
 
     var body: some View {
         HStack(spacing: 8) {
-            // Small circular ring with grade
+            // Grade letter with circular ring
             ZStack {
                 Circle()
                     .stroke(scoreColor.opacity(0.25), lineWidth: 2.5)
@@ -3098,27 +3106,11 @@ struct CompactNutriBadge: View {
                     .foregroundColor(scoreColor)
             }
 
-            Text(String(format: "%.1f", score))
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .contentTransition(.numericText())
-                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: score)
-
-            Text("NUTRI")
+            Text("NUTRI SCORE")
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundColor(.white.opacity(0.3))
                 .tracking(0.5)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(scoreColor.opacity(0.08))
-                .overlay(
-                    Capsule()
-                        .stroke(scoreColor.opacity(0.2), lineWidth: 1)
-                )
-        )
     }
 }
 

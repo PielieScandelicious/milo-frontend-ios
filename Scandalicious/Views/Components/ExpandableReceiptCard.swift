@@ -519,7 +519,7 @@ struct EditableLineItemRow: View {
                 ))
             }
 
-            // Nutri-Score letter badge (only shown when score exists)
+            // Nutri-Score letter (only shown when score exists)
             if item.displayHealthScore != nil {
                 Text(item.displayHealthScore.nutriScoreLetter)
                     .font(.system(size: 9, weight: .bold, design: .rounded))
