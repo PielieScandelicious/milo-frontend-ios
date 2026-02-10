@@ -2514,15 +2514,11 @@ struct OverviewView: View {
         return VStack(spacing: 0) {
             spendingHeaderSection(spending: spending, healthScore: healthScore)
 
-            cardDivider()
-
             flippableChartSection(period: period, segments: segments)
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
             }
-
-            cardDivider()
 
             rowsSection(
                 period: period,
