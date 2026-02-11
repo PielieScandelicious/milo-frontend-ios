@@ -2,9 +2,6 @@
 //  BudgetViewModel.swift
 //  Scandalicious
 //
-//  Created by Claude on 31/01/2026.
-//  Simplified on 05/02/2026 - Removed AI features
-//
 
 import Foundation
 import SwiftUI
@@ -15,8 +12,8 @@ import Combine
 enum BudgetState {
     case idle
     case loading
-    case noBudget              // User hasn't set a budget yet
-    case active(BudgetProgress) // User has an active budget with progress
+    case noBudget
+    case active(BudgetProgress)
     case error(String)
 
     var isLoading: Bool {
@@ -42,41 +39,25 @@ class BudgetViewModel: ObservableObject {
     // MARK: - Published State
 
     @Published var state: BudgetState = .idle
-    @Published var forceRefreshTrigger: Int = 0  // Increment to force view refresh
 
-    // Period selection state
-    @Published var selectedPeriod: String = ""  // "January 2026" format
+    // Period selection
+    @Published var selectedPeriod: String = ""
     @Published var availablePeriods: [String] = []
 
-    // Setup flow state
+    // Setup flow
     @Published var setupBudgetAmount: Double = 0
     @Published var showingSetupSheet = false
     @Published var isSaving = false
     @Published var saveError: String?
 
-    // Category editing state
+    // Category editing
     @Published var editingCategoryAllocations: [CategoryAllocation] = []
     @Published var showingCategoryEditor = false
 
-    // MARK: - Budget Suggestion State
-
-    @Published var suggestionState: SimpleLoadingState<SimpleBudgetSuggestionResponse> = .idle
-
-    // Legacy alias for backward compatibility
-    var aiSuggestionState: SimpleLoadingState<SimpleBudgetSuggestionResponse> {
-        get { suggestionState }
-        set { suggestionState = newValue }
-    }
-
-    // MARK: - Budget History State
-
+    // Budget history
     @Published var budgetHistory: [BudgetHistory] = []
     @Published var isLoadingHistory = false
     @Published var historyError: String?
-
-    // MARK: - Budget Insights State
-
-    @Published var insightsState: SimpleLoadingState<BudgetInsightsResponse> = .idle
 
     // MARK: - Private Properties
 
@@ -84,7 +65,6 @@ class BudgetViewModel: ObservableObject {
     private var notificationObserver: NSObjectProtocol?
     private var categoryAllocationsObserver: NSObjectProtocol?
 
-    // Date formatters
     private let displayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMMM yyyy"
@@ -100,10 +80,8 @@ class BudgetViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
-        // Initialize periods synchronously so UI can render immediately
         initializePeriodsSync()
 
-        // Set initial state from cache so first render shows correct state (no skeleton flash)
         let cache = AppDataCache.shared
         if let cached = cache.budgetProgressCache {
             state = .active(cached.toBudgetProgress())
@@ -111,7 +89,6 @@ class BudgetViewModel: ObservableObject {
             state = .noBudget
         }
 
-        // Listen for data changes that might affect budget progress
         notificationObserver = NotificationCenter.default.addObserver(
             forName: .receiptsDataDidChange,
             object: nil,
@@ -122,7 +99,6 @@ class BudgetViewModel: ObservableObject {
             }
         }
 
-        // Listen for category allocation updates
         categoryAllocationsObserver = NotificationCenter.default.addObserver(
             forName: .budgetCategoryAllocationsUpdated,
             object: nil,
@@ -136,7 +112,6 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    /// Initialize periods synchronously (called from init)
     private func initializePeriodsSync() {
         var periods: [String] = []
         let now = Date()
@@ -162,48 +137,37 @@ class BudgetViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Load budget for the current selected period
     func loadBudget() async {
-        // Periods are initialized in init(), but double-check
         if availablePeriods.isEmpty {
             initializePeriodsSync()
         }
 
-        // Check for smart budget auto-rollover first (only for current month)
         if isCurrentMonth {
             await checkAndPerformAutoRollover()
         }
 
         await loadBudgetForPeriod(selectedPeriod)
 
-        // Load budget history in background
         Task {
             await loadBudgetHistory()
         }
     }
 
-    /// Load budget for a specific period
     func loadBudgetForPeriod(_ period: String) async {
-        // Check if this is the current month or a past month
         let currentMonthString = displayFormatter.string(from: Date())
 
         if period == currentMonthString {
-            // Current month: Load real-time budget progress
             await loadCurrentMonthProgress()
         } else {
-            // Past month: Show no budget state (removed AI monthly report)
             state = .noBudget
         }
     }
 
-    /// Load current month's budget progress (real-time tracking)
     private func loadCurrentMonthProgress() async {
         let cache = AppDataCache.shared
 
-        // Check AppDataCache for instant display (no spinner)
         if let cached = cache.budgetProgressCache {
             state = .active(cached.toBudgetProgress())
-            // Background refresh for fresh data
             Task {
                 do {
                     let progressResponse = try await apiService.getBudgetProgress()
@@ -216,17 +180,15 @@ class BudgetViewModel: ObservableObject {
             return
         }
 
-        // If we already checked and there's no budget, show noBudget instantly
         if cache.budgetStatusChecked {
             state = .noBudget
-            // Background refresh in case user set a budget elsewhere
             Task {
                 do {
                     let progressResponse = try await apiService.getBudgetProgress()
                     state = .active(progressResponse.toBudgetProgress())
                     cache.updateBudgetProgress(progressResponse)
                 } catch {
-                    // Still no budget — keep .noBudget state
+                    // Still no budget
                 }
             }
             return
@@ -254,7 +216,6 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    /// Switch to a different period
     func selectPeriod(_ period: String) async {
         guard period != selectedPeriod else { return }
         selectedPeriod = period
@@ -263,71 +224,41 @@ class BudgetViewModel: ObservableObject {
 
     // MARK: - Period Helpers
 
-    /// Convert display format ("January 2026") to API format ("2026-01")
     private func convertToAPIFormat(_ displayPeriod: String) -> String {
         if let date = displayFormatter.date(from: displayPeriod) {
             return apiFormatter.string(from: date)
         }
-        // Fallback to current month
         return apiFormatter.string(from: Date())
     }
 
-    /// Check if the selected period is the current month
     var isCurrentMonth: Bool {
         selectedPeriod == displayFormatter.string(from: Date())
     }
 
-    /// Check if it's the start of a new month (day 1-3)
-    var isNewMonthStart: Bool {
-        guard isCurrentMonth else { return false }
-        let day = Calendar.current.component(.day, from: Date())
-        return day <= 3
-    }
-
-    /// Check if current period has minimal spending (new month scenario)
-    var isNewMonthWithMinimalSpending: Bool {
-        guard isNewMonthStart else { return false }
-        guard let progress = state.progress else { return true }
-        return progress.currentSpend < 50  // Less than €50 spent
-    }
-
-    /// Refresh just the progress (when spending changes)
     func refreshProgress() async {
-        print("🔄 [BudgetViewModel] refreshProgress called, current state: \(state)")
-        guard case .active = state else {
-            print("🔄 [BudgetViewModel] refreshProgress skipped - state is not .active")
-            return
-        }
+        guard case .active = state else { return }
 
         do {
             let progressResponse = try await apiService.getBudgetProgress()
             state = .active(progressResponse.toBudgetProgress())
             AppDataCache.shared.updateBudgetProgress(progressResponse)
-            print("🔄 [BudgetViewModel] refreshProgress completed - state updated to .active")
         } catch {
-            print("🔄 [BudgetViewModel] refreshProgress failed: \(error)")
             // Don't change state on refresh failure
         }
     }
 
     // MARK: - Smart Budget Auto-Rollover
 
-    /// Check if a smart budget should be auto-created for the current month
-    /// This is called when loading the budget to ensure smart budgets carry over
     private func checkAndPerformAutoRollover() async {
         do {
-            // Call the backend to check and perform auto-rollover
-            // The backend will handle the logic of checking if:
-            // 1. There's no budget for current month
-            // 2. Previous month had a smart budget (isSmartBudget = true)
-            // 3. Previous month's budget wasn't deleted
             try await apiService.performAutoRollover()
         } catch {
-            // Silently fail - auto-rollover is optional
+            // Silently fail
         }
     }
 
-    /// Load budget history for all past months
+    // MARK: - Budget History
+
     func loadBudgetHistory() async {
         isLoadingHistory = true
         historyError = nil
@@ -342,8 +273,8 @@ class BudgetViewModel: ObservableObject {
         isLoadingHistory = false
     }
 
-    /// Create a new budget
-    /// Smart budget is enabled by default, which means it will automatically roll over to next month
+    // MARK: - CRUD Operations
+
     func createBudget(amount: Double, categoryAllocations: [CategoryAllocation]? = nil, isSmartBudget: Bool = true) async -> Bool {
         isSaving = true
         saveError = nil
@@ -351,19 +282,14 @@ class BudgetViewModel: ObservableObject {
         let request = CreateBudgetRequest(
             monthlyAmount: amount,
             categoryAllocations: categoryAllocations,
-            notificationsEnabled: true,
-            alertThresholds: [0.5, 0.75, 0.9],
             isSmartBudget: isSmartBudget
         )
 
         do {
             let _ = try await apiService.saveBudget(request: request)
-            // Invalidate cache so fresh data is fetched
             AppDataCache.shared.budgetProgressCache = nil
-            AppDataCache.shared.budgetInsightsCache = nil
             AppDataCache.shared.budgetStatusChecked = false
             AppDataCache.shared.scheduleSaveToDisk()
-            // Reload to get fresh progress
             await loadBudget()
             NotificationCenter.default.post(name: .budgetUpdated, object: nil)
             isSaving = false
@@ -375,7 +301,6 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    /// Update existing budget amount
     func updateBudgetAmount(_ amount: Double) async -> Bool {
         isSaving = true
         saveError = nil
@@ -383,16 +308,12 @@ class BudgetViewModel: ObservableObject {
         let request = UpdateBudgetRequest(
             monthlyAmount: amount,
             categoryAllocations: nil,
-            notificationsEnabled: nil,
-            alertThresholds: nil,
             isSmartBudget: nil
         )
 
         do {
             let _ = try await apiService.modifyBudget(request: request)
-            // Invalidate cache so fresh data is fetched
             AppDataCache.shared.budgetProgressCache = nil
-            AppDataCache.shared.budgetInsightsCache = nil
             AppDataCache.shared.scheduleSaveToDisk()
             await loadBudget()
             NotificationCenter.default.post(name: .budgetUpdated, object: nil)
@@ -405,7 +326,6 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    /// Update category allocations
     func updateCategoryAllocations(_ allocations: [CategoryAllocation]) async -> Bool {
         isSaving = true
         saveError = nil
@@ -413,8 +333,6 @@ class BudgetViewModel: ObservableObject {
         let request = UpdateBudgetRequest(
             monthlyAmount: nil,
             categoryAllocations: allocations,
-            notificationsEnabled: nil,
-            alertThresholds: nil,
             isSmartBudget: nil
         )
 
@@ -431,9 +349,6 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    /// Toggle smart budget on/off
-    /// When enabled, budget automatically rolls over to next month
-    /// When disabled, budget will not be created for next month unless manually set
     func toggleSmartBudget(enabled: Bool) async -> Bool {
         isSaving = true
         saveError = nil
@@ -441,8 +356,6 @@ class BudgetViewModel: ObservableObject {
         let request = UpdateBudgetRequest(
             monthlyAmount: nil,
             categoryAllocations: nil,
-            notificationsEnabled: nil,
-            alertThresholds: nil,
             isSmartBudget: enabled
         )
 
@@ -459,218 +372,69 @@ class BudgetViewModel: ObservableObject {
         }
     }
 
-    /// Delete the budget for the currently selected period
-    /// Optimistic: animate first, then call API in background for snappy UX
     func deleteBudget() async -> Bool {
-        // Convert selected period to API format (yyyy-MM)
         let monthParam = isCurrentMonth ? nil : convertToAPIFormat(selectedPeriod)
-        print("🗑️ [BudgetViewModel] Starting budget deletion for \(monthParam ?? "current month")...")
 
-        // Save current state in case we need to roll back
         let previousState = state
-        let previousSuggestionState = suggestionState
 
-        // 1. Animate immediately — don't wait for network
-        suggestionState = .idle
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             state = .noBudget
         }
-        // Invalidate cache
         AppDataCache.shared.budgetProgressCache = nil
-        AppDataCache.shared.budgetInsightsCache = nil
         AppDataCache.shared.budgetStatusChecked = false
         AppDataCache.shared.scheduleSaveToDisk()
         NotificationCenter.default.post(name: .budgetDeleted, object: nil)
-        print("🗑️ [BudgetViewModel] Optimistic UI updated, now calling API...")
 
-        // 2. Call API in the background
         do {
             try await apiService.removeBudget(month: monthParam)
-            print("🗑️ [BudgetViewModel] API deletion confirmed")
             return true
         } catch {
-            // Roll back to previous state on failure
-            print("🗑️ [BudgetViewModel] Budget deletion failed: \(error.localizedDescription), rolling back")
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                 state = previousState
-                suggestionState = previousSuggestionState
             }
             saveError = error.localizedDescription
             return false
         }
     }
 
+    func updateBudgetFull(request: UpdateBudgetRequest) async -> Bool {
+        isSaving = true
+        saveError = nil
+
+        do {
+            let _ = try await apiService.modifyBudget(request: request)
+            AppDataCache.shared.budgetProgressCache = nil
+            AppDataCache.shared.scheduleSaveToDisk()
+            await loadBudget()
+            NotificationCenter.default.post(name: .budgetUpdated, object: nil)
+            isSaving = false
+            return true
+        } catch {
+            saveError = error.localizedDescription
+            isSaving = false
+            return false
+        }
+    }
+
     // MARK: - Setup Helpers
 
-    /// Start the budget setup flow
     func startSetup() {
         showingSetupSheet = true
-        Task {
-            await loadBudgetSuggestion()
-        }
     }
 
-    /// Prepare category allocations for editing based on suggestion or current budget
     func prepareCategoryAllocationsForEditing() {
         if let progress = state.progress {
-            // Use current allocations
             editingCategoryAllocations = progress.budget.categoryAllocations ?? []
-        } else if let suggestion = suggestionState.data {
-            // Use suggested allocations
-            editingCategoryAllocations = suggestion.categoryAllocations.map {
-                CategoryAllocation(category: $0.category, amount: $0.suggestedAmount, isLocked: false)
-            }
+        } else {
+            editingCategoryAllocations = []
         }
         showingCategoryEditor = true
-    }
-
-    /// Auto-balance category allocations to match total budget
-    func autoBalanceCategories(totalBudget: Double) {
-        guard !editingCategoryAllocations.isEmpty else { return }
-
-        // Sum of locked amounts
-        let lockedTotal = editingCategoryAllocations
-            .filter { $0.isLocked }
-            .reduce(0) { $0 + $1.amount }
-
-        // Remaining budget for unlocked categories
-        let remainingBudget = max(0, totalBudget - lockedTotal)
-
-        // Calculate total of unlocked categories (for proportional distribution)
-        let unlockedTotal = editingCategoryAllocations
-            .filter { !$0.isLocked }
-            .reduce(0) { $0 + $1.amount }
-
-        // Redistribute
-        editingCategoryAllocations = editingCategoryAllocations.map { allocation in
-            if allocation.isLocked {
-                return allocation
-            } else {
-                let proportion = unlockedTotal > 0 ? allocation.amount / unlockedTotal : 1.0 / Double(editingCategoryAllocations.filter { !$0.isLocked }.count)
-                let newAmount = remainingBudget * proportion
-                return CategoryAllocation(category: allocation.category, amount: newAmount, isLocked: false)
-            }
-        }
-    }
-
-    // MARK: - Category Monthly Spending (Smart Anchor)
-
-    @Published var categoryMonthlySpendState: SimpleLoadingState<CategoryMonthlySpendResponse> = .idle
-
-    /// Load per-category monthly spending for the Smart Anchor modal
-    func loadCategoryMonthlySpend(category: String? = nil) async {
-        categoryMonthlySpendState = .loading
-
-        do {
-            let response = try await apiService.getCategoryMonthlySpend(months: 3, category: category)
-            categoryMonthlySpendState = .loaded(response)
-        } catch {
-            categoryMonthlySpendState = .error(error.localizedDescription)
-        }
-    }
-
-    /// Get monthly spending data for a specific category (from loaded data)
-    func monthlySpendForCategory(_ categoryName: String) -> CategoryMonthlySpend? {
-        guard let data = categoryMonthlySpendState.data else { return nil }
-        return data.categories.first(where: { $0.category == categoryName })
-    }
-
-    // MARK: - Budget Suggestion Methods
-
-    /// Load budget suggestion based on historical spending
-    func loadBudgetSuggestion() async {
-        suggestionState = .loading
-
-        do {
-            let response = try await apiService.getBudgetSuggestion(basedOnMonths: 3)
-            suggestionState = .loaded(response)
-            // Also update the setup amount from suggestion
-            setupBudgetAmount = response.recommendedBudget.amount
-        } catch {
-            suggestionState = .error(error.localizedDescription)
-        }
-    }
-
-    // Legacy alias for backward compatibility
-    func loadAISuggestion() async {
-        await loadBudgetSuggestion()
-    }
-
-    /// Start setup flow (legacy alias)
-    func startAISetup() {
-        startSetup()
-    }
-
-    // MARK: - Budget Insights
-
-    /// Load budget insights (deterministic, no AI)
-    func loadInsights() async {
-        // Check AppDataCache for instant display
-        if let cached = AppDataCache.shared.budgetInsightsCache {
-            insightsState = .loaded(cached)
-            // Background refresh for fresh data
-            Task {
-                do {
-                    let response = try await apiService.getBudgetInsights()
-                    insightsState = .loaded(response)
-                    AppDataCache.shared.updateBudgetInsights(response)
-                } catch {
-                    // Keep cached data on refresh failure
-                }
-            }
-            return
-        }
-
-        insightsState = .loading
-
-        do {
-            let response = try await apiService.getBudgetInsights()
-            insightsState = .loaded(response)
-            AppDataCache.shared.updateBudgetInsights(response)
-        } catch {
-            insightsState = .error(error.localizedDescription)
-        }
-    }
-
-    /// Load insights with specific options
-    func loadInsights(
-        includeBenchmarks: Bool = true,
-        includeFlags: Bool = true,
-        includeQuickWins: Bool = true,
-        includeVolatility: Bool = true,
-        includeProgress: Bool = true
-    ) async {
-        // Use cache for default params, skip for custom requests
-        let isDefaultParams = includeBenchmarks && includeFlags && includeQuickWins && includeVolatility && includeProgress
-        if isDefaultParams, let cached = AppDataCache.shared.budgetInsightsCache {
-            insightsState = .loaded(cached)
-            return
-        }
-
-        insightsState = .loading
-
-        do {
-            let response = try await apiService.getBudgetInsights(
-                includeBenchmarks: includeBenchmarks,
-                includeFlags: includeFlags,
-                includeQuickWins: includeQuickWins,
-                includeVolatility: includeVolatility,
-                includeProgress: includeProgress
-            )
-            insightsState = .loaded(response)
-            if isDefaultParams {
-                AppDataCache.shared.updateBudgetInsights(response)
-            }
-        } catch {
-            insightsState = .error(error.localizedDescription)
-        }
     }
 }
 
 // MARK: - Activity Rings Support
 
 extension BudgetViewModel {
-    /// Get budget progress items for activity rings display
     var budgetProgressItems: [BudgetProgressItem] {
         guard let progress = state.progress else { return [] }
         return progress.categoryProgress.map { categoryProgress in
@@ -680,8 +444,7 @@ extension BudgetViewModel {
                 limitAmount: categoryProgress.budgetAmount,
                 spentAmount: categoryProgress.currentSpend,
                 isOverBudget: categoryProgress.isOverBudget,
-                overBudgetAmount: categoryProgress.isOverBudget ? categoryProgress.overAmount : nil,
-                isLocked: categoryProgress.isLocked
+                overBudgetAmount: categoryProgress.isOverBudget ? categoryProgress.overAmount : nil
             )
         }
     }
@@ -743,11 +506,9 @@ extension BudgetViewModel {
         let budget = progress.budget.monthlyAmount
 
         if projected > budget * 1.05 {
-            // Projected to be over budget
             let over = projected - budget
             return String(format: "Projected €%.0f over", over)
         } else if projected < budget * 0.95 {
-            // Projected to be under budget
             let under = budget - projected
             return String(format: "Projected €%.0f under", under)
         }

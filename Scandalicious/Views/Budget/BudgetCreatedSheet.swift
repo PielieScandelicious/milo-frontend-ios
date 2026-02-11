@@ -385,10 +385,10 @@ struct BudgetCreatedSheet: View {
         budgetAmount: 900,
         monthlySavings: 150,
         categoryAllocations: [
-            CategoryAllocation(category: "Meat & Fish", amount: 450, isLocked: false),
-            CategoryAllocation(category: "Alcohol", amount: 200, isLocked: false),
-            CategoryAllocation(category: "Fresh Produce", amount: 160, isLocked: false),
-            CategoryAllocation(category: "Dairy & Eggs", amount: 90, isLocked: false)
+            CategoryAllocation(category: "Meat & Fish", amount: 450),
+            CategoryAllocation(category: "Alcohol", amount: 200),
+            CategoryAllocation(category: "Fresh Produce", amount: 160),
+            CategoryAllocation(category: "Dairy & Eggs", amount: 90)
         ],
         onDismiss: {}
     )

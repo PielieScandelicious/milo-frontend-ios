@@ -231,11 +231,6 @@ struct BudgetHistoryView: View {
                                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                                     .foregroundColor(.white)
 
-                                if allocation.isLocked {
-                                    Image(systemName: "lock.fill")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(.white.opacity(0.4))
-                                }
                             }
                         }
 
@@ -275,10 +270,10 @@ struct BudgetHistoryView_Previews: PreviewProvider {
                 userId: "user123",
                 monthlyAmount: 1500,
                 categoryAllocations: [
-                    CategoryAllocation(category: "Groceries", amount: 600, isLocked: false),
-                    CategoryAllocation(category: "Dining Out", amount: 300, isLocked: true),
-                    CategoryAllocation(category: "Entertainment", amount: 200, isLocked: false),
-                    CategoryAllocation(category: "Transport", amount: 400, isLocked: false)
+                    CategoryAllocation(category: "Groceries", amount: 600),
+                    CategoryAllocation(category: "Dining Out", amount: 300),
+                    CategoryAllocation(category: "Entertainment", amount: 200),
+                    CategoryAllocation(category: "Transport", amount: 400)
                 ],
                 month: "2026-01",
                 wasSmartBudget: true,
@@ -290,10 +285,10 @@ struct BudgetHistoryView_Previews: PreviewProvider {
                 userId: "user123",
                 monthlyAmount: 1400,
                 categoryAllocations: [
-                    CategoryAllocation(category: "Groceries", amount: 550, isLocked: false),
-                    CategoryAllocation(category: "Dining Out", amount: 280, isLocked: false),
-                    CategoryAllocation(category: "Entertainment", amount: 180, isLocked: false),
-                    CategoryAllocation(category: "Transport", amount: 390, isLocked: false)
+                    CategoryAllocation(category: "Groceries", amount: 550),
+                    CategoryAllocation(category: "Dining Out", amount: 280),
+                    CategoryAllocation(category: "Entertainment", amount: 180),
+                    CategoryAllocation(category: "Transport", amount: 390)
                 ],
                 month: "2025-12",
                 wasSmartBudget: true,

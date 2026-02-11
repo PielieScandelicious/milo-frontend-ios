@@ -143,7 +143,6 @@ struct ContentView: View {
                 group.addTask { await cache.preloadYearSummary(for: year) }
             }
             group.addTask { await cache.preloadAllTimeAggregate() }
-            group.addTask { await cache.preloadBudgetInsights() }
             group.addTask { await cache.preloadBudgetProgress() }
         }
 

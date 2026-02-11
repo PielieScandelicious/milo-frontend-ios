@@ -26,8 +26,6 @@ class AppDataCache: ObservableObject {
     @Published var allTimeAggregate: AggregateResponse?
     /// Category items (transactions) keyed by "period|categoryName"
     @Published var categoryItemsCache: [String: [APITransaction]] = [:]
-    /// Budget insights (preloaded for instant display)
-    @Published var budgetInsightsCache: BudgetInsightsResponse?
     /// Budget progress (preloaded for instant display)
     @Published var budgetProgressCache: BudgetProgressResponse?
     /// Whether budget status has been checked (true = we know if user has budget or not)
@@ -114,7 +112,6 @@ class AppDataCache: ObservableObject {
         var yearSummaryCache: [String: YearSummaryResponse]
         var allTimeAggregate: AggregateResponse?
         var categoryItemsCache: [String: [APITransaction]]
-        var budgetInsightsCache: BudgetInsightsResponse?
         var budgetProgressCache: BudgetProgressResponse?
         var budgetStatusChecked: Bool?
         var lastRefreshDate: Date?
@@ -140,7 +137,6 @@ class AppDataCache: ObservableObject {
             self.yearSummaryCache = payload.yearSummaryCache
             self.allTimeAggregate = payload.allTimeAggregate
             self.categoryItemsCache = payload.categoryItemsCache
-            self.budgetInsightsCache = payload.budgetInsightsCache
             self.budgetProgressCache = payload.budgetProgressCache
             self.budgetStatusChecked = payload.budgetStatusChecked ?? false
             self.lastRefreshDate = payload.lastRefreshDate
@@ -171,7 +167,6 @@ class AppDataCache: ObservableObject {
             yearSummaryCache: yearSummaryCache,
             allTimeAggregate: allTimeAggregate,
             categoryItemsCache: categoryItemsCache,
-            budgetInsightsCache: budgetInsightsCache,
             budgetProgressCache: budgetProgressCache,
             budgetStatusChecked: budgetStatusChecked,
             lastRefreshDate: lastRefreshDate
@@ -239,11 +234,6 @@ class AppDataCache: ObservableObject {
 
     func updateCategoryItems(period: String, category: String, items: [APITransaction]) {
         categoryItemsCache[categoryItemsKey(period: period, category: category)] = items
-        scheduleSaveToDisk()
-    }
-
-    func updateBudgetInsights(_ insights: BudgetInsightsResponse) {
-        budgetInsightsCache = insights
         scheduleSaveToDisk()
     }
 
@@ -363,19 +353,6 @@ class AppDataCache: ObservableObject {
         }
     }
 
-    func preloadBudgetInsights() async {
-        guard budgetInsightsCache == nil else { return }
-        do {
-            let insights = try await BudgetAPIService.shared.getBudgetInsights()
-            await MainActor.run {
-                budgetInsightsCache = insights
-                scheduleSaveToDisk()
-            }
-        } catch {
-            // Non-critical — insights will load on demand
-        }
-    }
-
     func preloadBudgetProgress() async {
         guard !budgetStatusChecked else { return }
         do {
@@ -433,7 +410,6 @@ class AppDataCache: ObservableObject {
         yearSummaryCache = [:]
         allTimeAggregate = nil
         categoryItemsCache = [:]
-        budgetInsightsCache = nil
         budgetProgressCache = nil
         budgetStatusChecked = false
         lastRefreshDate = nil

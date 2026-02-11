@@ -271,8 +271,9 @@ struct CategoryBudgetRing: View {
         userId: "user1",
         monthlyAmount: 850,
         categoryAllocations: nil,
-        notificationsEnabled: true,
-        alertThresholds: [0.5, 0.75, 0.9]
+        isSmartBudget: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z"
     )
 
     let sampleProgress = BudgetProgress(
@@ -360,8 +361,7 @@ struct CategoryBudgetRing: View {
                         categoryProgress: CategoryBudgetProgress(
                             category: "Fresh Produce",
                             budgetAmount: 100,
-                            currentSpend: 65,
-                            isLocked: false
+                            currentSpend: 65
                         )
                     )
 
@@ -369,8 +369,7 @@ struct CategoryBudgetRing: View {
                         categoryProgress: CategoryBudgetProgress(
                             category: "Snacks & Sweets",
                             budgetAmount: 60,
-                            currentSpend: 72,
-                            isLocked: false
+                            currentSpend: 72
                         )
                     )
 
@@ -378,8 +377,7 @@ struct CategoryBudgetRing: View {
                         categoryProgress: CategoryBudgetProgress(
                             category: "Meat & Fish",
                             budgetAmount: 120,
-                            currentSpend: 110,
-                            isLocked: true
+                            currentSpend: 110
                         )
                     )
                 }
