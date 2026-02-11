@@ -205,6 +205,32 @@ struct ReceiptScanView: View {
 
     // MARK: - Floating Scan Button
 
+    // Premium glass card styling
+    private var scanPremiumCardBackground: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .fill(Color(white: 0.08))
+            .overlay(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.05), Color.white.opacity(0.02)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var scanPremiumCardBorder: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .stroke(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.5
+            )
+    }
+
     // Deep purple color matching overview tab theme
     private var deepPurple: Color {
         Color(red: 0.35, green: 0.10, blue: 0.60)
@@ -481,14 +507,6 @@ struct ReceiptScanView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.04))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                )
-        )
     }
 
     // MARK: - Top Stores Card (Flippable)
@@ -524,7 +542,7 @@ struct ReceiptScanView: View {
 
     // Front side content - Top Stores
     private var topStoresCardContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack(spacing: 10) {
                 ZStack {
@@ -555,6 +573,9 @@ struct ReceiptScanView: View {
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
 
             // Stores list
             if topStores.isEmpty {
@@ -572,39 +593,28 @@ struct ReceiptScanView: View {
                     Spacer()
                 }
             } else {
-                VStack(spacing: 8) {
+                VStack(spacing: 0) {
                     ForEach(Array(topStores.enumerated()), id: \.offset) { index, store in
-                        topStoreRow(rank: index + 1, name: store.name, visits: store.visits)
+                        VStack(spacing: 0) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.06))
+                                .frame(height: 0.5)
+                                .padding(.leading, 52)
+                            topStoreRow(rank: index + 1, name: store.name, visits: store.visits)
+                                .padding(.horizontal, 12)
+                        }
                     }
                 }
+                .padding(.bottom, 8)
             }
         }
-        .padding(16)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.04))
-
-                // Subtle gradient
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.cyan.opacity(0.06), Color.clear],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+        .background(scanPremiumCardBackground)
+        .overlay(scanPremiumCardBorder)
     }
 
     // Back side content - Top Categories
     private var topCategoriesCardContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack(spacing: 10) {
                 ZStack {
@@ -633,6 +643,9 @@ struct ReceiptScanView: View {
                         .foregroundStyle(.white.opacity(0.3))
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
 
             // Categories list
             if topCategories.isEmpty {
@@ -650,34 +663,23 @@ struct ReceiptScanView: View {
                     Spacer()
                 }
             } else {
-                VStack(spacing: 8) {
+                VStack(spacing: 0) {
                     ForEach(Array(topCategories.prefix(3).enumerated()), id: \.offset) { index, category in
-                        topCategoryRow(rank: index + 1, category: category)
+                        VStack(spacing: 0) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.06))
+                                .frame(height: 0.5)
+                                .padding(.leading, 52)
+                            topCategoryRow(rank: index + 1, category: category)
+                                .padding(.horizontal, 12)
+                        }
                     }
                 }
+                .padding(.bottom, 8)
             }
         }
-        .padding(16)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.04))
-
-                // Subtle gradient (purple theme)
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.06), Color.clear],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+        .background(scanPremiumCardBackground)
+        .overlay(scanPremiumCardBorder)
     }
 
     // MARK: - Top Category Row
@@ -730,38 +732,8 @@ struct ReceiptScanView: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 4)
         .padding(.vertical, 10)
-        .background(
-            ZStack {
-                // Base fill with medal tint
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                medalColor.opacity(0.12),
-                                medalColor.opacity(0.04)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            medalColor.opacity(0.4),
-                            medalColor.opacity(0.15)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
     }
 
     // MARK: - Top Store Row
@@ -808,38 +780,8 @@ struct ReceiptScanView: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 4)
         .padding(.vertical, 10)
-        .background(
-            ZStack {
-                // Base fill with medal tint
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                medalColor.opacity(0.12),
-                                medalColor.opacity(0.04)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            medalColor.opacity(0.4),
-                            medalColor.opacity(0.15)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
     }
 
     // MARK: - Rank Color
@@ -999,8 +941,9 @@ struct ReceiptScanView: View {
             Spacer()
         }
         .padding()
-        .background(Color.white.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(scanPremiumCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(scanPremiumCardBorder)
     }
 
     // MARK: - Wallet Pass Card
@@ -1046,26 +989,8 @@ struct ReceiptScanView: View {
                     .foregroundStyle(.white.opacity(0.3))
             }
             .padding(16)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white.opacity(0.04))
-
-                    // Subtle gradient accent
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.03), Color.clear],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            )
+            .background(scanPremiumCardBackground)
+            .overlay(scanPremiumCardBorder)
         }
         .buttonStyle(ScaleCardButtonStyle())
     }
@@ -1085,11 +1010,7 @@ struct ReceiptScanView: View {
         .padding(.vertical, 10)
         .background(
             Capsule()
-                .fill(Color.blue.opacity(0.2))
-                .overlay(
-                    Capsule()
-                        .stroke(Color.blue.opacity(0.4), lineWidth: 1)
-                )
+                .fill(Color.blue.opacity(0.15))
         )
     }
 
@@ -1105,11 +1026,7 @@ struct ReceiptScanView: View {
         .padding(.vertical, 10)
         .background(
             Capsule()
-                .fill(Color.green.opacity(0.15))
-                .overlay(
-                    Capsule()
-                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                )
+                .fill(Color.green.opacity(0.1))
         )
     }
 

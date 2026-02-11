@@ -418,8 +418,8 @@ struct WelcomeView: View {
             }
             .padding(.bottom, 28)
 
-            // Sample prompts with staggered animation
-            VStack(spacing: 10) {
+            // Sample prompts in premium glass card
+            VStack(spacing: 0) {
                 SamplePromptCard(
                     icon: "leaf.fill",
                     iconColor: Color(red: 0.2, green: 0.8, blue: 0.4),
@@ -429,6 +429,11 @@ struct WelcomeView: View {
                     messageText = "Do I have enough protein in my diet?"
                     onSend()
                 }
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.06))
+                    .frame(height: 0.5)
+                    .padding(.leading, 52)
 
                 SamplePromptCard(
                     icon: "chart.pie.fill",
@@ -440,6 +445,11 @@ struct WelcomeView: View {
                     onSend()
                 }
 
+                Rectangle()
+                    .fill(Color.white.opacity(0.06))
+                    .frame(height: 0.5)
+                    .padding(.leading, 52)
+
                 SamplePromptCard(
                     icon: "cart.fill",
                     iconColor: Color(red: 0.4, green: 0.7, blue: 1.0),
@@ -449,6 +459,11 @@ struct WelcomeView: View {
                     messageText = "Am I buying enough vegetables?"
                     onSend()
                 }
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.06))
+                    .frame(height: 0.5)
+                    .padding(.leading, 52)
 
                 SamplePromptCard(
                     icon: "banknote.fill",
@@ -460,6 +475,30 @@ struct WelcomeView: View {
                     onSend()
                 }
             }
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(white: 0.08))
+                    .overlay(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.05), Color.white.opacity(0.02)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.5
+                    )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20))
             .opacity(cardsOpacity)
 
             Spacer(minLength: 20)
@@ -528,14 +567,7 @@ struct SamplePromptCard: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(isPressed ? 0.10 : 0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
-                    )
-            )
+            .background(isPressed ? Color.white.opacity(0.04) : Color.clear)
             .scaleEffect(isPressed ? 0.98 : 1.0)
         }
         .buttonStyle(PromptCardButtonStyle(isPressed: $isPressed))

@@ -161,13 +161,18 @@ struct CategoryBudgetDetailView: View {
     // MARK: - Status Overview
 
     private var statusOverview: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 0) {
             statusCard(
                 count: overBudgetCategories.count,
                 label: "Over Budget",
                 color: Color(red: 1.0, green: 0.4, blue: 0.4),
                 icon: "exclamationmark.triangle.fill"
             )
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 0.5)
+                .padding(.vertical, 10)
 
             statusCard(
                 count: warningCategories.count,
@@ -176,6 +181,11 @@ struct CategoryBudgetDetailView: View {
                 icon: "exclamationmark.circle.fill"
             )
 
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 0.5)
+                .padding(.vertical, 10)
+
             statusCard(
                 count: onTrackCategories.count,
                 label: "On Track",
@@ -183,6 +193,30 @@ struct CategoryBudgetDetailView: View {
                 icon: "checkmark.circle.fill"
             )
         }
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(white: 0.08))
+                .overlay(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.05), Color.white.opacity(0.02)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.5
+                )
+        )
     }
 
     private func statusCard(count: Int, label: String, color: Color, icon: String) -> some View {
@@ -201,14 +235,6 @@ struct CategoryBudgetDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(color.opacity(0.2), lineWidth: 1)
-        )
     }
 
     // MARK: - Sort Picker
@@ -247,13 +273,38 @@ struct CategoryBudgetDetailView: View {
 
     // MARK: - Category List
 
+    private var premiumCardBackground: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .fill(Color(white: 0.08))
+            .overlay(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.05), Color.white.opacity(0.02)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var premiumCardBorder: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .stroke(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.5
+            )
+    }
+
     private var categoryList: some View {
         Group {
             if sortOrder == .byGroup {
                 // Grouped view with section headers
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
                     ForEach(groupedCategories, id: \.group) { section in
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(spacing: 0) {
                             // Group header
                             let registry = CategoryRegistryManager.shared
                             let groupSpent = section.categories.reduce(0) { $0 + $1.currentSpend }
@@ -280,23 +331,42 @@ struct CategoryBudgetDetailView: View {
                                         .foregroundColor(groupSpent > groupBudget ? Color(red: 1.0, green: 0.4, blue: 0.4) : .white.opacity(0.7))
                                 }
                             }
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
 
-                            // Category cards for this group
-                            ForEach(section.categories) { category in
-                                CategoryBudgetCard(categoryProgress: category)
+                            // Category items for this group with dividers
+                            ForEach(Array(section.categories.enumerated()), id: \.element.id) { index, category in
+                                VStack(spacing: 0) {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.06))
+                                        .frame(height: 0.5)
+                                        .padding(.leading, 52)
+
+                                    CategoryBudgetCard(categoryProgress: category)
+                                }
                             }
                         }
+                        .background(premiumCardBackground)
+                        .overlay(premiumCardBorder)
                     }
                 }
             } else {
-                // Flat sorted view
-                VStack(spacing: 12) {
-                    ForEach(sortedCategories) { category in
-                        CategoryBudgetCard(categoryProgress: category)
+                // Flat sorted view in premium glass card
+                VStack(spacing: 0) {
+                    ForEach(Array(sortedCategories.enumerated()), id: \.element.id) { index, category in
+                        VStack(spacing: 0) {
+                            if index > 0 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(height: 0.5)
+                                    .padding(.leading, 52)
+                            }
+                            CategoryBudgetCard(categoryProgress: category)
+                        }
                     }
                 }
+                .background(premiumCardBackground)
+                .overlay(premiumCardBorder)
             }
         }
     }
@@ -462,18 +532,8 @@ struct CategoryBudgetCard: View {
                 }
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    categoryProgress.isOverBudget ? statusColor.opacity(0.3) : Color.white.opacity(0.08),
-                    lineWidth: 1
-                )
-        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
                 animationProgress = 1.0
@@ -498,12 +558,12 @@ struct CategoryBudgetGrid: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             // Header
             HStack {
-                Text("Category Budgets")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
+                Text("Categories")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.5))
 
                 Spacer()
 
@@ -511,11 +571,11 @@ struct CategoryBudgetGrid: View {
                     Button(action: onSeeAll) {
                         HStack(spacing: 4) {
                             Text(categories.count > 5 ? "See All (\(categories.count))" : "Details")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 10, weight: .semibold))
                         }
-                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                        .foregroundColor(.white.opacity(0.35))
                     }
                 }
             }
@@ -523,14 +583,22 @@ struct CategoryBudgetGrid: View {
             // List of category items with budget amounts
             if displayCategories.isEmpty {
                 Text("No category budgets set")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 16)
             } else {
-                VStack(spacing: 8) {
-                    ForEach(displayCategories) { category in
-                        CompactCategoryBudgetItem(categoryProgress: category)
+                VStack(spacing: 0) {
+                    ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
+                        VStack(spacing: 0) {
+                            if index > 0 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(height: 0.5)
+                                    .padding(.leading, 52)
+                            }
+                            CompactCategoryBudgetItem(categoryProgress: category)
+                        }
                     }
                 }
             }
@@ -639,18 +707,8 @@ struct CompactCategoryBudgetItem: View {
                     .foregroundColor(categoryProgress.isOverBudget ? statusColor : .white.opacity(0.4))
             }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    categoryProgress.isOverBudget ? statusColor.opacity(0.3) : Color.white.opacity(0.08),
-                    lineWidth: 1
-                )
-        )
+        .padding(.horizontal, 4)
+        .padding(.vertical, 10)
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 animationProgress = 1.0

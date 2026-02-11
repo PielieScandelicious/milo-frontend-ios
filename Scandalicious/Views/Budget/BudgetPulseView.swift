@@ -17,6 +17,42 @@ struct BudgetPulseView: View {
     @State private var showDeleteConfirmation = false
     @State private var showingInsights = false
 
+    // MARK: - Premium Card Styling
+
+    private var premiumCardBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(white: 0.08))
+            RoundedRectangle(cornerRadius: 24)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.05),
+                            Color.white.opacity(0.02),
+                            Color.white.opacity(0.01)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
+    }
+
+    private var premiumCardBorder: some View {
+        RoundedRectangle(cornerRadius: 24)
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.15),
+                        Color.white.opacity(0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+    }
+
     var body: some View {
         let stateDescription: String
         switch viewModel.state {
@@ -34,10 +70,9 @@ struct BudgetPulseView: View {
         print("🎨 [BudgetPulseView] ========================")
 
         return contentView
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(white: 0.12))
-            )
+            .background(premiumCardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(premiumCardBorder)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: stateDescription)
             .onReceive(NotificationCenter.default.publisher(for: .budgetDeleted)) { _ in
                 print("🎨 [BudgetPulseView] ⚡️ Received budgetDeleted notification, resetting local state")
@@ -395,9 +430,6 @@ struct BudgetPulseView: View {
 
     private func expandedContent(_ progress: BudgetProgress) -> some View {
         VStack(spacing: 16) {
-            Divider()
-                .background(Color.white.opacity(0.1))
-
             // Large ring with details
             BudgetRingView(progress: progress, size: 160)
                 .padding(.vertical, 8)
@@ -410,9 +442,9 @@ struct BudgetPulseView: View {
                     color: progress.remainingBudget > 0 ? .green : .red
                 )
 
-                Divider()
-                    .frame(height: 40)
-                    .background(Color.white.opacity(0.1))
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 0.5, height: 32)
 
                 statItem(
                     title: "Daily Budget",
@@ -420,9 +452,9 @@ struct BudgetPulseView: View {
                     color: .white
                 )
 
-                Divider()
-                    .frame(height: 40)
-                    .background(Color.white.opacity(0.1))
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 0.5, height: 32)
 
                 statItem(
                     title: "Projected",
@@ -483,11 +515,7 @@ struct BudgetPulseView: View {
                 .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.15))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.3), lineWidth: 1)
+                        .fill(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.12))
                 )
             }
             .buttonStyle(PlainButtonStyle())

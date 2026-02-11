@@ -151,30 +151,79 @@ struct EditCategoryBudgetsSheet: View {
         categoryAllocations.indices.filter { categoryAllocations[$0].amount <= 0 && categoryAllocations[$0].originalAmount <= 0 }
     }
 
+    private var editPremiumCardBackground: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .fill(Color(white: 0.08))
+            .overlay(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.05), Color.white.opacity(0.02)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var editPremiumCardBorder: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .stroke(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 0.5
+            )
+    }
+
     private var categoryList: some View {
-        VStack(spacing: 6) {
-            // Budgeted categories
+        VStack(spacing: 16) {
+            // Budgeted categories in premium glass card
             if !budgetedIndices.isEmpty {
-                ForEach(budgetedIndices, id: \.self) { index in
-                    categoryRow(at: index)
+                VStack(spacing: 0) {
+                    ForEach(Array(budgetedIndices.enumerated()), id: \.element) { offset, index in
+                        VStack(spacing: 0) {
+                            if offset > 0 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(height: 0.5)
+                                    .padding(.leading, 52)
+                            }
+                            categoryRow(at: index)
+                        }
+                    }
                 }
+                .background(editPremiumCardBackground)
+                .overlay(editPremiumCardBorder)
             }
 
             // Unbudgeted categories section
             if !unbudgetedIndices.isEmpty {
-                HStack {
-                    Text("Other Categories")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.35))
-                        .textCase(.uppercase)
-                    Spacer()
-                }
-                .padding(.top, 12)
-                .padding(.bottom, 2)
-                .padding(.horizontal, 4)
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Other Categories")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.35))
+                            .textCase(.uppercase)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 4)
 
-                ForEach(unbudgetedIndices, id: \.self) { index in
-                    categoryRow(at: index)
+                    VStack(spacing: 0) {
+                        ForEach(Array(unbudgetedIndices.enumerated()), id: \.element) { offset, index in
+                            VStack(spacing: 0) {
+                                if offset > 0 {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.06))
+                                        .frame(height: 0.5)
+                                        .padding(.leading, 52)
+                                }
+                                categoryRow(at: index)
+                            }
+                        }
+                    }
+                    .background(editPremiumCardBackground)
+                    .overlay(editPremiumCardBorder)
                 }
             }
         }
@@ -497,8 +546,9 @@ struct CompactCategoryRow: View {
             // Expanded controls
             if isExpanded {
                 VStack(spacing: 12) {
-                    Divider()
-                        .background(Color.white.opacity(0.1))
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 0.5)
                         .padding(.horizontal, 14)
 
                     // Stepper: [-] amount [+]
@@ -598,20 +648,7 @@ struct CompactCategoryRow: View {
                 .padding(.bottom, 12)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(isExpanded ? Color.white.opacity(0.07) : Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    allocation.isEdited
-                        ? Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.3)
-                        : (isExpanded ? Color.white.opacity(0.12) : Color.white.opacity(0.06)),
-                    lineWidth: 1
-                )
-        )
+        .background(isExpanded ? Color.white.opacity(0.03) : Color.clear)
     }
 
     private func incrementAmount() {
