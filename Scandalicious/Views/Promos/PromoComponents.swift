@@ -96,10 +96,21 @@ struct PromoBannerCard: View {
             case .success(let data) where data.dealCount > 0:
                 bannerContent(data)
             case .success:
-                // deal_count == 0
-                debugBanner("No deals found yet — keep scanning receipts!")
-            case .error(let message):
-                debugBanner("Deals: \(message)")
+                // deal_count == 0 — still tappable to open PromosView & refresh
+                NavigationLink {
+                    PromosView(viewModel: viewModel)
+                } label: {
+                    debugBanner("No deals found yet — tap to check for deals!")
+                }
+                .buttonStyle(.plain)
+            case .error:
+                // Error — tappable to open PromosView & retry
+                NavigationLink {
+                    PromosView(viewModel: viewModel)
+                } label: {
+                    debugBanner("Couldn't load deals — tap to retry")
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -114,8 +125,12 @@ struct PromoBannerCard: View {
                 .foregroundColor(.white.opacity(0.6))
                 .lineLimit(2)
             Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.3))
         }
         .padding(14)
+        .contentShape(Rectangle())
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color(white: 0.08))
