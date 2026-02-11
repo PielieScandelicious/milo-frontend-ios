@@ -24,10 +24,6 @@ struct WalletPassCreatorView: View {
 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Pass Preview Card
-                        passPreviewCard
-                            .padding(.top, 8)
-
                         // Store Details Section
                         storeDetailsSection
 
@@ -48,7 +44,6 @@ struct WalletPassCreatorView: View {
                     .padding(.horizontal, 20)
                 }
             }
-            .navigationTitle("Create Pass")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
