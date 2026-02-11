@@ -1585,6 +1585,27 @@ struct OverviewView: View {
         }
     }
 
+    // MARK: - Legend Section Title
+
+    private func legendSectionTitle(icon: String, title: String, count: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.white.opacity(0.3))
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.2)
+                .foregroundColor(.white.opacity(0.3))
+            Spacer()
+            Text("\(count)")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.2))
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 4)
+        .padding(.bottom, 10)
+    }
+
     // MARK: - Expandable Category Functions
 
     private func toggleCategoryExpansion(_ category: CategorySpendItem, period: String) {
@@ -2400,6 +2421,12 @@ struct OverviewView: View {
                 let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
                 let hasMoreCategories = categories.count > maxVisibleRows
 
+                legendSectionTitle(
+                    icon: "square.grid.2x2.fill",
+                    title: "Categories",
+                    count: categories.count
+                )
+
                 ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                     VStack(spacing: 0) {
                         // Subtle divider between rows (not before first)
@@ -2444,6 +2471,12 @@ struct OverviewView: View {
             } else if !isPieChartFlipped && !segments.isEmpty {
                 let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
                 let hasMoreSegments = segments.count > maxVisibleRows
+
+                legendSectionTitle(
+                    icon: "storefront.fill",
+                    title: "Stores",
+                    count: segments.count
+                )
 
                 ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
                     VStack(spacing: 0) {

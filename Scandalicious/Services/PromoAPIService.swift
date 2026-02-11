@@ -57,7 +57,7 @@ actor PromoAPIService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 120  // Pinecone search + Gemini generation is slow
+        request.timeoutInterval = 180  // Pinecone search + Gemini generation is slow
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

@@ -157,7 +157,7 @@ struct AllStoresBreakdownView: View {
                 .fill(segment.color)
                 .frame(width: 12, height: 12)
 
-            Text(segment.storeName)
+            Text(segment.storeName.localizedCapitalized)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white)
 

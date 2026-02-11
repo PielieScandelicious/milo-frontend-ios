@@ -70,11 +70,40 @@ struct PromosView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("DEALS")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-                    .tracking(1.5)
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Task { await viewModel.refresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.20, green: 0.85, blue: 0.50),
+                                    Color(red: 0.10, green: 0.65, blue: 0.40)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .rotationEffect(.degrees(viewModel.isRefreshing ? 360 : 0))
+                        .animation(
+                            viewModel.isRefreshing
+                                ? .linear(duration: 1).repeatForever(autoreverses: false)
+                                : .default,
+                            value: viewModel.isRefreshing
+                        )
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.06))
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                        )
+                }
+                .disabled(viewModel.isRefreshing)
             }
         }
         .task {

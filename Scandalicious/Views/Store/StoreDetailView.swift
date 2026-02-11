@@ -147,7 +147,7 @@ struct StoreDetailView: View {
 
     private var storeHeaderSection: some View {
         VStack(spacing: 8) {
-            Text(storeBreakdown.storeName)
+            Text(storeBreakdown.storeName.localizedCapitalized)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
@@ -213,6 +213,27 @@ struct StoreDetailView: View {
             .padding(.horizontal, 20)
     }
 
+    // MARK: - Legend Section Title
+
+    private func legendSectionTitle(icon: String, title: String, count: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.white.opacity(0.3))
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.2)
+                .foregroundColor(.white.opacity(0.3))
+            Spacer()
+            Text("\(count)")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.2))
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 4)
+        .padding(.bottom, 10)
+    }
+
     // MARK: - Unified Store Card
 
     private var unifiedStoreCard: some View {
@@ -234,6 +255,12 @@ struct StoreDetailView: View {
 
             if !currentCategories.isEmpty {
                 VStack(spacing: 0) {
+                    legendSectionTitle(
+                        icon: "square.grid.2x2.fill",
+                        title: "Categories",
+                        count: currentCategories.count
+                    )
+
                     ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                         VStack(spacing: 0) {
                             if index > 0 {
