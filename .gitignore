@@ -2,6 +2,7 @@
 *.md
 xcuserdata/
 .idea/
+.DS_Store
 
 RESEARCH_AGENT_CONTEXT.txt
 build/
