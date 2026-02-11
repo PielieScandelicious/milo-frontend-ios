@@ -14,8 +14,8 @@ private let promoGreenDark = Color(red: 0.10, green: 0.65, blue: 0.40)
 private let cardBackground = Color(white: 0.08)
 private let cardOverlayTop = Color.white.opacity(0.04)
 private let cardOverlayBottom = Color.white.opacity(0.02)
-private let borderTop = Color.white.opacity(0.12)
-private let borderBottom = Color.white.opacity(0.04)
+private let borderTop = Color.white.opacity(0.15)
+private let borderBottom = Color.white.opacity(0.05)
 
 private var greenGradient: LinearGradient {
     LinearGradient(
@@ -23,6 +23,16 @@ private var greenGradient: LinearGradient {
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+}
+
+// MARK: - Brand Helper
+
+/// Returns true if the brand string is meaningful (not empty, not "No Brand", etc.)
+private func hasValidBrand(_ brand: String) -> Bool {
+    let trimmed = brand.trimmingCharacters(in: .whitespaces)
+    if trimmed.isEmpty { return false }
+    let lower = trimmed.lowercased()
+    return lower != "no brand" && lower != "unknown" && lower != "n/a"
 }
 
 // MARK: - Glass Card Background Modifier
@@ -55,7 +65,7 @@ private struct GlassCard: ViewModifier {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 1
+                        lineWidth: 0.5
                     )
             )
     }
@@ -107,12 +117,12 @@ struct PromoBannerCard: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color(white: 0.08))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
         )
     }
 
@@ -351,111 +361,131 @@ struct PromoSectionHeader: View {
 struct PromoTopPickCard: View {
     let pick: PromoTopPick
     let index: Int
-    @State private var appeared = false
+    @State private var isExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header: emoji + name + discount badge
-            HStack(alignment: .top, spacing: 12) {
-                // Emoji circle
-                Text(pick.emoji)
-                    .font(.system(size: 22))
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Color.white.opacity(0.06)))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(pick.productName)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    Text("\(pick.brand) · \(pick.store)")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
+        VStack(alignment: .leading, spacing: 0) {
+            // Compact header row — always visible
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    isExpanded.toggle()
                 }
-                .layoutPriority(1)
+            } label: {
+                HStack(spacing: 12) {
+                    Text(pick.emoji)
+                        .font(.system(size: 18))
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Color.white.opacity(0.04)))
 
-                Spacer(minLength: 4)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(hasValidBrand(pick.brand) ? pick.brand : pick.productName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
 
-                // Discount badge
-                Text(pick.mechanism)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(greenGradient))
-                    .fixedSize()
-            }
-
-            // Prices
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(String(format: "€%.2f", pick.promoPrice))
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundStyle(greenGradient)
-
-                Text(String(format: "€%.2f", pick.originalPrice))
-                    .font(.system(size: 15))
-                    .foregroundColor(.white.opacity(0.4))
-                    .strikethrough(true, color: .white.opacity(0.4))
-
-                Spacer()
-
-                // Savings capsule
-                HStack(spacing: 3) {
-                    Image(systemName: "arrow.down")
-                        .font(.system(size: 9, weight: .bold))
-                    Text(String(format: "€%.2f", pick.savings))
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundColor(promoGreen)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(promoGreen.opacity(0.12)))
-            }
-
-            // Reason
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "lightbulb.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(.yellow.opacity(0.8))
-                    .padding(.top, 2)
-
-                Text(pick.reason)
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.5))
-                    .italic()
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            // Validity + folder link
-            HStack {
-                Text("Valid \(pick.validityStart) - \(pick.validityEnd)")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.3))
-
-                Spacer()
-
-                if let urlString = pick.promoFolderUrl, let url = URL(string: urlString) {
-                    Link(destination: url) {
-                        HStack(spacing: 3) {
-                            Text("View in folder")
-                                .font(.system(size: 11, weight: .medium))
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 9, weight: .semibold))
+                        if hasValidBrand(pick.brand) {
+                            Text("\(pick.productName) · \(pick.store)")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.4))
+                                .lineLimit(2)
+                        } else {
+                            Text(pick.store)
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.4))
+                                .lineLimit(1)
                         }
-                        .foregroundColor(.blue.opacity(0.8))
+                    }
+                    .layoutPriority(1)
+
+                    Spacer(minLength: 4)
+
+                    // Price + discount
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(String(format: "€%.2f", pick.promoPrice))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(greenGradient)
+
+                        Text(String(format: "€%.2f", pick.originalPrice))
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.35))
+                            .strikethrough(true, color: .white.opacity(0.35))
+                    }
+                    .fixedSize()
+
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.3))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Expanded details
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    // Mechanism + savings
+                    HStack(spacing: 8) {
+                        Text(pick.mechanism)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(greenGradient))
+
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.down")
+                                .font(.system(size: 9, weight: .bold))
+                            Text(String(format: "€%.2f saved", pick.savings))
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(promoGreen)
+
+                        Spacer()
+                    }
+
+                    // Reason
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "lightbulb.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.yellow.opacity(0.8))
+                            .padding(.top, 2)
+
+                        Text(pick.reason)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.5))
+                            .italic()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    // Validity + folder link
+                    HStack {
+                        Text("Valid \(pick.validityStart) - \(pick.validityEnd)")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.3))
+
+                        Spacer()
+
+                        if let urlString = pick.promoFolderUrl, let url = URL(string: urlString) {
+                            Link(destination: url) {
+                                HStack(spacing: 3) {
+                                    Text("View in folder")
+                                        .font(.system(size: 11, weight: .medium))
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.system(size: 9, weight: .semibold))
+                                }
+                                .foregroundColor(.blue.opacity(0.8))
+                            }
+                        }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+                .clipped()
             }
         }
-        .padding(16)
-        .glassCard()
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 12)
-        .onAppear {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.8).delay(Double(index) * 0.08)) {
-                appeared = true
-            }
-        }
+        .background(isExpanded ? Color.white.opacity(0.02) : Color.clear)
     }
 }
 
@@ -630,9 +660,11 @@ struct PromoStoreSection: View {
             VStack(spacing: 0) {
                 ForEach(Array(visibleItems.enumerated()), id: \.element.id) { itemIndex, item in
                     if itemIndex > 0 {
-                        Divider()
-                            .background(Color.white.opacity(0.06))
-                            .padding(.horizontal, 16)
+                        Rectangle()
+                            .fill(Color.white.opacity(0.06))
+                            .frame(height: 0.5)
+                            .padding(.leading, 64)
+                            .padding(.trailing, 16)
                     }
                     PromoItemRow(item: item, storeColor: store.color)
                 }
@@ -670,14 +702,11 @@ struct PromoStoreSection: View {
                         .foregroundColor(.white.opacity(0.55))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.yellow.opacity(0.04))
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                .background(Color.yellow.opacity(0.03))
+                .padding(.bottom, 4)
             }
         }
         .glassCard()
@@ -705,17 +734,20 @@ struct PromoItemRow: View {
                 .frame(width: 36, height: 36)
                 .background(Circle().fill(Color.white.opacity(0.04)))
 
-            // Name + brand + mechanism
+            // Brand (title) + product name + mechanism
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.productName)
+                Text(hasValidBrand(item.brand) ? item.brand : item.productName)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
+                    .lineLimit(2)
 
                 HStack(spacing: 6) {
-                    Text(item.brand)
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.4))
-                        .lineLimit(1)
+                    if hasValidBrand(item.brand) {
+                        Text(item.productName)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.4))
+                            .lineLimit(2)
+                    }
 
                     Text(item.mechanism)
                         .font(.system(size: 10, weight: .semibold))
@@ -723,6 +755,7 @@ struct PromoItemRow: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Capsule().fill(storeColor.opacity(0.15)))
+                        .fixedSize()
                 }
             }
             .layoutPriority(1)
@@ -910,7 +943,7 @@ struct PromoSkeletonView: View {
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 1
+                            lineWidth: 0.5
                         )
                 }
             )
@@ -944,7 +977,7 @@ struct PromoSkeletonView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
                 )
                 .overlay(
                     // Shimmer sweep

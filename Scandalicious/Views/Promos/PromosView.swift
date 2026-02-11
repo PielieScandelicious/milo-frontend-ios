@@ -125,9 +125,45 @@ struct PromosView: View {
                     PromoSectionHeader(title: "TOP PICKS FOR YOU", icon: "star.fill")
                         .padding(.horizontal, 20)
 
-                    ForEach(Array(data.topPicks.enumerated()), id: \.element.id) { index, pick in
-                        PromoTopPickCard(pick: pick, index: index)
+                    // All picks in a single glass card
+                    VStack(spacing: 0) {
+                        ForEach(Array(data.topPicks.enumerated()), id: \.element.id) { index, pick in
+                            if index > 0 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(height: 0.5)
+                                    .padding(.leading, 64)
+                                    .padding(.trailing, 16)
+                            }
+                            PromoTopPickCard(pick: pick, index: index)
+                        }
                     }
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(white: 0.08))
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.04), Color.white.opacity(0.02)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.5
+                            )
+                    )
                     .padding(.horizontal, 16)
                 }
             }
