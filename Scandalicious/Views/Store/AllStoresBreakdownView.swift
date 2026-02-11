@@ -184,6 +184,7 @@ struct AllStoresBreakdownView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
+        .contentShape(Rectangle())
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white.opacity(0.05))

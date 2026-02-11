@@ -491,6 +491,7 @@ struct StoreDetailView: View {
             .foregroundStyle(.white.opacity(0.35))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.top, 2)
@@ -556,6 +557,7 @@ struct StoreDetailView: View {
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
+                .contentShape(Rectangle())
             }
             .buttonStyle(ReceiptsHeaderButtonStyle())
 
@@ -756,6 +758,7 @@ struct StoreDetailView: View {
                 }
                 .padding(.horizontal, 4)
                 .padding(.vertical, 11)
+                .contentShape(Rectangle())
             }
             .buttonStyle(CategoryRowButtonStyle())
 

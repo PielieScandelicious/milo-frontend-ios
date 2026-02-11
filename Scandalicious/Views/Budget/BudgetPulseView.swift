@@ -202,6 +202,7 @@ struct BudgetPulseView: View {
                             .foregroundColor(.white.opacity(0.4))
                     }
                     .padding(16)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
             } else {
@@ -424,6 +425,7 @@ struct BudgetPulseView: View {
                     .foregroundColor(.white.opacity(0.4))
             }
             .padding(16)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }

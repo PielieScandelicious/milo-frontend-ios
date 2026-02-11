@@ -81,6 +81,7 @@ struct SubscriptionBannerView: View {
                     .clipShape(Capsule())
             }
             .padding()
+            .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(.ultraThinMaterial)
@@ -222,6 +223,7 @@ struct SubscriptionStatusCard: View {
                 }
             }
             .padding()
+            .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(.ultraThinMaterial)

@@ -307,6 +307,7 @@ struct BelgianBenchmarksCard: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white.opacity(0.4))
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
 
@@ -456,6 +457,7 @@ struct QuickWinsCard: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white.opacity(0.4))
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
 
@@ -535,6 +537,7 @@ struct VolatilityAlertsCard: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white.opacity(0.4))
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
 

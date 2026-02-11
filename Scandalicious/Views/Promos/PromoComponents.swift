@@ -163,6 +163,7 @@ struct PromoBannerCard: View {
                     .foregroundColor(.white.opacity(0.3))
             }
             .padding(16)
+            .contentShape(Rectangle())
             .glassCard(
                 borderGradient: LinearGradient(
                     colors: [promoGreen.opacity(0.25), promoGreenDark.opacity(0.10)],
