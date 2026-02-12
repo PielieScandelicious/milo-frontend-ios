@@ -2296,10 +2296,13 @@ struct OverviewView: View {
 
     /// Subtle divider within the unified card
     private func cardDivider() -> some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.06))
-            .frame(height: 1)
-            .padding(.horizontal, 20)
+        LinearGradient(
+            colors: [.white.opacity(0), .white.opacity(0.25), .white.opacity(0)],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+        .frame(height: 0.5)
+        .padding(.horizontal, 20)
     }
 
     /// Spending header: amount + inline health badge + syncing
@@ -2547,10 +2550,13 @@ struct OverviewView: View {
                     VStack(spacing: 0) {
                         // Subtle divider between rows (not before first)
                         if index > 0 {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.06))
-                                .frame(height: 0.5)
-                                .padding(.leading, 44)
+                            LinearGradient(
+                                colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(height: 0.5)
+                            .padding(.leading, 44)
                         }
 
                         ExpandableCategoryRowHeader(
@@ -2598,10 +2604,13 @@ struct OverviewView: View {
                     VStack(spacing: 0) {
                         // Subtle divider between rows (not before first)
                         if index > 0 {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.06))
-                                .frame(height: 0.5)
-                                .padding(.leading, 24)
+                            LinearGradient(
+                                colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(height: 0.5)
+                            .padding(.leading, 24)
                         }
 
                         StoreRowButton(

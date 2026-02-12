@@ -162,6 +162,15 @@ struct StoreDetailView: View {
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentTotalSpend)
 
             if let score = currentHealthScore {
+                // Subtle divider above nutri score
+                LinearGradient(
+                    colors: [.white.opacity(0), .white.opacity(0.25), .white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 90, height: 0.5)
+                .padding(.top, 2)
+
                 CompactNutriBadge(score: score)
             }
         }
@@ -207,10 +216,13 @@ struct StoreDetailView: View {
     }
 
     private func cardDivider() -> some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.06))
-            .frame(height: 1)
-            .padding(.horizontal, 20)
+        LinearGradient(
+            colors: [.white.opacity(0), .white.opacity(0.25), .white.opacity(0)],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+        .frame(height: 0.5)
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Legend Section Title
@@ -264,10 +276,13 @@ struct StoreDetailView: View {
                     ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
                         VStack(spacing: 0) {
                             if index > 0 {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.06))
-                                    .frame(height: 0.5)
-                                    .padding(.leading, 24)
+                                LinearGradient(
+                                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(height: 0.5)
+                                .padding(.leading, 24)
                             }
 
                             let segment = categoryToSegment(category: category)
@@ -615,10 +630,13 @@ struct StoreDetailView: View {
                             ForEach(Array(sortedReceipts.enumerated()), id: \.element.id) { index, receipt in
                                 VStack(spacing: 0) {
                                     if index > 0 {
-                                        Rectangle()
-                                            .fill(Color.white.opacity(0.06))
-                                            .frame(height: 0.5)
-                                            .padding(.horizontal, 14)
+                                        LinearGradient(
+                                            colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                        .frame(height: 0.5)
+                                        .padding(.horizontal, 14)
                                     }
 
                                     ExpandableReceiptCard(
