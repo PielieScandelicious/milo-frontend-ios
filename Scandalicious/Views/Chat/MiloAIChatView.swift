@@ -85,11 +85,11 @@ private struct MiloDachshundView: View {
             let headPath = Path { p in
                 // Start at top center
                 p.move(to: CGPoint(x: cx, y: cy - 32 * u))
-                // Top-right: wide round forehead
+                // Top-right: narrower forehead, widens to cheek
                 p.addCurve(
                     to: CGPoint(x: cx + 36 * u, y: cy - 6 * u),
-                    control1: CGPoint(x: cx + 24 * u, y: cy - 32 * u),
-                    control2: CGPoint(x: cx + 38 * u, y: cy - 22 * u)
+                    control1: CGPoint(x: cx + 16 * u, y: cy - 32 * u),
+                    control2: CGPoint(x: cx + 32 * u, y: cy - 22 * u)
                 )
                 // Right cheek puff, then taper to chin
                 p.addCurve(
@@ -112,8 +112,8 @@ private struct MiloDachshundView: View {
                 // Top-left: back to top center
                 p.addCurve(
                     to: CGPoint(x: cx, y: cy - 32 * u),
-                    control1: CGPoint(x: cx - 38 * u, y: cy - 22 * u),
-                    control2: CGPoint(x: cx - 24 * u, y: cy - 32 * u)
+                    control1: CGPoint(x: cx - 32 * u, y: cy - 22 * u),
+                    control2: CGPoint(x: cx - 16 * u, y: cy - 32 * u)
                 )
                 p.closeSubpath()
             }

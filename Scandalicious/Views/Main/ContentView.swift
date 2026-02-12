@@ -326,8 +326,8 @@ private struct MiloTabIcon: View {
             gc.move(to: CGPoint(x: cx, y: cy - 32 * u))
             gc.addCurve(
                 to: CGPoint(x: cx + 36 * u, y: cy - 6 * u),
-                control1: CGPoint(x: cx + 24 * u, y: cy - 32 * u),
-                control2: CGPoint(x: cx + 38 * u, y: cy - 22 * u)
+                control1: CGPoint(x: cx + 16 * u, y: cy - 32 * u),
+                control2: CGPoint(x: cx + 32 * u, y: cy - 22 * u)
             )
             gc.addCurve(
                 to: CGPoint(x: cx + 18 * u, y: cy + 28 * u),
@@ -346,8 +346,8 @@ private struct MiloTabIcon: View {
             )
             gc.addCurve(
                 to: CGPoint(x: cx, y: cy - 32 * u),
-                control1: CGPoint(x: cx - 38 * u, y: cy - 22 * u),
-                control2: CGPoint(x: cx - 24 * u, y: cy - 32 * u)
+                control1: CGPoint(x: cx - 32 * u, y: cy - 22 * u),
+                control2: CGPoint(x: cx - 16 * u, y: cy - 32 * u)
             )
             gc.closePath()
             gc.fillPath()
