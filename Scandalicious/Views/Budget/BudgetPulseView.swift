@@ -226,9 +226,11 @@ struct BudgetPulseView: View {
                 Spacer()
 
                 Button(action: cancelSetup) {
-                    Text("Cancel")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.white.opacity(0.08)))
                 }
             }
             .padding(.horizontal, 20)
@@ -244,138 +246,178 @@ struct BudgetPulseView: View {
             // Option cards
             VStack(spacing: 10) {
                 // Total budget option
-                Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        selectedMode = .total
-                        showingModeChooser = false
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        focusedField = .monthly
-                    }
-                } label: {
-                    HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(
-                                    LinearGradient(
-                                        colors: isMonthlyConfigured
-                                            ? [Color(red: 0.2, green: 0.75, blue: 0.5).opacity(0.25), Color(red: 0.15, green: 0.6, blue: 0.4).opacity(0.15)]
-                                            : [Color(red: 0.2, green: 0.75, blue: 0.5).opacity(0.15), Color(red: 0.15, green: 0.6, blue: 0.4).opacity(0.08)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 44, height: 44)
-
-                            Image(systemName: isMonthlyConfigured ? "checkmark.circle.fill" : "dollarsign.circle.fill")
-                                .font(.system(size: 22, weight: .medium))
-                                .foregroundColor(Color(red: 0.25, green: 0.8, blue: 0.55))
+                HStack(spacing: 0) {
+                    Button {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            selectedMode = .total
+                            showingModeChooser = false
                         }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            focusedField = .monthly
+                        }
+                    } label: {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: isMonthlyConfigured
+                                                ? [Color(red: 0.2, green: 0.75, blue: 0.5).opacity(0.25), Color(red: 0.15, green: 0.6, blue: 0.4).opacity(0.15)]
+                                                : [Color(red: 0.2, green: 0.75, blue: 0.5).opacity(0.15), Color(red: 0.15, green: 0.6, blue: 0.4).opacity(0.08)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 44, height: 44)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Total monthly budget")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.white)
+                                Image(systemName: isMonthlyConfigured ? "checkmark.circle.fill" : "dollarsign.circle.fill")
+                                    .font(.system(size: 22, weight: .medium))
+                                    .foregroundColor(Color(red: 0.25, green: 0.8, blue: 0.55))
+                            }
 
-                            if isMonthlyConfigured {
-                                Text(String(format: "€%.0f / month", monthlyAmount))
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
-                            } else {
-                                Text("Set one amount for all groceries")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Total monthly budget")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.white)
+
+                                if isMonthlyConfigured {
+                                    Text(String(format: "€%.0f / month", monthlyAmount))
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
+                                } else {
+                                    Text("Set one amount for all groceries")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+                            }
+
+                            Spacer()
+
+                            if !isMonthlyConfigured {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.25))
                             }
                         }
-
-                        Spacer()
-
-                        Image(systemName: isMonthlyConfigured ? "pencil" : "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.25))
+                        .contentShape(Rectangle())
                     }
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.white.opacity(isMonthlyConfigured ? 0.06 : 0.04))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .strokeBorder(
-                                        isMonthlyConfigured
-                                            ? Color(red: 0.25, green: 0.8, blue: 0.55).opacity(0.2)
-                                            : Color.white.opacity(0.06),
-                                        lineWidth: isMonthlyConfigured ? 1 : 0.5
-                                    )
-                            )
-                    )
+                    .buttonStyle(PlainButtonStyle())
+
+                    // Remove button when configured
+                    if isMonthlyConfigured {
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                isMonthlyConfigured = false
+                                monthlyAmountText = "500"
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.white.opacity(0.2))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                 }
-                .buttonStyle(PlainButtonStyle())
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(isMonthlyConfigured ? 0.06 : 0.04))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(
+                                    isMonthlyConfigured
+                                        ? Color(red: 0.25, green: 0.8, blue: 0.55).opacity(0.2)
+                                        : Color.white.opacity(0.06),
+                                    lineWidth: isMonthlyConfigured ? 1 : 0.5
+                                )
+                        )
+                )
 
                 // By category option
-                Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        selectedMode = .byCategory
-                        showingModeChooser = false
-                    }
-                } label: {
-                    HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(
-                                    LinearGradient(
-                                        colors: isCategoriesConfigured
-                                            ? [Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.25), Color(red: 0.3, green: 0.4, blue: 0.9).opacity(0.15)]
-                                            : [Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.15), Color(red: 0.3, green: 0.4, blue: 0.9).opacity(0.08)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 44, height: 44)
-
-                            Image(systemName: isCategoriesConfigured ? "checkmark.circle.fill" : "square.grid.2x2.fill")
-                                .font(.system(size: isCategoriesConfigured ? 22 : 20, weight: .medium))
-                                .foregroundColor(Color(red: 0.5, green: 0.6, blue: 1.0))
+                HStack(spacing: 0) {
+                    Button {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            selectedMode = .byCategory
+                            showingModeChooser = false
                         }
+                    } label: {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: isCategoriesConfigured
+                                                ? [Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.25), Color(red: 0.3, green: 0.4, blue: 0.9).opacity(0.15)]
+                                                : [Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.15), Color(red: 0.3, green: 0.4, blue: 0.9).opacity(0.08)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 44, height: 44)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Budget by category")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            if isCategoriesConfigured {
-                                let count = inlineTargets.filter { $0.amount > 0 }.count
-                                Text("\(count) categor\(count == 1 ? "y" : "ies") · \(String(format: "€%.0f", categoryBudgetTotal))")
-                                    .font(.system(size: 12, weight: .semibold))
+                                Image(systemName: isCategoriesConfigured ? "checkmark.circle.fill" : "square.grid.2x2.fill")
+                                    .font(.system(size: isCategoriesConfigured ? 22 : 20, weight: .medium))
                                     .foregroundColor(Color(red: 0.5, green: 0.6, blue: 1.0))
-                            } else {
-                                Text("Set limits per category")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Budget by category")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.white)
+
+                                if isCategoriesConfigured {
+                                    let count = inlineTargets.filter { $0.amount > 0 }.count
+                                    Text("\(count) categor\(count == 1 ? "y" : "ies") · \(String(format: "€%.0f", categoryBudgetTotal))")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(Color(red: 0.5, green: 0.6, blue: 1.0))
+                                } else {
+                                    Text("Set limits per category")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+                            }
+
+                            Spacer()
+
+                            if !isCategoriesConfigured {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.25))
                             }
                         }
-
-                        Spacer()
-
-                        Image(systemName: isCategoriesConfigured ? "pencil" : "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.25))
+                        .contentShape(Rectangle())
                     }
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.white.opacity(isCategoriesConfigured ? 0.06 : 0.04))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .strokeBorder(
-                                        isCategoriesConfigured
-                                            ? Color(red: 0.5, green: 0.6, blue: 1.0).opacity(0.2)
-                                            : Color.white.opacity(0.06),
-                                        lineWidth: isCategoriesConfigured ? 1 : 0.5
-                                    )
-                            )
-                    )
+                    .buttonStyle(PlainButtonStyle())
+
+                    // Remove button when configured
+                    if isCategoriesConfigured {
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                isCategoriesConfigured = false
+                                inlineTargets = []
+                            }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.white.opacity(0.2))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                 }
-                .buttonStyle(PlainButtonStyle())
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(isCategoriesConfigured ? 0.06 : 0.04))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(
+                                    isCategoriesConfigured
+                                        ? Color(red: 0.5, green: 0.6, blue: 1.0).opacity(0.2)
+                                        : Color.white.opacity(0.06),
+                                    lineWidth: isCategoriesConfigured ? 1 : 0.5
+                                )
+                        )
+                )
             }
             .padding(.horizontal, 16)
 
@@ -557,8 +599,10 @@ struct BudgetPulseView: View {
                     }
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.4))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.white.opacity(0.08)))
                 }
             }
 
@@ -569,9 +613,11 @@ struct BudgetPulseView: View {
             Spacer()
 
             Button(action: cancelSetup) {
-                Text("Cancel")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color.white.opacity(0.08)))
             }
         }
         .padding(.horizontal, 20)
@@ -580,42 +626,62 @@ struct BudgetPulseView: View {
     }
 
     private var autoRenewRow: some View {
-        Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                isSmartBudget.toggle()
-            }
-        } label: {
-            HStack(spacing: 8) {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        LinearGradient(
+                            colors: isSmartBudget
+                                ? [Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.15), Color(red: 0.3, green: 0.4, blue: 0.9).opacity(0.08)]
+                                : [Color.white.opacity(0.04), Color.white.opacity(0.02)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 32, height: 32)
+
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(isSmartBudget ? Color(red: 0.45, green: 0.6, blue: 1.0) : .white.opacity(0.2))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isSmartBudget ? Color(red: 0.5, green: 0.6, blue: 1.0) : .white.opacity(0.2))
+            }
 
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Auto-renew")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSmartBudget ? Color(red: 0.45, green: 0.6, blue: 1.0).opacity(0.85) : .white.opacity(0.25))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isSmartBudget ? .white.opacity(0.85) : .white.opacity(0.35))
 
-                Spacer()
+                Text("Resets budget each month")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.25))
+            }
 
+            Spacer()
+
+            Button {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                    isSmartBudget.toggle()
+                }
+            } label: {
                 ZStack(alignment: isSmartBudget ? .trailing : .leading) {
                     Capsule()
                         .fill(isSmartBudget
                               ? Color(red: 0.35, green: 0.5, blue: 1.0).opacity(0.5)
                               : Color.white.opacity(0.08))
-                        .frame(width: 34, height: 20)
+                        .frame(width: 40, height: 24)
 
                     Circle()
                         .fill(isSmartBudget
-                              ? Color(red: 0.45, green: 0.6, blue: 1.0)
+                              ? Color(red: 0.5, green: 0.6, blue: 1.0)
                               : Color.white.opacity(0.25))
-                        .frame(width: 16, height: 16)
-                        .padding(.horizontal, 2)
-                        .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
+                        .frame(width: 18, height: 18)
+                        .padding(.horizontal, 3)
+                        .shadow(color: isSmartBudget ? Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.4) : .black.opacity(0.2), radius: 2, y: 1)
                 }
             }
+            .buttonStyle(PlainButtonStyle())
         }
-        .buttonStyle(PlainButtonStyle())
         .padding(.horizontal, 20)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
     }
 
     private var saveSetupButton: some View {
