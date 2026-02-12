@@ -596,10 +596,13 @@ struct ReceiptScanView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(topStores.enumerated()), id: \.offset) { index, store in
                         VStack(spacing: 0) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.06))
-                                .frame(height: 0.5)
-                                .padding(.leading, 52)
+                            LinearGradient(
+                                colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(height: 0.5)
+                            .padding(.leading, 52)
                             topStoreRow(rank: index + 1, name: store.name, visits: store.visits)
                                 .padding(.horizontal, 12)
                         }
@@ -666,10 +669,13 @@ struct ReceiptScanView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(topCategories.prefix(3).enumerated()), id: \.offset) { index, category in
                         VStack(spacing: 0) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.06))
-                                .frame(height: 0.5)
-                                .padding(.leading, 52)
+                            LinearGradient(
+                                colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(height: 0.5)
+                            .padding(.leading, 52)
                             topCategoryRow(rank: index + 1, category: category)
                                 .padding(.horizontal, 12)
                         }

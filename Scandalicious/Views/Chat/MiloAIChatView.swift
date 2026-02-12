@@ -680,10 +680,13 @@ struct WelcomeView: View {
                     onSend()
                 }
 
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 0.5)
-                    .padding(.leading, 52)
+                LinearGradient(
+                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 0.5)
+                .padding(.leading, 52)
 
                 SamplePromptCard(
                     icon: "chart.pie.fill",
@@ -695,10 +698,13 @@ struct WelcomeView: View {
                     onSend()
                 }
 
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 0.5)
-                    .padding(.leading, 52)
+                LinearGradient(
+                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 0.5)
+                .padding(.leading, 52)
 
                 SamplePromptCard(
                     icon: "cart.fill",
@@ -710,10 +716,13 @@ struct WelcomeView: View {
                     onSend()
                 }
 
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 0.5)
-                    .padding(.leading, 52)
+                LinearGradient(
+                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 0.5)
+                .padding(.leading, 52)
 
                 SamplePromptCard(
                     icon: "banknote.fill",
