@@ -366,21 +366,29 @@ struct ReceiptItemRow: View {
             // Item Details
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: 8) {
-                    // Horizontally scrollable item name (2 lines max)
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Text(transaction.itemName)
+                            Text(transaction.displayName)
                                 .font(.body)
-                                .fontWeight(.medium)
+                                .fontWeight(.semibold)
                                 .foregroundStyle(.primary)
+                                .lineLimit(1)
 
                             // Split participant avatars (friends only)
                             if !friendsOnly.isEmpty {
                                 ReceiptItemSplitAvatars(participants: friendsOnly)
                             }
                         }
+
+                        if let description = transaction.displayDescription {
+                            Text(description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                     }
-                    .frame(maxHeight: 44) // Roughly 2 lines of text
+
+                    Spacer(minLength: 0)
 
                     // Health Score Badge
                     HealthScoreBadge(score: transaction.healthScore, size: .small, style: .subtle)

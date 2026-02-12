@@ -311,10 +311,17 @@ struct SplitItemRow: View {
 
                 // Item details
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(transaction.itemName)
+                    Text(transaction.displayName)
                         .font(.subheadline)
-                        .fontWeight(.medium)
+                        .fontWeight(.semibold)
                         .lineLimit(2)
+
+                    if let description = transaction.displayDescription {
+                        Text(description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
 
                     if transaction.quantity > 1 {
                         Text("Qty: \(transaction.quantity)")

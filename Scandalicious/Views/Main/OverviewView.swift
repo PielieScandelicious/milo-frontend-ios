@@ -1793,9 +1793,9 @@ struct OverviewView: View {
             // Item details
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(item.itemName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.85))
+                    Text(item.displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
                         .lineLimit(1)
 
                     // Split participant avatars
@@ -1804,8 +1804,15 @@ struct OverviewView: View {
                     }
                 }
 
+                if let description = item.displayDescription {
+                    Text(description)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .lineLimit(1)
+                }
+
                 HStack(spacing: 6) {
-                    Text(item.storeName)
+                    Text(item.storeName.capitalized)
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.4))
                         .lineLimit(1)

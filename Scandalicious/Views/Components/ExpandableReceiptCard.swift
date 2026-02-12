@@ -48,7 +48,7 @@ extension APIReceipt: ReceiptDisplayable {
 }
 
 extension APIReceiptItem: ReceiptItemDisplayable {
-    var displayItemName: String { itemName }
+    var displayItemName: String { displayName }
     var displayItemPrice: Double { itemPrice }
     var displayQuantity: Int { quantity }
     var displayHealthScore: Int? { healthScore }
@@ -76,7 +76,7 @@ extension ReceiptUploadResponse: ReceiptDisplayable {
 }
 
 extension ReceiptTransaction: ReceiptItemDisplayable {
-    var displayItemName: String { itemName }
+    var displayItemName: String { displayName }
     var displayItemPrice: Double { itemPrice }
     var displayQuantity: Int { quantity }
     var displayHealthScore: Int? { healthScore }

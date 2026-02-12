@@ -421,6 +421,19 @@ struct APITransaction: Codable, Identifiable {
     let date: String
     let healthScore: Int?  // 0-5 for food items, nil for non-food
     let receiptId: String?  // Receipt ID for split lookup
+    let originalDescription: String?  // Raw OCR text
+    let normalizedBrand: String?  // Brand name
+    let normalizedName: String?  // Cleaned product name
+
+    /// Display name: prefer original_description if available, else item_name
+    var displayName: String {
+        (originalDescription ?? itemName).capitalized
+    }
+
+    /// Subtitle: normalized_brand shown beneath the description
+    var displayDescription: String? {
+        normalizedBrand?.capitalized
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -433,9 +446,12 @@ struct APITransaction: Codable, Identifiable {
         case date
         case healthScore = "health_score"
         case receiptId = "receipt_id"
+        case originalDescription = "original_description"
+        case normalizedBrand = "normalized_brand"
+        case normalizedName = "normalized_name"
     }
 
-    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, healthScore: Int? = nil, receiptId: String? = nil) {
+    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, healthScore: Int? = nil, receiptId: String? = nil, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
         self.id = id
         self.storeName = storeName
         self.itemName = itemName
@@ -446,6 +462,9 @@ struct APITransaction: Codable, Identifiable {
         self.date = date
         self.healthScore = healthScore
         self.receiptId = receiptId
+        self.originalDescription = originalDescription
+        self.normalizedBrand = normalizedBrand
+        self.normalizedName = normalizedName
     }
 
     var dateParsed: Date? {
@@ -643,8 +662,21 @@ struct APIReceiptItem: Codable, Identifiable {
     let unitPrice: Double?
     let category: String
     let healthScore: Int?
+    let originalDescription: String?  // Raw OCR text
+    let normalizedBrand: String?  // Brand name
+    let normalizedName: String?  // Cleaned product name
 
     var id: String { itemId ?? "\(itemName)-\(itemPrice)-\(quantity)" }
+
+    /// Display name: prefer original_description if available, else item_name
+    var displayName: String {
+        (originalDescription ?? itemName).capitalized
+    }
+
+    /// Subtitle: normalized_brand shown beneath the description
+    var displayDescription: String? {
+        normalizedBrand?.capitalized
+    }
 
     enum CodingKeys: String, CodingKey {
         case itemId = "item_id"
@@ -654,6 +686,9 @@ struct APIReceiptItem: Codable, Identifiable {
         case unitPrice = "unit_price"
         case category
         case healthScore = "health_score"
+        case originalDescription = "original_description"
+        case normalizedBrand = "normalized_brand"
+        case normalizedName = "normalized_name"
     }
 
     var totalPrice: Double {
@@ -666,7 +701,7 @@ struct APIReceiptItem: Codable, Identifiable {
     }
 
     /// Manual initializer for creating instances (e.g., previews)
-    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, healthScore: Int?) {
+    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, healthScore: Int?, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
         self.itemId = itemId
         self.itemName = itemName
         self.itemPrice = itemPrice
@@ -674,6 +709,9 @@ struct APIReceiptItem: Codable, Identifiable {
         self.unitPrice = unitPrice
         self.category = category
         self.healthScore = healthScore
+        self.originalDescription = originalDescription
+        self.normalizedBrand = normalizedBrand
+        self.normalizedName = normalizedName
     }
 }
 
@@ -690,7 +728,10 @@ extension APIReceipt {
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
                 category: item.category,
-                healthScore: item.healthScore
+                healthScore: item.healthScore,
+                originalDescription: item.originalDescription,
+                normalizedBrand: item.normalizedBrand,
+                normalizedName: item.normalizedName
             )
         }
 

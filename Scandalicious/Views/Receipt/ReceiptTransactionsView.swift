@@ -450,10 +450,21 @@ struct ReceiptTransactionsView: View {
             // Item details
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(transaction.itemName)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(transaction.displayName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+
+                        if let description = transaction.displayDescription {
+                            Text(description)
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(.white.opacity(0.45))
+                                .lineLimit(1)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
 
                     if let healthScore = transaction.healthScore {
                         HealthScoreBadge(score: healthScore, size: .small, style: .subtle)

@@ -112,9 +112,22 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     let unitPrice: Double?
     let category: String
     let healthScore: Int?  // 0-5 for food items, nil for non-food
+    let originalDescription: String?  // Raw OCR text
+    let normalizedBrand: String?  // Brand name
+    let normalizedName: String?  // Cleaned product name
 
     // Generate a unique ID using UUID to handle duplicate items
     let id: UUID
+
+    /// Display name: prefer original_description if available, else item_name
+    var displayName: String {
+        (originalDescription ?? itemName).capitalized
+    }
+
+    /// Subtitle: normalized_brand shown beneath the description
+    var displayDescription: String? {
+        normalizedBrand?.capitalized
+    }
 
     enum CodingKeys: String, CodingKey {
         case itemId = "item_id"
@@ -124,10 +137,13 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         case unitPrice = "unit_price"
         case category
         case healthScore = "health_score"
+        case originalDescription = "original_description"
+        case normalizedBrand = "normalized_brand"
+        case normalizedName = "normalized_name"
     }
 
     // Custom initializer to generate UUID
-    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, healthScore: Int? = nil) {
+    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, healthScore: Int? = nil, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
         self.itemId = itemId
         self.itemName = itemName
         self.itemPrice = itemPrice
@@ -135,6 +151,9 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         self.unitPrice = unitPrice
         self.category = category
         self.healthScore = healthScore
+        self.originalDescription = originalDescription
+        self.normalizedBrand = normalizedBrand
+        self.normalizedName = normalizedName
         self.id = UUID()
     }
 
@@ -148,6 +167,9 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         unitPrice = try container.decodeIfPresent(Double.self, forKey: .unitPrice)
         category = try container.decode(String.self, forKey: .category)
         healthScore = try container.decodeIfPresent(Int.self, forKey: .healthScore)
+        originalDescription = try container.decodeIfPresent(String.self, forKey: .originalDescription)
+        normalizedBrand = try container.decodeIfPresent(String.self, forKey: .normalizedBrand)
+        normalizedName = try container.decodeIfPresent(String.self, forKey: .normalizedName)
         // Generate a unique ID for each decoded transaction
         id = UUID()
     }
@@ -162,6 +184,9 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         try container.encodeIfPresent(unitPrice, forKey: .unitPrice)
         try container.encode(category, forKey: .category)
         try container.encodeIfPresent(healthScore, forKey: .healthScore)
+        try container.encodeIfPresent(originalDescription, forKey: .originalDescription)
+        try container.encodeIfPresent(normalizedBrand, forKey: .normalizedBrand)
+        try container.encodeIfPresent(normalizedName, forKey: .normalizedName)
     }
 }
 

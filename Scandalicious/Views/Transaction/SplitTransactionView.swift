@@ -145,9 +145,16 @@ struct SplitTransactionView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.itemName)
+                Text(transaction.displayName)
                     .font(.headline)
                     .lineLimit(2)
+
+                if let description = transaction.displayDescription {
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
                 HStack(spacing: 8) {
                     Text(storeName)

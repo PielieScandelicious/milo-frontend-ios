@@ -965,9 +965,9 @@ private struct CategoryTransactionItemRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(transaction.itemName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.85))
+                    Text(transaction.displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.9))
                         .lineLimit(1)
 
                     if transaction.quantity > 1 {
@@ -985,6 +985,13 @@ private struct CategoryTransactionItemRow: View {
                     if !friends.isEmpty {
                         MiniSplitAvatars(participants: friends)
                     }
+                }
+
+                if let description = transaction.displayDescription {
+                    Text(description)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+                        .lineLimit(1)
                 }
             }
 

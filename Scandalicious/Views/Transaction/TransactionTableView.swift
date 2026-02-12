@@ -572,10 +572,17 @@ struct APITransactionTableRow: View {
 
     private var itemDetails: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(transaction.itemName)
+            Text(transaction.displayName)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
+
+            if let description = transaction.displayDescription {
+                Text(description)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.45))
+                    .lineLimit(1)
+            }
 
             Text(transaction.category)
                 .font(.system(size: 12, weight: .medium))

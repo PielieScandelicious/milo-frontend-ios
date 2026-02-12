@@ -86,7 +86,7 @@ class AppDataCache: ObservableObject {
     // MARK: - Disk Cache
 
     /// Bump this version whenever category names change to force cache invalidation
-    private static let cacheVersion = 3
+    private static let cacheVersion = 4
 
     private let cacheFileURL: URL = {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!

@@ -389,8 +389,8 @@ struct CategoryDetailView: View {
             // Item info
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(transaction.itemName)
-                        .font(.system(size: 14, weight: .medium))
+                    Text(transaction.displayName)
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white.opacity(0.9))
                         .lineLimit(1)
 
@@ -412,9 +412,16 @@ struct CategoryDetailView: View {
                     }
                 }
 
+                if let description = transaction.displayDescription {
+                    Text(description)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+                        .lineLimit(1)
+                }
+
                 Text(formatTransactionDate(transaction.dateParsed))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.35))
+                    .foregroundColor(.white.opacity(0.3))
             }
 
             Spacer()

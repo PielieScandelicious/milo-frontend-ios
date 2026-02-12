@@ -572,19 +572,28 @@ struct APITransactionRowView: View {
             // Item details
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Text(transaction.itemName)
+                            Text(transaction.displayName)
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
-                                .fixedSize(horizontal: true, vertical: false)
+                                .lineLimit(1)
 
                             // Split participant avatars (inline with item name)
                             if !friendsOnly.isEmpty {
                                 TransactionSplitAvatars(participants: friendsOnly)
                             }
                         }
+
+                        if let description = transaction.displayDescription {
+                            Text(description)
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(.white.opacity(0.45))
+                                .lineLimit(1)
+                        }
                     }
+
+                    Spacer(minLength: 0)
 
                     // Health Score Badge
                     HealthScoreBadge(score: transaction.healthScore, size: .small, style: .subtle)

@@ -560,9 +560,9 @@ struct CategoryBreakdownDetailView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Text(item.itemName)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white.opacity(0.85))
+                            Text(item.displayName)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.9))
                                 .lineLimit(1)
 
                             if item.quantity > 1 {
@@ -583,10 +583,17 @@ struct CategoryBreakdownDetailView: View {
                             }
                         }
 
+                        if let description = item.displayDescription {
+                            Text(description)
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.45))
+                                .lineLimit(1)
+                        }
+
                         // Store name for context
-                        Text(item.storeName)
+                        Text(item.storeName.capitalized)
                             .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(.white.opacity(0.3))
                             .lineLimit(1)
                     }
 
