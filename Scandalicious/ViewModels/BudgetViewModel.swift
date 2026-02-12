@@ -405,9 +405,11 @@ class BudgetViewModel: ObservableObject {
 
         do {
             let _ = try await apiService.modifyBudget(request: request)
-            AppDataCache.shared.budgetProgressCache = nil
+            // Fetch fresh progress directly — skip loading state to avoid card collapse
+            let progressResponse = try await apiService.getBudgetProgress()
+            state = .active(progressResponse.toBudgetProgress())
+            AppDataCache.shared.updateBudgetProgress(progressResponse)
             AppDataCache.shared.scheduleSaveToDisk()
-            await loadBudget()
             NotificationCenter.default.post(name: .budgetUpdated, object: nil)
             isSaving = false
             return true

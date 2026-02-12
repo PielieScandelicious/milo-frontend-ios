@@ -119,6 +119,18 @@ struct MiniBudgetRing: View {
     var size: CGFloat = 44
 
     @State private var animationProgress: CGFloat = 0
+    @Environment(\.selectedTabIndex) private var selectedTabIndex
+
+    private func replayAnimation() {
+        // Reset without animation, then animate in the next render pass.
+        // Without the delay, SwiftUI coalesces 1.0→0→1.0 into a no-op.
+        animationProgress = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                animationProgress = 1.0
+            }
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -143,11 +155,12 @@ struct MiniBudgetRing: View {
                 .animation(.spring(response: 0.8, dampingFraction: 0.8), value: animationProgress)
         }
         .onAppear {
-            // Reset to 0 and re-animate every time the view appears
-            // (including tab switches from Scan back to View tab)
-            animationProgress = 0
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                animationProgress = 1.0
+            replayAnimation()
+        }
+        .onChange(of: selectedTabIndex) { _, newValue in
+            // Replay sweep when switching to the View tab (rawValue 0)
+            if newValue == 0 {
+                replayAnimation()
             }
         }
     }

@@ -530,6 +530,45 @@ struct BudgetPulseView: View {
             // Header
             setupHeader(title: hasExistingBudget ? "Edit Budget" : "Category Budgets")
 
+            // Monthly total (only when editing an existing budget)
+            if hasExistingBudget {
+                VStack(spacing: 4) {
+                    Text("MONTHLY BUDGET")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundColor(.white.opacity(0.3))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(spacing: 4) {
+                        Text("€")
+                            .font(.system(size: 20, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.3))
+
+                        TextField("0", text: $monthlyAmountText)
+                            .keyboardType(.numberPad)
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .focused($focusedField, equals: .monthly)
+                            .onChange(of: monthlyAmountText) { _, newValue in
+                                let filtered = newValue.filter { $0.isNumber }
+                                if filtered != newValue { monthlyAmountText = filtered }
+                                if let val = Double(filtered), val > 99999 {
+                                    monthlyAmountText = "99999"
+                                }
+                            }
+
+                        Text("/month")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.2))
+
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+            }
+
             // Category list
             if inlineTargets.isEmpty {
                 // Empty state — prompt to add
@@ -620,6 +659,16 @@ struct BudgetPulseView: View {
                 .foregroundColor(.white)
 
             Spacer()
+
+            if hasExistingBudget {
+                Button(action: { showDeleteConfirmation = true }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.white.opacity(0.08)))
+                }
+            }
 
             Button(action: cancelSetup) {
                 Image(systemName: "xmark")
@@ -759,7 +808,12 @@ struct BudgetPulseView: View {
     }
 
     private var canSaveCategories: Bool {
-        !inlineTargets.isEmpty && categoryBudgetTotal > 0 && !viewModel.isSaving
+        if hasExistingBudget {
+            // When editing, allow saving with no categories (clears them)
+            // as long as the monthly amount is valid
+            return monthlyAmount > 0 && !viewModel.isSaving
+        }
+        return !inlineTargets.isEmpty && categoryBudgetTotal > 0 && !viewModel.isSaving
     }
 
     private var saveCategoryButton: some View {
@@ -1021,10 +1075,8 @@ struct BudgetPulseView: View {
                 .filter { $0.amount > 0 }
                 .map { CategoryAllocation(category: $0.category, amount: $0.amount) }
 
-            let total = allocations.reduce(0.0) { $0 + $1.amount }
-
             let success = await viewModel.updateBudgetFull(request: UpdateBudgetRequest(
-                monthlyAmount: total,
+                monthlyAmount: monthlyAmount,
                 categoryAllocations: allocations,
                 isSmartBudget: isSmartBudget
             ))
