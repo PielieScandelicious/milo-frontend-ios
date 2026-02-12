@@ -12,48 +12,76 @@ import Combine
 @MainActor
 class PromosViewModel: ObservableObject {
     @Published var state: LoadingState<PromoRecommendationResponse> = .idle
-    @Published var isRefreshing = false
 
     private let apiService = PromoAPIService.shared
+    private var hasFetchedThisSession = false
 
-    // MARK: - Load (always fresh — no caching, dachshund sniffs every time)
+    // MARK: - Cache
 
-    func loadPromos(forceRefresh: Bool = false) async {
-        // If we already have data and not forcing refresh, skip re-fetch
-        if case .success = state, !forceRefresh {
+    private static var cacheFileURL: URL {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        return caches.appendingPathComponent("promos_cache.json")
+    }
+
+    private func saveToCache(_ response: PromoRecommendationResponse) {
+        do {
+            let data = try JSONEncoder().encode(response)
+            try data.write(to: Self.cacheFileURL)
+            print("[PromosVM] cached to disk")
+        } catch {
+            print("[PromosVM] cache write failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func loadFromCache() -> PromoRecommendationResponse? {
+        guard let data = try? Data(contentsOf: Self.cacheFileURL),
+              let response = try? JSONDecoder().decode(PromoRecommendationResponse.self, from: data) else {
+            return nil
+        }
+        print("[PromosVM] loaded from disk cache")
+        return response
+    }
+
+    // MARK: - Load (once per app launch, then cached)
+
+    func loadPromos() async {
+        // Already have data this session — skip
+        if case .success = state {
             print("[PromosVM] loadPromos skipped — data already loaded")
             return
         }
 
-        print("[PromosVM] loadPromos called — fetching fresh")
-        state = .loading
+        // Show cached data immediately while fetching
+        if let cached = loadFromCache() {
+            state = .success(cached)
+        }
 
+        // Only fetch from API once per app session (allow retry on error)
+        if hasFetchedThisSession, case .success = state { return }
+        hasFetchedThisSession = true
+
+        // If no cache yet, show loading state
+        if case .idle = state {
+            state = .loading
+        } else if case .error = state {
+            state = .loading
+        }
+
+        print("[PromosVM] fetching from API")
         do {
             let response = try await apiService.getRecommendations()
             state = .success(response)
+            saveToCache(response)
             print("[PromosVM] success: \(response.dealCount) deals, €\(response.weeklySavings) savings")
         } catch {
-            state = .error(error.localizedDescription)
-            print("[PromosVM] error: \(error.localizedDescription)")
-        }
-    }
-
-    func refresh() async {
-        isRefreshing = true
-        // During pull-to-refresh, keep current data visible
-        do {
-            let response = try await apiService.getRecommendations()
-            state = .success(response)
-            print("[PromosVM] refresh success: \(response.dealCount) deals")
-        } catch {
+            // If we already have cached data, keep showing it
             if case .success = state {
-                print("[PromosVM] refresh failed, keeping current data: \(error.localizedDescription)")
+                print("[PromosVM] API failed, keeping cached data: \(error.localizedDescription)")
             } else {
                 state = .error(error.localizedDescription)
+                print("[PromosVM] error: \(error.localizedDescription)")
             }
-            print("[PromosVM] refresh error: \(error.localizedDescription)")
         }
-        isRefreshing = false
     }
 
     // MARK: - Convenience for banner
