@@ -57,14 +57,14 @@ struct BudgetSetupView: View {
                     .onTapGesture { focusedField = nil }
 
                 ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 16) {
                         monthlySection
                         categorySection
                         autoRenewToggle
                         saveButton
                     }
                     .padding(.horizontal, 20)
-                    .padding(.top, 12)
+                    .padding(.top, 16)
                     .padding(.bottom, 40)
                 }
                 .scrollDismissesKeyboard(.interactively)
@@ -117,19 +117,21 @@ struct BudgetSetupView: View {
     // MARK: - Monthly Section
 
     private var monthlySection: some View {
-        VStack(spacing: 16) {
-            Text("Monthly grocery budget")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.5))
+        VStack(spacing: 8) {
+            Text("MONTHLY BUDGET")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.5)
+                .foregroundColor(.white.opacity(0.35))
 
-            HStack(spacing: 4) {
+            HStack(spacing: 2) {
                 Text("€")
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
+                    .font(.system(size: 32, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.3))
+                    .offset(y: -4)
 
                 TextField("0", text: $monthlyAmountText)
                     .keyboardType(.numberPad)
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.system(size: 56, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
                     .fixedSize(horizontal: true, vertical: false)
                     .focused($focusedField, equals: .monthly)
@@ -144,12 +146,28 @@ struct BudgetSetupView: View {
 
             Text("per month")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundColor(.white.opacity(0.25))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
+        .padding(.vertical, 32)
         .padding(.horizontal, 20)
-        .background(cardBackground)
+        .background(
+            ZStack {
+                cardBackground
+                // Subtle top accent glow
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.4, green: 0.35, blue: 1.0).opacity(0.08),
+                                Color.clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                    )
+            }
+        )
         .overlay(cardBorder)
         .contentShape(Rectangle())
         .onTapGesture { focusedField = .monthly }
@@ -161,22 +179,29 @@ struct BudgetSetupView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Category targets")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white)
+                Text("CATEGORY TARGETS")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundColor(.white.opacity(0.4))
 
                 Spacer()
 
                 Text("Optional")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.3))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.white.opacity(0.06)))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.25))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.05))
+                            .overlay(
+                                Capsule().strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
+                            )
+                    )
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, categoryTargets.isEmpty ? 4 : 12)
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, categoryTargets.isEmpty ? 6 : 14)
 
             // Category rows
             if !categoryTargets.isEmpty {
@@ -199,13 +224,18 @@ struct BudgetSetupView: View {
             Button(action: { showCategoryPicker = true }) {
                 HStack(spacing: 6) {
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                     Text("Add category")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                 }
-                .foregroundColor(Color(red: 0.4, green: 0.65, blue: 1.0))
+                .foregroundColor(Color(red: 0.45, green: 0.6, blue: 1.0))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(red: 0.4, green: 0.55, blue: 1.0).opacity(0.06))
+                )
+                .padding(.horizontal, 14)
             }
 
             // Info text
@@ -213,10 +243,11 @@ struct BudgetSetupView: View {
                  ? "Set limits on categories you want to keep an eye on."
                  : "Independent limits — they don't need to add up to your monthly budget.")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.white.opacity(0.25))
+                .foregroundColor(.white.opacity(0.2))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
-                .padding(.bottom, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
         }
         .background(cardBackground)
         .overlay(cardBorder)
@@ -224,23 +255,24 @@ struct BudgetSetupView: View {
 
     private func categoryRow(index: Int) -> some View {
         let target = categoryTargets[index]
+        let isFocused = focusedField == .category(target.id)
 
         return HStack(spacing: 12) {
             // Icon
             ZStack {
                 Circle()
-                    .fill(target.category.categoryColor.opacity(0.15))
-                    .frame(width: 40, height: 40)
+                    .fill(target.category.categoryColor.opacity(0.12))
+                    .frame(width: 38, height: 38)
 
                 Image(systemName: target.category.categoryIcon)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(target.category.categoryColor)
             }
 
             // Name
             Text(target.category.normalizedCategoryName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.85))
                 .lineLimit(1)
 
             Spacer()
@@ -248,8 +280,8 @@ struct BudgetSetupView: View {
             // Amount input pill
             HStack(spacing: 2) {
                 Text("€")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.4))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
 
                 TextField("0", text: $categoryTargets[index].amountText)
                     .keyboardType(.numberPad)
@@ -268,8 +300,17 @@ struct BudgetSetupView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(focusedField == .category(target.id) ? 0.1 : 0.05))
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white.opacity(isFocused ? 0.10 : 0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(
+                        isFocused
+                            ? Color(red: 0.45, green: 0.55, blue: 1.0).opacity(0.3)
+                            : Color.clear,
+                        lineWidth: 1
+                    )
             )
 
             // Remove
@@ -280,11 +321,11 @@ struct BudgetSetupView: View {
                 }
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(.white.opacity(0.2))
+                    .font(.system(size: 17))
+                    .foregroundColor(.white.opacity(0.15))
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
 
@@ -293,30 +334,31 @@ struct BudgetSetupView: View {
     private var autoRenewToggle: some View {
         HStack(spacing: 14) {
             Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(Color(red: 0.4, green: 0.65, blue: 1.0))
-                .frame(width: 40, height: 40)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color(red: 0.45, green: 0.6, blue: 1.0))
+                .frame(width: 38, height: 38)
                 .background(
-                    Circle().fill(Color(red: 0.4, green: 0.65, blue: 1.0).opacity(0.12))
+                    Circle().fill(Color(red: 0.4, green: 0.55, blue: 1.0).opacity(0.10))
                 )
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Auto-renew monthly")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.white.opacity(0.9))
 
                 Text("Reuse this budget every month")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.35))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.white.opacity(0.3))
             }
 
             Spacer()
 
             Toggle("", isOn: $isSmartBudget)
                 .labelsHidden()
-                .tint(Color(red: 0.4, green: 0.65, blue: 1.0))
+                .tint(Color(red: 0.45, green: 0.55, blue: 1.0))
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(cardBackground)
         .overlay(cardBorder)
     }
@@ -330,44 +372,66 @@ struct BudgetSetupView: View {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Text(isEditing ? "Update Budget" : "Create Budget")
-                        .font(.system(size: 17, weight: .bold))
+                    Text(isEditing ? "Update Budget" : "Set Budget")
+                        .font(.system(size: 16, weight: .bold))
                 }
             }
-            .foregroundColor(canSave ? .white : .white.opacity(0.35))
+            .foregroundColor(canSave ? .white : .white.opacity(0.3))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
+            .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(
-                        LinearGradient(
-                            colors: canSave
-                                ? [Color(red: 0.35, green: 0.3, blue: 0.95), Color(red: 0.55, green: 0.4, blue: 1.0)]
-                                : [Color(white: 0.12), Color(white: 0.12)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                        canSave
+                            ? AnyShapeStyle(LinearGradient(
+                                colors: [Color(red: 0.35, green: 0.30, blue: 0.90), Color(red: 0.50, green: 0.35, blue: 1.0)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            : AnyShapeStyle(Color(white: 0.10))
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        canSave
+                            ? Color.white.opacity(0.12)
+                            : Color.white.opacity(0.04),
+                        lineWidth: 0.5
                     )
             )
         }
         .disabled(!canSave)
         .shadow(
-            color: canSave ? Color(red: 0.5, green: 0.3, blue: 1.0).opacity(0.3) : .clear,
-            radius: 12, y: 4
+            color: canSave ? Color(red: 0.45, green: 0.30, blue: 1.0).opacity(0.25) : .clear,
+            radius: 16, y: 6
         )
-        .padding(.top, 8)
+        .padding(.top, 10)
     }
 
     // MARK: - Card Styling
 
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 20)
-            .fill(Color(white: 0.09))
+        RoundedRectangle(cornerRadius: 22)
+            .fill(
+                LinearGradient(
+                    colors: [Color(white: 0.10), Color(white: 0.07)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
     }
 
     private var cardBorder: some View {
-        RoundedRectangle(cornerRadius: 20)
-            .stroke(Color.white.opacity(0.07), lineWidth: 0.5)
+        RoundedRectangle(cornerRadius: 22)
+            .strokeBorder(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.10), Color.white.opacity(0.04)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 0.5
+            )
     }
 
     // MARK: - Actions

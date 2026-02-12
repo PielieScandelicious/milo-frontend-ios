@@ -7,6 +7,13 @@
 
 import SwiftUI
 
+// MARK: - Budget Mode
+
+private enum BudgetMode {
+    case total       // Single monthly amount
+    case byCategory  // Per-category limits
+}
+
 // MARK: - Inline Target
 
 private struct InlineTarget: Identifiable {
@@ -35,6 +42,10 @@ struct BudgetPulseView: View {
 
     // Inline setup / editing
     @State private var isSettingUp = false
+    @State private var showingModeChooser = false
+    @State private var selectedMode: BudgetMode? = nil
+    @State private var isMonthlyConfigured = false
+    @State private var isCategoriesConfigured = false
     @State private var monthlyAmountText = "500"
     @State private var inlineTargets: [InlineTarget] = []
     @State private var isSmartBudget = true
@@ -95,10 +106,15 @@ struct BudgetPulseView: View {
             .overlay(premiumCardBorder)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isSettingUp)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isExpanded)
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showingModeChooser)
             .onReceive(NotificationCenter.default.publisher(for: .budgetDeleted)) { _ in
                 isExpanded = false
                 showingCategoryDetail = false
                 isSettingUp = false
+                showingModeChooser = false
+                selectedMode = nil
+                isMonthlyConfigured = false
+                isCategoriesConfigured = false
             }
             .sheet(isPresented: $showCategoryPicker) {
                 CategoryPickerSheet(
@@ -183,9 +199,27 @@ struct BudgetPulseView: View {
 
     private var inlineSetupView: some View {
         VStack(spacing: 0) {
+            if showingModeChooser && !hasExistingBudget {
+                modeChooserView
+            } else if selectedMode == .byCategory || (hasExistingBudget && viewModel.currentBudget?.categoryAllocations?.isEmpty == false) {
+                categoryBudgetSetupView
+            } else {
+                totalBudgetSetupView
+            }
+        }
+    }
+
+    // MARK: - Mode Chooser
+
+    private var canCreateBudget: Bool {
+        (isMonthlyConfigured || isCategoriesConfigured) && !viewModel.isSaving
+    }
+
+    private var modeChooserView: some View {
+        VStack(spacing: 0) {
             // Header
             HStack {
-                Text(hasExistingBudget ? "Edit Budget" : "Set Budget")
+                Text("Set Budget")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
 
@@ -199,22 +233,215 @@ struct BudgetPulseView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
-            .padding(.bottom, 12)
+            .padding(.bottom, 6)
+
+            Text("How do you want to track your groceries?")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.4))
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+
+            // Option cards
+            VStack(spacing: 10) {
+                // Total budget option
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        selectedMode = .total
+                        showingModeChooser = false
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        focusedField = .monthly
+                    }
+                } label: {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(
+                                    LinearGradient(
+                                        colors: isMonthlyConfigured
+                                            ? [Color(red: 0.2, green: 0.75, blue: 0.5).opacity(0.25), Color(red: 0.15, green: 0.6, blue: 0.4).opacity(0.15)]
+                                            : [Color(red: 0.2, green: 0.75, blue: 0.5).opacity(0.15), Color(red: 0.15, green: 0.6, blue: 0.4).opacity(0.08)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 44, height: 44)
+
+                            Image(systemName: isMonthlyConfigured ? "checkmark.circle.fill" : "dollarsign.circle.fill")
+                                .font(.system(size: 22, weight: .medium))
+                                .foregroundColor(Color(red: 0.25, green: 0.8, blue: 0.55))
+                        }
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Total monthly budget")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            if isMonthlyConfigured {
+                                Text(String(format: "€%.0f / month", monthlyAmount))
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
+                            } else {
+                                Text("Set one amount for all groceries")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
+                        }
+
+                        Spacer()
+
+                        Image(systemName: isMonthlyConfigured ? "pencil" : "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.25))
+                    }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white.opacity(isMonthlyConfigured ? 0.06 : 0.04))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(
+                                        isMonthlyConfigured
+                                            ? Color(red: 0.25, green: 0.8, blue: 0.55).opacity(0.2)
+                                            : Color.white.opacity(0.06),
+                                        lineWidth: isMonthlyConfigured ? 1 : 0.5
+                                    )
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                // By category option
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        selectedMode = .byCategory
+                        showingModeChooser = false
+                    }
+                } label: {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(
+                                    LinearGradient(
+                                        colors: isCategoriesConfigured
+                                            ? [Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.25), Color(red: 0.3, green: 0.4, blue: 0.9).opacity(0.15)]
+                                            : [Color(red: 0.4, green: 0.5, blue: 1.0).opacity(0.15), Color(red: 0.3, green: 0.4, blue: 0.9).opacity(0.08)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 44, height: 44)
+
+                            Image(systemName: isCategoriesConfigured ? "checkmark.circle.fill" : "square.grid.2x2.fill")
+                                .font(.system(size: isCategoriesConfigured ? 22 : 20, weight: .medium))
+                                .foregroundColor(Color(red: 0.5, green: 0.6, blue: 1.0))
+                        }
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Budget by category")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            if isCategoriesConfigured {
+                                let count = inlineTargets.filter { $0.amount > 0 }.count
+                                Text("\(count) categor\(count == 1 ? "y" : "ies") · \(String(format: "€%.0f", categoryBudgetTotal))")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(Color(red: 0.5, green: 0.6, blue: 1.0))
+                            } else {
+                                Text("Set limits per category")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
+                        }
+
+                        Spacer()
+
+                        Image(systemName: isCategoriesConfigured ? "pencil" : "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.25))
+                    }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white.opacity(isCategoriesConfigured ? 0.06 : 0.04))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(
+                                        isCategoriesConfigured
+                                            ? Color(red: 0.5, green: 0.6, blue: 1.0).opacity(0.2)
+                                            : Color.white.opacity(0.06),
+                                        lineWidth: isCategoriesConfigured ? 1 : 0.5
+                                    )
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding(.horizontal, 16)
+
+            // Auto-renew (show once at least one is configured)
+            if isMonthlyConfigured || isCategoriesConfigured {
+                autoRenewRow
+                    .padding(.top, 8)
+            }
+
+            // Create Budget button
+            Button(action: createFinalBudget) {
+                Group {
+                    if viewModel.isSaving {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Create Budget")
+                            .font(.system(size: 15, weight: .bold))
+                    }
+                }
+                .foregroundColor(canCreateBudget ? .white : .white.opacity(0.3))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            canCreateBudget
+                                ? LinearGradient(
+                                    colors: [Color(red: 0.15, green: 0.7, blue: 0.4), Color(red: 0.2, green: 0.8, blue: 0.45)],
+                                    startPoint: .topLeading, endPoint: .bottomTrailing)
+                                : LinearGradient(
+                                    colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)],
+                                    startPoint: .leading, endPoint: .trailing)
+                        )
+                )
+                .shadow(color: canCreateBudget ? Color(red: 0.15, green: 0.7, blue: 0.4).opacity(0.3) : .clear, radius: 8, y: 3)
+            }
+            .disabled(!canCreateBudget)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 18)
+        }
+    }
+
+    // MARK: - Total Budget Setup
+
+    private var totalBudgetSetupView: some View {
+        VStack(spacing: 0) {
+            // Header
+            setupHeader(title: hasExistingBudget ? "Edit Budget" : "Monthly Budget")
 
             // Monthly amount
             VStack(spacing: 6) {
-                Text("Monthly grocery budget")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
+                Text("MONTHLY BUDGET")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundColor(.white.opacity(0.3))
 
-                HStack(spacing: 4) {
+                HStack(spacing: 2) {
                     Text("€")
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.4))
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.3))
+                        .offset(y: -3)
 
                     TextField("0", text: $monthlyAmountText)
                         .keyboardType(.numberPad)
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .font(.system(size: 44, weight: .heavy, design: .rounded))
                         .foregroundColor(.white)
                         .fixedSize(horizontal: true, vertical: false)
                         .focused($focusedField, equals: .monthly)
@@ -229,15 +456,60 @@ struct BudgetPulseView: View {
 
                 Text("per month")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.25))
+                    .foregroundColor(.white.opacity(0.2))
             }
             .frame(maxWidth: .infinity)
             .padding(.bottom, 16)
             .contentShape(Rectangle())
             .onTapGesture { focusedField = .monthly }
 
-            // Category targets
-            if !inlineTargets.isEmpty {
+            // Auto-renew only shown when editing (for new budgets it's on the chooser)
+            if hasExistingBudget {
+                autoRenewRow
+            }
+
+            saveSetupButton
+        }
+    }
+
+    // MARK: - Category Budget Setup
+
+    private var categoryBudgetSetupView: some View {
+        VStack(spacing: 0) {
+            // Header
+            setupHeader(title: hasExistingBudget ? "Edit Budget" : "Category Budgets")
+
+            // Category list
+            if inlineTargets.isEmpty {
+                // Empty state — prompt to add
+                VStack(spacing: 10) {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundColor(.white.opacity(0.15))
+
+                    Text("Add categories you want to track")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.35))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
+                // Category total
+                HStack {
+                    Text("TOTAL")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.0)
+                        .foregroundColor(.white.opacity(0.3))
+
+                    Spacer()
+
+                    Text(String(format: "€%.0f", categoryBudgetTotal))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+
                 ForEach(Array(inlineTargets.enumerated()), id: \.element.id) { index, _ in
                     setupCategoryRow(index: index)
                 }
@@ -249,87 +521,231 @@ struct BudgetPulseView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
-                    Text("Add category target")
+                    Text("Add category")
                         .font(.system(size: 13, weight: .semibold))
                 }
-                .foregroundColor(Color(red: 0.4, green: 0.65, blue: 1.0))
-            }
-            .padding(.vertical, 8)
-
-            // Auto-renew
-            Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                    isSmartBudget.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(isSmartBudget ? Color(red: 0.4, green: 0.65, blue: 1.0) : .white.opacity(0.2))
-
-                    Text("Auto-renew")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(isSmartBudget ? Color(red: 0.4, green: 0.65, blue: 1.0).opacity(0.85) : .white.opacity(0.25))
-
-                    Spacer()
-
-                    // Mini toggle pill
-                    ZStack(alignment: isSmartBudget ? .trailing : .leading) {
-                        Capsule()
-                            .fill(isSmartBudget
-                                  ? Color(red: 0.3, green: 0.55, blue: 1.0).opacity(0.5)
-                                  : Color.white.opacity(0.08))
-                            .frame(width: 34, height: 20)
-
-                        Circle()
-                            .fill(isSmartBudget
-                                  ? Color(red: 0.4, green: 0.65, blue: 1.0)
-                                  : Color.white.opacity(0.25))
-                            .frame(width: 16, height: 16)
-                            .padding(.horizontal, 2)
-                            .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
-                    }
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-
-            // Save button
-            Button(action: saveInlineBudget) {
-                Group {
-                    if viewModel.isSaving {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Text(hasExistingBudget ? "Save" : "Create Budget")
-                            .font(.system(size: 15, weight: .bold))
-                    }
-                }
-                .foregroundColor(canSave ? .white : .white.opacity(0.3))
+                .foregroundColor(Color(red: 0.45, green: 0.6, blue: 1.0))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(
-                            canSave
-                                ? LinearGradient(
-                                    colors: [Color(red: 0.15, green: 0.7, blue: 0.4), Color(red: 0.2, green: 0.8, blue: 0.45)],
-                                    startPoint: .topLeading, endPoint: .bottomTrailing
-                                  )
-                                : LinearGradient(
-                                    colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)],
-                                    startPoint: .leading, endPoint: .trailing
-                                  )
-                        )
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(red: 0.4, green: 0.55, blue: 1.0).opacity(0.06))
                 )
-                .shadow(color: canSave ? Color(red: 0.15, green: 0.7, blue: 0.4).opacity(0.3) : .clear, radius: 8, y: 3)
+                .padding(.horizontal, 20)
             }
-            .disabled(!canSave)
-            .padding(.horizontal, 20)
-            .padding(.top, 6)
-            .padding(.bottom, 18)
+            .padding(.vertical, 4)
+
+            // Auto-renew only shown when editing (for new budgets it's on the chooser)
+            if hasExistingBudget {
+                autoRenewRow
+            }
+
+            saveCategoryButton
         }
+    }
+
+    // MARK: - Shared Setup Components
+
+    private func setupHeader(title: String) -> some View {
+        HStack {
+            if !hasExistingBudget && selectedMode != nil {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        showingModeChooser = true
+                        selectedMode = nil
+                        focusedField = nil
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+            }
+
+            Text(title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Button(action: cancelSetup) {
+                Text("Cancel")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 12)
+    }
+
+    private var autoRenewRow: some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                isSmartBudget.toggle()
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(isSmartBudget ? Color(red: 0.45, green: 0.6, blue: 1.0) : .white.opacity(0.2))
+
+                Text("Auto-renew")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isSmartBudget ? Color(red: 0.45, green: 0.6, blue: 1.0).opacity(0.85) : .white.opacity(0.25))
+
+                Spacer()
+
+                ZStack(alignment: isSmartBudget ? .trailing : .leading) {
+                    Capsule()
+                        .fill(isSmartBudget
+                              ? Color(red: 0.35, green: 0.5, blue: 1.0).opacity(0.5)
+                              : Color.white.opacity(0.08))
+                        .frame(width: 34, height: 20)
+
+                    Circle()
+                        .fill(isSmartBudget
+                              ? Color(red: 0.45, green: 0.6, blue: 1.0)
+                              : Color.white.opacity(0.25))
+                        .frame(width: 16, height: 16)
+                        .padding(.horizontal, 2)
+                        .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+    }
+
+    private var saveSetupButton: some View {
+        Group {
+            if hasExistingBudget {
+                // Editing: save directly to backend
+                Button(action: saveInlineBudget) {
+                    Group {
+                        if viewModel.isSaving {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Save")
+                                .font(.system(size: 15, weight: .bold))
+                        }
+                    }
+                    .foregroundColor(canSave ? .white : .white.opacity(0.3))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(
+                                canSave
+                                    ? LinearGradient(
+                                        colors: [Color(red: 0.15, green: 0.7, blue: 0.4), Color(red: 0.2, green: 0.8, blue: 0.45)],
+                                        startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    : LinearGradient(
+                                        colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)],
+                                        startPoint: .leading, endPoint: .trailing)
+                            )
+                    )
+                    .shadow(color: canSave ? Color(red: 0.15, green: 0.7, blue: 0.4).opacity(0.3) : .clear, radius: 8, y: 3)
+                }
+                .disabled(!canSave)
+            } else {
+                // New budget: confirm and return to chooser
+                Button(action: confirmMonthlySetup) {
+                    Text("Done")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(canSave ? .white : .white.opacity(0.3))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(
+                                    canSave
+                                        ? LinearGradient(
+                                            colors: [Color(red: 0.15, green: 0.7, blue: 0.4), Color(red: 0.2, green: 0.8, blue: 0.45)],
+                                            startPoint: .topLeading, endPoint: .bottomTrailing)
+                                        : LinearGradient(
+                                            colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)],
+                                            startPoint: .leading, endPoint: .trailing)
+                                )
+                        )
+                        .shadow(color: canSave ? Color(red: 0.15, green: 0.7, blue: 0.4).opacity(0.3) : .clear, radius: 8, y: 3)
+                }
+                .disabled(!canSave)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 18)
+    }
+
+    private var categoryBudgetTotal: Double {
+        inlineTargets.reduce(0) { $0 + $1.amount }
+    }
+
+    private var canSaveCategories: Bool {
+        !inlineTargets.isEmpty && categoryBudgetTotal > 0 && !viewModel.isSaving
+    }
+
+    private var saveCategoryButton: some View {
+        Group {
+            if hasExistingBudget {
+                // Editing: save directly to backend
+                Button(action: saveCategoryBudget) {
+                    Group {
+                        if viewModel.isSaving {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Save")
+                                .font(.system(size: 15, weight: .bold))
+                        }
+                    }
+                    .foregroundColor(canSaveCategories ? .white : .white.opacity(0.3))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(
+                                canSaveCategories
+                                    ? LinearGradient(
+                                        colors: [Color(red: 0.15, green: 0.7, blue: 0.4), Color(red: 0.2, green: 0.8, blue: 0.45)],
+                                        startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    : LinearGradient(
+                                        colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)],
+                                        startPoint: .leading, endPoint: .trailing)
+                            )
+                    )
+                    .shadow(color: canSaveCategories ? Color(red: 0.15, green: 0.7, blue: 0.4).opacity(0.3) : .clear, radius: 8, y: 3)
+                }
+                .disabled(!canSaveCategories)
+            } else {
+                // New budget: confirm and return to chooser
+                Button(action: confirmCategorySetup) {
+                    Text("Done")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(canSaveCategories ? .white : .white.opacity(0.3))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(
+                                    canSaveCategories
+                                        ? LinearGradient(
+                                            colors: [Color(red: 0.15, green: 0.7, blue: 0.4), Color(red: 0.2, green: 0.8, blue: 0.45)],
+                                            startPoint: .topLeading, endPoint: .bottomTrailing)
+                                        : LinearGradient(
+                                            colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)],
+                                            startPoint: .leading, endPoint: .trailing)
+                                )
+                        )
+                        .shadow(color: canSaveCategories ? Color(red: 0.15, green: 0.7, blue: 0.4).opacity(0.3) : .clear, radius: 8, y: 3)
+                }
+                .disabled(!canSaveCategories)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 18)
     }
 
     private func setupCategoryRow(index: Int) -> some View {
@@ -404,19 +820,22 @@ struct BudgetPulseView: View {
                 InlineTarget(category: $0.category, amount: $0.amount)
             }
             isSmartBudget = budget.isSmartBudget
+            // Editing: skip the chooser, go straight to form
+            showingModeChooser = false
+            let hasCats = !(budget.categoryAllocations ?? []).isEmpty
+            selectedMode = hasCats ? .byCategory : .total
         } else {
             monthlyAmountText = "500"
             inlineTargets = []
             isSmartBudget = true
+            // New budget: show the mode chooser
+            showingModeChooser = true
+            selectedMode = nil
         }
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             isSettingUp = true
             isExpanded = true
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            focusedField = .monthly
         }
     }
 
@@ -424,42 +843,117 @@ struct BudgetPulseView: View {
         focusedField = nil
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             isSettingUp = false
+            showingModeChooser = false
+            selectedMode = nil
+            isMonthlyConfigured = false
+            isCategoriesConfigured = false
             if !viewModel.state.hasBudget {
                 isExpanded = false
             }
         }
     }
 
-    private func saveInlineBudget() {
+    /// "Done" in the total-budget sub-form → mark configured, return to chooser
+    private func confirmMonthlySetup() {
+        focusedField = nil
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            isMonthlyConfigured = true
+            showingModeChooser = true
+            selectedMode = nil
+        }
+    }
+
+    /// "Done" in the category sub-form → mark configured, return to chooser
+    private func confirmCategorySetup() {
+        focusedField = nil
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            isCategoriesConfigured = true
+            showingModeChooser = true
+            selectedMode = nil
+        }
+    }
+
+    /// "Create Budget" on the chooser → actually save to backend
+    private func createFinalBudget() {
         focusedField = nil
 
         Task {
-            let allocations: [CategoryAllocation]? = {
-                let targets = inlineTargets
+            let amount: Double
+            let allocations: [CategoryAllocation]?
+
+            if isCategoriesConfigured {
+                let cats = inlineTargets
                     .filter { $0.amount > 0 }
                     .map { CategoryAllocation(category: $0.category, amount: $0.amount) }
-                return targets.isEmpty ? nil : targets
-            }()
+                allocations = cats.isEmpty ? nil : cats
 
-            let success: Bool
-
-            if hasExistingBudget {
-                success = await viewModel.updateBudgetFull(request: UpdateBudgetRequest(
-                    monthlyAmount: monthlyAmount,
-                    categoryAllocations: allocations,
-                    isSmartBudget: isSmartBudget
-                ))
+                // If monthly is also configured, use that amount; otherwise sum categories
+                amount = isMonthlyConfigured ? monthlyAmount : cats.reduce(0.0) { $0 + $1.amount }
             } else {
-                success = await viewModel.createBudget(
-                    amount: monthlyAmount,
-                    categoryAllocations: allocations,
-                    isSmartBudget: isSmartBudget
-                )
+                // Monthly only
+                amount = monthlyAmount
+                allocations = nil
             }
+
+            let success = await viewModel.createBudget(
+                amount: amount,
+                categoryAllocations: allocations,
+                isSmartBudget: isSmartBudget
+            )
 
             if success {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     isSettingUp = false
+                    showingModeChooser = false
+                    selectedMode = nil
+                    isMonthlyConfigured = false
+                    isCategoriesConfigured = false
+                }
+            }
+        }
+    }
+
+    /// Direct save when editing an existing budget (total mode)
+    private func saveInlineBudget() {
+        focusedField = nil
+
+        Task {
+            let success = await viewModel.updateBudgetFull(request: UpdateBudgetRequest(
+                monthlyAmount: monthlyAmount,
+                categoryAllocations: nil,
+                isSmartBudget: isSmartBudget
+            ))
+
+            if success {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isSettingUp = false
+                    selectedMode = nil
+                }
+            }
+        }
+    }
+
+    /// Direct save when editing an existing budget (category mode)
+    private func saveCategoryBudget() {
+        focusedField = nil
+
+        Task {
+            let allocations = inlineTargets
+                .filter { $0.amount > 0 }
+                .map { CategoryAllocation(category: $0.category, amount: $0.amount) }
+
+            let total = allocations.reduce(0.0) { $0 + $1.amount }
+
+            let success = await viewModel.updateBudgetFull(request: UpdateBudgetRequest(
+                monthlyAmount: total,
+                categoryAllocations: allocations,
+                isSmartBudget: isSmartBudget
+            ))
+
+            if success {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isSettingUp = false
+                    selectedMode = nil
                 }
             }
         }
