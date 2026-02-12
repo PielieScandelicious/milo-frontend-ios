@@ -660,7 +660,7 @@ struct WelcomeView: View {
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
 
-                    Text("Your helpfull shopping assistant")
+                    Text("Your helpfull shopping doggo")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                 }
@@ -671,12 +671,12 @@ struct WelcomeView: View {
             // Sample prompts in premium glass card
             VStack(spacing: 0) {
                 SamplePromptCard(
-                    icon: "leaf.fill",
-                    iconColor: Color(red: 0.2, green: 0.8, blue: 0.4),
-                    title: "Analyze my diet",
-                    subtitle: "Do I have enough protein?"
+                    icon: "fork.knife",
+                    iconColor: Color(red: 1.0, green: 0.6, blue: 0.2),
+                    title: "Cook with what I bought",
+                    subtitle: "Recipes from my last haul"
                 ) {
-                    messageText = "Do I have enough protein in my diet?"
+                    messageText = "What meals can I cook using the items from my most recent grocery receipt?"
                     onSend()
                 }
 
@@ -686,15 +686,15 @@ struct WelcomeView: View {
                     endPoint: .trailing
                 )
                 .frame(height: 0.5)
-                .padding(.leading, 52)
+                .padding(.leading, 50)
 
                 SamplePromptCard(
-                    icon: "chart.pie.fill",
-                    iconColor: .orange,
-                    title: "Review spending",
-                    subtitle: "What's my biggest expense?"
+                    icon: "wand.and.stars",
+                    iconColor: Color(red: 0.4, green: 0.75, blue: 1.0),
+                    title: "Predict my next list",
+                    subtitle: "What I'll need to restock soon"
                 ) {
-                    messageText = "What's my biggest expense category?"
+                    messageText = "Based on my purchase history, what grocery items will I likely need to restock soon?"
                     onSend()
                 }
 
@@ -704,15 +704,15 @@ struct WelcomeView: View {
                     endPoint: .trailing
                 )
                 .frame(height: 0.5)
-                .padding(.leading, 52)
+                .padding(.leading, 50)
 
                 SamplePromptCard(
-                    icon: "cart.fill",
-                    iconColor: Color(red: 0.4, green: 0.7, blue: 1.0),
-                    title: "Shopping habits",
-                    subtitle: "Am I buying enough vegetables?"
+                    icon: "chart.line.uptrend.xyaxis",
+                    iconColor: Color(red: 1.0, green: 0.45, blue: 0.4),
+                    title: "Spot the price creep",
+                    subtitle: "Are my groceries getting pricier?"
                 ) {
-                    messageText = "Am I buying enough vegetables?"
+                    messageText = "Are any of my regularly purchased grocery items getting more expensive over time?"
                     onSend()
                 }
 
@@ -722,15 +722,15 @@ struct WelcomeView: View {
                     endPoint: .trailing
                 )
                 .frame(height: 0.5)
-                .padding(.leading, 52)
+                .padding(.leading, 50)
 
                 SamplePromptCard(
-                    icon: "banknote.fill",
-                    iconColor: Color(red: 0.3, green: 0.85, blue: 0.6),
-                    title: "Save money",
-                    subtitle: "Where can I cut costs?"
+                    icon: "heart.fill",
+                    iconColor: Color(red: 1.0, green: 0.4, blue: 0.6),
+                    title: "Rate my basket",
+                    subtitle: "Nutrition score breakdown"
                 ) {
-                    messageText = "Where can I save money?"
+                    messageText = "Analyze the nutritional balance of my recent grocery purchases and give me a health score"
                     onSend()
                 }
             }
@@ -797,16 +797,10 @@ struct SamplePromptCard: View {
             action()
         }) {
             HStack(spacing: 14) {
-                // Icon with subtle gradient background
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(iconColor.opacity(0.15))
-
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(iconColor)
-                }
-                .frame(width: 42, height: 42)
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 36, height: 36)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
