@@ -81,27 +81,57 @@ private struct MiloDachshundView: View {
                 ))
             }
 
-            // ── HEAD (main oval) ──
-            let headRect = CGRect(
-                x: cx - 34 * u, y: cy - 30 * u,
-                width: 68 * u, height: 64 * u
-            )
-            let headPath = Path(ellipseIn: headRect)
+            // ── HEAD (cute dog shape — wide forehead, puffy cheeks, softer chin) ──
+            let headPath = Path { p in
+                // Start at top center
+                p.move(to: CGPoint(x: cx, y: cy - 32 * u))
+                // Top-right: wide round forehead
+                p.addCurve(
+                    to: CGPoint(x: cx + 36 * u, y: cy - 6 * u),
+                    control1: CGPoint(x: cx + 24 * u, y: cy - 32 * u),
+                    control2: CGPoint(x: cx + 38 * u, y: cy - 22 * u)
+                )
+                // Right cheek puff, then taper to chin
+                p.addCurve(
+                    to: CGPoint(x: cx + 18 * u, y: cy + 28 * u),
+                    control1: CGPoint(x: cx + 36 * u, y: cy + 10 * u),
+                    control2: CGPoint(x: cx + 28 * u, y: cy + 26 * u)
+                )
+                // Chin — soft rounded
+                p.addCurve(
+                    to: CGPoint(x: cx - 18 * u, y: cy + 28 * u),
+                    control1: CGPoint(x: cx + 8 * u, y: cy + 34 * u),
+                    control2: CGPoint(x: cx - 8 * u, y: cy + 34 * u)
+                )
+                // Left cheek puff back up
+                p.addCurve(
+                    to: CGPoint(x: cx - 36 * u, y: cy - 6 * u),
+                    control1: CGPoint(x: cx - 28 * u, y: cy + 26 * u),
+                    control2: CGPoint(x: cx - 36 * u, y: cy + 10 * u)
+                )
+                // Top-left: back to top center
+                p.addCurve(
+                    to: CGPoint(x: cx, y: cy - 32 * u),
+                    control1: CGPoint(x: cx - 38 * u, y: cy - 22 * u),
+                    control2: CGPoint(x: cx - 24 * u, y: cy - 32 * u)
+                )
+                p.closeSubpath()
+            }
             context.fill(headPath, with: .linearGradient(
                 Gradient(colors: [furLight, furMid]),
-                startPoint: CGPoint(x: cx, y: cy - 30 * u),
-                endPoint: CGPoint(x: cx, y: cy + 34 * u)
+                startPoint: CGPoint(x: cx, y: cy - 32 * u),
+                endPoint: CGPoint(x: cx, y: cy + 30 * u)
             ))
 
             // Head highlight (subtle top glow)
             let highlightRect = CGRect(
-                x: cx - 22 * u, y: cy - 28 * u,
-                width: 44 * u, height: 30 * u
+                x: cx - 20 * u, y: cy - 30 * u,
+                width: 40 * u, height: 28 * u
             )
             context.fill(Path(ellipseIn: highlightRect), with: .linearGradient(
                 Gradient(colors: [furHighlight.opacity(0.5), furHighlight.opacity(0)]),
-                startPoint: CGPoint(x: cx, y: cy - 28 * u),
-                endPoint: CGPoint(x: cx, y: cy - 5 * u)
+                startPoint: CGPoint(x: cx, y: cy - 30 * u),
+                endPoint: CGPoint(x: cx, y: cy - 8 * u)
             ))
 
             // ── SNOUT / MUZZLE (lighter bump) ──

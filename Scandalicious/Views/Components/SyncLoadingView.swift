@@ -182,18 +182,45 @@ private struct MiloHeadRenderer {
     // MARK: - Head
 
     func drawHead(in ctx: inout GraphicsContext) {
-        let rect = CGRect(x: cx - 34 * u, y: cy - 30 * u, width: 68 * u, height: 64 * u)
-        ctx.fill(Path(ellipseIn: rect), with: .linearGradient(
+        let headPath = Path { p in
+            p.move(to: CGPoint(x: cx, y: cy - 32 * u))
+            p.addCurve(
+                to: CGPoint(x: cx + 36 * u, y: cy - 6 * u),
+                control1: CGPoint(x: cx + 24 * u, y: cy - 32 * u),
+                control2: CGPoint(x: cx + 38 * u, y: cy - 22 * u)
+            )
+            p.addCurve(
+                to: CGPoint(x: cx + 18 * u, y: cy + 28 * u),
+                control1: CGPoint(x: cx + 36 * u, y: cy + 10 * u),
+                control2: CGPoint(x: cx + 28 * u, y: cy + 26 * u)
+            )
+            p.addCurve(
+                to: CGPoint(x: cx - 18 * u, y: cy + 28 * u),
+                control1: CGPoint(x: cx + 8 * u, y: cy + 34 * u),
+                control2: CGPoint(x: cx - 8 * u, y: cy + 34 * u)
+            )
+            p.addCurve(
+                to: CGPoint(x: cx - 36 * u, y: cy - 6 * u),
+                control1: CGPoint(x: cx - 28 * u, y: cy + 26 * u),
+                control2: CGPoint(x: cx - 36 * u, y: cy + 10 * u)
+            )
+            p.addCurve(
+                to: CGPoint(x: cx, y: cy - 32 * u),
+                control1: CGPoint(x: cx - 38 * u, y: cy - 22 * u),
+                control2: CGPoint(x: cx - 24 * u, y: cy - 32 * u)
+            )
+            p.closeSubpath()
+        }
+        ctx.fill(headPath, with: .linearGradient(
             Gradient(colors: [furLight, furMid]),
-            startPoint: CGPoint(x: cx, y: cy - 30 * u),
-            endPoint: CGPoint(x: cx, y: cy + 34 * u)
+            startPoint: CGPoint(x: cx, y: cy - 32 * u),
+            endPoint: CGPoint(x: cx, y: cy + 30 * u)
         ))
-        // Top highlight
-        let hl = CGRect(x: cx - 22 * u, y: cy - 28 * u, width: 44 * u, height: 30 * u)
+        let hl = CGRect(x: cx - 20 * u, y: cy - 30 * u, width: 40 * u, height: 28 * u)
         ctx.fill(Path(ellipseIn: hl), with: .linearGradient(
             Gradient(colors: [furHighlight.opacity(0.5), furHighlight.opacity(0)]),
-            startPoint: CGPoint(x: cx, y: cy - 28 * u),
-            endPoint: CGPoint(x: cx, y: cy - 5 * u)
+            startPoint: CGPoint(x: cx, y: cy - 30 * u),
+            endPoint: CGPoint(x: cx, y: cy - 8 * u)
         ))
     }
 

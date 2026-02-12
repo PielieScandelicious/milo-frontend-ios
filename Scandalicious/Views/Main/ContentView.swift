@@ -321,8 +321,36 @@ private struct MiloTabIcon: View {
             gc.closePath()
             gc.fillPath()
 
-            // Head (main oval)
-            gc.fillEllipse(in: CGRect(x: cx - 34 * u, y: cy - 30 * u, width: 68 * u, height: 64 * u))
+            // Head (cute dog shape)
+            gc.beginPath()
+            gc.move(to: CGPoint(x: cx, y: cy - 32 * u))
+            gc.addCurve(
+                to: CGPoint(x: cx + 36 * u, y: cy - 6 * u),
+                control1: CGPoint(x: cx + 24 * u, y: cy - 32 * u),
+                control2: CGPoint(x: cx + 38 * u, y: cy - 22 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx + 18 * u, y: cy + 28 * u),
+                control1: CGPoint(x: cx + 36 * u, y: cy + 10 * u),
+                control2: CGPoint(x: cx + 28 * u, y: cy + 26 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx - 18 * u, y: cy + 28 * u),
+                control1: CGPoint(x: cx + 8 * u, y: cy + 34 * u),
+                control2: CGPoint(x: cx - 8 * u, y: cy + 34 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx - 36 * u, y: cy - 6 * u),
+                control1: CGPoint(x: cx - 28 * u, y: cy + 26 * u),
+                control2: CGPoint(x: cx - 36 * u, y: cy + 10 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx, y: cy - 32 * u),
+                control1: CGPoint(x: cx - 38 * u, y: cy - 22 * u),
+                control2: CGPoint(x: cx - 24 * u, y: cy - 32 * u)
+            )
+            gc.closePath()
+            gc.fillPath()
 
             // Snout (lighter — leave as filled, template mode handles tint)
             gc.fillEllipse(in: CGRect(x: cx - 20 * u, y: cy + 2 * u, width: 40 * u, height: 30 * u))
