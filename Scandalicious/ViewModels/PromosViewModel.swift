@@ -73,7 +73,17 @@ class PromosViewModel: ObservableObject {
             state = .success(response)
             saveToCache(response)
             print("[PromosVM] success: \(response.dealCount) deals, €\(response.weeklySavings) savings")
+        } catch is CancellationError {
+            // Task was cancelled (e.g. user navigated back) — keep current state
+            print("[PromosVM] fetch cancelled, keeping current state")
+            hasFetchedThisSession = false
         } catch {
+            guard !Task.isCancelled else {
+                // URLSession wraps cancellation in URLError — keep current state
+                print("[PromosVM] fetch cancelled (URLError), keeping current state")
+                hasFetchedThisSession = false
+                return
+            }
             // If we already have cached data, keep showing it
             if case .success = state {
                 print("[PromosVM] API failed, keeping cached data: \(error.localizedDescription)")
