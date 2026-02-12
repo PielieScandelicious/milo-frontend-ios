@@ -1140,10 +1140,11 @@ struct OverviewView: View {
             lastRefreshTime = Date()
             isManuallySyncing = false
 
-            // Show "Synced" confirmation
+            // Show "Synced" confirmation + haptic
             withAnimation(.easeInOut(duration: 0.3)) {
                 showSyncedConfirmation = true
             }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
 
         // Hide "Synced" after 2 seconds
@@ -2316,8 +2317,26 @@ struct OverviewView: View {
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
 
             if let score = healthScore {
+                // Subtle divider above nutri score
+                LinearGradient(
+                    colors: [.white.opacity(0), .white.opacity(0.25), .white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 90, height: 0.5)
+                .padding(.top, 2)
+
                 CompactNutriBadge(score: score)
             }
+
+            // Subtle divider above sync indicator
+            LinearGradient(
+                colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 60, height: 0.5)
+            .padding(.top, 2)
 
             syncingIndicator()
                 .animation(.easeInOut(duration: 0.3), value: isSyncingActive)
