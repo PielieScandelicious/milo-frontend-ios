@@ -91,27 +91,15 @@ struct BudgetRingView: View {
     private var centerContent: some View {
         VStack(spacing: 2) {
             if showDetails {
-                // Amount spent
-                Text(String(format: "€%.0f", progress.currentSpend))
+                let remaining = max(0, progress.budget.monthlyAmount - progress.currentSpend)
+
+                Text(String(format: "€%.0f", remaining))
                     .font(.system(size: size * 0.2, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
-                // Of budget
-                Text(String(format: "of €%.0f", progress.budget.monthlyAmount))
-                    .font(.system(size: size * 0.09, weight: .medium))
+                Text("left to spend")
+                    .font(.system(size: size * 0.08, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
-
-                Spacer().frame(height: 4)
-
-                // Status indicator
-                HStack(spacing: 4) {
-                    Image(systemName: paceStatus.icon)
-                        .font(.system(size: size * 0.08, weight: .semibold))
-
-                    Text(paceStatus.displayText)
-                        .font(.system(size: size * 0.08, weight: .semibold))
-                }
-                .foregroundColor(paceStatus.color)
             } else {
                 // Compact: just percentage
                 Text(String(format: "%.0f%%", progress.spendRatio * 100))
@@ -134,10 +122,11 @@ struct MiniBudgetRing: View {
 
     var body: some View {
         ZStack {
-            // Background
+            // Background — blocks inherited animations
             Circle()
                 .stroke(Color.white.opacity(0.1), lineWidth: size * 0.15)
                 .frame(width: size, height: size)
+                .transaction { $0.animation = nil }
 
             // Progress
             Circle()
@@ -151,13 +140,12 @@ struct MiniBudgetRing: View {
                 )
                 .frame(width: size, height: size)
                 .rotationEffect(.degrees(-90))
-
-            // Percentage
-            Text(String(format: "%.0f", min(spendRatio, 1.0) * 100))
-                .font(.system(size: size * 0.28, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .animation(.spring(response: 0.8, dampingFraction: 0.8), value: animationProgress)
         }
         .onAppear {
+            // Reset to 0 and re-animate every time the view appears
+            // (including tab switches from Scan back to View tab)
+            animationProgress = 0
             withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
                 animationProgress = 1.0
             }
@@ -256,6 +244,82 @@ struct CategoryBudgetRing: View {
                 .foregroundColor(ringColor)
         }
         .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                animationProgress = 1.0
+            }
+        }
+    }
+}
+
+// MARK: - Projected Budget Bar
+
+/// A horizontal bar visualizing current and projected spend against a category limit.
+/// Uses three layered capsules: background track, semi-transparent ghost bar for projection,
+/// and a solid bar for current spend.
+struct ProjectedBudgetBar: View {
+    let totalBudget: Double
+    let currentSpend: Double
+    let projectedSpend: Double
+    var height: CGFloat = 10
+
+    @State private var animationProgress: CGFloat = 0
+
+    private var currentRatio: CGFloat {
+        guard totalBudget > 0 else { return 0 }
+        return min(1.0, CGFloat(currentSpend / totalBudget))
+    }
+
+    private var projectedRatio: CGFloat {
+        guard totalBudget > 0 else { return 0 }
+        return min(1.0, CGFloat(projectedSpend / totalBudget))
+    }
+
+    private var isProjectedOverBudget: Bool {
+        projectedSpend > totalBudget
+    }
+
+    private var ghostBarColor: Color {
+        isProjectedOverBudget
+            ? Color(red: 1.0, green: 0.5, blue: 0.25)
+            : Color(red: 0.3, green: 0.75, blue: 0.45)
+    }
+
+    private var currentBarColor: Color {
+        if currentSpend > totalBudget {
+            return Color(red: 1.0, green: 0.4, blue: 0.4)
+        } else if isProjectedOverBudget {
+            return Color(red: 1.0, green: 0.65, blue: 0.2)
+        } else {
+            return Color(red: 0.3, green: 0.75, blue: 0.45)
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Layer 1 (Bottom): Gray background track — full budget
+                Capsule()
+                    .fill(Color.white.opacity(0.1))
+
+                // Layer 2 (Middle): Ghost bar — projected spend
+                Capsule()
+                    .fill(ghostBarColor.opacity(0.3))
+                    .frame(width: geometry.size.width * projectedRatio * animationProgress)
+
+                // Layer 3 (Top): Solid bar — current spend
+                Capsule()
+                    .fill(currentBarColor)
+                    .frame(width: geometry.size.width * currentRatio * animationProgress)
+            }
+        }
+        .frame(height: height)
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                animationProgress = 1.0
+            }
+        }
+        .onChange(of: currentSpend) { _, _ in
+            animationProgress = 0
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 animationProgress = 1.0
             }
@@ -381,6 +445,49 @@ struct CategoryBudgetRing: View {
                         )
                     )
                 }
+
+                Text("Projected Budget Bar")
+                    .font(.headline)
+                    .foregroundColor(.white)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    // Under budget projection
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Under budget")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                        ProjectedBudgetBar(
+                            totalBudget: 850,
+                            currentSpend: 400,
+                            projectedSpend: 620
+                        )
+                    }
+
+                    // Over budget projection
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Over budget projection")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                        ProjectedBudgetBar(
+                            totalBudget: 850,
+                            currentSpend: 500,
+                            projectedSpend: 950
+                        )
+                    }
+
+                    // Already over budget
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Already over budget")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                        ProjectedBudgetBar(
+                            totalBudget: 850,
+                            currentSpend: 920,
+                            projectedSpend: 1100
+                        )
+                    }
+                }
+                .padding(.horizontal)
             }
             .padding()
         }

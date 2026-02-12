@@ -287,6 +287,7 @@ class BudgetViewModel: ObservableObject {
 
         do {
             let _ = try await apiService.saveBudget(request: request)
+            print("[BudgetVM] Budget created successfully, reloading...")
             AppDataCache.shared.budgetProgressCache = nil
             AppDataCache.shared.budgetStatusChecked = false
             AppDataCache.shared.scheduleSaveToDisk()
@@ -295,6 +296,7 @@ class BudgetViewModel: ObservableObject {
             isSaving = false
             return true
         } catch {
+            print("[BudgetVM] Create budget failed: \(error)")
             saveError = error.localizedDescription
             isSaving = false
             return false

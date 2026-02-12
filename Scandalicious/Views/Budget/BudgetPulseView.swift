@@ -65,9 +65,9 @@ struct BudgetPulseView: View {
 
     private var premiumCardBackground: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(Color(white: 0.08))
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: 20)
                 .fill(
                     LinearGradient(
                         colors: [
@@ -83,7 +83,7 @@ struct BudgetPulseView: View {
     }
 
     private var premiumCardBorder: some View {
-        RoundedRectangle(cornerRadius: 24)
+        RoundedRectangle(cornerRadius: 20)
             .stroke(
                 LinearGradient(
                     colors: [
@@ -93,7 +93,7 @@ struct BudgetPulseView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
-                lineWidth: 1
+                lineWidth: 0.5
             )
     }
 
@@ -102,7 +102,7 @@ struct BudgetPulseView: View {
     var body: some View {
         contentView
             .background(premiumCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(premiumCardBorder)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isSettingUp)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isExpanded)
@@ -424,6 +424,15 @@ struct BudgetPulseView: View {
             // Auto-renew (show once at least one is configured)
             if isMonthlyConfigured || isCategoriesConfigured {
                 autoRenewRow
+                    .padding(.top, 8)
+            }
+
+            // Error message
+            if let error = viewModel.saveError {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color(red: 1.0, green: 0.4, blue: 0.4))
+                    .padding(.horizontal, 16)
                     .padding(.top, 8)
             }
 
@@ -961,11 +970,15 @@ struct BudgetPulseView: View {
                 allocations = nil
             }
 
+            print("[BudgetPulse] Creating budget: amount=\(amount), allocations=\(String(describing: allocations)), smartBudget=\(isSmartBudget)")
+
             let success = await viewModel.createBudget(
                 amount: amount,
                 categoryAllocations: allocations,
                 isSmartBudget: isSmartBudget
             )
+
+            print("[BudgetPulse] Create result: success=\(success), error=\(viewModel.saveError ?? "none")")
 
             if success {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -1215,6 +1228,7 @@ struct BudgetPulseView: View {
 
             if isExpanded {
                 expandedContent(progress)
+                    .transition(.identity)
             }
         }
     }
@@ -1229,7 +1243,7 @@ struct BudgetPulseView: View {
                 MiniBudgetRing(
                     spendRatio: progress.spendRatio,
                     paceStatus: progress.paceStatus,
-                    size: 44
+                    size: 36
                 )
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -1247,23 +1261,9 @@ struct BudgetPulseView: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
 
-                    HStack(spacing: 6) {
-                        HStack(spacing: 4) {
-                            Image(systemName: progress.paceStatus.icon)
-                                .font(.system(size: 11, weight: .semibold))
-
-                            Text(progress.paceStatus.displayText)
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundColor(progress.paceStatus.color)
-
-                        Text("•")
-                            .foregroundColor(.white.opacity(0.3))
-
-                        Text("\(progress.daysRemaining) days left")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
+                    Text("\(progress.daysRemaining) days left")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
                 }
 
                 Spacer()
@@ -1289,169 +1289,42 @@ struct BudgetPulseView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.4))
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }
 
     private func expandedContent(_ progress: BudgetProgress) -> some View {
-        VStack(spacing: 16) {
-            // Large ring
-            BudgetRingView(progress: progress, size: 160)
-                .padding(.vertical, 8)
-
-            // Stats row — no dividers
-            HStack(spacing: 0) {
-                statItem(
-                    title: "Remaining",
-                    value: String(format: "€%.0f", progress.remainingBudget),
-                    color: progress.remainingBudget > 0 ? .green : .red
-                )
-
-                statItem(
-                    title: "Daily Budget",
-                    value: String(format: "€%.0f", progress.dailyBudgetRemaining),
-                    color: .white
-                )
-
-                statItem(
-                    title: "Projected",
-                    value: String(format: "€%.0f", progress.projectedEndOfMonth),
-                    color: progress.projectedOverUnder > 0 ? .orange : .green
-                )
-            }
-            .padding(.horizontal, 8)
-
-            // Progress bar
-            VStack(spacing: 6) {
-                BudgetProgressBar(progress: progress, height: 10)
-
-                HStack {
-                    Text("Day \(progress.daysElapsed)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-
-                    Spacer()
-
-                    Text("Day \(progress.daysInMonth)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-            }
-            .padding(.horizontal, 16)
-
-            // Category breakdown — seamless, no dividers
-            if !progress.categoryProgress.isEmpty {
-                VStack(spacing: 4) {
-                    HStack {
-                        Text("Categories")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.5))
-
-                        Spacer()
-
-                        Button(action: { showingCategoryDetail = true }) {
-                            HStack(spacing: 4) {
-                                Text(progress.categoryProgress.count > 5
-                                     ? "See All (\(progress.categoryProgress.count))"
-                                     : "Details")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .semibold))
-                            }
-                            .foregroundColor(.white.opacity(0.35))
-                        }
-                    }
-                    .padding(.horizontal, 16)
-
-                    let sorted = progress.categoryProgress
-                        .sorted { $0.currentSpend > $1.currentSpend }
-                        .prefix(5)
-
-                    ForEach(Array(sorted), id: \.id) { cat in
-                        compactCategoryRow(cat)
-                    }
-                }
-            }
-        }
-        .padding(.bottom, 16)
-    }
-
-    // MARK: - Compact Category Row (progress display)
-
-    private func compactCategoryRow(_ cat: CategoryBudgetProgress) -> some View {
-        let statusColor: Color = {
-            if cat.isOverBudget { return Color(red: 1.0, green: 0.4, blue: 0.4) }
-            else if cat.spendRatio > 0.85 { return Color(red: 1.0, green: 0.75, blue: 0.3) }
-            else { return Color(red: 0.3, green: 0.8, blue: 0.5) }
-        }()
-
-        return HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(cat.category.categoryColor.opacity(0.15))
-                    .frame(width: 34, height: 34)
-
-                Image(systemName: cat.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(cat.category.categoryColor)
-            }
-
-            Text(cat.category.normalizedCategoryName)
+        VStack(spacing: 12) {
+            // Monthly Budget title
+            Text("Monthly Budget")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-                .lineLimit(1)
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 1) {
-                HStack(spacing: 3) {
-                    Text(String(format: "€%.0f", cat.currentSpend))
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundColor(cat.isOverBudget ? statusColor : .white)
-
-                    Text("/")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.25))
-
-                    Text(String(format: "€%.0f", cat.budgetAmount))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.45))
-                }
-
-                Text(cat.isOverBudget
-                     ? String(format: "€%.0f over", cat.overAmount)
-                     : String(format: "€%.0f left", cat.remainingAmount))
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(cat.isOverBudget ? statusColor : .white.opacity(0.35))
-            }
-
-            // Quick remove
-            Button {
-                categoryToRemove = cat.category
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.12))
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-    }
-
-    private func statItem(title: String, value: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(color)
-
-            Text(title)
-                .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+
+            // Budget visualization: pie chart when categories exist, total ring fallback
+            if let allocations = progress.budget.categoryAllocations,
+               !allocations.isEmpty {
+                BudgetPieChartView(progress: progress, size: 140)
+                    .padding(.vertical, 4)
+            } else {
+                BudgetPieChartView(progress: progress, size: 120)
+                    .padding(.vertical, 4)
+            }
+
+            // Category spending bars
+            if !progress.categoryProgress.isEmpty {
+                CategoryAllocationBarList(
+                    categories: progress.categoryProgress,
+                    maxVisible: 5,
+                    onSeeAll: { showingCategoryDetail = true }
+                )
+            }
         }
-        .frame(maxWidth: .infinity)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Remove Category Target
