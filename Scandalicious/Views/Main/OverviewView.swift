@@ -50,6 +50,9 @@ struct OverviewView: View {
     // Track when syncing just completed to show "Synced" confirmation
     @State private var showSyncedConfirmation = false
 
+    // Track manual sync triggered by user tapping the sync button
+    @State private var isManuallySyncing = false
+
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
@@ -1094,6 +1097,61 @@ struct OverviewView: View {
         // Reload receipts for current month if it's the selected period
         if selectedPeriod == currentMonthPeriod {
             await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
+        }
+    }
+
+    /// Manual sync triggered by user tapping the sync button
+    private func manualSync() async {
+        // Prevent duplicate syncs
+        guard !isManuallySyncing && !isReceiptUploading && !dataManager.isLoading else { return }
+
+        await MainActor.run {
+            isManuallySyncing = true
+            showSyncedConfirmation = false
+        }
+
+        let periodToSync = selectedPeriod
+
+        // Refresh store breakdowns for selected period
+        await dataManager.refreshData(for: .month, periodString: periodToSync)
+
+        // Refresh period metadata (totals, receipt counts)
+        await dataManager.fetchPeriodMetadata()
+
+        // Invalidate and re-fetch category data
+        pieChartSummaryCache.removeValue(forKey: periodToSync)
+        AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: periodToSync)
+        categoryItems.removeAll()
+        await fetchCategoryData(for: periodToSync)
+
+        // Reload receipts
+        await receiptsViewModel.loadReceipts(period: periodToSync, storeName: nil, reset: true)
+        if !receiptsViewModel.receipts.isEmpty {
+            AppDataCache.shared.updateReceipts(for: periodToSync, receipts: receiptsViewModel.receipts)
+        }
+
+        // Sync rate limit
+        await rateLimitManager.syncFromBackend()
+
+        // Update UI
+        await MainActor.run {
+            updateAvailablePeriodsCache()
+            updateDisplayedBreakdowns()
+            lastRefreshTime = Date()
+            isManuallySyncing = false
+
+            // Show "Synced" confirmation
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showSyncedConfirmation = true
+            }
+        }
+
+        // Hide "Synced" after 2 seconds
+        try? await Task.sleep(for: .seconds(2))
+        await MainActor.run {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showSyncedConfirmation = false
+            }
         }
     }
 
@@ -2262,16 +2320,24 @@ struct OverviewView: View {
             }
 
             syncingIndicator()
+                .animation(.easeInOut(duration: 0.3), value: isSyncingActive)
+                .animation(.easeInOut(duration: 0.3), value: showSyncedConfirmation)
         }
         .padding(.top, 20)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
     }
 
-    /// Syncing/synced status indicator
+    /// Whether any sync operation is in progress
+    private var isSyncingActive: Bool {
+        isManuallySyncing || (isCurrentPeriod && (dataManager.isLoading || isReceiptUploading))
+    }
+
+    /// Interactive sync button - tappable idle state, animated syncing state, green synced state
     @ViewBuilder
     private func syncingIndicator() -> some View {
-        if isCurrentPeriod && (dataManager.isLoading || isReceiptUploading) {
+        if isSyncingActive {
+            // Syncing state: blue spinning arrows + label
             HStack(spacing: 4) {
                 SyncingArrowsView()
                     .font(.system(size: 11))
@@ -2279,14 +2345,32 @@ struct OverviewView: View {
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.blue)
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
         } else if showSyncedConfirmation {
+            // Synced state: green checkmark + label
             HStack(spacing: 4) {
-                Image(systemName: "checkmark.icloud.fill")
+                Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11))
                 Text("Synced")
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.green)
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        } else {
+            // Idle state: subtle tappable sync button
+            Button {
+                Task { await manualSync() }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Sync")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(.white.opacity(0.35))
+            }
+            .buttonStyle(.plain)
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
         }
     }
 
