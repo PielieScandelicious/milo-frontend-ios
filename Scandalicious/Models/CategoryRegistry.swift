@@ -190,9 +190,9 @@ class CategoryRegistryManager: ObservableObject {
         case "Fresh Food": return "leaf.fill"
         case "Pantry & Frozen": return "cabinet.fill"
         case "Snacks & Beverages": return "cup.and.saucer.fill"
-        case "Household & Care": return "house.fill"
-        case "Other": return "square.grid.2x2.fill"
-        default: return "square.grid.2x2.fill"
+        case "Household & Care": return "spraycan.fill"
+        case "Other": return "tag.fill"
+        default: return "tag.fill"
         }
     }
 
@@ -220,8 +220,8 @@ class CategoryRegistryManager: ObservableObject {
             ("Fresh Food", "leaf.fill", "#2ECC71"),
             ("Pantry & Frozen", "cabinet.fill", "#E67E22"),
             ("Snacks & Beverages", "cup.and.saucer.fill", "#E74C3C"),
-            ("Household & Care", "house.fill", "#8E44AD"),
-            ("Other", "square.grid.2x2.fill", "#95A5A6"),
+            ("Household & Care", "spraycan.fill", "#8E44AD"),
+            ("Other", "tag.fill", "#95A5A6"),
         ]
         for (name, icon, colorHex) in fallbackGroups {
             groupLookup[name] = (icon: icon, colorHex: colorHex)

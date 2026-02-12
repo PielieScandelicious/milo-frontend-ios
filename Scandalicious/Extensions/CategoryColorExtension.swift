@@ -49,24 +49,24 @@ extension String {
         if name == "fruits" || name.contains("fruit") { return "leaf.fill" }
         if name == "vegetables" || name.contains("veg") || name.contains("produce") { return "carrot.fill" }
         if name == "seafood" || name.contains("seafood") || name.contains("fish") { return "fish.fill" }
-        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "fork.knife" }
-        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "mug.fill" }
-        if name.contains("bakery") || name.contains("bread") { return "croissant.fill" }
+        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "flame.fill" }
+        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "drop.fill" }
+        if name.contains("bakery") || name.contains("bread") { return "oven.fill" }
 
         // Pantry & Frozen
         if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "cabinet.fill" }
         if name.contains("frozen") { return "snowflake" }
-        if name.contains("ready meal") || name.contains("prepared food") { return "takeoutbag.and.cup.and.straw.fill" }
+        if name.contains("ready meal") || name.contains("prepared food") { return "fork.knife" }
 
         // Snacks & Beverages
-        if name == "candy" || name.contains("candy") || name.contains("chocolate") || name.contains("sweet") { return "gift.fill" }
-        if name.contains("snack") { return "birthday.cake.fill" }
+        if name == "candy" || name.contains("candy") || name.contains("chocolate") || name.contains("sweet") { return "birthday.cake.fill" }
+        if name.contains("snack") { return "popcorn.fill" }
         if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "cup.and.saucer.fill" }
         if name.contains("beer") || name.contains("wine") || name.contains("alcohol") { return "wineglass.fill" }
 
         // Household & Care
-        if name.contains("household consumable") || name.contains("paper/cleaning") { return "house.fill" }
-        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") { return "sparkles" }
+        if name.contains("household consumable") || name.contains("paper/cleaning") { return "spraycan.fill" }
+        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") { return "comb.fill" }
 
         // Other
         if name.contains("baby food") || name.contains("formula") { return "figure.and.child.holdinghands" }
@@ -74,17 +74,17 @@ extension String {
         if name.contains("tobacco") { return "smoke.fill" }
 
         // Legacy category names (for backward compatibility)
-        if name.contains("personal care") { return "sparkles" }
-        if name.contains("household") { return "house.fill" }
+        if name.contains("personal care") { return "comb.fill" }
+        if name.contains("household") { return "spraycan.fill" }
         if name.contains("pet") { return "pawprint.fill" }
         if name.contains("baby") { return "figure.and.child.holdinghands" }
-        if name.contains("ready") || name.contains("meal") { return "takeoutbag.and.cup.and.straw.fill" }
+        if name.contains("ready") || name.contains("meal") { return "fork.knife" }
         if name.contains("drink") || name.contains("soda") || name.contains("soft") { return "cup.and.saucer.fill" }
         if name.contains("water") { return "waterbottle.fill" }
         if name.contains("sweet") { return "birthday.cake.fill" }
-        if name == "other" { return "shippingbox.fill" }
+        if name == "other" { return "tag.fill" }
 
-        return "square.grid.2x2.fill"
+        return "tag.fill"
     }
 }
 
@@ -306,22 +306,22 @@ extension String {
         if name == "fruits" || name.contains("fruit") { return "leaf.fill" }
         if name == "vegetables" || name.contains("veg") || name.contains("produce") { return "carrot.fill" }
         if name == "seafood" || name.contains("seafood") || name.contains("fish") { return "fish.fill" }
-        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "fork.knife" }
-        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "mug.fill" }
-        if name.contains("bakery") || name.contains("bread") { return "croissant.fill" }
+        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "flame.fill" }
+        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "drop.fill" }
+        if name.contains("bakery") || name.contains("bread") { return "oven.fill" }
         if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "cabinet.fill" }
         if name.contains("frozen") { return "snowflake" }
-        if name == "candy" || name.contains("candy") || name.contains("sweet") || name.contains("confectionery") { return "gift.fill" }
-        if name.contains("snack") { return "birthday.cake.fill" }
+        if name == "candy" || name.contains("candy") || name.contains("sweet") || name.contains("confectionery") { return "birthday.cake.fill" }
+        if name.contains("snack") { return "popcorn.fill" }
         if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "cup.and.saucer.fill" }
         if name.contains("alcohol") || name.contains("beer") || name.contains("wine") || name.contains("spirit") { return "wineglass.fill" }
         if name.contains("baby food") || name.contains("formula") || name.contains("baby") { return "figure.and.child.holdinghands" }
         if name.contains("pet food") || name.contains("pet supplies") || name.contains("pet") { return "pawprint.fill" }
-        if name.contains("household") || name.contains("paper/cleaning") || name.contains("cleaning") { return "house.fill" }
-        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") || name == "personal care" { return "sparkles" }
-        if name.contains("ready meal") || name.contains("prepared food") || name == "ready meals" { return "takeoutbag.and.cup.and.straw.fill" }
+        if name.contains("household") || name.contains("paper/cleaning") || name.contains("cleaning") { return "spraycan.fill" }
+        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") || name == "personal care" { return "comb.fill" }
+        if name.contains("ready meal") || name.contains("prepared food") || name == "ready meals" { return "fork.knife" }
         if name.contains("tobacco") { return "smoke.fill" }
-        if name == "other" { return "shippingbox.fill" }
+        if name == "other" { return "tag.fill" }
         return nil
     }
 }

@@ -148,15 +148,9 @@ struct CategoryDetailView: View {
 
     private var emptyView: some View {
         VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(category.color.opacity(0.15))
-                    .frame(width: 80, height: 80)
-
-                Image(systemName: category.icon)
-                    .font(.system(size: 32, weight: .medium))
-                    .foregroundColor(category.color)
-            }
+            Image(systemName: category.icon)
+                .font(.system(size: 40, weight: .medium))
+                .foregroundColor(category.color)
 
             Text("No Items Found")
                 .font(.system(size: 20, weight: .bold))
@@ -204,15 +198,10 @@ struct CategoryDetailView: View {
             // Left side: Category info
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(category.color.opacity(0.2))
-                            .frame(width: 36, height: 36)
-
-                        Image(systemName: category.icon)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(category.color)
-                    }
+                    Image(systemName: category.icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(category.color)
+                        .frame(width: 24)
 
                     Text(category.name)
                         .font(.system(size: 20, weight: .bold, design: .rounded))
@@ -292,7 +281,7 @@ struct CategoryDetailView: View {
             // Store header
             HStack(spacing: 12) {
                 ZStack {
-                    Circle()
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color.white.opacity(0.08))
                         .frame(width: 36, height: 36)
                     Image(systemName: "storefront.fill")

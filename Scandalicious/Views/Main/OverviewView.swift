@@ -1386,7 +1386,7 @@ struct OverviewView: View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle()
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(isNewMonth
                             ? LinearGradient(
                                 colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
@@ -1526,7 +1526,7 @@ struct OverviewView: View {
     private func storesSectionHeader(storeCount: Int, isAllTime: Bool = false, isYear: Bool = false) -> some View {
         HStack(spacing: 12) {
             ZStack {
-                Circle()
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.white.opacity(0.08))
                     .frame(width: 36, height: 36)
                 Image(systemName: "storefront.fill")
@@ -1561,7 +1561,7 @@ struct OverviewView: View {
     private func categoriesSectionHeader(categoryCount: Int, isAllTime: Bool = false, isYear: Bool = false) -> some View {
         HStack(spacing: 12) {
             ZStack {
-                Circle()
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.white.opacity(0.08))
                     .frame(width: 36, height: 36)
                 Image(systemName: "cart.fill")
@@ -2767,14 +2767,10 @@ private struct ExpandableCategoryRowHeader: View {
                     .frame(width: 3, height: 28)
 
                 // Category icon
-                ZStack {
-                    Circle()
-                        .fill(category.color.opacity(0.12))
-                        .frame(width: 30, height: 30)
-                    Image(systemName: category.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(category.color)
-                }
+                Image(systemName: category.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(category.color)
+                    .frame(width: 20)
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {
@@ -2827,14 +2823,10 @@ private struct CategoryRowButton: View {
                     .frame(width: 3, height: 28)
 
                 // Category icon
-                ZStack {
-                    Circle()
-                        .fill(category.color.opacity(0.12))
-                        .frame(width: 30, height: 30)
-                    Image(systemName: category.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(category.color)
-                }
+                Image(systemName: category.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(category.color)
+                    .frame(width: 20)
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {

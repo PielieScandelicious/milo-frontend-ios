@@ -509,7 +509,7 @@ struct TransactionCardWithMenu: View {
                 }
             } label: {
                 ZStack {
-                    Circle()
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(Color.white.opacity(0.08))
                         .frame(width: 44, height: 44)
 

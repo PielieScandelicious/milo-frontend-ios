@@ -479,15 +479,10 @@ struct CompactCategoryRow: View {
             Button(action: onTap) {
                 HStack(spacing: 12) {
                     // Category icon
-                    ZStack {
-                        Circle()
-                            .fill(allocation.category.categoryColor.opacity(0.2))
-                            .frame(width: 36, height: 36)
-
-                        Image(systemName: allocation.category.categoryIcon)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(allocation.category.categoryColor)
-                    }
+                    Image(systemName: allocation.category.categoryIcon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(allocation.category.categoryColor)
+                        .frame(width: 24)
 
                     // Name + bar
                     VStack(alignment: .leading, spacing: 4) {

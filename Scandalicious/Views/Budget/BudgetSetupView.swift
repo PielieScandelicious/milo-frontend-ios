@@ -1206,15 +1206,10 @@ struct BudgetSetupView: View {
 
         return HStack(spacing: 12) {
             // Category icon
-            ZStack {
-                Circle()
-                    .fill(allocation.category.categoryColor.opacity(0.2))
-                    .frame(width: 32, height: 32)
-
-                Image(systemName: categoryIcon(for: allocation.category))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(allocation.category.categoryColor)
-            }
+            Image(systemName: categoryIcon(for: allocation.category))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(allocation.category.categoryColor)
+                .frame(width: 20)
 
             // Name and bar
             VStack(alignment: .leading, spacing: 4) {

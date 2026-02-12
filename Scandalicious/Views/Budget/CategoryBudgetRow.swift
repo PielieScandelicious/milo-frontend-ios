@@ -122,15 +122,10 @@ struct EditableCategoryBudgetRow: View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
                 // Category icon
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 36, height: 36)
-
-                    Image(systemName: categoryIcon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(category.categoryColor)
-                }
+                Image(systemName: categoryIcon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(category.categoryColor)
+                    .frame(width: 24)
 
                 // Category name and percentage
                 VStack(alignment: .leading, spacing: 2) {

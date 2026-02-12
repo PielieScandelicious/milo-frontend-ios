@@ -176,11 +176,11 @@ struct BudgetPulseView: View {
                 Button(action: { viewModel.startSetup() }) {
                     HStack(spacing: 12) {
                         ZStack {
-                            Circle()
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(Color.white.opacity(0.1))
                                 .frame(width: 44, height: 44)
 
-                            Image(systemName: "plus.circle.fill")
+                            Image(systemName: "plus")
                                 .font(.system(size: 22, weight: .semibold))
                                 .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
                         }

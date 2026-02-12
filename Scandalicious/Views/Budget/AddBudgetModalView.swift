@@ -126,15 +126,10 @@ struct AddBudgetModalView: View {
 
     private var categoryHeader: some View {
         HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(vm.categoryName.categoryColor.opacity(0.2))
-                    .frame(width: 48, height: 48)
-
-                Image(systemName: vm.categoryName.categoryIcon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(vm.categoryName.categoryColor)
-            }
+            Image(systemName: vm.categoryName.categoryIcon)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(vm.categoryName.categoryColor)
+                .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(vm.categoryName.normalizedCategoryName)
