@@ -269,53 +269,53 @@ private struct MiloTabIcon: View {
 
             gc.setFillColor(UIColor.black.cgColor)
 
-            // Left ear (hooked floppy)
+            // Left ear (large floppy)
             gc.beginPath()
             gc.move(to: CGPoint(x: cx - 18 * u, y: cy - 16 * u))
             gc.addCurve(
-                to: CGPoint(x: cx - 44 * u, y: cy - 14 * u),
-                control1: CGPoint(x: cx - 24 * u, y: cy - 30 * u),
-                control2: CGPoint(x: cx - 42 * u, y: cy - 28 * u)
+                to: CGPoint(x: cx - 50 * u, y: cy - 16 * u),
+                control1: CGPoint(x: cx - 28 * u, y: cy - 34 * u),
+                control2: CGPoint(x: cx - 48 * u, y: cy - 32 * u)
             )
             gc.addCurve(
-                to: CGPoint(x: cx - 38 * u, y: cy + 20 * u),
-                control1: CGPoint(x: cx - 50 * u, y: cy - 2 * u),
-                control2: CGPoint(x: cx - 48 * u, y: cy + 14 * u)
+                to: CGPoint(x: cx - 44 * u, y: cy + 28 * u),
+                control1: CGPoint(x: cx - 58 * u, y: cy - 2 * u),
+                control2: CGPoint(x: cx - 56 * u, y: cy + 20 * u)
             )
             gc.addCurve(
-                to: CGPoint(x: cx - 28 * u, y: cy + 18 * u),
-                control1: CGPoint(x: cx - 34 * u, y: cy + 26 * u),
-                control2: CGPoint(x: cx - 30 * u, y: cy + 26 * u)
+                to: CGPoint(x: cx - 32 * u, y: cy + 26 * u),
+                control1: CGPoint(x: cx - 40 * u, y: cy + 34 * u),
+                control2: CGPoint(x: cx - 36 * u, y: cy + 34 * u)
             )
             gc.addCurve(
                 to: CGPoint(x: cx - 18 * u, y: cy - 16 * u),
-                control1: CGPoint(x: cx - 24 * u, y: cy + 6 * u),
+                control1: CGPoint(x: cx - 26 * u, y: cy + 10 * u),
                 control2: CGPoint(x: cx - 14 * u, y: cy - 4 * u)
             )
             gc.closePath()
             gc.fillPath()
 
-            // Right ear (hooked floppy)
+            // Right ear (large floppy)
             gc.beginPath()
             gc.move(to: CGPoint(x: cx + 18 * u, y: cy - 16 * u))
             gc.addCurve(
-                to: CGPoint(x: cx + 44 * u, y: cy - 14 * u),
-                control1: CGPoint(x: cx + 24 * u, y: cy - 30 * u),
-                control2: CGPoint(x: cx + 42 * u, y: cy - 28 * u)
+                to: CGPoint(x: cx + 50 * u, y: cy - 16 * u),
+                control1: CGPoint(x: cx + 28 * u, y: cy - 34 * u),
+                control2: CGPoint(x: cx + 48 * u, y: cy - 32 * u)
             )
             gc.addCurve(
-                to: CGPoint(x: cx + 38 * u, y: cy + 20 * u),
-                control1: CGPoint(x: cx + 50 * u, y: cy - 2 * u),
-                control2: CGPoint(x: cx + 48 * u, y: cy + 14 * u)
+                to: CGPoint(x: cx + 44 * u, y: cy + 28 * u),
+                control1: CGPoint(x: cx + 58 * u, y: cy - 2 * u),
+                control2: CGPoint(x: cx + 56 * u, y: cy + 20 * u)
             )
             gc.addCurve(
-                to: CGPoint(x: cx + 28 * u, y: cy + 18 * u),
-                control1: CGPoint(x: cx + 34 * u, y: cy + 26 * u),
-                control2: CGPoint(x: cx + 30 * u, y: cy + 26 * u)
+                to: CGPoint(x: cx + 32 * u, y: cy + 26 * u),
+                control1: CGPoint(x: cx + 40 * u, y: cy + 34 * u),
+                control2: CGPoint(x: cx + 36 * u, y: cy + 34 * u)
             )
             gc.addCurve(
                 to: CGPoint(x: cx + 18 * u, y: cy - 16 * u),
-                control1: CGPoint(x: cx + 24 * u, y: cy + 6 * u),
+                control1: CGPoint(x: cx + 26 * u, y: cy + 10 * u),
                 control2: CGPoint(x: cx + 14 * u, y: cy - 4 * u)
             )
             gc.closePath()

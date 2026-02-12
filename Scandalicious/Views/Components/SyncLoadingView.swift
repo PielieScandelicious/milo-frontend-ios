@@ -150,31 +150,31 @@ private struct MiloHeadRenderer {
             let ear = Path { p in
                 p.move(to: CGPoint(x: cx + xSign * 18 * u, y: cy - 16 * u))
                 p.addCurve(
-                    to: CGPoint(x: cx + xSign * 44 * u, y: cy - 14 * u),
-                    control1: CGPoint(x: cx + xSign * 24 * u, y: cy - 30 * u),
-                    control2: CGPoint(x: cx + xSign * 42 * u, y: cy - 28 * u)
+                    to: CGPoint(x: cx + xSign * 50 * u, y: cy - 16 * u),
+                    control1: CGPoint(x: cx + xSign * 28 * u, y: cy - 34 * u),
+                    control2: CGPoint(x: cx + xSign * 48 * u, y: cy - 32 * u)
                 )
                 p.addCurve(
-                    to: CGPoint(x: cx + xSign * 38 * u, y: cy + 20 * u),
-                    control1: CGPoint(x: cx + xSign * 50 * u, y: cy - 2 * u),
-                    control2: CGPoint(x: cx + xSign * 48 * u, y: cy + 14 * u)
+                    to: CGPoint(x: cx + xSign * 44 * u, y: cy + 28 * u),
+                    control1: CGPoint(x: cx + xSign * 58 * u, y: cy - 2 * u),
+                    control2: CGPoint(x: cx + xSign * 56 * u, y: cy + 20 * u)
                 )
                 p.addCurve(
-                    to: CGPoint(x: cx + xSign * 28 * u, y: cy + 18 * u),
-                    control1: CGPoint(x: cx + xSign * 34 * u, y: cy + 26 * u),
-                    control2: CGPoint(x: cx + xSign * 30 * u, y: cy + 26 * u)
+                    to: CGPoint(x: cx + xSign * 32 * u, y: cy + 26 * u),
+                    control1: CGPoint(x: cx + xSign * 40 * u, y: cy + 34 * u),
+                    control2: CGPoint(x: cx + xSign * 36 * u, y: cy + 34 * u)
                 )
                 p.addCurve(
                     to: CGPoint(x: cx + xSign * 18 * u, y: cy - 16 * u),
-                    control1: CGPoint(x: cx + xSign * 24 * u, y: cy + 6 * u),
+                    control1: CGPoint(x: cx + xSign * 26 * u, y: cy + 10 * u),
                     control2: CGPoint(x: cx + xSign * 14 * u, y: cy - 4 * u)
                 )
                 p.closeSubpath()
             }
             ctx.fill(ear, with: .linearGradient(
                 Gradient(colors: [furDark, furDark.opacity(0.8)]),
-                startPoint: CGPoint(x: cx + xSign * 30 * u, y: cy - 24 * u),
-                endPoint: CGPoint(x: cx + xSign * 36 * u, y: cy + 22 * u)
+                startPoint: CGPoint(x: cx + xSign * 34 * u, y: cy - 28 * u),
+                endPoint: CGPoint(x: cx + xSign * 40 * u, y: cy + 30 * u)
             ))
         }
     }

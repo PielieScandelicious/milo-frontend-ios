@@ -46,38 +46,33 @@ private struct MiloDachshundView: View {
             // ── EARS (hooked floppy — fold over and hang down) ──
             for xSign: CGFloat in [-1, 1] {
                 let ear = Path { p in
-                    // Attach at top-side of head
                     p.move(to: CGPoint(x: cx + xSign * 18 * u, y: cy - 16 * u))
-                    // Sweep up and outward (the hook)
                     p.addCurve(
-                        to: CGPoint(x: cx + xSign * 44 * u, y: cy - 14 * u),
-                        control1: CGPoint(x: cx + xSign * 24 * u, y: cy - 30 * u),
-                        control2: CGPoint(x: cx + xSign * 42 * u, y: cy - 28 * u)
+                        to: CGPoint(x: cx + xSign * 50 * u, y: cy - 16 * u),
+                        control1: CGPoint(x: cx + xSign * 28 * u, y: cy - 34 * u),
+                        control2: CGPoint(x: cx + xSign * 48 * u, y: cy - 32 * u)
                     )
-                    // Fold over and drop down (outer edge)
                     p.addCurve(
-                        to: CGPoint(x: cx + xSign * 38 * u, y: cy + 20 * u),
-                        control1: CGPoint(x: cx + xSign * 50 * u, y: cy - 2 * u),
-                        control2: CGPoint(x: cx + xSign * 48 * u, y: cy + 14 * u)
+                        to: CGPoint(x: cx + xSign * 44 * u, y: cy + 28 * u),
+                        control1: CGPoint(x: cx + xSign * 58 * u, y: cy - 2 * u),
+                        control2: CGPoint(x: cx + xSign * 56 * u, y: cy + 20 * u)
                     )
-                    // Round bottom tip
                     p.addCurve(
-                        to: CGPoint(x: cx + xSign * 28 * u, y: cy + 18 * u),
-                        control1: CGPoint(x: cx + xSign * 34 * u, y: cy + 26 * u),
-                        control2: CGPoint(x: cx + xSign * 30 * u, y: cy + 26 * u)
+                        to: CGPoint(x: cx + xSign * 32 * u, y: cy + 26 * u),
+                        control1: CGPoint(x: cx + xSign * 40 * u, y: cy + 34 * u),
+                        control2: CGPoint(x: cx + xSign * 36 * u, y: cy + 34 * u)
                     )
-                    // Inner edge back up to head
                     p.addCurve(
                         to: CGPoint(x: cx + xSign * 18 * u, y: cy - 16 * u),
-                        control1: CGPoint(x: cx + xSign * 24 * u, y: cy + 6 * u),
+                        control1: CGPoint(x: cx + xSign * 26 * u, y: cy + 10 * u),
                         control2: CGPoint(x: cx + xSign * 14 * u, y: cy - 4 * u)
                     )
                     p.closeSubpath()
                 }
                 context.fill(ear, with: .linearGradient(
                     Gradient(colors: [furDark, furDark.opacity(0.8)]),
-                    startPoint: CGPoint(x: cx + xSign * 30 * u, y: cy - 24 * u),
-                    endPoint: CGPoint(x: cx + xSign * 36 * u, y: cy + 22 * u)
+                    startPoint: CGPoint(x: cx + xSign * 34 * u, y: cy - 28 * u),
+                    endPoint: CGPoint(x: cx + xSign * 40 * u, y: cy + 30 * u)
                 ))
             }
 
@@ -312,7 +307,7 @@ struct ScandaLiciousAIChatView: View {
                 .offset(y: inputAreaOffset)
                 .opacity(inputAreaOpacity)
         }
-        .navigationTitle(viewModel.messages.isEmpty ? "" : "Milo")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if showClearButton {
