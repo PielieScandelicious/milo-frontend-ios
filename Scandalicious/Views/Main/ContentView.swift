@@ -39,7 +39,11 @@ struct ContentView: View {
 
                 ScandaLiciousTab()
                     .tabItem {
-                        Label("Milo", systemImage: "sparkles")
+                        Label {
+                            Text("Milo")
+                        } icon: {
+                            MiloTabIcon()
+                        }
                     }
                     .tag(Tab.dobby)
             }
@@ -241,6 +245,110 @@ struct ScandaLiciousTab: View {
         }
         .foregroundColor(.green)
         .padding(.top, 12)
+    }
+}
+
+// MARK: - Milo Tab Icon
+
+/// Tiny Dachshund head for the tab bar, rendered as a template image
+/// so iOS can apply the correct tint for selected/unselected states.
+private struct MiloTabIcon: View {
+    var body: some View {
+        Image(uiImage: renderTabIcon())
+            .renderingMode(.template)
+    }
+
+    private func renderTabIcon() -> UIImage {
+        let size: CGFloat = 28
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
+        return renderer.image { ctx in
+            let gc = ctx.cgContext
+            let u = size / 100
+            let cx = size / 2
+            let cy = size / 2
+
+            gc.setFillColor(UIColor.black.cgColor)
+
+            // Left ear (hooked floppy)
+            gc.beginPath()
+            gc.move(to: CGPoint(x: cx - 18 * u, y: cy - 16 * u))
+            gc.addCurve(
+                to: CGPoint(x: cx - 44 * u, y: cy - 14 * u),
+                control1: CGPoint(x: cx - 24 * u, y: cy - 30 * u),
+                control2: CGPoint(x: cx - 42 * u, y: cy - 28 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx - 38 * u, y: cy + 20 * u),
+                control1: CGPoint(x: cx - 50 * u, y: cy - 2 * u),
+                control2: CGPoint(x: cx - 48 * u, y: cy + 14 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx - 28 * u, y: cy + 18 * u),
+                control1: CGPoint(x: cx - 34 * u, y: cy + 26 * u),
+                control2: CGPoint(x: cx - 30 * u, y: cy + 26 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx - 18 * u, y: cy - 16 * u),
+                control1: CGPoint(x: cx - 24 * u, y: cy + 6 * u),
+                control2: CGPoint(x: cx - 14 * u, y: cy - 4 * u)
+            )
+            gc.closePath()
+            gc.fillPath()
+
+            // Right ear (hooked floppy)
+            gc.beginPath()
+            gc.move(to: CGPoint(x: cx + 18 * u, y: cy - 16 * u))
+            gc.addCurve(
+                to: CGPoint(x: cx + 44 * u, y: cy - 14 * u),
+                control1: CGPoint(x: cx + 24 * u, y: cy - 30 * u),
+                control2: CGPoint(x: cx + 42 * u, y: cy - 28 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx + 38 * u, y: cy + 20 * u),
+                control1: CGPoint(x: cx + 50 * u, y: cy - 2 * u),
+                control2: CGPoint(x: cx + 48 * u, y: cy + 14 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx + 28 * u, y: cy + 18 * u),
+                control1: CGPoint(x: cx + 34 * u, y: cy + 26 * u),
+                control2: CGPoint(x: cx + 30 * u, y: cy + 26 * u)
+            )
+            gc.addCurve(
+                to: CGPoint(x: cx + 18 * u, y: cy - 16 * u),
+                control1: CGPoint(x: cx + 24 * u, y: cy + 6 * u),
+                control2: CGPoint(x: cx + 14 * u, y: cy - 4 * u)
+            )
+            gc.closePath()
+            gc.fillPath()
+
+            // Head (main oval)
+            gc.fillEllipse(in: CGRect(x: cx - 34 * u, y: cy - 30 * u, width: 68 * u, height: 64 * u))
+
+            // Snout (lighter — leave as filled, template mode handles tint)
+            gc.fillEllipse(in: CGRect(x: cx - 20 * u, y: cy + 2 * u, width: 40 * u, height: 30 * u))
+
+            // Cut out eyes (white = transparent in template mode)
+            gc.setBlendMode(.clear)
+
+            // Left eye
+            gc.fillEllipse(in: CGRect(
+                x: cx - 14 * u - 7 * u, y: cy - 8 * u - 8 * u,
+                width: 14 * u, height: 16 * u
+            ))
+            // Right eye
+            gc.fillEllipse(in: CGRect(
+                x: cx + 14 * u - 7 * u, y: cy - 8 * u - 8 * u,
+                width: 14 * u, height: 16 * u
+            ))
+
+            // Nose cutout
+            gc.fillEllipse(in: CGRect(
+                x: cx - 7 * u, y: cy + 4 * u,
+                width: 14 * u, height: 10 * u
+            ))
+
+            gc.setBlendMode(.normal)
+        }
     }
 }
 

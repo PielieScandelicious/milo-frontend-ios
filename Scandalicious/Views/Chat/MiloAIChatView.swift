@@ -21,6 +21,237 @@ private extension Color {
     static let miloHeaderIndigo = Color(red: 0.15, green: 0.05, blue: 0.30)
 }
 
+// MARK: - Milo Dachshund Avatar (Apple-style head)
+private struct MiloDachshundView: View {
+    var size: CGFloat = 64
+
+    // Base unit for proportional scaling
+    private var u: CGFloat { size / 100 }
+
+    // Palette — warm chocolate tones
+    private let furDark = Color(red: 0.40, green: 0.22, blue: 0.11)
+    private let furMid = Color(red: 0.55, green: 0.33, blue: 0.16)
+    private let furLight = Color(red: 0.68, green: 0.45, blue: 0.24)
+    private let furHighlight = Color(red: 0.78, green: 0.58, blue: 0.36)
+    private let snoutTan = Color(red: 0.76, green: 0.56, blue: 0.35)
+    private let snoutLight = Color(red: 0.85, green: 0.68, blue: 0.48)
+    private let noseDark = Color(red: 0.18, green: 0.12, blue: 0.08)
+    private let eyeDark = Color(red: 0.10, green: 0.06, blue: 0.04)
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let cx = canvasSize.width / 2
+            let cy = canvasSize.height / 2
+
+            // ── EARS (hooked floppy — fold over and hang down) ──
+            for xSign: CGFloat in [-1, 1] {
+                let ear = Path { p in
+                    // Attach at top-side of head
+                    p.move(to: CGPoint(x: cx + xSign * 18 * u, y: cy - 16 * u))
+                    // Sweep up and outward (the hook)
+                    p.addCurve(
+                        to: CGPoint(x: cx + xSign * 44 * u, y: cy - 14 * u),
+                        control1: CGPoint(x: cx + xSign * 24 * u, y: cy - 30 * u),
+                        control2: CGPoint(x: cx + xSign * 42 * u, y: cy - 28 * u)
+                    )
+                    // Fold over and drop down (outer edge)
+                    p.addCurve(
+                        to: CGPoint(x: cx + xSign * 38 * u, y: cy + 20 * u),
+                        control1: CGPoint(x: cx + xSign * 50 * u, y: cy - 2 * u),
+                        control2: CGPoint(x: cx + xSign * 48 * u, y: cy + 14 * u)
+                    )
+                    // Round bottom tip
+                    p.addCurve(
+                        to: CGPoint(x: cx + xSign * 28 * u, y: cy + 18 * u),
+                        control1: CGPoint(x: cx + xSign * 34 * u, y: cy + 26 * u),
+                        control2: CGPoint(x: cx + xSign * 30 * u, y: cy + 26 * u)
+                    )
+                    // Inner edge back up to head
+                    p.addCurve(
+                        to: CGPoint(x: cx + xSign * 18 * u, y: cy - 16 * u),
+                        control1: CGPoint(x: cx + xSign * 24 * u, y: cy + 6 * u),
+                        control2: CGPoint(x: cx + xSign * 14 * u, y: cy - 4 * u)
+                    )
+                    p.closeSubpath()
+                }
+                context.fill(ear, with: .linearGradient(
+                    Gradient(colors: [furDark, furDark.opacity(0.8)]),
+                    startPoint: CGPoint(x: cx + xSign * 30 * u, y: cy - 24 * u),
+                    endPoint: CGPoint(x: cx + xSign * 36 * u, y: cy + 22 * u)
+                ))
+            }
+
+            // ── HEAD (main oval) ──
+            let headRect = CGRect(
+                x: cx - 34 * u, y: cy - 30 * u,
+                width: 68 * u, height: 64 * u
+            )
+            let headPath = Path(ellipseIn: headRect)
+            context.fill(headPath, with: .linearGradient(
+                Gradient(colors: [furLight, furMid]),
+                startPoint: CGPoint(x: cx, y: cy - 30 * u),
+                endPoint: CGPoint(x: cx, y: cy + 34 * u)
+            ))
+
+            // Head highlight (subtle top glow)
+            let highlightRect = CGRect(
+                x: cx - 22 * u, y: cy - 28 * u,
+                width: 44 * u, height: 30 * u
+            )
+            context.fill(Path(ellipseIn: highlightRect), with: .linearGradient(
+                Gradient(colors: [furHighlight.opacity(0.5), furHighlight.opacity(0)]),
+                startPoint: CGPoint(x: cx, y: cy - 28 * u),
+                endPoint: CGPoint(x: cx, y: cy - 5 * u)
+            ))
+
+            // ── SNOUT / MUZZLE (lighter bump) ──
+            let snoutRect = CGRect(
+                x: cx - 20 * u, y: cy + 2 * u,
+                width: 40 * u, height: 30 * u
+            )
+            context.fill(Path(ellipseIn: snoutRect), with: .linearGradient(
+                Gradient(colors: [snoutLight, snoutTan]),
+                startPoint: CGPoint(x: cx, y: cy + 2 * u),
+                endPoint: CGPoint(x: cx, y: cy + 32 * u)
+            ))
+
+            // ── NOSE ──
+            let noseW: CGFloat = 14 * u
+            let noseH: CGFloat = 10 * u
+            let noseY: CGFloat = cy + 4 * u
+            let noseRect = CGRect(x: cx - noseW / 2, y: noseY, width: noseW, height: noseH)
+            let nosePath = Path(roundedRect: noseRect, cornerRadius: 5 * u)
+            context.fill(nosePath, with: .linearGradient(
+                Gradient(colors: [noseDark, noseDark.opacity(0.9)]),
+                startPoint: CGPoint(x: cx, y: noseY),
+                endPoint: CGPoint(x: cx, y: noseY + noseH)
+            ))
+
+            // Nose shine
+            let shineRect = CGRect(x: cx - 3.5 * u, y: noseY + 1.5 * u, width: 7 * u, height: 4 * u)
+            context.fill(Path(ellipseIn: shineRect), with: .color(.white.opacity(0.35)))
+
+            // ── EYES (solid dark, Apple Memoji-style) ──
+            let eyeRadius: CGFloat = 7 * u
+            let eyeY: CGFloat = cy - 8 * u
+            let eyeSpacing: CGFloat = 14 * u
+
+            // Left eye — solid dark oval
+            let leftEyeRect = CGRect(
+                x: cx - eyeSpacing - eyeRadius,
+                y: eyeY - eyeRadius * 1.15,
+                width: eyeRadius * 2,
+                height: eyeRadius * 2.3
+            )
+            context.fill(Path(ellipseIn: leftEyeRect), with: .color(eyeDark))
+
+            // Left eye shine (small bright dot, top-right)
+            let lShine = CGRect(
+                x: cx - eyeSpacing + 1.5 * u,
+                y: eyeY - eyeRadius * 0.7,
+                width: 4 * u, height: 4 * u
+            )
+            context.fill(Path(ellipseIn: lShine), with: .color(.white.opacity(0.85)))
+
+            // Left eye secondary shine (smaller, lower-left)
+            let lShine2 = CGRect(
+                x: cx - eyeSpacing - 2.5 * u,
+                y: eyeY + 2 * u,
+                width: 2.5 * u, height: 2.5 * u
+            )
+            context.fill(Path(ellipseIn: lShine2), with: .color(.white.opacity(0.4)))
+
+            // Right eye — solid dark oval
+            let rightEyeRect = CGRect(
+                x: cx + eyeSpacing - eyeRadius,
+                y: eyeY - eyeRadius * 1.15,
+                width: eyeRadius * 2,
+                height: eyeRadius * 2.3
+            )
+            context.fill(Path(ellipseIn: rightEyeRect), with: .color(eyeDark))
+
+            // Right eye shine
+            let rShine = CGRect(
+                x: cx + eyeSpacing + 1.5 * u,
+                y: eyeY - eyeRadius * 0.7,
+                width: 4 * u, height: 4 * u
+            )
+            context.fill(Path(ellipseIn: rShine), with: .color(.white.opacity(0.85)))
+
+            // Right eye secondary shine
+            let rShine2 = CGRect(
+                x: cx + eyeSpacing - 2.5 * u,
+                y: eyeY + 2 * u,
+                width: 2.5 * u, height: 2.5 * u
+            )
+            context.fill(Path(ellipseIn: rShine2), with: .color(.white.opacity(0.4)))
+
+            // ── EYEBROWS (subtle fur ridges) ──
+            var leftBrow = Path()
+            leftBrow.move(to: CGPoint(x: cx - eyeSpacing - 8 * u, y: eyeY - 12 * u))
+            leftBrow.addQuadCurve(
+                to: CGPoint(x: cx - eyeSpacing + 8 * u, y: eyeY - 11 * u),
+                control: CGPoint(x: cx - eyeSpacing, y: eyeY - 16 * u)
+            )
+            context.stroke(leftBrow, with: .color(furDark.opacity(0.5)), style: StrokeStyle(lineWidth: 2 * u, lineCap: .round))
+
+            var rightBrow = Path()
+            rightBrow.move(to: CGPoint(x: cx + eyeSpacing - 8 * u, y: eyeY - 11 * u))
+            rightBrow.addQuadCurve(
+                to: CGPoint(x: cx + eyeSpacing + 8 * u, y: eyeY - 12 * u),
+                control: CGPoint(x: cx + eyeSpacing, y: eyeY - 16 * u)
+            )
+            context.stroke(rightBrow, with: .color(furDark.opacity(0.5)), style: StrokeStyle(lineWidth: 2 * u, lineCap: .round))
+
+            // ── MOUTH (happy little smile) ──
+            let mouthY: CGFloat = cy + 18 * u
+            var mouth = Path()
+            mouth.move(to: CGPoint(x: cx - 7 * u, y: mouthY))
+            mouth.addQuadCurve(
+                to: CGPoint(x: cx, y: mouthY + 4 * u),
+                control: CGPoint(x: cx - 3 * u, y: mouthY + 5 * u)
+            )
+            mouth.addQuadCurve(
+                to: CGPoint(x: cx + 7 * u, y: mouthY),
+                control: CGPoint(x: cx + 3 * u, y: mouthY + 5 * u)
+            )
+            context.stroke(mouth, with: .color(furDark.opacity(0.6)), style: StrokeStyle(lineWidth: 1.8 * u, lineCap: .round))
+
+            // ── TONGUE (proper shape — narrow top, round bottom) ──
+            let tTop = mouthY + 1 * u
+            let tBot = mouthY + 12 * u
+            let tonguePath = Path { p in
+                // Start top-left (narrow opening)
+                p.move(to: CGPoint(x: cx - 3.5 * u, y: tTop))
+                // Left edge curves outward then rounds bottom
+                p.addCurve(
+                    to: CGPoint(x: cx, y: tBot),
+                    control1: CGPoint(x: cx - 6 * u, y: tTop + 4 * u),
+                    control2: CGPoint(x: cx - 6 * u, y: tBot)
+                )
+                // Right side mirrors back up
+                p.addCurve(
+                    to: CGPoint(x: cx + 3.5 * u, y: tTop),
+                    control1: CGPoint(x: cx + 6 * u, y: tBot),
+                    control2: CGPoint(x: cx + 6 * u, y: tTop + 4 * u)
+                )
+                p.closeSubpath()
+            }
+            context.fill(tonguePath, with: .color(Color(red: 0.88, green: 0.25, blue: 0.30)))
+            // Center crease line
+            var crease = Path()
+            crease.move(to: CGPoint(x: cx, y: tTop + 1.5 * u))
+            crease.addLine(to: CGPoint(x: cx, y: tBot - 2.5 * u))
+            context.stroke(crease, with: .color(Color(red: 0.72, green: 0.18, blue: 0.22).opacity(0.4)),
+                          style: StrokeStyle(lineWidth: 1 * u, lineCap: .round))
+            // Highlight
+            let tongueHL = CGRect(x: cx - 1.5 * u, y: tTop + 2 * u, width: 3 * u, height: 4 * u)
+            context.fill(Path(ellipseIn: tongueHL), with: .color(Color(red: 0.95, green: 0.42, blue: 0.45).opacity(0.45)))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 struct ScandaLiciousAIChatView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
@@ -378,7 +609,7 @@ struct WelcomeView: View {
 
             // Hero section with staggered animation
             VStack(spacing: 16) {
-                // Animated logo
+                // Animated Milo mascot
                 ZStack {
                     // Ambient glow
                     Circle()
@@ -386,21 +617,15 @@ struct WelcomeView: View {
                             RadialGradient(
                                 colors: [Color.miloPurple.opacity(0.3), Color.clear],
                                 center: .center,
-                                startRadius: 15,
-                                endRadius: 50
+                                startRadius: 20,
+                                endRadius: 60
                             )
                         )
-                        .frame(width: 100, height: 100)
+                        .frame(width: 120, height: 120)
                         .blur(radius: 20)
 
-                    // Icon
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 44, weight: .semibold))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(
-                            Color.miloPurple,
-                            Color.miloPurpleLight
-                        )
+                    // Milo the Dachshund
+                    MiloDachshundView(size: 80)
                 }
                 .scaleEffect(logoScale)
                 .opacity(logoOpacity)
@@ -410,7 +635,7 @@ struct WelcomeView: View {
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
 
-                    Text("Your AI shopping assistant")
+                    Text("Your helpfull shopping assistant")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                 }
