@@ -180,7 +180,6 @@ class WalletPassViewModel: ObservableObject {
             // Build request
             let request = WalletPassCreateRequest(
                 storeName: passData.storeName,
-                memberNumber: passData.memberNumber,
                 barcodeValue: passData.barcodeValue,
                 barcodeFormat: passData.barcodeType.rawValue,
                 backgroundColor: ColorComponents(red: bgColor.red, green: bgColor.green, blue: bgColor.blue),

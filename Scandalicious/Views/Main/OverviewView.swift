@@ -1564,7 +1564,7 @@ struct OverviewView: View {
                 Circle()
                     .fill(Color.white.opacity(0.08))
                     .frame(width: 36, height: 36)
-                Image(systemName: "square.grid.2x2.fill")
+                Image(systemName: "cart.fill")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -2311,7 +2311,7 @@ struct OverviewView: View {
                                 subtitle: nil,
                                 totalItems: nil,
                                 averageItemPrice: nil,
-                                centerIcon: "square.grid.2x2.fill",
+                                centerIcon: "cart.fill",
                                 centerLabel: "Categories",
                                 showAllSegments: showAllRows
                             )
@@ -2319,7 +2319,7 @@ struct OverviewView: View {
                             SkeletonDonutChart()
                         } else {
                             VStack(spacing: 12) {
-                                Image(systemName: "square.grid.2x2")
+                                Image(systemName: "cart")
                                     .font(.system(size: 36))
                                     .foregroundColor(.white.opacity(0.3))
                                 Text("No category data")
@@ -2379,7 +2379,7 @@ struct OverviewView: View {
                 ZStack {
                     EmptyPieChartView(
                         isNewMonth: isNewMonth,
-                        icon: "square.grid.2x2.fill",
+                        icon: "cart.fill",
                         label: "Categories"
                     )
                     .opacity(isPieChartFlipped ? 1 : 0)
@@ -2428,7 +2428,7 @@ struct OverviewView: View {
                 let hasMoreCategories = categories.count > maxVisibleRows
 
                 legendSectionTitle(
-                    icon: "square.grid.2x2.fill",
+                    icon: "cart.fill",
                     title: "Categories",
                     count: categories.count
                 )
@@ -2520,7 +2520,7 @@ struct OverviewView: View {
                 }
             } else if isPieChartFlipped && categories.isEmpty {
                 emptyRowsSection(
-                    icon: "square.grid.2x2",
+                    icon: "cart",
                     title: "Categories",
                     subtitle: "No category data yet",
                     isNewMonth: isNewMonthStart && isCurrentPeriod

@@ -14,7 +14,6 @@ import SwiftUI
 
 struct WalletPassCreateRequest: Codable, Sendable {
     let storeName: String
-    let memberNumber: String
     let barcodeValue: String
     let barcodeFormat: String
     let backgroundColor: ColorComponents
@@ -24,7 +23,6 @@ struct WalletPassCreateRequest: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case storeName = "store_name"
-        case memberNumber = "member_number"
         case barcodeValue = "barcode_value"
         case barcodeFormat = "barcode_format"
         case backgroundColor = "background_color"

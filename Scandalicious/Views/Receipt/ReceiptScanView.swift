@@ -622,7 +622,7 @@ struct ReceiptScanView: View {
                         .fill(Color.purple.opacity(0.15))
                         .frame(width: 36, height: 36)
 
-                    Image(systemName: "square.grid.2x2.fill")
+                    Image(systemName: "cart.fill")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.purple)
                 }
@@ -652,7 +652,7 @@ struct ReceiptScanView: View {
                 HStack {
                     Spacer()
                     VStack(spacing: 8) {
-                        Image(systemName: "square.grid.2x2")
+                        Image(systemName: "cart")
                             .font(.system(size: 28))
                             .foregroundStyle(.white.opacity(0.2))
                         Text("No categories yet")

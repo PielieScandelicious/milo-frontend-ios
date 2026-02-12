@@ -256,7 +256,7 @@ struct StoreDetailView: View {
             if !currentCategories.isEmpty {
                 VStack(spacing: 0) {
                     legendSectionTitle(
-                        icon: "square.grid.2x2.fill",
+                        icon: "cart.fill",
                         title: "Categories",
                         count: currentCategories.count
                     )

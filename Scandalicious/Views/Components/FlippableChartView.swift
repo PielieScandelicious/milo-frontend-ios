@@ -145,7 +145,7 @@ struct FlippableAllTimeChartView: View {
                 } else {
                     // Empty state when no categories data
                     VStack(spacing: 12) {
-                        Image(systemName: "square.grid.2x2")
+                        Image(systemName: "cart")
                             .font(.system(size: size * 0.2))
                             .foregroundColor(.white.opacity(0.3))
 

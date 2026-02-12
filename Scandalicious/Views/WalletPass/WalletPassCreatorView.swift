@@ -229,13 +229,6 @@ struct WalletPassCreatorView: View {
                     placeholder: "Store Name",
                     text: $viewModel.passData.storeName
                 )
-
-                // Member number field (optional)
-                PremiumTextField(
-                    icon: "person.text.rectangle",
-                    placeholder: "Member Number (Optional)",
-                    text: $viewModel.passData.memberNumber
-                )
             }
         }
     }
@@ -738,20 +731,6 @@ struct PassCardView: View {
                 }
 
                 Spacer()
-
-                // Member info
-                if !passData.memberNumber.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("MEMBER")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(passData.colorPreset.labelColor)
-
-                        Text(passData.memberNumber)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(passData.colorPreset.foregroundColor)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
 
                 // Barcode (visual only, no text)
                 ZStack {

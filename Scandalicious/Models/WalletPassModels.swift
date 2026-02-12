@@ -111,7 +111,6 @@ struct PassColorPreset: Identifiable, Equatable {
 // MARK: - Loyalty Pass Data
 struct LoyaltyPassData {
     var storeName: String = ""
-    var memberNumber: String = ""
     var barcodeValue: String = ""
     var barcodeType: WalletBarcodeType = .qr
     var colorPreset: PassColorPreset = PassColorPreset.presets[0]
