@@ -722,6 +722,11 @@ struct OverviewView: View {
     private func handlePeriodChanged(newValue: String) {
         expandedReceiptId = nil
 
+        // Reset carousel to budget page when switching periods
+        // (past periods don't show promos, so avoid landing on a hidden page)
+        activeCardPage = 0
+        cardDragOffset = 0
+
         // Reset store rows animation for staggered re-entry
         storeRowsAppeared = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -1305,11 +1310,12 @@ struct OverviewView: View {
         .id(period)
     }
 
-    /// Swipeable carousel: Budget + Promos
+    /// Swipeable carousel: Budget + Promos (current period only shows both)
     /// Uses a single BudgetPulseView instance with offset-based paging (no TabView)
     /// so expanding/collapsing is smooth with no flash.
     private var cardCarousel: some View {
         let screenWidth = UIScreen.main.bounds.width
+        let showPromos = isCurrentPeriod
 
         return VStack(spacing: 8) {
             // Carousel area
@@ -1317,11 +1323,11 @@ struct OverviewView: View {
                 // Budget widget - single instance, always rendered
                 BudgetPulseView(viewModel: budgetViewModel, isExpanded: $budgetExpanded)
                     .padding(.horizontal, 16)
-                    .offset(x: budgetExpanded ? 0 : CGFloat(-activeCardPage) * screenWidth + cardDragOffset)
-                    .allowsHitTesting(budgetExpanded || activeCardPage == 0)
+                    .offset(x: (budgetExpanded || !showPromos) ? 0 : CGFloat(-activeCardPage) * screenWidth + cardDragOffset)
+                    .allowsHitTesting(budgetExpanded || !showPromos || activeCardPage == 0)
 
-                // Promo card
-                if !budgetExpanded {
+                // Promo card - only shown for current period
+                if showPromos && !budgetExpanded {
                     PromoBannerCard(viewModel: promosViewModel)
                         .padding(.horizontal, 16)
                         .offset(x: CGFloat(1 - activeCardPage) * screenWidth + cardDragOffset)
@@ -1331,7 +1337,7 @@ struct OverviewView: View {
             .clipped()
             .contentShape(Rectangle())
             .highPriorityGesture(
-                budgetExpanded ? nil :
+                (budgetExpanded || !showPromos) ? nil :
                 DragGesture(minimumDistance: 20, coordinateSpace: .local)
                     .onChanged { value in
                         if abs(value.translation.width) > abs(value.translation.height) {
@@ -1351,8 +1357,8 @@ struct OverviewView: View {
             )
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
 
-            // Page dots
-            if !budgetExpanded {
+            // Page dots - only shown for current period with promos
+            if showPromos && !budgetExpanded {
                 HStack(spacing: 6) {
                     ForEach(0..<2, id: \.self) { index in
                         Capsule()
