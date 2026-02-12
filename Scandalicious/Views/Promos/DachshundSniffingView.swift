@@ -204,27 +204,27 @@ private struct DachshundBody: View {
         let earFlap = sin(time * 7) * 3.0          // subtle ear bounce from trotting
 
         ZStack {
-            // — Tail (Capsule, attached to rear of body, wagging)
+            // — Tail (Capsule, tucked into rear of body, wagging)
             Capsule()
                 .fill(furBrown)
                 .frame(width: 5, height: 22)
                 .rotationEffect(.degrees(-50 + tailWag * 0.8), anchor: .bottom)
-                .offset(x: -42, y: -12 - bob)
+                .offset(x: -36, y: -10 - bob)
 
             // — Back legs (diagonal gait: opposite to front legs)
             // Back-left leg
             RoundedRectangle(cornerRadius: 3)
                 .fill(furDark.opacity(0.7))
-                .frame(width: 8, height: 16)
+                .frame(width: 8, height: 28)
                 .rotationEffect(.degrees(walk), anchor: .top)
-                .offset(x: -25, y: 20 - bob)
+                .offset(x: -25, y: 14 - bob)
 
             // Back-right leg
             RoundedRectangle(cornerRadius: 3)
                 .fill(furDark.opacity(0.7))
-                .frame(width: 8, height: 16)
+                .frame(width: 8, height: 28)
                 .rotationEffect(.degrees(-walk), anchor: .top)
-                .offset(x: -18, y: 20 - bob)
+                .offset(x: -18, y: 14 - bob)
 
             // — Body (long capsule, tilted slightly forward for sniffing posture)
             Capsule()
@@ -260,13 +260,6 @@ private struct DachshundBody: View {
                 .frame(width: 8, height: 16)
                 .rotationEffect(.degrees(walk), anchor: .top)
                 .offset(x: 25, y: 20 - bob)
-
-            // — Back ear (big floppy, peeking behind head)
-            FlopEarShape()
-                .fill(furDark.opacity(0.5))
-                .frame(width: 16, height: 28)
-                .rotationEffect(.degrees(30 + earFlap), anchor: .top)
-                .offset(x: 34, y: 2 - bob)
 
             // — Head (dog-shaped — wider forehead, tapered jaw)
             DogHeadShape()
@@ -436,25 +429,25 @@ struct DachshundBannerView: View {
         let tailWag = sin(time * 10) * 10.0
 
         ZStack {
-            // Tail (Capsule)
+            // Tail (tucked into body)
             Capsule()
                 .fill(furBrown)
                 .frame(width: 2.5, height: 22 * s)
                 .rotationEffect(.degrees(-50 + tailWag * 0.8), anchor: .bottom)
-                .offset(x: -42 * s, y: (-12 - bob) * s)
+                .offset(x: -36 * s, y: (-10 - bob) * s)
 
             // Back legs (walking)
             RoundedRectangle(cornerRadius: 1.5)
                 .fill(furDark.opacity(0.7))
-                .frame(width: 3, height: 16 * s)
+                .frame(width: 3, height: 28 * s)
                 .rotationEffect(.degrees(walk), anchor: .top)
-                .offset(x: -22 * s, y: (20 - bob) * s)
+                .offset(x: -22 * s, y: (14 - bob) * s)
 
             RoundedRectangle(cornerRadius: 1.5)
                 .fill(furDark.opacity(0.7))
-                .frame(width: 3, height: 16 * s)
+                .frame(width: 3, height: 28 * s)
                 .rotationEffect(.degrees(-walk), anchor: .top)
-                .offset(x: -16 * s, y: (20 - bob) * s)
+                .offset(x: -16 * s, y: (14 - bob) * s)
 
             // Body
             Capsule()
@@ -475,13 +468,6 @@ struct DachshundBannerView: View {
                 .frame(width: 3, height: 16 * s)
                 .rotationEffect(.degrees(walk), anchor: .top)
                 .offset(x: 24 * s, y: (20 - bob) * s)
-
-            // Back ear (mini)
-            FlopEarShape()
-                .fill(furDark.opacity(0.5))
-                .frame(width: 16 * s, height: 28 * s)
-                .rotationEffect(.degrees(30), anchor: .top)
-                .offset(x: 34 * s, y: (2 - bob) * s)
 
             // Head (dog-shaped)
             DogHeadShape()
