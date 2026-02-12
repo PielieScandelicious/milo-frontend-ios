@@ -118,6 +118,77 @@ private struct MovingGrassLayer: View {
     }
 }
 
+// MARK: - Custom Dog Shapes
+
+/// Dog head side profile — wider forehead, tapered jaw (not a plain circle)
+private struct DogHeadShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var path = Path()
+        path.move(to: CGPoint(x: w * 0.5, y: 0))
+        path.addCurve(
+            to: CGPoint(x: w, y: h * 0.38),
+            control1: CGPoint(x: w * 0.78, y: 0),
+            control2: CGPoint(x: w, y: h * 0.12)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.6, y: h),
+            control1: CGPoint(x: w, y: h * 0.68),
+            control2: CGPoint(x: w * 0.82, y: h * 0.92)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.3, y: h),
+            control1: CGPoint(x: w * 0.5, y: h * 1.06),
+            control2: CGPoint(x: w * 0.4, y: h * 1.06)
+        )
+        path.addCurve(
+            to: CGPoint(x: 0, y: h * 0.38),
+            control1: CGPoint(x: w * 0.12, y: h * 0.92),
+            control2: CGPoint(x: 0, y: h * 0.68)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.5, y: 0),
+            control1: CGPoint(x: 0, y: h * 0.12),
+            control2: CGPoint(x: w * 0.22, y: 0)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Floppy dachshund ear — hooks out at top, hangs down with rounded tip
+private struct FlopEarShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var path = Path()
+        path.move(to: CGPoint(x: w * 0.4, y: 0))
+        path.addCurve(
+            to: CGPoint(x: w, y: h * 0.15),
+            control1: CGPoint(x: w * 0.6, y: -h * 0.06),
+            control2: CGPoint(x: w * 0.95, y: -h * 0.02)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.6, y: h * 0.9),
+            control1: CGPoint(x: w * 1.05, y: h * 0.45),
+            control2: CGPoint(x: w * 0.85, y: h * 0.8)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.15, y: h * 0.75),
+            control1: CGPoint(x: w * 0.4, y: h * 1.05),
+            control2: CGPoint(x: w * 0.1, y: h * 0.98)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.4, y: 0),
+            control1: CGPoint(x: w * 0.2, y: h * 0.4),
+            control2: CGPoint(x: w * 0.3, y: h * 0.05)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
 // MARK: - Dachshund Body (walking & sniffing pose)
 
 /// All coordinates relative to body center at (0, 0).
@@ -130,6 +201,7 @@ private struct DachshundBody: View {
         let walk = sin(time * 7) * 14.0           // leg swing angle
         let bob = abs(sin(time * 7)) * 1.5         // body bounce from walking
         let tailWag = sin(time * 10) * 15.0        // tail wag
+        let earFlap = sin(time * 7) * 3.0          // subtle ear bounce from trotting
 
         ZStack {
             // — Tail (Capsule, attached to rear of body, wagging)
@@ -189,8 +261,15 @@ private struct DachshundBody: View {
                 .rotationEffect(.degrees(walk), anchor: .top)
                 .offset(x: 25, y: 20 - bob)
 
-            // — Head (tilted down — sniffing the ground)
-            Ellipse()
+            // — Back ear (big floppy, peeking behind head)
+            FlopEarShape()
+                .fill(furDark.opacity(0.5))
+                .frame(width: 16, height: 28)
+                .rotationEffect(.degrees(30 + earFlap), anchor: .top)
+                .offset(x: 34, y: 2 - bob)
+
+            // — Head (dog-shaped — wider forehead, tapered jaw)
+            DogHeadShape()
                 .fill(
                     LinearGradient(
                         colors: [furLight, furBrown],
@@ -198,25 +277,32 @@ private struct DachshundBody: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: 28, height: 26)
+                .frame(width: 30, height: 28)
                 .rotationEffect(.degrees(20))
                 .offset(x: 44, y: 10 - bob)
 
-            // — Ear (floppy, hangs from top of head, dark brown)
+            // Head highlight (subtle forehead glow)
             Ellipse()
-                .fill(furDark)
-                .frame(width: 14, height: 22)
-                .rotationEffect(.degrees(15))
-                .offset(x: 38, y: 14 - bob)
+                .fill(furLight.opacity(0.4))
+                .frame(width: 16, height: 10)
+                .rotationEffect(.degrees(20))
+                .offset(x: 42, y: 4 - bob)
 
-            // — Snout (angled down toward ground, static)
+            // — Front ear (big floppy, prominent — cute like Milo avatar)
+            FlopEarShape()
+                .fill(furDark)
+                .frame(width: 18, height: 30)
+                .rotationEffect(.degrees(22 + earFlap), anchor: .top)
+                .offset(x: 39, y: 4 - bob)
+
+            // — Snout (angled down toward ground)
             Capsule()
                 .fill(furBrown)
                 .frame(width: 18, height: 11)
                 .rotationEffect(.degrees(30))
                 .offset(x: 55, y: 22 - bob)
 
-            // — Nose (static, near ground)
+            // — Nose (near ground)
             Ellipse()
                 .fill(noseBlack)
                 .frame(width: 8, height: 6)
@@ -228,17 +314,23 @@ private struct DachshundBody: View {
                 .frame(width: 3, height: 2)
                 .offset(x: 61, y: 24 - bob)
 
-            // — Eye (on head, above snout)
+            // — Eye (on head, with Milo-style shine highlights)
             Circle()
                 .fill(noseBlack)
                 .frame(width: 5, height: 5)
-                .offset(x: 48, y: 7 - bob)
+                .offset(x: 47, y: 6 - bob)
 
-            // Eye highlight
+            // Eye primary highlight
             Circle()
-                .fill(Color.white.opacity(0.8))
-                .frame(width: 2, height: 2)
-                .offset(x: 49, y: 6 - bob)
+                .fill(Color.white.opacity(0.85))
+                .frame(width: 2.5, height: 2.5)
+                .offset(x: 48.5, y: 4.5 - bob)
+
+            // Eye secondary highlight
+            Circle()
+                .fill(Color.white.opacity(0.4))
+                .frame(width: 1.5, height: 1.5)
+                .offset(x: 46, y: 7.5 - bob)
         }
     }
 }
@@ -384,28 +476,35 @@ struct DachshundBannerView: View {
                 .rotationEffect(.degrees(walk), anchor: .top)
                 .offset(x: 24 * s, y: (20 - bob) * s)
 
-            // Head
-            Ellipse()
+            // Back ear (mini)
+            FlopEarShape()
+                .fill(furDark.opacity(0.5))
+                .frame(width: 16 * s, height: 28 * s)
+                .rotationEffect(.degrees(30), anchor: .top)
+                .offset(x: 34 * s, y: (2 - bob) * s)
+
+            // Head (dog-shaped)
+            DogHeadShape()
                 .fill(furBrown)
-                .frame(width: 28 * s, height: 26 * s)
+                .frame(width: 30 * s, height: 28 * s)
                 .rotationEffect(.degrees(20))
                 .offset(x: 44 * s, y: (10 - bob) * s)
 
-            // Ear
-            Ellipse()
+            // Front ear (mini)
+            FlopEarShape()
                 .fill(furDark)
-                .frame(width: 14 * s, height: 22 * s)
-                .rotationEffect(.degrees(15))
-                .offset(x: 38 * s, y: (14 - bob) * s)
+                .frame(width: 18 * s, height: 30 * s)
+                .rotationEffect(.degrees(22), anchor: .top)
+                .offset(x: 39 * s, y: (4 - bob) * s)
 
-            // Snout (static)
+            // Snout
             Capsule()
                 .fill(furBrown)
                 .frame(width: 18 * s, height: 11 * s)
                 .rotationEffect(.degrees(30))
                 .offset(x: 55 * s, y: (22 - bob) * s)
 
-            // Nose (static)
+            // Nose
             Ellipse()
                 .fill(noseBlack)
                 .frame(width: 8 * s, height: 6 * s)
@@ -415,7 +514,7 @@ struct DachshundBannerView: View {
             Circle()
                 .fill(noseBlack)
                 .frame(width: 2.5)
-                .offset(x: 48 * s, y: (7 - bob) * s)
+                .offset(x: 47 * s, y: (6 - bob) * s)
         }
     }
 }
