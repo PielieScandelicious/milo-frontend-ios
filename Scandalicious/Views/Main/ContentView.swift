@@ -12,13 +12,13 @@ struct ContentView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @StateObject private var transactionManager = TransactionManager()
     @StateObject private var dataManager = StoreDataManager()
-    @State private var selectedTab: Tab = .scan
+    @State private var selectedTab: Tab = .home
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
 
     enum Tab: Int, Hashable {
-        case view = 0
-        case scan = 1
+        case budget = 0
+        case home = 1
         case dobby = 2
     }
 
@@ -27,15 +27,15 @@ struct ContentView: View {
             TabView(selection: $selectedTab) {
                 ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
                     .tabItem {
-                        Label("View", systemImage: "chart.pie.fill")
+                        Label("Budget", systemImage: "creditcard.fill")
                     }
-                    .tag(Tab.view)
+                    .tag(Tab.budget)
 
                 ScanTab()
                     .tabItem {
-                        Label("Scan", systemImage: "qrcode.viewfinder")
+                        Label("Home", systemImage: "house.fill")
                     }
-                    .tag(Tab.scan)
+                    .tag(Tab.home)
 
                 ScandaLiciousTab()
                     .tabItem {
