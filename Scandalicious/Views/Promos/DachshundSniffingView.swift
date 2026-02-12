@@ -43,7 +43,7 @@ struct DachshundSniffingView: View {
 
                     // Dachshund walking and sniffing
                     DachshundBody(time: t)
-                        .offset(y: 12)
+                        .offset(x: -20, y: 12)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -340,7 +340,7 @@ struct DachshundBannerView: View {
                 ZStack {
                     miniGrass(time: t)
                     miniDachshund(time: t)
-                        .offset(y: 2)
+                        .offset(x: -6, y: 4)
                 }
                 .frame(width: 60, height: 36)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
