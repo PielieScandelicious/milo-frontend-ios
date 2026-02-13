@@ -12,17 +12,8 @@ struct BudgetPieChartView: View {
     let progress: BudgetProgress
     var size: CGFloat = 160
 
-    private var hasCategories: Bool {
-        guard let allocations = progress.budget.categoryAllocations else { return false }
-        return !allocations.isEmpty
-    }
-
     var body: some View {
-        if hasCategories {
-            BudgetCategoryDonut(progress: progress, size: size)
-        } else {
-            BudgetTotalRing(progress: progress, size: size)
-        }
+        BudgetTotalRing(progress: progress, size: size)
     }
 }
 
@@ -104,10 +95,6 @@ private struct BudgetCategoryDonut: View {
         size * 0.08
     }
 
-    private var leftToSpend: Double {
-        max(0, progress.budget.monthlyAmount - progress.currentSpend)
-    }
-
     /// Computes the visible trim end for a slice based on current reveal progress.
     /// When revealProgress < startAngle, returns startAngle (zero-length arc = invisible).
     /// When revealProgress >= endAngle, returns endAngle (fully revealed).
@@ -145,21 +132,11 @@ private struct BudgetCategoryDonut: View {
                     .animation(.spring(response: 0.8, dampingFraction: 0.8), value: revealProgress)
             }
 
-            // Center content — also blocks inherited animations
-            VStack(spacing: 3) {
-                Image(systemName: "wallet.bifold.fill")
-                    .font(.system(size: size * 0.12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.5))
-
-                Text(String(format: "€%.0f", leftToSpend))
-                    .font(.system(size: size * 0.18, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-
-                Text("left to spend")
-                    .font(.system(size: size * 0.065, weight: .medium))
-                    .foregroundColor(.white.opacity(0.45))
-            }
-            .transaction { $0.animation = nil }
+            // Center icon
+            Image(systemName: "banknote.fill")
+                .font(.system(size: size * 0.22, weight: .medium))
+                .foregroundColor(.white.opacity(0.35))
+                .transaction { $0.animation = nil }
         }
         .frame(width: size, height: size)
         .onAppear {
@@ -169,36 +146,54 @@ private struct BudgetCategoryDonut: View {
 }
 
 // MARK: - Total Budget Ring (fixed gray background, animated colored segment)
+// Uses the same animation pattern as MiniBudgetRing for reliable rendering.
 
 private struct BudgetTotalRing: View {
     let progress: BudgetProgress
     var size: CGFloat = 120
 
-    @State private var fillEnd: CGFloat = 0
+    @State private var animationProgress: CGFloat = 0
 
     private var isOverBudget: Bool {
         progress.currentSpend > progress.budget.monthlyAmount
     }
 
+    // Same green/red as collapsedHeader's accentColor
     private var ringColor: Color {
         isOverBudget
-            ? Color(red: 0.88, green: 0.35, blue: 0.35)
-            : Color(red: 0.22, green: 0.72, blue: 0.45)
+            ? Color(red: 1.0, green: 0.4, blue: 0.4)
+            : Color(red: 0.3, green: 0.8, blue: 0.5)
     }
 
     private var strokeWidth: CGFloat {
-        size * 0.08
+        size * 0.12
     }
 
-    private var leftToSpend: Double {
-        max(0, progress.budget.monthlyAmount - progress.currentSpend)
+    private var spendFraction: CGFloat {
+        guard progress.budget.monthlyAmount > 0 else { return 0 }
+        return min(1.0, CGFloat(progress.currentSpend / progress.budget.monthlyAmount))
+    }
+
+    private func replayAnimation() {
+        animationProgress = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                animationProgress = 1.0
+            }
+        }
     }
 
     var body: some View {
         ZStack {
-            // Colored segment — spring animation on the trim value
+            // Full gray background circle — always visible, no animation
             Circle()
-                .trim(from: 0, to: fillEnd)
+                .stroke(Color(white: 0.25), lineWidth: strokeWidth)
+                .frame(width: size - strokeWidth, height: size - strokeWidth)
+                .transaction { $0.animation = nil }
+
+            // Colored segment — spend ratio × animationProgress (same as MiniBudgetRing)
+            Circle()
+                .trim(from: 0, to: spendFraction * animationProgress)
                 .stroke(
                     ringColor,
                     style: StrokeStyle(
@@ -208,27 +203,20 @@ private struct BudgetTotalRing: View {
                 )
                 .frame(width: size - strokeWidth, height: size - strokeWidth)
                 .rotationEffect(.degrees(-90))
-                .animation(.spring(response: 0.8, dampingFraction: 0.8), value: fillEnd)
+                .animation(.spring(response: 0.8, dampingFraction: 0.8), value: animationProgress)
 
-            // Center: amount left to spend — blocks inherited animations
-            VStack(spacing: 3) {
-                Image(systemName: "wallet.bifold.fill")
-                    .font(.system(size: size * 0.12, weight: .semibold))
-                    .foregroundColor(ringColor.opacity(0.7))
-
-                Text(String(format: "€%.0f", leftToSpend))
-                    .font(.system(size: size * 0.18, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-
-                Text("left to spend")
-                    .font(.system(size: size * 0.065, weight: .medium))
-                    .foregroundColor(.white.opacity(0.45))
-            }
-            .transaction { $0.animation = nil }
+            // Center icon
+            Image(systemName: "banknote.fill")
+                .font(.system(size: size * 0.22, weight: .medium))
+                .foregroundColor(.white.opacity(0.35))
+                .transaction { $0.animation = nil }
         }
         .frame(width: size, height: size)
         .onAppear {
-            fillEnd = 1.0
+            replayAnimation()
+        }
+        .onChange(of: spendFraction) { _, _ in
+            replayAnimation()
         }
     }
 }

@@ -116,6 +116,7 @@ struct BudgetRingView: View {
 struct MiniBudgetRing: View {
     let spendRatio: Double
     let paceStatus: PaceStatus
+    var ringColor: Color? = nil
     var size: CGFloat = 44
 
     @State private var animationProgress: CGFloat = 0
@@ -144,7 +145,7 @@ struct MiniBudgetRing: View {
             Circle()
                 .trim(from: 0, to: min(1.0, CGFloat(spendRatio)) * animationProgress)
                 .stroke(
-                    paceStatus.color,
+                    ringColor ?? paceStatus.color,
                     style: StrokeStyle(
                         lineWidth: size * 0.15,
                         lineCap: .round
