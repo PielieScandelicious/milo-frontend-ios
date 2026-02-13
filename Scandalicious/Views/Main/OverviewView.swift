@@ -1880,6 +1880,8 @@ struct OverviewView: View {
             Text(String(format: "€%.2f", item.totalPrice))
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.75))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.vertical, 9)
         .padding(.horizontal, 4)
