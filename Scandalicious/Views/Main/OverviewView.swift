@@ -3249,19 +3249,19 @@ struct CompactNutriBadge: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             // Grade letter with circular ring
             ZStack {
                 Circle()
-                    .stroke(scoreColor.opacity(0.25), lineWidth: 2.5)
-                    .frame(width: 28, height: 28)
+                    .stroke(scoreColor.opacity(0.2), lineWidth: 2)
+                    .frame(width: 26, height: 26)
                 Circle()
                     .trim(from: 0, to: scoreProgress)
-                    .stroke(scoreColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    .frame(width: 28, height: 28)
+                    .stroke(scoreColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .frame(width: 26, height: 26)
                     .rotationEffect(.degrees(-90))
                 Text(gradeLabel)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(scoreColor)
                     .contentTransition(.numericText())
             }
@@ -3269,9 +3269,19 @@ struct CompactNutriBadge: View {
 
             Text("NUTRI SCORE")
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(.white.opacity(0.3))
-                .tracking(0.5)
+                .foregroundColor(.white.opacity(0.4))
+                .tracking(0.8)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(scoreColor.opacity(0.08))
+                .overlay(
+                    Capsule()
+                        .stroke(scoreColor.opacity(0.2), lineWidth: 0.5)
+                )
+        )
     }
 }
 
