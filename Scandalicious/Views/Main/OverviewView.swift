@@ -1678,11 +1678,8 @@ struct OverviewView: View {
 
     // MARK: - Legend Section Title
 
-    private func legendSectionTitle(icon: String, title: String, count: Int) -> some View {
+    private func legendSectionTitle(title: String, count: Int) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.white.opacity(0.3))
             Text(title.uppercased())
                 .font(.system(size: 11, weight: .bold))
                 .tracking(1.2)
@@ -2331,8 +2328,8 @@ struct OverviewView: View {
         .padding(.horizontal, 20)
     }
 
-    /// Spending header: amount + inline health badge + syncing
-    private func spendingHeaderSection(spending: Double, healthScore: Double?) -> some View {
+    /// Spending header: amount + syncing
+    private func spendingHeaderSection(spending: Double) -> some View {
         VStack(spacing: 8) {
             Text("SPENT THIS MONTH")
                 .font(.system(size: 11, weight: .medium))
@@ -2344,28 +2341,6 @@ struct OverviewView: View {
                 .foregroundColor(.white)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
-
-            if let score = healthScore {
-                // Subtle divider above nutri score
-                LinearGradient(
-                    colors: [.white.opacity(0), .white.opacity(0.25), .white.opacity(0)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: 90, height: 0.5)
-                .padding(.top, 2)
-
-                CompactNutriBadge(score: score)
-            }
-
-            // Subtle divider above sync indicator
-            LinearGradient(
-                colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(width: 60, height: 0.5)
-            .padding(.top, 2)
 
             syncingIndicator()
                 .animation(.easeInOut(duration: 0.3), value: isSyncingActive)
@@ -2563,7 +2538,6 @@ struct OverviewView: View {
                 let hasMoreCategories = categories.count > maxVisibleRows
 
                 legendSectionTitle(
-                    icon: "cart.fill",
                     title: "Categories",
                     count: categories.count
                 )
@@ -2617,7 +2591,6 @@ struct OverviewView: View {
                 let hasMoreSegments = segments.count > maxVisibleRows
 
                 legendSectionTitle(
-                    icon: "storefront.fill",
                     title: "Stores",
                     count: segments.count
                 )
@@ -2696,7 +2669,7 @@ struct OverviewView: View {
         let healthScore = healthScoreForPeriod(period)
 
         return VStack(spacing: 0) {
-            spendingHeaderSection(spending: spending, healthScore: healthScore)
+            spendingHeaderSection(spending: spending)
 
             flippableChartSection(period: period, segments: segments)
                 .id("chart-\(period)")
@@ -2704,6 +2677,13 @@ struct OverviewView: View {
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
+            }
+
+            if isPieChartFlipped, let score = healthScore {
+                CompactNutriBadge(score: score)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    .transition(.opacity)
             }
 
             rowsSection(

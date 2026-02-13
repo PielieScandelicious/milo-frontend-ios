@@ -161,21 +161,9 @@ struct StoreDetailView: View {
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentTotalSpend)
 
-            if let score = currentHealthScore {
-                // Subtle divider above nutri score
-                LinearGradient(
-                    colors: [.white.opacity(0), .white.opacity(0.25), .white.opacity(0)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: 90, height: 0.5)
-                .padding(.top, 2)
-
-                CompactNutriBadge(score: score)
-            }
         }
         .padding(.top, 20)
-        .padding(.bottom, 16)
+        .padding(.bottom, 4)
         .frame(maxWidth: .infinity)
     }
 
@@ -227,11 +215,8 @@ struct StoreDetailView: View {
 
     // MARK: - Legend Section Title
 
-    private func legendSectionTitle(icon: String, title: String, count: Int) -> some View {
+    private func legendSectionTitle(title: String, count: Int) -> some View {
         HStack(spacing: 6) {
-            Image.categorySymbol(icon)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.white.opacity(0.3))
             Text(title.uppercased())
                 .font(.system(size: 11, weight: .bold))
                 .tracking(1.2)
@@ -265,10 +250,15 @@ struct StoreDetailView: View {
             )
             .padding(.vertical, 12)
 
+            if let score = currentHealthScore {
+                CompactNutriBadge(score: score)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+            }
+
             if !currentCategories.isEmpty {
                 VStack(spacing: 0) {
                     legendSectionTitle(
-                        icon: "cart.fill",
                         title: "Categories",
                         count: currentCategories.count
                     )
@@ -327,7 +317,7 @@ struct StoreDetailView: View {
                     // Expandable Receipts Section — revealed last
                     receiptsSection
                         .padding(.horizontal, 16)
-                        .padding(.top, 8)
+                        .padding(.top, 20)
                         .opacity(receiptsRevealed ? 1 : 0)
                         .offset(y: receiptsRevealed ? 0 : 14)
                         .animation(.easeOut(duration: 0.35), value: receiptsRevealed)
