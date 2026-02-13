@@ -392,7 +392,7 @@ struct CategoryDetailView: View {
                     Text(transaction.displayName)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     if transaction.quantity > 1 {
                         Text("\(transaction.quantity)")
@@ -416,7 +416,7 @@ struct CategoryDetailView: View {
                     Text(description)
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.4))
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
 
                 Text(formatTransactionDate(transaction.dateParsed))

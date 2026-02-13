@@ -563,7 +563,7 @@ struct CategoryBreakdownDetailView: View {
                             Text(item.displayName)
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.white.opacity(0.9))
-                                .lineLimit(1)
+                                .lineLimit(2)
 
                             if item.quantity > 1 {
                                 Text("×\(item.quantity)")
@@ -587,7 +587,7 @@ struct CategoryBreakdownDetailView: View {
                             Text(description)
                                 .font(.system(size: 11))
                                 .foregroundColor(.white.opacity(0.45))
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
 
                         // Store name for context

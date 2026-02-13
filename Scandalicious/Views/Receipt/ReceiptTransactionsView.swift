@@ -454,13 +454,13 @@ struct ReceiptTransactionsView: View {
                         Text(transaction.displayName)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
-                            .lineLimit(1)
+                            .lineLimit(2)
 
                         if let description = transaction.displayDescription {
                             Text(description)
                                 .font(.system(size: 12, weight: .regular))
                                 .foregroundColor(.white.opacity(0.45))
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
                     }
 

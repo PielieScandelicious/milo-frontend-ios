@@ -372,7 +372,7 @@ struct ReceiptItemRow: View {
                                 .font(.body)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.primary)
-                                .lineLimit(1)
+                                .lineLimit(2)
 
                             // Split participant avatars (friends only)
                             if !friendsOnly.isEmpty {
@@ -384,7 +384,7 @@ struct ReceiptItemRow: View {
                             Text(description)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
                     }
 
