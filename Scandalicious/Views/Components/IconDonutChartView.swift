@@ -51,6 +51,8 @@ struct IconDonutChartView: View {
     @State private var selectedSegmentIndex: Int? = nil
     @State private var isSettling = false // Guards against backend refresh re-animation
     @State private var centerRevealed = false // Controls center content reveal animation
+    @State private var appearanceScale: CGFloat = 0.85 // Start slightly smaller than final size
+    @State private var appearanceRotation: Double = -90 // Start rotated -90° (will spin clockwise)
 
     /// Whether the data needs grouping (more than maxVisibleSegments)
     private var needsGrouping: Bool {
@@ -240,7 +242,8 @@ struct IconDonutChartView: View {
                     )
                 }
             }
-            .rotationEffect(.degrees(-90)) // Start from top
+            .rotationEffect(.degrees(-90 + (shouldAnimate ? appearanceRotation : 0))) // Start from top + entrance spin
+            .scaleEffect(shouldAnimate ? appearanceScale : 1.0)
 
             // Center content - premium reveal with spring animation
             Group {
@@ -257,26 +260,26 @@ struct IconDonutChartView: View {
         .onAppear {
             if shouldAnimate {
                 if !segments.isEmpty {
-                    // We have data — play the sweep and guard against backend refresh
+                    // Segments start at center circle edge, center visible immediately
+                    animationProgress = 1.0
+                    appearanceScale = 0.85
+                    centerRevealed = true
                     isSettling = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         isSettling = false
                     }
-                    withAnimation(.easeInOut(duration: 0.8)) {
-                        animationProgress = 1.0
-                    }
-                    // Reveal center early in the sweep (gradient bg appears;
-                    // text content fades in via its own animation when data arrives)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            centerRevealed = true
+                    // Brief pause, then expand outward + rotate — decelerates and locks in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
+                            appearanceScale = 1.0
+                            appearanceRotation = 0
                         }
                     }
                 }
-                // If segments are empty, leave animationProgress at 0
-                // and wait for data to arrive via onChange
             } else {
                 animationProgress = 1.0
+                appearanceScale = 1.0
+                appearanceRotation = 0
                 centerRevealed = true
             }
         }
@@ -288,35 +291,16 @@ struct IconDonutChartView: View {
             guard !isSettling else { return }
 
             if shouldAnimate {
-                centerRevealed = false
-                if animationProgress == 0 {
-                    // First time receiving data (was empty on appear) — clean sweep from 0
-                    isSettling = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        isSettling = false
-                    }
-                    withAnimation(.easeInOut(duration: 0.8)) {
-                        animationProgress = 1.0
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        guard !centerRevealed else { return }
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            centerRevealed = true
-                        }
-                    }
-                } else {
-                    // Structural change (period switch, etc.) — reset and re-sweep
-                    animationProgress = 0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        withAnimation(.easeInOut(duration: 0.8)) {
-                            animationProgress = 1.0
-                        }
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        guard !centerRevealed else { return }
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            centerRevealed = true
-                        }
+                // Segments start at center circle edge, center visible immediately
+                animationProgress = 1.0
+                centerRevealed = true
+                appearanceScale = 0.85
+                appearanceRotation = -90
+                // Brief pause, then expand outward + rotate
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
+                        appearanceScale = 1.0
+                        appearanceRotation = 0
                     }
                 }
             }
@@ -335,6 +319,8 @@ struct IconDonutChartView: View {
                 animationProgress = 0
                 selectedSegmentIndex = nil
                 centerRevealed = false
+                appearanceScale = 0.85
+                appearanceRotation = -90
             }
         }
     }

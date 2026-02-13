@@ -2,1524 +2,593 @@
 //  BudgetSetupView.swift
 //  Scandalicious
 //
-//  Created by Claude on 31/01/2026.
-//  Simplified on 05/02/2026 - Removed AI features
-//
 
 import SwiftUI
 
+// MARK: - Editable Target (local)
+
+private struct EditableTarget: Identifiable {
+    let id = UUID()
+    let category: String
+    var amountText: String
+
+    var amount: Double { Double(amountText) ?? 0 }
+
+    init(category: String, amount: Double = 50) {
+        self.category = category
+        self.amountText = amount > 0 ? String(format: "%.0f", amount) : ""
+    }
+}
+
 // MARK: - Budget Setup View
 
-/// Smart budget setup with category allocations
 struct BudgetSetupView: View {
     @ObservedObject var viewModel: BudgetViewModel
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: FocusField?
 
-    // Budget selection state
-    @State private var selectionMode: SelectionMode = .percentage
-    @State private var selectedPercentage: SavingsPercentage = .ten
-    @State private var customAmount: Double = 500
+    @State private var monthlyAmountText = "500"
+    @State private var categoryTargets: [EditableTarget] = []
+    @State private var isSmartBudget = true
+    @State private var showCategoryPicker = false
     @State private var showSuccessSheet = false
-    @State private var showAllCategories = false
 
-    // Category editing state
-    @State private var showCategoryEditor = false
-    @State private var editableCategoryAllocations: [EditableCategoryAllocation] = []
-    @State private var hasCustomizedCategories = false
-    @State private var categoryListExpanded = false
-
-    enum SelectionMode {
-        case percentage
-        case custom
+    private enum FocusField: Hashable {
+        case monthly
+        case category(UUID)
     }
 
-    enum SavingsPercentage: CaseIterable, Identifiable {
-        case five, ten, fifteen, twenty, twentyFive
-
-        var id: Int { value }
-
-        var value: Int {
-            switch self {
-            case .five: return 5
-            case .ten: return 10
-            case .fifteen: return 15
-            case .twenty: return 20
-            case .twentyFive: return 25
-            }
-        }
-
-        var label: String { "\(value)%" }
+    private var monthlyAmount: Double {
+        Double(monthlyAmountText) ?? 0
     }
 
-    // Computed properties
-
-    private var navigationTitle: String {
-        guard let suggestion = viewModel.aiSuggestionState.data else {
-            return "Budget"
-        }
-        let phase = suggestion.dataCollectionPhase
-        if phase == .onboarding { return "Budget" }
-        return phase.title
+    private var isEditing: Bool {
+        viewModel.currentBudget != nil
     }
 
-    private var averageSpending: Double {
-        viewModel.aiSuggestionState.data?.monthlyAverage ?? 500
-    }
-
-    private var targetBudget: Double {
-        switch selectionMode {
-        case .percentage:
-            let savings = averageSpending * Double(selectedPercentage.value) / 100
-            return max(100, roundToNearest5(averageSpending - savings))
-        case .custom:
-            return roundToNearest5(customAmount)
-        }
-    }
-
-    /// Round to nearest 5 (e.g. 18 -> 20, 22 -> 20)
-    private func roundToNearest5(_ value: Double) -> Double {
-        guard value > 0 else { return 0 }
-        return (value / 5).rounded() * 5
-    }
-
-    private var savingsAmount: Double {
-        max(0, averageSpending - targetBudget)
-    }
-
-    private var savingsPercentageValue: Double {
-        guard averageSpending > 0 else { return 0 }
-        return (savingsAmount / averageSpending) * 100
-    }
-
-    /// Scale category allocations to match the target budget
-    /// If categories have been customized, return those instead
-    private var scaledCategoryAllocations: [CategoryAllocation] {
-        // If user has customized categories, use those
-        if hasCustomizedCategories && !editableCategoryAllocations.isEmpty {
-            return editableCategoryAllocations.map { editable in
-                CategoryAllocation(
-                    category: editable.category,
-                    amount: editable.amount,
-                    isLocked: editable.isLocked
-                )
-            }
-        }
-
-        // Otherwise, scale suggestions
-        guard let suggestion = viewModel.aiSuggestionState.data else { return [] }
-
-        let originalTotal = suggestion.categoryAllocations.reduce(0) { $0 + $1.suggestedAmount }
-        guard originalTotal > 0 else { return [] }
-
-        let scaleFactor = targetBudget / originalTotal
-
-        return suggestion.categoryAllocations.map { allocation in
-            CategoryAllocation(
-                category: allocation.category,
-                amount: roundToNearest5(allocation.suggestedAmount * scaleFactor),
-                isLocked: false
-            )
-        }
+    private var canSave: Bool {
+        monthlyAmount > 0 && !viewModel.isSaving
     }
 
     var body: some View {
         NavigationView {
             ZStack {
-                // Background gradient
-                LinearGradient(
-                    colors: [
-                        Color(white: 0.08),
-                        Color(red: 0.08, green: 0.06, blue: 0.12)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                Color(white: 0.06).ignoresSafeArea()
+                    .onTapGesture { focusedField = nil }
 
-                if viewModel.aiSuggestionState.isLoading {
-                    loadingView
-                } else if let suggestion = viewModel.aiSuggestionState.data {
-                    // Show different UI based on data collection phase
-                    switch suggestion.dataCollectionPhase {
-                    case .onboarding:
-                        onboardingContent(suggestion)
-                    case .buildingProfile:
-                        buildingProfileContent(suggestion)
-                    case .fullyPersonalized:
-                        mainContent
+                ScrollView {
+                    VStack(spacing: 16) {
+                        monthlySection
+                        categorySection
+                        autoRenewToggle
+                        saveButton
                     }
-                } else if let error = viewModel.aiSuggestionState.errorMessage {
-                    errorView(error)
-                } else {
-                    loadingView
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 40)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle(navigationTitle)
+            .navigationTitle(isEditing ? "Edit Budget" : "Set Budget")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                        .fontWeight(.semibold)
                 }
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear {
-            if viewModel.aiSuggestionState.data == nil {
-                Task {
-                    await viewModel.loadAISuggestion()
-                    // Set default custom amount to -10% after data loads
-                    if customAmount == 500 && averageSpending > 0 {
-                        customAmount = roundToNearest5(averageSpending * 0.9)
-                    }
+        .onAppear { loadExistingBudget() }
+        .sheet(isPresented: $showCategoryPicker) {
+            CategoryPickerSheet(
+                existingCategories: Set(categoryTargets.map { $0.category })
+            ) { category in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    categoryTargets.append(EditableTarget(category: category))
                 }
-            } else {
-                // Data already loaded, set default if needed
-                if customAmount == 500 && averageSpending > 0 {
-                    customAmount = roundToNearest5(averageSpending * 0.9)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    if let last = categoryTargets.last {
+                        focusedField = .category(last.id)
+                    }
                 }
             }
         }
         .fullScreenCover(isPresented: $showSuccessSheet) {
             BudgetCreatedSheet(
-                budgetAmount: targetBudget,
-                monthlySavings: savingsAmount,
-                categoryAllocations: scaledCategoryAllocations,
+                budgetAmount: monthlyAmount,
+                monthlySavings: 0,
+                categoryAllocations: categoryTargets
+                    .filter { $0.amount > 0 }
+                    .map { CategoryAllocation(category: $0.category, amount: $0.amount) },
                 onDismiss: {
                     showSuccessSheet = false
                     dismiss()
                 }
             )
         }
-        .sheet(isPresented: $showAllCategories) {
-            AllCategoriesSheet(
-                allocations: scaledCategoryAllocations,
-                totalBudget: targetBudget
-            )
-        }
-        .sheet(isPresented: $showCategoryEditor) {
-            // Create a temporary budget for editing
-            let tempBudget = UserBudget(
-                id: "temp",
-                userId: "temp",
-                monthlyAmount: targetBudget,
-                categoryAllocations: editableCategoryAllocations.isEmpty ? scaledCategoryAllocations : editableCategoryAllocations.map { editable in
-                    CategoryAllocation(
-                        category: editable.category,
-                        amount: editable.amount,
-                        isLocked: editable.isLocked
-                    )
-                }
-            )
-
-            EditCategoryBudgetsSheet(initialBudget: tempBudget) { updatedAllocations in
-                handleCategorySave(updatedAllocations)
-            }
-        }
     }
 
-    // MARK: - Loading View
+    // MARK: - Monthly Section
 
-    private var loadingView: some View {
-        VStack(spacing: 24) {
-            Spacer()
+    private var monthlySection: some View {
+        VStack(spacing: 8) {
+            Text("MONTHLY BUDGET")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.5)
+                .foregroundColor(.white.opacity(0.35))
 
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 4)
-                    .frame(width: 100, height: 100)
+            HStack(spacing: 2) {
+                Text("€")
+                    .font(.system(size: 32, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.3))
+                    .offset(y: -4)
 
-                Circle()
-                    .trim(from: 0, to: 0.7)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color(red: 0.6, green: 0.4, blue: 1.0), Color(red: 0.3, green: 0.7, blue: 1.0)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .frame(width: 100, height: 100)
-                    .rotationEffect(.degrees(-90))
-                    .modifier(RotatingAnimation())
-
-                Image(systemName: "chart.bar.fill")
-                    .font(.system(size: 28))
-                    .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-            }
-
-            VStack(spacing: 8) {
-                Text("Analyzing Your Spending")
-                    .font(.system(size: 20, weight: .bold))
+                TextField("0", text: $monthlyAmountText)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 56, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
-
-                Text("Calculating your personalized budget...")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
+                    .fixedSize(horizontal: true, vertical: false)
+                    .focused($focusedField, equals: .monthly)
+                    .onChange(of: monthlyAmountText) { _, newValue in
+                        let filtered = newValue.filter { $0.isNumber }
+                        if filtered != newValue { monthlyAmountText = filtered }
+                        if let val = Double(filtered), val > 99999 {
+                            monthlyAmountText = "99999"
+                        }
+                    }
             }
 
-            Spacer()
-        }
-    }
-
-    // MARK: - Onboarding Content (No Data)
-
-    private func onboardingContent(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Welcome header with progress
-                onboardingHeader(suggestion)
-                    .padding(.horizontal, 20)
-
-                // Recommended Budget
-                recommendedBudgetCardForOnboarding(suggestion)
-                    .padding(.horizontal, 20)
-
-                // Budget setup with slider and create button
-                simplifiedBudgetSetup(suggestion)
-                    .padding(.horizontal, 20)
-            }
-            .padding(.vertical, 16)
-        }
-        .onAppear {
-            // Default to the suggested budget amount
-            if customAmount == 500 || selectionMode == .percentage {
-                customAmount = suggestion.recommendedBudget.amount
-                selectionMode = .custom
-            }
-        }
-    }
-
-    private func onboardingHeader(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        HStack(spacing: 16) {
-            // Progress ring showing 0 of 3
-            DataCollectionProgressRing(
-                monthsCollected: 0,
-                targetMonths: 3,
-                size: 64,
-                showLabel: false
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Getting Started")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text("Scan receipts to personalize your budget")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-
-                HStack(spacing: 4) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 12))
-
-                    Text("We've prepared a starting point for you")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-            }
-
-            Spacer()
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.12),
-                            Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.04)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.2), lineWidth: 1)
-                )
-        )
-    }
-
-    private func recommendedBudgetCardForOnboarding(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        VStack(spacing: 16) {
-            // Header
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.yellow.opacity(0.8))
-
-                    Text("Suggested Starting Point")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white.opacity(0.9))
-                }
-
-                Spacer()
-
-                // Preliminary badge
-                Text("Preliminary")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.4))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.06))
-                    )
-            }
-
-            // Recommended amount
-            VStack(spacing: 6) {
-                Text(String(format: "€%.0f", suggestion.recommendedBudget.amount))
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.7))
-
-                Text("per month")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.35))
-            }
-
-            // Reasoning
-            Text(suggestion.recommendedBudget.reasoning)
+            Text("per month")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.45))
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
-
-            // Note about personalization
-            HStack(spacing: 6) {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 11))
-                Text("This will become personalized as you scan receipts")
-                    .font(.system(size: 11, weight: .medium))
-            }
-            .foregroundColor(.white.opacity(0.35))
+                .foregroundColor(.white.opacity(0.25))
         }
-        .padding(20)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .padding(.horizontal, 20)
         .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                )
-        )
-    }
-
-    private func simplifiedBudgetSetup(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        VStack(spacing: 20) {
-            // Amount display
-            Text(String(format: "€%.0f", customAmount))
-                .font(.system(size: 36, weight: .bold, design: .rounded))
-                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-            // Slider
-            VStack(spacing: 8) {
-                Slider(
-                    value: $customAmount,
-                    in: 100...1500,
-                    step: 5
-                )
-                .tint(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-                HStack {
-                    Text("€100")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.3))
-                    Spacer()
-                    Text("€1,500")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.3))
-                }
-            }
-
-            // Create button
-            Button(action: createBudget) {
-                HStack(spacing: 8) {
-                    if viewModel.isSaving {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Text("Set Starting Budget")
-                            .font(.system(size: 16, weight: .bold))
-                    }
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.3, green: 0.7, blue: 1.0),
-                            Color(red: 0.25, green: 0.6, blue: 0.95)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(14)
-            }
-            .disabled(viewModel.isSaving)
-
-            // Note
-            Text("This is a starting point. Your budget will become more personalized as you scan receipts.")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.4))
-                .multilineTextAlignment(.center)
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.03))
-        )
-    }
-
-    // MARK: - Building Profile Content (1-2 Months Data)
-
-    private func buildingProfileContent(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header with progress
-                buildingProfileHeader(suggestion)
-
-                // Recommended Budget
-                recommendedBudgetCardForPartialData(suggestion)
-
-                // Budget target section
-                budgetTargetSection
-
-                // Category preview
-                categoryPreviewSection
-
-                // Create budget button
-                createBudgetButton
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-        }
-    }
-
-    private func buildingProfileHeader(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        HStack(spacing: 16) {
-            // Progress ring
-            DataCollectionProgressRing(
-                monthsCollected: suggestion.basedOnMonths,
-                targetMonths: 3,
-                size: 72,
-                showLabel: false
-            )
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Building Your Profile")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text(suggestion.dataBasisDescription)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-
-                // Progress message
-                let remaining = 3 - suggestion.basedOnMonths
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 12))
-
-                    Text("\(remaining) more month\(remaining == 1 ? "" : "s") for full personalization")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundColor(Color(red: 0.55, green: 0.35, blue: 0.95))
-            }
-
-            Spacer()
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.15),
-                            Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.05)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.2), lineWidth: 1)
-                )
-        )
-    }
-
-    // MARK: - Main Content (3+ Months Data)
-
-    private var mainContent: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Data collection phase header (always show progress)
-                if let suggestion = viewModel.aiSuggestionState.data {
-                    dataCollectionPhaseHeader(suggestion)
-                }
-
-                // Recommended Budget - PROMINENT
-                recommendedBudgetCard
-
-                // Budget Target Section
-                budgetTargetSection
-
-                // Category Allocations Preview
-                categoryPreviewSection
-
-                // Create Budget Button
-                createBudgetButton
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-        }
-    }
-
-    // MARK: - Data Collection Phase Header
-
-    private func dataCollectionPhaseHeader(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        HStack(spacing: 16) {
-            // Progress ring
-            DataCollectionProgressRing(
-                monthsCollected: suggestion.basedOnMonths,
-                targetMonths: 3,
-                size: 64,
-                showLabel: false
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                // Phase title
-                Text(suggestion.dataCollectionPhase.title)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-
-                // Data basis
-                Text(suggestion.dataBasisDescription)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-
-                // Status message
-                HStack(spacing: 4) {
-                    Image(systemName: suggestion.dataCollectionPhase.isFullyPersonalized ? "checkmark.circle.fill" : "arrow.triangle.2.circlepath")
-                        .font(.system(size: 12))
-
-                    Text(suggestion.dataCollectionPhase.isFullyPersonalized ?
-                         "Fully personalized recommendations" :
-                         "\(3 - suggestion.basedOnMonths) more month\(suggestion.basedOnMonths == 2 ? "" : "s") for full personalization")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundColor(suggestion.dataCollectionPhase.isFullyPersonalized ?
-                                 Color(red: 0.3, green: 0.8, blue: 0.5) :
-                                 Color(red: 0.55, green: 0.35, blue: 0.95))
-            }
-
-            Spacer()
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            (suggestion.dataCollectionPhase.isFullyPersonalized ?
-                             Color(red: 0.3, green: 0.8, blue: 0.5) :
-                             Color(red: 0.55, green: 0.35, blue: 0.95)).opacity(0.12),
-                            (suggestion.dataCollectionPhase.isFullyPersonalized ?
-                             Color(red: 0.3, green: 0.8, blue: 0.5) :
-                             Color(red: 0.55, green: 0.35, blue: 0.95)).opacity(0.04)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(
-                            (suggestion.dataCollectionPhase.isFullyPersonalized ?
-                             Color(red: 0.3, green: 0.8, blue: 0.5) :
-                             Color(red: 0.55, green: 0.35, blue: 0.95)).opacity(0.2),
-                            lineWidth: 1
+            ZStack {
+                cardBackground
+                // Subtle top accent glow
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.4, green: 0.35, blue: 1.0).opacity(0.08),
+                                Color.clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .center
                         )
-                )
-        )
-    }
-
-    // MARK: - Recommended Budget Card
-
-    private var recommendedBudgetCard: some View {
-        VStack(spacing: 16) {
-            // Header
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-
-                    Text("Recommended Budget")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                }
-
-                Spacer()
-            }
-
-            // Recommended amount - VERY PROMINENT
-            if let amount = viewModel.aiSuggestionState.data?.recommendedBudget.amount {
-                VStack(spacing: 8) {
-                    Text(String(format: "€%.0f", amount))
-                        .font(.system(size: 56, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-
-                    Text("per month")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-
-            // Stats row
-            HStack(spacing: 0) {
-                // Average Spend
-                VStack(spacing: 4) {
-                    Text(String(format: "€%.0f", averageSpending))
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.8))
-
-                    Text("Avg Spend")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-                .frame(maxWidth: .infinity)
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 1, height: 50)
-
-                // Estimated Savings
-                if let recommended = viewModel.aiSuggestionState.data?.recommendedBudget.amount {
-                    let savings = averageSpending - recommended
-                    VStack(spacing: 4) {
-                        Text(String(format: "€%.0f", max(0, savings)))
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(savings > 0 ? Color(red: 0.3, green: 0.8, blue: 0.5) : .white.opacity(0.5))
-
-                        Text("Est. Savings")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 1, height: 50)
-
-                // Months of data
-                if let months = viewModel.aiSuggestionState.data?.basedOnMonths {
-                    VStack(spacing: 4) {
-                        Text("\(months)")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.9))
-
-                        Text(months == 1 ? "Month" : "Months")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.03))
-            )
-
-            // Reasoning
-            if let reasoning = viewModel.aiSuggestionState.data?.recommendedBudget.reasoning {
-                Text(reasoning)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.12),
-                            Color(red: 0.5, green: 0.3, blue: 0.9).opacity(0.04)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
                     )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.25), lineWidth: 1)
-                )
+            }
         )
+        .overlay(cardBorder)
+        .contentShape(Rectangle())
+        .onTapGesture { focusedField = .monthly }
     }
 
-    // MARK: - Recommended Budget Card for Partial Data
+    // MARK: - Category Section
 
-    private func recommendedBudgetCardForPartialData(_ suggestion: SimpleBudgetSuggestionResponse) -> some View {
-        VStack(spacing: 16) {
+    private var categorySection: some View {
+        VStack(spacing: 0) {
             // Header
             HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.8))
-
-                    Text("Recommended Budget")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white.opacity(0.9))
-                }
+                Text("CATEGORY TARGETS")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundColor(.white.opacity(0.4))
 
                 Spacer()
 
-                // Building badge
-                Text("Building")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.5))
-                    .padding(.horizontal, 8)
+                Text("Optional")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.25))
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(Color.white.opacity(0.08))
-                    )
-            }
-
-            // Recommended amount
-            VStack(spacing: 8) {
-                Text(String(format: "€%.0f", suggestion.recommendedBudget.amount))
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.85))
-
-                Text("per month")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-
-            // Stats row
-            HStack(spacing: 0) {
-                // Average Spend (if available)
-                if suggestion.totalSpendAnalyzed > 0 {
-                    VStack(spacing: 4) {
-                        Text(String(format: "€%.0f", averageSpending))
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.7))
-
-                        Text("Avg Spend")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 1, height: 40)
-                }
-
-                // Estimated Savings
-                let savings = averageSpending - suggestion.recommendedBudget.amount
-                VStack(spacing: 4) {
-                    Text(String(format: "€%.0f", max(0, savings)))
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundColor(savings > 0 ? Color(red: 0.3, green: 0.8, blue: 0.5).opacity(0.8) : .white.opacity(0.4))
-
-                    Text("Est. Savings")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-                .frame(maxWidth: .infinity)
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 1, height: 40)
-
-                // Data basis
-                VStack(spacing: 4) {
-                    Text("\(suggestion.basedOnMonths)")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.9))
-
-                    Text(suggestion.basedOnMonths == 1 ? "Month" : "Months")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.03))
-            )
-
-            // Reasoning
-            VStack(spacing: 8) {
-                Text(suggestion.recommendedBudget.reasoning)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 10))
-                    Text("Will improve with more data")
-                        .font(.system(size: 11, weight: .medium))
-                }
-                .foregroundColor(Color(red: 0.55, green: 0.35, blue: 0.95).opacity(0.8))
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.08),
-                            Color(red: 0.5, green: 0.3, blue: 0.9).opacity(0.03)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [8, 4]))
-                )
-        )
-    }
-
-    // MARK: - Budget Target Section
-
-    private var budgetTargetSection: some View {
-        VStack(spacing: 20) {
-            // Section Header - NO badge
-            HStack {
-                Image(systemName: "target")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-                Text("Set Your Target")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-
-                Spacer()
-            }
-
-            // Mode Toggle
-            HStack(spacing: 0) {
-                modeToggleButton(mode: .percentage, label: "Save %", icon: "percent")
-                modeToggleButton(mode: .custom, label: "Custom", icon: "slider.horizontal.3")
-            }
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.05))
-            )
-
-            // Selection Content
-            if selectionMode == .percentage {
-                percentageSelector
-            } else {
-                customAmountSelector
-            }
-
-            // Result Display
-            resultDisplay
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-        )
-    }
-
-    private func modeToggleButton(mode: SelectionMode, label: String, icon: String) -> some View {
-        Button(action: { withAnimation(.spring(response: 0.3)) { selectionMode = mode } }) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(label)
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .foregroundColor(selectionMode == mode ? .white : .white.opacity(0.5))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(selectionMode == mode ? Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.3) : Color.clear)
-            )
-        }
-        .padding(4)
-    }
-
-    private var percentageSelector: some View {
-        VStack(spacing: 16) {
-            Text("How much do you want to save?")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-
-            // Percentage pills
-            HStack(spacing: 8) {
-                ForEach(SavingsPercentage.allCases) { percentage in
-                    Button(action: { withAnimation(.spring(response: 0.25)) { selectedPercentage = percentage } }) {
-                        Text(percentage.label)
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundColor(selectedPercentage == percentage ? .white : .white.opacity(0.6))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(selectedPercentage == percentage ?
-                                          LinearGradient(
-                                            colors: [Color(red: 0.3, green: 0.8, blue: 0.5), Color(red: 0.2, green: 0.7, blue: 0.5)],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                          ) :
-                                            LinearGradient(colors: [Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom))
-                            )
+                            .fill(Color.white.opacity(0.05))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(selectedPercentage == percentage ? Color(red: 0.3, green: 0.8, blue: 0.5) : Color.clear, lineWidth: 2)
+                                Capsule().strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
                             )
-                    }
-                }
+                    )
             }
-        }
-    }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, categoryTargets.isEmpty ? 6 : 14)
 
-    private var customAmountSelector: some View {
-        VStack(spacing: 16) {
-            Text("Set your monthly budget")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-
-            // Amount display
-            Text(String(format: "€%.0f", customAmount))
-                .font(.system(size: 40, weight: .bold, design: .rounded))
-                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-            // Slider
-            VStack(spacing: 8) {
-                Slider(
-                    value: $customAmount,
-                    in: 100...max(averageSpending * 1.5, 2000),
-                    step: 5
-                )
-                .tint(Color(red: 0.3, green: 0.7, blue: 1.0))
-
-                HStack {
-                    Text("€100")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.3))
-                    Spacer()
-                    Text(String(format: "€%.0f", max(averageSpending * 1.5, 2000)))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.3))
-                }
-            }
-
-            // Quick select based on average
-            HStack(spacing: 8) {
-                quickAmountButton(multiplier: 0.8, label: "-20%")
-                quickAmountButton(multiplier: 0.9, label: "-10%")
-                quickAmountButton(multiplier: 1.0, label: "Average")
-                quickAmountButton(multiplier: 1.1, label: "+10%")
-            }
-        }
-    }
-
-    private func quickAmountButton(multiplier: Double, label: String) -> some View {
-        let amount = roundToNearest5(averageSpending * multiplier)
-        let isSelected = abs(customAmount - amount) < 5
-
-        return Button(action: { withAnimation { customAmount = amount } }) {
-            Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(isSelected ? .white : .white.opacity(0.5))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(isSelected ? Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.3) : Color.white.opacity(0.05))
-                )
-        }
-    }
-
-    private var resultDisplay: some View {
-        HStack(spacing: 0) {
-            // Target Budget
-            VStack(spacing: 4) {
-                Text("Target Budget")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-
-                Text(String(format: "€%.0f", targetBudget))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-            }
-            .frame(maxWidth: .infinity)
-
-            Rectangle()
-                .fill(Color.white.opacity(0.1))
-                .frame(width: 1, height: 40)
-
-            // Monthly Savings
-            VStack(spacing: 4) {
-                Text("Monthly Savings")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-
-                HStack(spacing: 4) {
-                    Text(String(format: "€%.0f", savingsAmount))
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(savingsAmount > 0 ? Color(red: 0.3, green: 0.8, blue: 0.5) : .white.opacity(0.5))
-
-                    if savingsAmount > 0 {
-                        Text(String(format: "(%.0f%%)", savingsPercentageValue))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5).opacity(0.7))
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.03))
-        )
-    }
-
-    // MARK: - Category Preview Section
-
-    private var categoryPreviewSection: some View {
-        VStack(spacing: 16) {
-            // Header
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "chart.pie.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-
-                    Text("Category Budgets")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-
-                    // Customized indicator
-                    if hasCustomizedCategories {
-                        HStack(spacing: 3) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 10))
-                            Text("Customized")
-                                .font(.system(size: 10, weight: .semibold))
-                        }
-                        .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule()
-                                .fill(Color(red: 0.3, green: 0.8, blue: 0.5).opacity(0.15))
-                        )
-                    }
-                }
-
-                Spacer()
-
-                // Edit button
-                Button(action: { openCategoryEditor() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("Edit")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-                }
-            }
-
-            // Category bars - show top 5 or all if expanded
-            VStack(spacing: 10) {
-                ForEach(categoryListExpanded ? scaledCategoryAllocations : Array(scaledCategoryAllocations.prefix(5)), id: \.category) { allocation in
-                    categoryBar(allocation)
-                }
-
-                // Expand/collapse button
-                if scaledCategoryAllocations.count > 5 {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            categoryListExpanded.toggle()
-                        }
-                    }) {
-                        HStack(spacing: 6) {
-                            if !categoryListExpanded {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text("Show \(scaledCategoryAllocations.count - 5) more categories")
-                                    .font(.system(size: 12, weight: .semibold))
-                            } else {
-                                Image(systemName: "minus.circle.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text("Show less")
-                                    .font(.system(size: 12, weight: .semibold))
+            // Category rows
+            if !categoryTargets.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(categoryTargets.enumerated()), id: \.element.id) { index, _ in
+                        VStack(spacing: 0) {
+                            if index > 0 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(height: 0.5)
+                                    .padding(.leading, 56)
                             }
+                            categoryRow(index: index)
                         }
-                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.08))
-                        )
                     }
-                    .buttonStyle(PlainButtonStyle())
                 }
             }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.2), lineWidth: 1)
+
+            // Add button
+            Button(action: { showCategoryPicker = true }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Add category")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundColor(Color(red: 0.45, green: 0.6, blue: 1.0))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(red: 0.4, green: 0.55, blue: 1.0).opacity(0.06))
                 )
-        )
+                .padding(.horizontal, 14)
+            }
+
+            // Info text
+            Text(categoryTargets.isEmpty
+                 ? "Set limits on categories you want to keep an eye on."
+                 : "Independent limits — they don't need to add up to your monthly budget.")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.2))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+        }
+        .background(cardBackground)
+        .overlay(cardBorder)
     }
 
-    private func categoryBar(_ allocation: CategoryAllocation) -> some View {
-        let percentage = targetBudget > 0 ? (allocation.amount / targetBudget) : 0
+    private func categoryRow(index: Int) -> some View {
+        let target = categoryTargets[index]
+        let isFocused = focusedField == .category(target.id)
 
         return HStack(spacing: 12) {
-            // Category icon
-            Image.categorySymbol(categoryIcon(for: allocation.category))
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(allocation.category.categoryColor)
-                .frame(width: 20)
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(target.category.categoryColor.opacity(0.12))
+                    .frame(width: 38, height: 38)
 
-            // Name and bar
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(allocation.category.normalizedCategoryName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+                Image(systemName: target.category.categoryIcon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(target.category.categoryColor)
+            }
 
-                    // Edited indicator
-                    if allocation.isLocked {
-                        Image(systemName: "pencil.circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+            // Name
+            Text(target.category.normalizedCategoryName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(1)
+
+            Spacer()
+
+            // Amount input pill
+            HStack(spacing: 2) {
+                Text("€")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
+
+                TextField("0", text: $categoryTargets[index].amountText)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(width: 52)
+                    .multilineTextAlignment(.trailing)
+                    .focused($focusedField, equals: .category(target.id))
+                    .onChange(of: categoryTargets[index].amountText) { _, newValue in
+                        let filtered = newValue.filter { $0.isNumber }
+                        if filtered != newValue {
+                            categoryTargets[index].amountText = filtered
+                        }
                     }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white.opacity(isFocused ? 0.10 : 0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(
+                        isFocused
+                            ? Color(red: 0.45, green: 0.55, blue: 1.0).opacity(0.3)
+                            : Color.clear,
+                        lineWidth: 1
+                    )
+            )
 
-                    Spacer()
-
-                    Text(String(format: "€%.0f", allocation.amount))
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.8))
+            // Remove
+            Button {
+                focusedField = nil
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    let _ = categoryTargets.remove(at: index)
                 }
-
-                // Progress bar
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.white.opacity(0.1))
-                            .frame(height: 6)
-
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(allocation.category.categoryColor)
-                            .frame(width: geometry.size.width * CGFloat(percentage), height: 6)
-                    }
-                }
-                .frame(height: 6)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 17))
+                    .foregroundColor(.white.opacity(0.15))
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
-    // MARK: - Create Budget Button
+    // MARK: - Auto-Renew Toggle
 
-    private var createBudgetButton: some View {
-        Button(action: createBudget) {
-            HStack(spacing: 10) {
+    private var autoRenewToggle: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color(red: 0.45, green: 0.6, blue: 1.0))
+                .frame(width: 38, height: 38)
+                .background(
+                    Circle().fill(Color(red: 0.4, green: 0.55, blue: 1.0).opacity(0.10))
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Auto-renew monthly")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
+
+                Text("Reuse this budget every month")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.white.opacity(0.3))
+            }
+
+            Spacer()
+
+            Toggle("", isOn: $isSmartBudget)
+                .labelsHidden()
+                .tint(Color(red: 0.45, green: 0.55, blue: 1.0))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(cardBackground)
+        .overlay(cardBorder)
+    }
+
+    // MARK: - Save Button
+
+    private var saveButton: some View {
+        Button(action: saveBudget) {
+            Group {
                 if viewModel.isSaving {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-
-                    Text("Create Budget")
-                        .font(.system(size: 17, weight: .bold))
+                    Text(isEditing ? "Update Budget" : "Set Budget")
+                        .font(.system(size: 16, weight: .bold))
                 }
             }
-            .foregroundColor(.white)
+            .foregroundColor(canSave ? .white : .white.opacity(0.3))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
+            .padding(.vertical, 16)
             .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.4, green: 0.3, blue: 0.95),
-                        Color(red: 0.6, green: 0.4, blue: 1.0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .cornerRadius(16)
-            .shadow(color: Color(red: 0.5, green: 0.3, blue: 1.0).opacity(0.4), radius: 12, y: 4)
-        }
-        .disabled(viewModel.isSaving)
-        .padding(.bottom, 20)
-    }
-
-    // MARK: - Error View
-
-    private func errorView(_ error: String) -> some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.orange)
-
-            VStack(spacing: 8) {
-                Text("Couldn't Load Data")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text(error)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-
-            Button(action: { Task { await viewModel.loadAISuggestion() } }) {
-                Text("Try Again")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(red: 0.3, green: 0.7, blue: 1.0))
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        canSave
+                            ? AnyShapeStyle(LinearGradient(
+                                colors: [Color(red: 0.35, green: 0.30, blue: 0.90), Color(red: 0.50, green: 0.35, blue: 1.0)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            : AnyShapeStyle(Color(white: 0.10))
                     )
-            }
-
-            Spacer()
-        }
-    }
-
-    // MARK: - Helper Functions
-
-    private func categoryIcon(for category: String) -> String {
-        category.categoryIcon
-    }
-
-    // MARK: - Category Editing
-
-    private func openCategoryEditor() {
-        // Initialize editable categories if not already done
-        if editableCategoryAllocations.isEmpty {
-            editableCategoryAllocations = scaledCategoryAllocations.map { allocation in
-                EditableCategoryAllocation(
-                    category: allocation.category,
-                    amount: allocation.amount,
-                    originalAmount: allocation.amount,
-                    isLocked: allocation.isLocked
-                )
-            }
-        }
-        showCategoryEditor = true
-    }
-
-    private func handleCategorySave(_ allocations: [CategoryAllocation]) {
-        // Update editable categories
-        editableCategoryAllocations = allocations.map { allocation in
-            EditableCategoryAllocation(
-                category: allocation.category,
-                amount: allocation.amount,
-                originalAmount: allocation.amount, // Keep current as new original
-                isLocked: allocation.isLocked
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        canSave
+                            ? Color.white.opacity(0.12)
+                            : Color.white.opacity(0.04),
+                        lineWidth: 0.5
+                    )
             )
         }
-        hasCustomizedCategories = true
+        .disabled(!canSave)
+        .shadow(
+            color: canSave ? Color(red: 0.45, green: 0.30, blue: 1.0).opacity(0.25) : .clear,
+            radius: 16, y: 6
+        )
+        .padding(.top, 10)
+    }
+
+    // MARK: - Card Styling
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 22)
+            .fill(
+                LinearGradient(
+                    colors: [Color(white: 0.10), Color(white: 0.07)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+    }
+
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: 22)
+            .strokeBorder(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.10), Color.white.opacity(0.04)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 0.5
+            )
     }
 
     // MARK: - Actions
 
-    private func createBudget() {
-        Task {
-            let success = await viewModel.createBudget(
-                amount: targetBudget,
-                categoryAllocations: scaledCategoryAllocations.isEmpty ? nil : scaledCategoryAllocations
-            )
-            if success {
-                showSuccessSheet = true
-            }
+    private func loadExistingBudget() {
+        guard let budget = viewModel.currentBudget else { return }
+        monthlyAmountText = String(format: "%.0f", budget.monthlyAmount)
+        categoryTargets = (budget.categoryAllocations ?? []).map {
+            EditableTarget(category: $0.category, amount: $0.amount)
         }
+        isSmartBudget = budget.isSmartBudget
     }
-}
 
-// MARK: - Rotating Animation Modifier
+    private func saveBudget() {
+        focusedField = nil
 
-struct RotatingAnimation: ViewModifier {
-    @State private var rotation: Double = 0
+        Task {
+            let allocations: [CategoryAllocation]? = {
+                let targets = categoryTargets
+                    .filter { $0.amount > 0 }
+                    .map { CategoryAllocation(category: $0.category, amount: $0.amount) }
+                return targets.isEmpty ? nil : targets
+            }()
 
-    func body(content: Content) -> some View {
-        content
-            .rotationEffect(.degrees(rotation))
-            .onAppear {
-                withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                    rotation = 360
+            let success: Bool
+
+            if isEditing {
+                success = await viewModel.updateBudgetFull(request: UpdateBudgetRequest(
+                    monthlyAmount: monthlyAmount,
+                    categoryAllocations: allocations,
+                    isSmartBudget: isSmartBudget
+                ))
+            } else {
+                success = await viewModel.createBudget(
+                    amount: monthlyAmount,
+                    categoryAllocations: allocations,
+                    isSmartBudget: isSmartBudget
+                )
+            }
+
+            if success {
+                if isEditing {
+                    dismiss()
+                } else {
+                    showSuccessSheet = true
                 }
             }
+        }
     }
 }
 
-// MARK: - All Categories Sheet
+// MARK: - Category Picker Sheet
 
-struct AllCategoriesSheet: View {
-    let allocations: [CategoryAllocation]
-    let totalBudget: Double
+struct CategoryPickerSheet: View {
+    let existingCategories: Set<String>
+    let onSelect: (String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
 
-    /// Group allocations by category group
-    private var groupedAllocations: [(group: String, allocations: [CategoryAllocation])] {
-        let registry = CategoryRegistryManager.shared
-        var groups: [String: [CategoryAllocation]] = [:]
+    private var registry: CategoryRegistryManager { CategoryRegistryManager.shared }
 
-        for allocation in allocations {
-            let group = registry.groupForSubCategory(allocation.category)
-            groups[group, default: []].append(allocation)
-        }
-
-        return groups
-            .map { (group: $0.key, allocations: $0.value) }
-            .sorted { g1, g2 in
-                let total1 = g1.allocations.reduce(0) { $0 + $1.amount }
-                let total2 = g2.allocations.reduce(0) { $0 + $1.amount }
-                return total1 > total2
-            }
+    private var availableCategories: [String] {
+        let all = registry.allSubCategories.filter { !existingCategories.contains($0) }
+        if searchText.isEmpty { return all }
+        return all.filter { $0.lowercased().contains(searchText.lowercased()) }
     }
 
     var body: some View {
         NavigationView {
             ZStack {
-                Color(white: 0.08).ignoresSafeArea()
+                Color(white: 0.06).ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 16) {
-                        // Total
-                        VStack(spacing: 4) {
-                            Text("Total Budget")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
+                    LazyVStack(spacing: 0) {
+                        // Search
+                        HStack(spacing: 10) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 14))
+                                .foregroundColor(.white.opacity(0.35))
 
-                            Text(String(format: "€%.0f", totalBudget))
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                            TextField("Search categories", text: $searchText)
+                                .font(.system(size: 15))
+                                .foregroundColor(.white)
                         }
-                        .padding(.vertical, 20)
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(0.06))
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
 
-                        // All categories grouped
-                        let grouped = groupedAllocations
-                        if grouped.count <= 1 {
-                            VStack(spacing: 8) {
-                                ForEach(allocations, id: \.category) { allocation in
-                                    allocationRow(allocation)
-                                }
-                            }
-                        } else {
-                            VStack(spacing: 20) {
-                                ForEach(grouped, id: \.group) { section in
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        // Group header
-                                        let registry = CategoryRegistryManager.shared
-                                        let groupTotal = section.allocations.reduce(0) { $0 + $1.amount }
+                        // List
+                        ForEach(availableCategories, id: \.self) { category in
+                            Button {
+                                onSelect(category)
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(category.categoryColor.opacity(0.15))
+                                            .frame(width: 38, height: 38)
 
-                                        HStack(spacing: 8) {
-                                            Image(systemName: registry.iconForGroup(section.group))
-                                                .font(.system(size: 14, weight: .semibold))
-                                                .foregroundColor(registry.colorForGroup(section.group))
-
-                                            Text(section.group)
-                                                .font(.system(size: 14, weight: .bold))
-                                                .foregroundColor(.white.opacity(0.8))
-
-                                            Spacer()
-
-                                            Text(String(format: "€%.0f", groupTotal))
-                                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                                .foregroundColor(.white.opacity(0.5))
-                                        }
-                                        .padding(.horizontal, 4)
-
-                                        ForEach(section.allocations, id: \.category) { allocation in
-                                            allocationRow(allocation)
-                                        }
+                                        Image(systemName: category.categoryIcon)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(category.categoryColor)
                                     }
+
+                                    Text(category.normalizedCategoryName)
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(.white)
+
+                                    Spacer()
+
+                                    Image(systemName: "plus.circle")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.2))
                                 }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
                             }
+
+                            if category != availableCategories.last {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.05))
+                                    .frame(height: 0.5)
+                                    .padding(.leading, 70)
+                            }
+                        }
+
+                        if availableCategories.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white.opacity(0.2))
+
+                                Text("No categories found")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
                         }
                     }
-                    .padding(20)
                 }
             }
-            .navigationTitle("All Categories")
+            .navigationTitle("Add Category")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.white.opacity(0.6))
                 }
             }
         }
         .preferredColorScheme(.dark)
-    }
-
-    private func allocationRow(_ allocation: CategoryAllocation) -> some View {
-        let percentage = totalBudget > 0 ? (allocation.amount / totalBudget) * 100 : 0
-
-        return HStack(spacing: 14) {
-            Circle()
-                .fill(allocation.category.categoryColor)
-                .frame(width: 12, height: 12)
-
-            Text(allocation.category.normalizedCategoryName)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white)
-
-            Spacer()
-
-            Text(String(format: "%.0f%%", percentage))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.4))
-
-            Text(String(format: "€%.0f", allocation.amount))
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .frame(width: 60, alignment: .trailing)
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
-        )
     }
 }
 

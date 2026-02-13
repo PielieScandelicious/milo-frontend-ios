@@ -2,8 +2,6 @@
 //  BudgetModels.swift
 //  Scandalicious
 //
-//  Created by Claude on 31/01/2026.
-//
 
 import Foundation
 import SwiftUI
@@ -15,9 +13,7 @@ struct UserBudget: Codable, Identifiable {
     let userId: String
     let monthlyAmount: Double
     let categoryAllocations: [CategoryAllocation]?
-    let notificationsEnabled: Bool
-    let alertThresholds: [Double]  // e.g., [0.5, 0.75, 0.9]
-    let isSmartBudget: Bool  // If true, automatically rolls over to next month
+    let isSmartBudget: Bool
     let createdAt: String
     let updatedAt: String
 
@@ -26,45 +22,38 @@ struct UserBudget: Codable, Identifiable {
         case userId = "user_id"
         case monthlyAmount = "monthly_amount"
         case categoryAllocations = "category_allocations"
-        case notificationsEnabled = "notifications_enabled"
-        case alertThresholds = "alert_thresholds"
         case isSmartBudget = "is_smart_budget"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
 
-    init(id: String, userId: String, monthlyAmount: Double, categoryAllocations: [CategoryAllocation]? = nil, notificationsEnabled: Bool = true, alertThresholds: [Double] = [0.5, 0.75, 0.9], isSmartBudget: Bool = true, createdAt: String = "", updatedAt: String = "") {
+    init(id: String, userId: String, monthlyAmount: Double, categoryAllocations: [CategoryAllocation]? = nil, isSmartBudget: Bool = true, createdAt: String = "", updatedAt: String = "") {
         self.id = id
         self.userId = userId
         self.monthlyAmount = monthlyAmount
         self.categoryAllocations = categoryAllocations
-        self.notificationsEnabled = notificationsEnabled
-        self.alertThresholds = alertThresholds
         self.isSmartBudget = isSmartBudget
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 }
 
-// MARK: - Category Allocation
+// MARK: - Category Allocation (Guardrail)
 
 struct CategoryAllocation: Codable, Identifiable {
-    let category: String  // Category display name
+    let category: String
     let amount: Double
-    let isLocked: Bool    // If true, user manually set this; if false, auto-calculated
 
     var id: String { category }
 
     enum CodingKeys: String, CodingKey {
         case category
         case amount
-        case isLocked = "is_locked"
     }
 
-    init(category: String, amount: Double, isLocked: Bool = false) {
+    init(category: String, amount: Double) {
         self.category = category
         self.amount = amount
-        self.isLocked = isLocked
     }
 }
 
@@ -115,15 +104,15 @@ struct BudgetProgress {
 
         switch variance {
         case ..<(-0.10):
-            return .wellUnderBudget  // >10% under pace
+            return .wellUnderBudget
         case -0.10..<(-0.02):
-            return .underBudget      // 2-10% under pace
+            return .underBudget
         case -0.02..<0.05:
-            return .onTrack          // Within -2% to +5%
+            return .onTrack
         case 0.05..<0.15:
-            return .slightlyOver     // 5-15% over pace
+            return .slightlyOver
         default:
-            return .overBudget       // >15% over pace
+            return .overBudget
         }
     }
 
@@ -142,7 +131,6 @@ struct CategoryBudgetProgress: Identifiable {
     let category: String
     let budgetAmount: Double
     let currentSpend: Double
-    let isLocked: Bool
 
     var id: String { category }
 
@@ -200,15 +188,15 @@ enum PaceStatus: String, CaseIterable {
     var color: Color {
         switch self {
         case .wellUnderBudget:
-            return Color(red: 0.2, green: 0.8, blue: 0.5)   // Bright green
+            return Color(red: 0.2, green: 0.8, blue: 0.5)
         case .underBudget:
-            return Color(red: 0.3, green: 0.75, blue: 0.45) // Green
+            return Color(red: 0.3, green: 0.75, blue: 0.45)
         case .onTrack:
-            return Color(red: 0.3, green: 0.7, blue: 1.0)   // Blue
+            return Color(red: 0.3, green: 0.7, blue: 1.0)
         case .slightlyOver:
-            return Color(red: 1.0, green: 0.75, blue: 0.3)  // Amber/Yellow
+            return Color(red: 1.0, green: 0.75, blue: 0.3)
         case .overBudget:
-            return Color(red: 1.0, green: 0.4, blue: 0.4)   // Red
+            return Color(red: 1.0, green: 0.4, blue: 0.4)
         }
     }
 
@@ -242,54 +230,6 @@ enum PaceStatus: String, CaseIterable {
     }
 }
 
-// MARK: - Budget Suggestion Response
-
-struct BudgetSuggestionResponse: Codable, Equatable {
-    let suggestedAmount: Double
-    let basedOnMonths: Int
-    let averageMonthlySpend: Double
-    let categoryBreakdown: [CategorySuggestion]
-    let savingsOptions: [SavingsOption]
-
-    enum CodingKeys: String, CodingKey {
-        case suggestedAmount = "suggested_amount"
-        case basedOnMonths = "based_on_months"
-        case averageMonthlySpend = "average_monthly_spend"
-        case categoryBreakdown = "category_breakdown"
-        case savingsOptions = "savings_options"
-    }
-}
-
-struct CategorySuggestion: Codable, Identifiable, Equatable {
-    let category: String
-    let averageSpend: Double
-    let suggestedBudget: Double
-    let percentage: Double
-
-    var id: String { category }
-
-    enum CodingKeys: String, CodingKey {
-        case category
-        case averageSpend = "average_spend"
-        case suggestedBudget = "suggested_budget"
-        case percentage
-    }
-}
-
-struct SavingsOption: Codable, Identifiable, Equatable {
-    let label: String
-    let amount: Double
-    let savingsPercentage: Double
-
-    var id: String { label }
-
-    enum CodingKeys: String, CodingKey {
-        case label
-        case amount
-        case savingsPercentage = "savings_percentage"
-    }
-}
-
 // MARK: - Budget Progress Response (from backend)
 
 struct BudgetProgressResponse: Codable {
@@ -317,81 +257,44 @@ struct BudgetProgressResponse: Codable {
         )
     }
 
-    /// Convert all category progress items to BudgetProgressItem array for Activity Rings
     func toBudgetProgressItems() -> [BudgetProgressItem] {
         categoryProgress.map { $0.toBudgetProgressItem() }
     }
 }
 
 struct CategoryProgressResponse: Codable {
-    // Legacy fields
-    let category: String?
-    let budgetAmount: Double?
-    let currentSpend: Double?
-
-    // New fields from updated backend
-    let categoryId: String?
-    let name: String?
-    let limitAmount: Double?
-    let spentAmount: Double?
-    let isOverBudget: Bool?
+    let categoryId: String
+    let name: String
+    let limitAmount: Double
+    let spentAmount: Double
+    let isOverBudget: Bool
     let overBudgetAmount: Double?
-    let isLocked: Bool
 
     enum CodingKeys: String, CodingKey {
-        case category
-        case budgetAmount = "budget_amount"
-        case currentSpend = "current_spend"
         case categoryId = "category_id"
         case name
         case limitAmount = "limit_amount"
         case spentAmount = "spent_amount"
         case isOverBudget = "is_over_budget"
         case overBudgetAmount = "over_budget_amount"
-        case isLocked = "is_locked"
-    }
-
-    // MARK: - Computed Properties for Compatibility
-
-    /// Display name (prefers new `name` field, falls back to `category`), normalized from ALL_CAPS enum style
-    var displayName: String {
-        (name ?? category ?? "Unknown").normalizedCategoryName
-    }
-
-    /// Budget limit amount (prefers new field, falls back to legacy)
-    var budget: Double {
-        limitAmount ?? budgetAmount ?? 0
-    }
-
-    /// Spent amount (prefers new field, falls back to legacy)
-    var spent: Double {
-        spentAmount ?? currentSpend ?? 0
-    }
-
-    /// Whether the category is over budget
-    var overBudget: Bool {
-        isOverBudget ?? (spent > budget)
     }
 
     func toCategoryBudgetProgress() -> CategoryBudgetProgress {
         CategoryBudgetProgress(
-            category: displayName,
-            budgetAmount: budget,
-            currentSpend: spent,
-            isLocked: isLocked
+            category: name,
+            budgetAmount: limitAmount,
+            currentSpend: spentAmount
         )
     }
 
-    /// Convert to BudgetProgressItem for Activity Rings
     func toBudgetProgressItem() -> BudgetProgressItem {
         BudgetProgressItem(
-            categoryId: categoryId ?? category?.uppercased().replacingOccurrences(of: " ", with: "_").replacingOccurrences(of: "&", with: "") ?? "OTHER",
-            name: displayName,
-            limitAmount: budget,
-            spentAmount: spent,
-            isOverBudget: overBudget,
-            overBudgetAmount: overBudgetAmount,
-            isLocked: isLocked
+            categoryId: categoryId,
+            name: name,
+            limitAmount: limitAmount,
+            spentAmount: spentAmount,
+            isOverBudget: isOverBudget,
+            overBudgetAmount: overBudgetAmount
         )
     }
 }
@@ -401,15 +304,11 @@ struct CategoryProgressResponse: Codable {
 struct CreateBudgetRequest: Encodable {
     let monthlyAmount: Double
     let categoryAllocations: [CategoryAllocation]?
-    let notificationsEnabled: Bool
-    let alertThresholds: [Double]
     let isSmartBudget: Bool
 
     enum CodingKeys: String, CodingKey {
         case monthlyAmount = "monthly_amount"
         case categoryAllocations = "category_allocations"
-        case notificationsEnabled = "notifications_enabled"
-        case alertThresholds = "alert_thresholds"
         case isSmartBudget = "is_smart_budget"
     }
 }
@@ -417,31 +316,24 @@ struct CreateBudgetRequest: Encodable {
 struct UpdateBudgetRequest: Encodable {
     let monthlyAmount: Double?
     let categoryAllocations: [CategoryAllocation]?
-    let notificationsEnabled: Bool?
-    let alertThresholds: [Double]?
     let isSmartBudget: Bool?
 
     enum CodingKeys: String, CodingKey {
         case monthlyAmount = "monthly_amount"
         case categoryAllocations = "category_allocations"
-        case notificationsEnabled = "notifications_enabled"
-        case alertThresholds = "alert_thresholds"
         case isSmartBudget = "is_smart_budget"
     }
 }
 
 // MARK: - Budget Progress Item (for Activity Rings)
 
-/// Represents budget progress for a single category
-/// Matches GET /api/v2/budgets/progress response per-category structure
 struct BudgetProgressItem: Codable, Identifiable {
-    let categoryId: String       // Enum name e.g., "MEAT_FISH"
-    let name: String             // Display name e.g., "Meat & Fish"
-    let limitAmount: Double      // Budget allocation
-    let spentAmount: Double      // Actual spending
-    let isOverBudget: Bool       // True if over budget
-    let overBudgetAmount: Double? // Amount over budget (null if not over)
-    let isLocked: Bool           // Whether allocation is locked
+    let categoryId: String
+    let name: String
+    let limitAmount: Double
+    let spentAmount: Double
+    let isOverBudget: Bool
+    let overBudgetAmount: Double?
 
     var id: String { categoryId }
 
@@ -452,33 +344,25 @@ struct BudgetProgressItem: Codable, Identifiable {
         case spentAmount = "spent_amount"
         case isOverBudget = "is_over_budget"
         case overBudgetAmount = "over_budget_amount"
-        case isLocked = "is_locked"
     }
 
-    // MARK: - Computed Properties
-
-    /// Progress ratio (0.0 to 1.0+, can exceed 1.0 when over budget)
     var progressRatio: Double {
         guard limitAmount > 0 else { return 0 }
         return spentAmount / limitAmount
     }
 
-    /// Clamped progress for visual display (0.0 to 1.0)
     var clampedProgress: Double {
         min(1.0, progressRatio)
     }
 
-    /// Amount remaining in budget
     var remainingAmount: Double {
         max(0, limitAmount - spentAmount)
     }
 
-    /// Amount over budget (positive when over)
     var overAmount: Double {
         overBudgetAmount ?? max(0, spentAmount - limitAmount)
     }
 
-    /// Status text for display (e.g., "€20 left" or "+€15 over")
     var statusText: String {
         if isOverBudget {
             return String(format: "+€%.0f over", overAmount)
@@ -487,7 +371,6 @@ struct BudgetProgressItem: Codable, Identifiable {
         }
     }
 
-    /// Compact status text for small displays
     var compactStatusText: String {
         if isOverBudget {
             return String(format: "+€%.0f", overAmount)
@@ -496,12 +379,10 @@ struct BudgetProgressItem: Codable, Identifiable {
         }
     }
 
-    /// Color based on category name
     var color: Color {
         name.categoryColor
     }
 
-    /// SF Symbol icon for this category (uses dynamic keyword-based matching)
     var icon: String {
         name.categoryIcon
     }
@@ -524,37 +405,6 @@ extension Color {
         let blue = Double(rgb & 0x0000FF) / 255.0
 
         self.init(red: red, green: green, blue: blue)
-    }
-}
-
-// MARK: - Last Month Summary
-
-struct LastMonthSummary {
-    let month: String              // "January 2026"
-    let totalSpent: Double
-    let budgetAmount: Double
-    let grade: String              // "A", "B", etc.
-    let score: Int                 // 0-100
-    let headline: String
-    let wasUnderBudget: Bool
-    let difference: Double         // Amount under/over
-
-    var gradeColor: Color {
-        switch grade.uppercased() {
-        case "A+", "A": return Color(red: 0.2, green: 0.8, blue: 0.5)
-        case "A-", "B+", "B": return Color(red: 0.3, green: 0.75, blue: 0.45)
-        case "B-", "C+", "C": return Color(red: 1.0, green: 0.75, blue: 0.3)
-        case "C-", "D+", "D": return Color(red: 1.0, green: 0.55, blue: 0.3)
-        default: return Color(red: 1.0, green: 0.4, blue: 0.4)
-        }
-    }
-
-    var statusText: String {
-        if wasUnderBudget {
-            return String(format: "€%.0f under budget", difference)
-        } else {
-            return String(format: "€%.0f over budget", difference)
-        }
     }
 }
 
@@ -583,7 +433,6 @@ struct BudgetHistory: Codable, Identifiable {
         case createdAt = "created_at"
     }
 
-    /// Display format for month (e.g., "January 2026")
     var displayMonth: String {
         let components = month.split(separator: "-")
         guard components.count == 2,

@@ -324,8 +324,7 @@ struct CompactActivityRing: View {
             limitAmount: 100,
             spentAmount: 35,
             isOverBudget: false,
-            overBudgetAmount: nil,
-            isLocked: false
+            overBudgetAmount: nil
         ),
         BudgetProgressItem(
             categoryId: "MEAT_FISH",
@@ -333,8 +332,7 @@ struct CompactActivityRing: View {
             limitAmount: 150,
             spentAmount: 90,
             isOverBudget: false,
-            overBudgetAmount: nil,
-            isLocked: true
+            overBudgetAmount: nil
         ),
         BudgetProgressItem(
             categoryId: "SNACKS_SWEETS",
@@ -342,8 +340,7 @@ struct CompactActivityRing: View {
             limitAmount: 50,
             spentAmount: 72,
             isOverBudget: true,
-            overBudgetAmount: 22,
-            isLocked: false
+            overBudgetAmount: 22
         ),
         BudgetProgressItem(
             categoryId: "DAIRY_EGGS",
@@ -351,8 +348,7 @@ struct CompactActivityRing: View {
             limitAmount: 80,
             spentAmount: 65,
             isOverBudget: false,
-            overBudgetAmount: nil,
-            isLocked: false
+            overBudgetAmount: nil
         ),
         BudgetProgressItem(
             categoryId: "ALCOHOL",
@@ -360,8 +356,7 @@ struct CompactActivityRing: View {
             limitAmount: 60,
             spentAmount: 85,
             isOverBudget: true,
-            overBudgetAmount: 25,
-            isLocked: false
+            overBudgetAmount: 25
         ),
         BudgetProgressItem(
             categoryId: "BAKERY",
@@ -369,8 +364,7 @@ struct CompactActivityRing: View {
             limitAmount: 40,
             spentAmount: 28,
             isOverBudget: false,
-            overBudgetAmount: nil,
-            isLocked: false
+            overBudgetAmount: nil
         )
     ]
 

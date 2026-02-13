@@ -12,10 +12,12 @@ import SwiftUI
 /// Full-screen view showing detailed budget breakdown by category
 struct CategoryBudgetDetailView: View {
     let progress: BudgetProgress
+    var onRemoveCategory: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var sortOrder: CategorySortOrder = .worstFirst
     @State private var selectedCategory: CategoryBudgetProgress?
     @State private var showingEditSheet = false
+    @State private var categoryToRemove: String?
 
     enum CategorySortOrder: String, CaseIterable {
         case worstFirst = "Needs Attention"
@@ -118,14 +120,30 @@ struct CategoryBudgetDetailView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showingEditSheet) {
             EditCategoryBudgetsSheet(initialBudget: progress.budget) { updatedAllocations in
-                // Handle save - notify parent to update budget
-                // This will be handled by NotificationCenter or callback
                 NotificationCenter.default.post(
                     name: .budgetCategoryAllocationsUpdated,
                     object: nil,
                     userInfo: ["allocations": updatedAllocations]
                 )
             }
+        }
+        .confirmationDialog(
+            "Remove \(categoryToRemove?.normalizedCategoryName ?? "") target?",
+            isPresented: Binding(
+                get: { categoryToRemove != nil },
+                set: { if !$0 { categoryToRemove = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove Target", role: .destructive) {
+                if let category = categoryToRemove {
+                    onRemoveCategory?(category)
+                    categoryToRemove = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { categoryToRemove = nil }
+        } message: {
+            Text("This category will no longer be tracked against a target.")
         }
     }
 
@@ -342,7 +360,10 @@ struct CategoryBudgetDetailView: View {
                                         .frame(height: 0.5)
                                         .padding(.leading, 52)
 
-                                    CategoryBudgetCard(categoryProgress: category)
+                                    CategoryBudgetCard(
+                                        categoryProgress: category,
+                                        onRemove: onRemoveCategory != nil ? { categoryToRemove = category.category } : nil
+                                    )
                                 }
                             }
                         }
@@ -361,7 +382,10 @@ struct CategoryBudgetDetailView: View {
                                     .frame(height: 0.5)
                                     .padding(.leading, 52)
                             }
-                            CategoryBudgetCard(categoryProgress: category)
+                            CategoryBudgetCard(
+                                categoryProgress: category,
+                                onRemove: onRemoveCategory != nil ? { categoryToRemove = category.category } : nil
+                            )
                         }
                     }
                 }
@@ -377,6 +401,7 @@ struct CategoryBudgetDetailView: View {
 /// A detailed card showing budget progress for a single category
 struct CategoryBudgetCard: View {
     let categoryProgress: CategoryBudgetProgress
+    var onRemove: (() -> Void)?
 
     @State private var animationProgress: CGFloat = 0
 
@@ -467,6 +492,16 @@ struct CategoryBudgetCard: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
                 }
+
+                // Remove button
+                if let onRemove {
+                    Button(action: onRemove) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.15))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
             }
 
             // Progress bar
@@ -521,15 +556,6 @@ struct CategoryBudgetCard: View {
 
                 Spacer()
 
-                if categoryProgress.isLocked {
-                    HStack(spacing: 4) {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 10))
-                        Text("Locked")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundColor(.white.opacity(0.3))
-                }
             }
         }
         .padding(.horizontal, 16)
@@ -548,6 +574,7 @@ struct CategoryBudgetCard: View {
 struct CategoryBudgetGrid: View {
     let categories: [CategoryBudgetProgress]
     var onSeeAll: (() -> Void)?
+    var onRemoveCategory: ((String) -> Void)?
 
     /// Show top categories sorted by spend amount (highest first)
     private var displayCategories: [CategoryBudgetProgress] {
@@ -597,7 +624,10 @@ struct CategoryBudgetGrid: View {
                                     .frame(height: 0.5)
                                     .padding(.leading, 52)
                             }
-                            CompactCategoryBudgetItem(categoryProgress: category)
+                            CompactCategoryBudgetItem(
+                                categoryProgress: category,
+                                onRemove: onRemoveCategory != nil ? { onRemoveCategory?(category.category) } : nil
+                            )
                         }
                     }
                 }
@@ -611,6 +641,7 @@ struct CategoryBudgetGrid: View {
 /// A row display of a category budget showing spent vs budget amounts
 struct CompactCategoryBudgetItem: View {
     let categoryProgress: CategoryBudgetProgress
+    var onRemove: (() -> Void)?
 
     @State private var animationProgress: CGFloat = 0
 
@@ -706,6 +737,16 @@ struct CompactCategoryBudgetItem: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(categoryProgress.isOverBudget ? statusColor : .white.opacity(0.4))
             }
+
+            // Remove button
+            if let onRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.15))
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 10)
@@ -725,8 +766,9 @@ struct CompactCategoryBudgetItem: View {
         userId: "user1",
         monthlyAmount: 850,
         categoryAllocations: nil,
-        notificationsEnabled: true,
-        alertThresholds: [0.5, 0.75, 0.9]
+        isSmartBudget: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z"
     )
 
     let sampleProgress = BudgetProgress(
@@ -735,14 +777,14 @@ struct CompactCategoryBudgetItem: View {
         daysElapsed: 21,
         daysInMonth: 31,
         categoryProgress: [
-            CategoryBudgetProgress(category: "Fresh Produce", budgetAmount: 100, currentSpend: 65, isLocked: false),
-            CategoryBudgetProgress(category: "Meat & Fish", budgetAmount: 150, currentSpend: 168, isLocked: true),
-            CategoryBudgetProgress(category: "Snacks & Sweets", budgetAmount: 60, currentSpend: 72, isLocked: false),
-            CategoryBudgetProgress(category: "Dairy & Eggs", budgetAmount: 80, currentSpend: 74, isLocked: false),
-            CategoryBudgetProgress(category: "Bakery", budgetAmount: 50, currentSpend: 35, isLocked: false),
-            CategoryBudgetProgress(category: "Household", budgetAmount: 120, currentSpend: 95, isLocked: false),
-            CategoryBudgetProgress(category: "Drinks (Soft/Soda)", budgetAmount: 40, currentSpend: 28, isLocked: false),
-            CategoryBudgetProgress(category: "Frozen", budgetAmount: 70, currentSpend: 42, isLocked: false),
+            CategoryBudgetProgress(category: "Fresh Produce", budgetAmount: 100, currentSpend: 65),
+            CategoryBudgetProgress(category: "Meat & Fish", budgetAmount: 150, currentSpend: 168),
+            CategoryBudgetProgress(category: "Snacks & Sweets", budgetAmount: 60, currentSpend: 72),
+            CategoryBudgetProgress(category: "Dairy & Eggs", budgetAmount: 80, currentSpend: 74),
+            CategoryBudgetProgress(category: "Bakery", budgetAmount: 50, currentSpend: 35),
+            CategoryBudgetProgress(category: "Household", budgetAmount: 120, currentSpend: 95),
+            CategoryBudgetProgress(category: "Drinks (Soft/Soda)", budgetAmount: 40, currentSpend: 28),
+            CategoryBudgetProgress(category: "Frozen", budgetAmount: 70, currentSpend: 42),
         ]
     )
 

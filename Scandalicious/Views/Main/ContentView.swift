@@ -8,6 +8,19 @@
 import SwiftUI
 import FirebaseAuth
 
+// MARK: - Environment key for active tab (used by MiniBudgetRing to replay animation)
+
+private struct SelectedTabIndexKey: EnvironmentKey {
+    static let defaultValue: Int = 1 // scan tab by default
+}
+
+extension EnvironmentValues {
+    var selectedTabIndex: Int {
+        get { self[SelectedTabIndexKey.self] }
+        set { self[SelectedTabIndexKey.self] = newValue }
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @StateObject private var transactionManager = TransactionManager()
@@ -50,6 +63,7 @@ struct ContentView: View {
             .tint(.blue) // Apple blue
             .toolbarBackground(.ultraThinMaterial, for: .tabBar)
             .toolbarBackgroundVisibility(.visible, for: .tabBar)
+            .environment(\.selectedTabIndex, selectedTab.rawValue)
 
             // Loading screen overlay
             if !hasLoadedInitialData {
@@ -147,7 +161,6 @@ struct ContentView: View {
                 group.addTask { await cache.preloadYearSummary(for: year) }
             }
             group.addTask { await cache.preloadAllTimeAggregate() }
-            group.addTask { await cache.preloadBudgetInsights() }
             group.addTask { await cache.preloadBudgetProgress() }
         }
 

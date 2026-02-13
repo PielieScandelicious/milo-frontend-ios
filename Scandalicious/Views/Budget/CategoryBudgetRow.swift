@@ -83,12 +83,6 @@ struct CategoryBudgetRow: View {
                 .frame(height: 4)
             }
 
-            // Lock indicator (if category budget is locked)
-            if categoryProgress.isLocked {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.3))
-            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -97,81 +91,6 @@ struct CategoryBudgetRow: View {
                 animationProgress = 1.0
             }
         }
-    }
-}
-
-// MARK: - Editable Category Budget Row
-
-/// An editable version of the category budget row for setup/editing
-struct EditableCategoryBudgetRow: View {
-    let category: String
-    @Binding var amount: Double
-    @Binding var isLocked: Bool
-    let totalBudget: Double
-
-    private var percentage: Double {
-        guard totalBudget > 0 else { return 0 }
-        return (amount / totalBudget) * 100
-    }
-
-    private var categoryIcon: String {
-        category.categoryIcon
-    }
-
-    var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                // Category icon
-                Image.categorySymbol(categoryIcon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(category.categoryColor)
-                    .frame(width: 24)
-
-                // Category name and percentage
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(category)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    Text(String(format: "%.0f%% of budget", percentage))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-
-                Spacer()
-
-                // Amount display
-                Text(String(format: "€%.0f", amount))
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-
-                // Lock toggle
-                Button(action: { isLocked.toggle() }) {
-                    Image(systemName: isLocked ? "lock.fill" : "lock.open")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(isLocked ? Color(red: 0.3, green: 0.7, blue: 1.0) : .white.opacity(0.4))
-                }
-            }
-
-            // Slider for amount
-            Slider(
-                value: $amount,
-                in: 0...max(amount * 2, 500),
-                step: 5
-            )
-            .tint(category.categoryColor)
-            .disabled(isLocked)
-            .opacity(isLocked ? 0.5 : 1)
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isLocked ? Color(red: 0.3, green: 0.7, blue: 1.0).opacity(0.3) : Color.clear, lineWidth: 1)
-        )
     }
 }
 
@@ -191,8 +110,7 @@ struct EditableCategoryBudgetRow: View {
                 categoryProgress: CategoryBudgetProgress(
                     category: "Fresh Produce",
                     budgetAmount: 100,
-                    currentSpend: 65,
-                    isLocked: false
+                    currentSpend: 65
                 )
             )
 
@@ -201,8 +119,7 @@ struct EditableCategoryBudgetRow: View {
                 categoryProgress: CategoryBudgetProgress(
                     category: "Meat & Fish",
                     budgetAmount: 150,
-                    currentSpend: 140,
-                    isLocked: true
+                    currentSpend: 140
                 )
             )
 
@@ -211,33 +128,9 @@ struct EditableCategoryBudgetRow: View {
                 categoryProgress: CategoryBudgetProgress(
                     category: "Snacks & Sweets",
                     budgetAmount: 60,
-                    currentSpend: 72,
-                    isLocked: false
+                    currentSpend: 72
                 )
             )
-
-            Divider()
-                .padding(.vertical)
-
-            Text("Editable Row")
-                .font(.headline)
-                .foregroundColor(.white)
-
-            EditableCategoryBudgetRow(
-                category: "Fresh Produce",
-                amount: .constant(100),
-                isLocked: .constant(false),
-                totalBudget: 850
-            )
-            .padding(.horizontal)
-
-            EditableCategoryBudgetRow(
-                category: "Meat & Fish",
-                amount: .constant(150),
-                isLocked: .constant(true),
-                totalBudget: 850
-            )
-            .padding(.horizontal)
         }
         .padding()
     }

@@ -96,6 +96,7 @@ struct OverviewView: View {
     @State private var budgetExpanded = false // Track if budget widget is expanded
     @State private var activeCardPage = 0 // 0=budget, 1=promos
     @State private var cardDragOffset: CGFloat = 0 // Live drag offset for carousel
+    @State private var periodBounceOffset: CGFloat = 0 // Rubber-band effect when at period boundary
     private let maxVisibleRows = 4 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
 
@@ -1193,16 +1194,41 @@ struct OverviewView: View {
                 guard abs(horizontalAmount) > verticalAmount * 2 else { return }
                 guard abs(horizontalAmount) > 50 else { return }
 
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    if horizontalAmount > 0 {
-                        // Swipe right -> go to previous (older) period
-                        goToPreviousPeriod()
+                if horizontalAmount > 0 {
+                    // Swipe right -> go to previous (older) period
+                    if canGoToPreviousPeriod {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            goToPreviousPeriod()
+                        }
                     } else {
-                        // Swipe left -> go to next (newer) period
-                        goToNextPeriod()
+                        triggerPeriodBoundaryFeedback(direction: 1)
+                    }
+                } else {
+                    // Swipe left -> go to next (newer) period
+                    if canGoToNextPeriod {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            goToNextPeriod()
+                        }
+                    } else {
+                        triggerPeriodBoundaryFeedback(direction: -1)
                     }
                 }
             }
+    }
+
+    /// Rubber-band bounce + haptic when user swipes past the period boundary
+    private func triggerPeriodBoundaryFeedback(direction: CGFloat) {
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.impactOccurred(intensity: 0.5)
+
+        withAnimation(.interpolatingSpring(stiffness: 400, damping: 12)) {
+            periodBounceOffset = direction * 20
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+                periodBounceOffset = 0
+            }
+        }
     }
 
     // MARK: - Main Content View
@@ -1363,10 +1389,10 @@ struct OverviewView: View {
 
             // Spending card with period swipe
             unifiedSpendingCardForPeriod(period)
+                .offset(x: periodBounceOffset)
                 .contentShape(Rectangle())
                 .simultaneousGesture(periodSwipeGesture)
         }
-        .id(period)
     }
 
     /// Swipeable carousel: Budget + Promos (current period only shows both)
@@ -2481,9 +2507,7 @@ struct OverviewView: View {
                         showAllRows = false
                     }
                 }
-                .onChange(of: period) { _, newPeriod in
-                    isPieChartFlipped = true
-                    pieChartFlipDegrees = 180
+                .onChange(of: period) { _, _ in
                     showAllRows = false
                 }
             } else {
@@ -2519,8 +2543,6 @@ struct OverviewView: View {
                     }
                 }
                 .onChange(of: period) { _, _ in
-                    isPieChartFlipped = true
-                    pieChartFlipDegrees = 180
                     showAllRows = false
                 }
             }
@@ -2677,6 +2699,8 @@ struct OverviewView: View {
             spendingHeaderSection(spending: spending, healthScore: healthScore)
 
             flippableChartSection(period: period, segments: segments)
+                .id("chart-\(period)")
+                .transition(.identity)
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
@@ -3259,7 +3283,9 @@ struct CompactNutriBadge: View {
                 Text(gradeLabel)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(scoreColor)
+                    .contentTransition(.numericText())
             }
+            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: score)
 
             Text("NUTRI SCORE")
                 .font(.system(size: 9, weight: .semibold))
