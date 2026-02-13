@@ -344,6 +344,10 @@ struct ScandaLiciousAIChatView: View {
                 await rateLimitManager.syncFromBackend()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
+            // Refresh transaction data so chat has up-to-date context
+            viewModel.setTransactions(transactionManager.transactions)
+        }
         .onDisappear {
             // Reset entrance animation states for next appearance
             viewAppeared = false

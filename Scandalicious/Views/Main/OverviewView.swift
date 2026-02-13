@@ -33,23 +33,18 @@ struct OverviewView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject var dataManager: StoreDataManager
     @ObservedObject var rateLimitManager = RateLimitManager.shared
+    @ObservedObject private var syncManager = AppSyncManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @StateObject private var budgetViewModel = BudgetViewModel()
     @StateObject private var promosViewModel = PromosViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
-    // Track the last time we checked for Share Extension uploads
-    @State private var lastCheckedUploadTimestamp: TimeInterval = 0
-
-    // Track when a receipt is being uploaded from Scan tab or Share Extension
-    @State private var isReceiptUploading = false
-
     // Track if refreshWithRetry is currently running to prevent duplicate calls
     @State private var isRefreshWithRetryRunning = false
 
-    // Track manual sync triggered by pull-to-refresh
-    @State private var isManuallySyncing = false
-    @State private var showSyncedConfirmation = false
+    // Track manual sync triggered by pull-to-refresh (which period is syncing)
+    @State private var manuallySyncingPeriod: String?
+    @State private var syncedConfirmationPeriod: String?
 
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
@@ -454,9 +449,6 @@ struct OverviewView: View {
                 contentOpacity = 0
                 headerOpacity = 0
             }
-            .onReceive(NotificationCenter.default.publisher(for: .receiptUploadStarted)) { _ in
-                handleReceiptUploadStarted()
-            }
             .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
                 handleReceiptUploadSuccess()
             }
@@ -475,7 +467,7 @@ struct OverviewView: View {
             .onChange(of: dataManager.storeBreakdowns) { _, _ in
                 // Skip cache rebuild during manual sync to prevent flash of empty state
                 // (refreshData temporarily clears breakdowns before adding new ones)
-                guard !isManuallySyncing else { return }
+                guard manuallySyncingPeriod == nil else { return }
                 // Wrap in animation so donut chart trim values and segment proportions
                 // animate smoothly instead of snapping during data refresh
                 withAnimation(.easeInOut(duration: 0.35)) {
@@ -483,8 +475,8 @@ struct OverviewView: View {
                     cacheSegmentsForPeriod(selectedPeriod)
                 }
             }
-            .onChange(of: scenePhase) { _, newPhase in
-                if newPhase == .active { checkForShareExtensionUploads() }
+            .onReceive(NotificationCenter.default.publisher(for: .shareExtensionUploadDetected)) { _ in
+                handleShareExtensionUpload()
             }
     }
 
@@ -525,11 +517,8 @@ struct OverviewView: View {
                 // Build breakdown caches from preloaded data
                 rebuildBreakdownCache()
 
-                // Load share extension timestamps (UserDefaults I/O)
-                loadShareExtensionTimestamps()
-
-                // Check for share extension uploads
-                checkForShareExtensionUploads()
+                // Check for share extension uploads via centralized manager
+                syncManager.checkForShareExtensionUploads()
             }
         }
 
@@ -582,30 +571,7 @@ struct OverviewView: View {
 
     }
 
-    private func loadShareExtensionTimestamps() {
-        guard lastCheckedUploadTimestamp == 0 else { return }
-
-        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else { return }
-
-        let persistedLastChecked = sharedDefaults.double(forKey: "lastCheckedUploadTimestamp")
-        if persistedLastChecked > 0 {
-            lastCheckedUploadTimestamp = persistedLastChecked
-        } else {
-            let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-            if existingTimestamp > 0 {
-                lastCheckedUploadTimestamp = existingTimestamp
-                sharedDefaults.set(existingTimestamp, forKey: "lastCheckedUploadTimestamp")
-            }
-        }
-    }
-
-    private func handleReceiptUploadStarted() {
-        isReceiptUploading = true
-    }
-
     private func handleReceiptUploadSuccess() {
-        isReceiptUploading = false
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
@@ -995,33 +961,13 @@ struct OverviewView: View {
         }
     }
 
-    // MARK: - Share Extension Upload Detection
+    // MARK: - Share Extension Upload Handling
 
-    /// Checks if the Share Extension uploaded a receipt while the app was in the background
-    private func checkForShareExtensionUploads() {
-        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else { return }
-
-        // Check if there's a new upload timestamp
-        let uploadTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-
-        // If there's a new upload (timestamp is newer than last checked)
-        if uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0 {
-            // Update last checked timestamp and persist it
-            lastCheckedUploadTimestamp = uploadTimestamp
-            sharedDefaults.set(uploadTimestamp, forKey: "lastCheckedUploadTimestamp")
-
-            // Show syncing indicator immediately
-            isReceiptUploading = true
-
-            // Post notification so other views can react
-            NotificationCenter.default.post(name: .shareExtensionUploadDetected, object: nil)
-
-            // Only start refresh if not already running (prevent duplicate concurrent refreshes)
-            if !isRefreshWithRetryRunning {
-                Task {
-                    await refreshWithRetry()
-                }
+    /// Called when AppSyncManager detects a share extension upload
+    private func handleShareExtensionUpload() {
+        if !isRefreshWithRetryRunning {
+            Task {
+                await refreshWithRetry()
             }
         }
     }
@@ -1073,10 +1019,9 @@ struct OverviewView: View {
         // Sync rate limit status
         await rateLimitManager.syncFromBackend()
 
-        // Update UI on main thread and always reset isReceiptUploading
+        // Update UI on main thread
         await MainActor.run {
-            // Always clear syncing indicator and running flag
-            isReceiptUploading = false
+            // Clear running flag
             isRefreshWithRetryRunning = false
 
             // Notify other views that share extension sync is complete
@@ -1097,9 +1042,9 @@ struct OverviewView: View {
 
     /// Manual sync triggered by pull-to-refresh — only refreshes the current period
     private func manualSync() async {
-        // isManuallySyncing is already set by .refreshable before this Task starts
-        guard !isReceiptUploading && !dataManager.isLoading else {
-            await MainActor.run { isManuallySyncing = false }
+        // manuallySyncingPeriod is already set by .refreshable before this Task starts
+        guard syncManager.syncState != .syncing && !dataManager.isLoading else {
+            await MainActor.run { manuallySyncingPeriod = nil }
             return
         }
 
@@ -1133,15 +1078,16 @@ struct OverviewView: View {
         }
 
         // Transition to "Synced" — rebuild caches with fresh data
+        let syncedPeriod = manuallySyncingPeriod
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.35)) {
                 rebuildBreakdownCache()
                 cacheSegmentsForPeriod(selectedPeriod)
             }
             lastRefreshTime = Date()
-            isManuallySyncing = false
+            manuallySyncingPeriod = nil
             withAnimation(.easeInOut(duration: 0.3)) {
-                showSyncedConfirmation = true
+                syncedConfirmationPeriod = syncedPeriod
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
@@ -1150,7 +1096,7 @@ struct OverviewView: View {
         try? await Task.sleep(for: .seconds(2))
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.3)) {
-                showSyncedConfirmation = false
+                syncedConfirmationPeriod = nil
             }
         }
     }
@@ -1256,8 +1202,8 @@ struct OverviewView: View {
         }
         .refreshable {
             // Set syncing flag immediately so the UI doesn't flash during refresh
-            isManuallySyncing = true
-            showSyncedConfirmation = false
+            manuallySyncingPeriod = selectedPeriod
+            syncedConfirmationPeriod = nil
             // Fire the actual sync work in a non-cancellable task so .refreshable
             // dismissal doesn't kill the minimum display time for the syncing sequence
             Task { await manualSync() }
@@ -2335,8 +2281,15 @@ struct OverviewView: View {
     }
 
     /// Spending header: amount + syncing status
-    private func spendingHeaderSection(spending: Double) -> some View {
-        VStack(spacing: 8) {
+    private func spendingHeaderSection(spending: Double, period: String) -> some View {
+        let isCurrentMonth: Bool = {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+            return period == dateFormatter.string(from: Date())
+        }()
+
+        return VStack(spacing: 8) {
             Text("SPENT THIS MONTH")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
@@ -2348,19 +2301,26 @@ struct OverviewView: View {
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
 
-            syncingIndicator()
-                .animation(.easeInOut(duration: 0.3), value: isManuallySyncing)
-                .animation(.easeInOut(duration: 0.3), value: showSyncedConfirmation)
+            syncingIndicator(for: period, isCurrentMonth: isCurrentMonth)
+                .animation(.easeInOut(duration: 0.3), value: manuallySyncingPeriod)
+                .animation(.easeInOut(duration: 0.3), value: syncedConfirmationPeriod)
+                .animation(.easeInOut(duration: 0.3), value: syncManager.syncState)
         }
         .padding(.top, 20)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
     }
 
-    /// Syncing status shown during pull-to-refresh
+    /// Syncing status indicator (pull-to-refresh + receipt uploads)
+    /// Shows for: manual sync on the specific period being synced, or receipt upload sync on current month only
     @ViewBuilder
-    private func syncingIndicator() -> some View {
-        if isManuallySyncing {
+    private func syncingIndicator(for period: String, isCurrentMonth: Bool) -> some View {
+        let isManualSyncing = manuallySyncingPeriod == period
+        let isManualSynced = syncedConfirmationPeriod == period
+        let isUploadSyncing = isCurrentMonth && syncManager.syncState == .syncing
+        let isUploadSynced = isCurrentMonth && syncManager.syncState == .synced
+
+        if isManualSyncing || isUploadSyncing {
             HStack(spacing: 4) {
                 SyncingArrowsView()
                     .font(.system(size: 11))
@@ -2369,7 +2329,7 @@ struct OverviewView: View {
             }
             .foregroundColor(.blue)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
-        } else if showSyncedConfirmation {
+        } else if isManualSynced || isUploadSynced {
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11))
@@ -2654,7 +2614,7 @@ struct OverviewView: View {
         let healthScore = healthScoreForPeriod(period)
 
         return VStack(spacing: 0) {
-            spendingHeaderSection(spending: spending)
+            spendingHeaderSection(spending: spending, period: period)
 
             flippableChartSection(period: period, segments: segments)
                 .id("chart-\(period)")

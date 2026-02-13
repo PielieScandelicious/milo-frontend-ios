@@ -105,14 +105,6 @@ class RateLimitManager: ObservableObject {
     /// Last sync error (if any)
     @Published private(set) var lastSyncError: String?
 
-    // MARK: - Receipt Upload Sync State
-
-    /// Whether a receipt is currently being uploaded/processed
-    @Published var isReceiptUploading: Bool = false
-
-    /// Whether to show the synced confirmation banner
-    @Published var showReceiptSynced: Bool = false
-
     // MARK: - Private Properties
 
     private var currentUserId: String?
@@ -227,45 +219,6 @@ class RateLimitManager: ObservableObject {
         // Load initial state if user is already logged in
         if let user = Auth.auth().currentUser {
             handleUserChange(user)
-        }
-
-        // Listen for receipt upload notifications
-        NotificationCenter.default.addObserver(
-            forName: .receiptUploadStarted,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.showReceiptSynced = false
-                self?.isReceiptUploading = true
-            }
-        }
-
-        NotificationCenter.default.addObserver(
-            forName: .receiptUploadedSuccessfully,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.isReceiptUploading = false
-                self?.showReceiptSynced = true
-                // Auto-hide synced indicator after brief display
-                try? await Task.sleep(for: .seconds(2.0))
-                self?.showReceiptSynced = false
-            }
-        }
-
-        // Listen for share extension upload detection
-        // Just set syncing state - the completion will be handled by .receiptUploadedSuccessfully
-        NotificationCenter.default.addObserver(
-            forName: .shareExtensionUploadDetected,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.showReceiptSynced = false
-                self?.isReceiptUploading = true
-            }
         }
     }
 
