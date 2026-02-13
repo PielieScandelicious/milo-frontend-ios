@@ -2886,7 +2886,7 @@ private struct ExpandableCategoryRowHeader: View {
                     .frame(width: 3, height: 28)
 
                 // Category icon
-                Image(systemName: category.icon)
+                Image.categorySymbol(category.icon)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(category.color)
                     .frame(width: 20)
@@ -2942,7 +2942,7 @@ private struct CategoryRowButton: View {
                     .frame(width: 3, height: 28)
 
                 // Category icon
-                Image(systemName: category.icon)
+                Image.categorySymbol(category.icon)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(category.color)
                     .frame(width: 20)

@@ -229,7 +229,7 @@ struct StoreDetailView: View {
 
     private func legendSectionTitle(icon: String, title: String, count: Int) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: icon)
+            Image.categorySymbol(icon)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(.white.opacity(0.3))
             Text(title.uppercased())
@@ -771,7 +771,7 @@ struct StoreDetailView: View {
 
                     // Health-themed icon for grocery sub-categories
                     if let icon = icon {
-                        Image(systemName: icon)
+                        Image.categorySymbol(icon)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(segment.color)
                             .frame(width: 20)

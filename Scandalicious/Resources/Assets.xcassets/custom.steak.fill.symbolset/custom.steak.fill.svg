@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Custom Symbol: Steak Fill-->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+  <g id="Notes">
+    <rect height="2200" id="artboard" style="fill:white;" width="3300" x="0" y="0"></rect>
+  </g>
+  <g id="Guides">
+    <line id="Baseline-S" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="263" x2="823" y1="1556" y2="1556"></line>
+    <line id="Capline-S" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="263" x2="823" y1="884" y2="884"></line>
+    <line id="Baseline-M" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="1013" x2="2287" y1="1556" y2="1556"></line>
+    <line id="Capline-M" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="1013" x2="2287" y1="884" y2="884"></line>
+    <line id="Baseline-L" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="2477" x2="3037" y1="1556" y2="1556"></line>
+    <line id="Capline-L" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="2477" x2="3037" y1="884" y2="884"></line>
+    <line id="left-margin-Regular-M" style="fill:none;stroke:#00AEEF;opacity:1.0;" x1="1320" x2="1320" y1="0" y2="2200"></line>
+    <line id="right-margin-Regular-M" style="fill:none;stroke:#00AEEF;opacity:1.0;" x1="1980" x2="1980" y1="0" y2="2200"></line>
+  </g>
+  <g id="Symbols">
+    <g id="Regular-M" transform="matrix(1 0 0 1 1320 884)">
+      <!-- Classic T-bone steak -->
+      <!-- Main steak body (organic rounded shape) -->
+      <path d="M 330,50 C 190,50 75,120 35,240 C -5,360 15,480 85,555 C 155,630 265,655 370,645 C 475,635 580,595 645,510 C 710,425 730,310 690,195 C 650,80 470,50 330,50 Z" fill="black"/>
+      <!-- T-bone (white cutout) -->
+      <!-- Horizontal bone bar -->
+      <rect x="155" y="305" width="380" height="50" rx="12" fill="white"/>
+      <!-- Vertical bone (down from center) -->
+      <path d="M 325,305 L 375,305 L 375,540 C 375,558 365,570 350,570 C 335,570 325,558 325,540 Z" fill="white"/>
+      <!-- Bone end knobs (left) -->
+      <circle cx="170" cy="305" r="30" fill="white"/>
+      <circle cx="175" cy="355" r="24" fill="white"/>
+      <!-- Bone end knobs (right) -->
+      <circle cx="520" cy="305" r="30" fill="white"/>
+      <circle cx="515" cy="355" r="24" fill="white"/>
+      <!-- Fat marbling lines -->
+      <path d="M 180,190 C 215,178 260,200 300,188" fill="none" stroke="white" stroke-width="12" stroke-linecap="round" opacity="0.35"/>
+      <path d="M 400,165 C 440,152 485,175 525,158" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.35"/>
+      <path d="M 230,480 C 270,468 315,490 360,475" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.35"/>
+    </g>
+  </g>
+</svg>

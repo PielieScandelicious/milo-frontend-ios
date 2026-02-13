@@ -715,7 +715,7 @@ struct ReceiptScanView: View {
             }
 
             // Category icon
-            Image(systemName: category.icon)
+            Image.categorySymbol(category.icon)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(medalColor)
                 .frame(width: 24)

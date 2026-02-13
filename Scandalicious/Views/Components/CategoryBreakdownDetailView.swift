@@ -216,7 +216,7 @@ struct CategoryBreakdownDetailView: View {
 
     private func selectedCenterContent(_ category: CategorySpendItem) -> some View {
         VStack(spacing: 4) {
-            Image(systemName: category.icon)
+            Image.categorySymbol(category.icon)
                 .font(.system(size: 24))
                 .foregroundStyle(category.color)
 
@@ -348,7 +348,7 @@ struct CategoryBreakdownDetailView: View {
                 .frame(width: 4, height: 32)
 
             // Category icon
-            Image(systemName: category.icon)
+            Image.categorySymbol(category.icon)
                 .font(.system(size: 16))
                 .foregroundStyle(category.color)
                 .frame(width: 24)

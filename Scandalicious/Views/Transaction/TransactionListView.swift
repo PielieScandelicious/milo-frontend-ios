@@ -548,7 +548,7 @@ struct APITransactionRowView: View {
                         .fill(categoryColor(for: transaction.category).opacity(0.2))
                         .frame(width: 50, height: 50)
 
-                    Image(systemName: categoryIcon(for: transaction.category))
+                    Image.categorySymbol(categoryIcon(for: transaction.category))
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(categoryColor(for: transaction.category))
                 }

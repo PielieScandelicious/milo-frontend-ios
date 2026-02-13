@@ -286,7 +286,7 @@ struct ReceiptTransactionsView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Category header
             HStack {
-                Image(systemName: categoryIcon(for: category))
+                Image.categorySymbol(categoryIcon(for: category))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(category.categoryColor)
 

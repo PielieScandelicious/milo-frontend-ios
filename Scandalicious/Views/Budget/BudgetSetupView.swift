@@ -1206,7 +1206,7 @@ struct BudgetSetupView: View {
 
         return HStack(spacing: 12) {
             // Category icon
-            Image(systemName: categoryIcon(for: allocation.category))
+            Image.categorySymbol(categoryIcon(for: allocation.category))
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(allocation.category.categoryColor)
                 .frame(width: 20)

@@ -148,7 +148,7 @@ struct CategoryDetailView: View {
 
     private var emptyView: some View {
         VStack(spacing: 20) {
-            Image(systemName: category.icon)
+            Image.categorySymbol(category.icon)
                 .font(.system(size: 40, weight: .medium))
                 .foregroundColor(category.color)
 
@@ -198,7 +198,7 @@ struct CategoryDetailView: View {
             // Left side: Category info
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
-                    Image(systemName: category.icon)
+                    Image.categorySymbol(category.icon)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(category.color)
                         .frame(width: 24)

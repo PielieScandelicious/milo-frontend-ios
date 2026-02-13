@@ -189,8 +189,8 @@ class CategoryRegistryManager: ObservableObject {
         switch group {
         case "Fresh Food": return "leaf.fill"
         case "Pantry & Frozen": return "cabinet.fill"
-        case "Snacks & Beverages": return "cup.and.saucer.fill"
-        case "Household & Care": return "spraycan.fill"
+        case "Snacks & Beverages": return "mug.fill"
+        case "Household & Care": return "bubbles.and.sparkles.fill"
         case "Other": return "tag.fill"
         default: return "tag.fill"
         }
@@ -219,8 +219,8 @@ class CategoryRegistryManager: ObservableObject {
         let fallbackGroups: [(String, String, String)] = [
             ("Fresh Food", "leaf.fill", "#2ECC71"),
             ("Pantry & Frozen", "cabinet.fill", "#E67E22"),
-            ("Snacks & Beverages", "cup.and.saucer.fill", "#E74C3C"),
-            ("Household & Care", "spraycan.fill", "#8E44AD"),
+            ("Snacks & Beverages", "mug.fill", "#E74C3C"),
+            ("Household & Care", "bubbles.and.sparkles.fill", "#8E44AD"),
             ("Other", "tag.fill", "#95A5A6"),
         ]
         for (name, icon, colorHex) in fallbackGroups {

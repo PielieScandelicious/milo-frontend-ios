@@ -479,7 +479,7 @@ struct CompactCategoryRow: View {
             Button(action: onTap) {
                 HStack(spacing: 12) {
                     // Category icon
-                    Image(systemName: allocation.category.categoryIcon)
+                    Image.categorySymbol(allocation.category.categoryIcon)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(allocation.category.categoryColor)
                         .frame(width: 24)

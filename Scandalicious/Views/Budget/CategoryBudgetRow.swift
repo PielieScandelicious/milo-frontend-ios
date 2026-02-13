@@ -122,7 +122,7 @@ struct EditableCategoryBudgetRow: View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
                 // Category icon
-                Image(systemName: categoryIcon)
+                Image.categorySymbol(categoryIcon)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(category.categoryColor)
                     .frame(width: 24)

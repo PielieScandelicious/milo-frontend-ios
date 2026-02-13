@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Custom Symbol: Apple Fill-->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+  <g id="Notes">
+    <rect height="2200" id="artboard" style="fill:white;" width="3300" x="0" y="0"></rect>
+  </g>
+  <g id="Guides">
+    <line id="Baseline-S" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="263" x2="823" y1="1556" y2="1556"></line>
+    <line id="Capline-S" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="263" x2="823" y1="884" y2="884"></line>
+    <line id="Baseline-M" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="1013" x2="2287" y1="1556" y2="1556"></line>
+    <line id="Capline-M" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="1013" x2="2287" y1="884" y2="884"></line>
+    <line id="Baseline-L" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="2477" x2="3037" y1="1556" y2="1556"></line>
+    <line id="Capline-L" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="2477" x2="3037" y1="884" y2="884"></line>
+    <line id="left-margin-Regular-M" style="fill:none;stroke:#00AEEF;opacity:1.0;" x1="1350" x2="1350" y1="0" y2="2200"></line>
+    <line id="right-margin-Regular-M" style="fill:none;stroke:#00AEEF;opacity:1.0;" x1="1950" x2="1950" y1="0" y2="2200"></line>
+  </g>
+  <g id="Symbols">
+    <g id="Regular-M" transform="matrix(1 0 0 1 1350 884)">
+      <!-- Classic apple shape -->
+      <!-- Main apple body -->
+      <path d="M 300,60 C 220,60 140,100 95,170 C 50,240 30,330 40,420 C 50,510 85,580 140,620 C 195,660 250,670 300,650 C 350,670 405,660 460,620 C 515,580 550,510 560,420 C 570,330 550,240 505,170 C 460,100 380,60 300,60 Z" fill="black"/>
+      <!-- Top indentation -->
+      <path d="M 260,70 C 275,40 290,55 300,60 C 310,55 325,40 340,70 C 325,60 310,50 300,55 C 290,50 275,60 260,70 Z" fill="white"/>
+      <!-- Stem -->
+      <path d="M 292,60 C 290,30 295,5 305,0 C 300,8 296,32 298,60 Z" fill="black"/>
+      <!-- Leaf -->
+      <path d="M 305,15 C 340,0 380,5 400,25 C 370,20 340,18 310,30 Z" fill="black"/>
+    </g>
+  </g>
+</svg>

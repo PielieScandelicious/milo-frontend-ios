@@ -139,7 +139,7 @@ struct SplitTransactionView: View {
                     .fill(categoryColor.opacity(0.2))
                     .frame(width: 50, height: 50)
 
-                Image(systemName: categoryIcon)
+                Image.categorySymbol(categoryIcon)
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(categoryColor)
             }

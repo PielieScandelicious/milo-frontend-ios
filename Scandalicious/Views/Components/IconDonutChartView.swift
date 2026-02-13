@@ -363,7 +363,7 @@ struct IconDonutChartView: View {
                 // Custom center icon and label - clean and simple
                 if let icon = centerIcon, let label = centerLabel {
                     VStack(spacing: 8) {
-                        Image(systemName: icon)
+                        Image.categorySymbol(icon)
                             .font(.system(size: size * 0.18, weight: .semibold))
                             .foregroundStyle(
                                 LinearGradient(

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Custom Symbol: Cheese Fill-->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+  <g id="Notes">
+    <rect height="2200" id="artboard" style="fill:white;" width="3300" x="0" y="0"></rect>
+  </g>
+  <g id="Guides">
+    <line id="Baseline-S" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="263" x2="823" y1="1556" y2="1556"></line>
+    <line id="Capline-S" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="263" x2="823" y1="884" y2="884"></line>
+    <line id="Baseline-M" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="1013" x2="2287" y1="1556" y2="1556"></line>
+    <line id="Capline-M" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="1013" x2="2287" y1="884" y2="884"></line>
+    <line id="Baseline-L" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="2477" x2="3037" y1="1556" y2="1556"></line>
+    <line id="Capline-L" style="fill:none;stroke:#27AAE1;opacity:1.0;" x1="2477" x2="3037" y1="884" y2="884"></line>
+    <line id="left-margin-Regular-M" style="fill:none;stroke:#00AEEF;opacity:1.0;" x1="1300" x2="1300" y1="0" y2="2200"></line>
+    <line id="right-margin-Regular-M" style="fill:none;stroke:#00AEEF;opacity:1.0;" x1="2000" x2="2000" y1="0" y2="2200"></line>
+  </g>
+  <g id="Symbols">
+    <g id="Regular-M" transform="matrix(1 0 0 1 1300 884)">
+      <!-- Big bold cheese wedge filling full area -->
+      <!-- Front cut face - large triangle -->
+      <path d="M 10,660 L 10,30 L 590,660 Z" fill="black"/>
+      <!-- Top surface for 3D depth -->
+      <path d="M 10,30 L 150,0 L 700,600 L 590,660 Z" fill="black" opacity="0.5"/>
+      <!-- Right side thickness -->
+      <path d="M 590,660 L 700,600 L 700,630 L 590,672 Z" fill="black" opacity="0.3"/>
+      <!-- Bottom thickness -->
+      <path d="M 10,660 L 590,660 L 590,672 L 10,672 Z" fill="black" opacity="0.3"/>
+      <!-- Classic Swiss cheese holes - big and round -->
+      <circle cx="150" cy="480" r="58" fill="white"/>
+      <circle cx="320" cy="560" r="50" fill="white"/>
+      <circle cx="100" cy="320" r="42" fill="white"/>
+      <circle cx="440" cy="600" r="38" fill="white"/>
+      <circle cx="210" cy="280" r="32" fill="white"/>
+      <circle cx="80" cy="540" r="28" fill="white"/>
+    </g>
+  </g>
+</svg>

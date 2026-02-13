@@ -126,7 +126,7 @@ struct AddBudgetModalView: View {
 
     private var categoryHeader: some View {
         HStack(spacing: 14) {
-            Image(systemName: vm.categoryName.categoryIcon)
+            Image.categorySymbol(vm.categoryName.categoryIcon)
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(vm.categoryName.categoryColor)
                 .frame(width: 32)

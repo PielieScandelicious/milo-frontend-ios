@@ -288,7 +288,7 @@ struct BudgetCreatedSheet: View {
                     .fill(allocation.category.categoryColor.opacity(0.2))
                     .frame(width: 36, height: 36)
 
-                Image(systemName: categoryIcon(for: allocation.category))
+                Image.categorySymbol(categoryIcon(for: allocation.category))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(allocation.category.categoryColor)
             }
