@@ -31,12 +31,17 @@ struct CategoryGroupResponse: Codable, Identifiable {
 
 struct CategoryMidResponse: Codable, Identifiable {
     let name: String
+    let displayName: String?
     let subCategories: [String]
 
     var id: String { name }
 
+    /// Clean display name, falling back to raw name
+    var cleanName: String { displayName ?? name }
+
     enum CodingKeys: String, CodingKey {
         case name
+        case displayName = "display_name"
         case subCategories = "sub_categories"
     }
 }
@@ -49,6 +54,7 @@ struct UsedCategoryResponse: Codable {
 
 struct UsedCategory: Codable, Identifiable {
     let subCategory: String
+    let displayName: String?
     let category: String
     let group: String
     let totalSpent: Double
@@ -59,8 +65,12 @@ struct UsedCategory: Codable, Identifiable {
 
     var id: String { categoryId }
 
+    /// Clean display name, falling back to subCategory
+    var cleanName: String { displayName ?? subCategory }
+
     enum CodingKeys: String, CodingKey {
         case subCategory = "sub_category"
+        case displayName = "display_name"
         case category
         case group
         case totalSpent = "total_spent"
@@ -86,6 +96,8 @@ class CategoryRegistryManager: ObservableObject {
     private var subCategoryToGroup: [String: String] = [:]
     // Sub-category -> mid-level category name (e.g., "Fresh Produce (Fruit & Veg)" -> "Fruits & Vegetables")
     private var subCategoryToCategory: [String: String] = [:]
+    // Sub-category -> clean display name (e.g., "Alcohol (Beer, Cider, ...)" -> "Alcohol")
+    private var subCategoryToDisplayName: [String: String] = [:]
     // Mid-level category -> group name (e.g., "Fruits & Vegetables" -> "Fresh Food")
     private var categoryToGroup: [String: String] = [:]
 
@@ -133,6 +145,7 @@ class CategoryRegistryManager: ObservableObject {
         groupLookup.removeAll()
         subCategoryToGroup.removeAll()
         subCategoryToCategory.removeAll()
+        subCategoryToDisplayName.removeAll()
         categoryToGroup.removeAll()
 
         for group in response.groups {
@@ -142,6 +155,7 @@ class CategoryRegistryManager: ObservableObject {
                 for subCategory in category.subCategories {
                     subCategoryToGroup[subCategory] = group.name
                     subCategoryToCategory[subCategory] = category.name
+                    subCategoryToDisplayName[subCategory] = category.cleanName
                 }
             }
         }
@@ -158,6 +172,11 @@ class CategoryRegistryManager: ObservableObject {
     }
 
     // MARK: - Lookup Helpers
+
+    /// Get clean display name for a sub-category (e.g., "Alcohol (Beer, ...)" → "Alcohol")
+    func displayNameForSubCategory(_ subCategory: String) -> String {
+        subCategoryToDisplayName[subCategory] ?? subCategory
+    }
 
     func groupForSubCategory(_ subCategory: String) -> String {
         subCategoryToGroup[subCategory] ?? "Other"
