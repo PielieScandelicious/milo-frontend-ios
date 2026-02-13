@@ -15,6 +15,7 @@
 		295F4B942F1FC9DA003FD5BA /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 295F4B932F1FC9DA003FD5BA /* GoogleSignInSwift */; };
 		2999B8AF2F1D9AC1002ACAF3 /* Info-additions.plist in Resources */ = {isa = PBXBuildFile; fileRef = 2999B8AE2F1D9AC1002ACAF3 /* Info-additions.plist */; };
 		2999B8C82F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 2999B8BE2F1DA4F9002ACAF3 /* Scandalicious Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		29AAAB032F26030000000003 /* PhosphorSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 29AAAB022F26030000000002 /* PhosphorSwift */; };
 		29CD76132F2028B1003DD40E /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 29CD76122F2028B1003DD40E /* FirebaseAuth */; };
 		29CD76152F2028B1003DD40E /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 29CD76142F2028B1003DD40E /* FirebaseCore */; };
 		3580E9029461F5F72450FE7C /* ScandaliciousUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0163F9C385F7C611E0FF9C /* ScandaliciousUITests.swift */; };
@@ -115,6 +116,7 @@
 				295F4B8D2F1FC95E003FD5BA /* FirebaseAuth in Frameworks */,
 				295F4B922F1FC9DA003FD5BA /* GoogleSignIn in Frameworks */,
 				295F4B942F1FC9DA003FD5BA /* GoogleSignInSwift in Frameworks */,
+				29AAAB032F26030000000003 /* PhosphorSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -214,6 +216,7 @@
 				295F4B8E2F1FC95E003FD5BA /* FirebaseCore */,
 				295F4B912F1FC9DA003FD5BA /* GoogleSignIn */,
 				295F4B932F1FC9DA003FD5BA /* GoogleSignInSwift */,
+				29AAAB022F26030000000002 /* PhosphorSwift */,
 			);
 			productName = Dobby;
 			productReference = 294D4FBD2F1D695B001B9193 /* Scandalicious.app */;
@@ -291,6 +294,7 @@
 			packageReferences = (
 				295F4B8B2F1FC95E003FD5BA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				295F4B902F1FC9DA003FD5BA /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				29AAAB012F26030000000001 /* XCRemoteSwiftPackageReference "swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 294D4FBE2F1D695B001B9193 /* Products */;
@@ -725,6 +729,14 @@
 				minimumVersion = 9.1.0;
 			};
 		};
+		29AAAB012F26030000000001 /* XCRemoteSwiftPackageReference "swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/phosphor-icons/swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -747,6 +759,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 295F4B902F1FC9DA003FD5BA /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		29AAAB022F26030000000002 /* PhosphorSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 29AAAB012F26030000000001 /* XCRemoteSwiftPackageReference "swift" */;
+			productName = PhosphorSwift;
 		};
 		29CD76122F2028B1003DD40E /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;

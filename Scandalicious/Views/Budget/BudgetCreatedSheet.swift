@@ -288,9 +288,9 @@ struct BudgetCreatedSheet: View {
                     .fill(allocation.category.categoryColor.opacity(0.2))
                     .frame(width: 36, height: 36)
 
-                Image.categorySymbol(categoryIcon(for: allocation.category))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(allocation.category.categoryColor)
+                Image.categorySymbol(allocation.category.categoryIcon)
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(allocation.category.categoryColor)
             }
 
             // Name
@@ -354,28 +354,6 @@ struct BudgetCreatedSheet: View {
 
     // MARK: - Helper Functions
 
-    private func categoryIcon(for category: String) -> String {
-        let lowercased = category.lowercased()
-        if lowercased.contains("produce") || lowercased.contains("vegetable") || lowercased.contains("fruit") {
-            return "leaf.fill"
-        } else if lowercased.contains("meat") || lowercased.contains("fish") || lowercased.contains("protein") {
-            return "fish.fill"
-        } else if lowercased.contains("dairy") || lowercased.contains("milk") {
-            return "drop.fill"
-        } else if lowercased.contains("snack") || lowercased.contains("sweet") || lowercased.contains("candy") {
-            return "birthday.cake.fill"
-        } else if lowercased.contains("beverage") || lowercased.contains("drink") || lowercased.contains("alcohol") {
-            return "cup.and.saucer.fill"
-        } else if lowercased.contains("bakery") || lowercased.contains("bread") {
-            return "storefront.fill"
-        } else if lowercased.contains("frozen") {
-            return "snowflake"
-        } else if lowercased.contains("household") || lowercased.contains("cleaning") {
-            return "house.fill"
-        } else {
-            return "cart.fill"
-        }
-    }
 }
 
 // MARK: - Preview

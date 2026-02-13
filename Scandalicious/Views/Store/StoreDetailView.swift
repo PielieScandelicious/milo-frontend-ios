@@ -762,9 +762,8 @@ struct StoreDetailView: View {
                     // Health-themed icon for grocery sub-categories
                     if let icon = icon {
                         Image.categorySymbol(icon)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(segment.color)
-                            .frame(width: 20)
+                            .foregroundStyle(segment.color)
+                            .frame(width: 16, height: 16)
                     }
 
                     // Category name + percentage

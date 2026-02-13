@@ -4,22 +4,23 @@
 //
 
 import SwiftUI
-
-/// Names of custom SF Symbol assets in the asset catalog.
-/// These are NOT system SF Symbols and must be loaded with `Image(_:)` instead of `Image(systemName:)`.
-private let customSymbolNames: Set<String> = [
-    "custom.apple.fill",
-    "custom.cheese.fill",
-    "custom.steak.fill",
-]
+import PhosphorSwift
 
 extension Image {
-    /// Creates an Image from either a system SF Symbol or a custom symbol in the asset catalog.
-    /// Use this instead of `Image(systemName:)` when the icon name may refer to a custom symbol.
-    static func categorySymbol(_ name: String) -> Image {
-        if customSymbolNames.contains(name) {
-            return Image(name)
+    /// Creates a resizable, template-rendered icon from a Phosphor icon name (kebab-case)
+    /// or falls back to an SF Symbol. Use `.frame(width:height:)` for sizing and
+    /// `.foregroundStyle()` for coloring.
+    @ViewBuilder
+    static func categorySymbol(_ name: String) -> some View {
+        if let phIcon = Ph(rawValue: name) {
+            phIcon.fill
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            Image(systemName: name)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
         }
-        return Image(systemName: name)
     }
 }

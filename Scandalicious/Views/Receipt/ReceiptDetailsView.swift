@@ -343,7 +343,7 @@ struct ReceiptItemRow: View {
                         .frame(width: 44, height: 44)
 
                     Image.categorySymbol(transaction.category.categoryIcon)
-                        .font(.system(size: 20))
+                        .frame(width: 20, height: 20)
                         .foregroundStyle(categoryColor)
                 }
 

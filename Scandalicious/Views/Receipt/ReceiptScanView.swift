@@ -696,9 +696,8 @@ struct ReceiptScanView: View {
 
             // Category icon
             Image.categorySymbol(category.icon)
-                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(medalColor)
-                .frame(width: 24)
+                .frame(width: 18, height: 18)
 
             // Category name
             Text(category.name.normalizedCategoryName)

@@ -2838,9 +2838,8 @@ private struct ExpandableCategoryRowHeader: View {
 
                 // Category icon
                 Image.categorySymbol(category.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(category.color)
-                    .frame(width: 20)
+                    .foregroundStyle(category.color)
+                    .frame(width: 16, height: 16)
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {
@@ -2895,9 +2894,8 @@ private struct CategoryRowButton: View {
 
                 // Category icon
                 Image.categorySymbol(category.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(category.color)
-                    .frame(width: 20)
+                    .foregroundStyle(category.color)
+                    .frame(width: 16, height: 16)
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {

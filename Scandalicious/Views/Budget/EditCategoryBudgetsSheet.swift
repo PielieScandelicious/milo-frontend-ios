@@ -175,9 +175,9 @@ struct EditCategoryBudgetsSheet: View {
                     .fill(alloc.category.categoryColor.opacity(0.15))
                     .frame(width: 40, height: 40)
 
-                Image(systemName: alloc.category.categoryIcon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(alloc.category.categoryColor)
+                Image.categorySymbol(alloc.category.categoryIcon)
+                    .frame(width: 17, height: 17)
+                    .foregroundStyle(alloc.category.categoryColor)
             }
 
             // Name + edit indicator

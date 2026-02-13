@@ -140,7 +140,7 @@ struct SplitTransactionView: View {
                     .frame(width: 50, height: 50)
 
                 Image.categorySymbol(categoryIcon)
-                    .font(.system(size: 22, weight: .semibold))
+                    .frame(width: 22, height: 22)
                     .foregroundStyle(categoryColor)
             }
 
@@ -516,24 +516,7 @@ struct SplitTransactionView: View {
     }
 
     private var categoryIcon: String {
-        switch transaction.category.lowercased() {
-        case "meat_fish": return "fish.fill"
-        case "alcohol": return "wineglass.fill"
-        case "drinks": return "cup.and.saucer.fill"
-        case "fresh_produce": return "leaf.fill"
-        case "dairy_eggs": return "carton.fill"
-        case "bakery": return "birthday.cake.fill"
-        case "frozen_foods": return "snowflake"
-        case "pantry_staples": return "cabinet.fill"
-        case "snacks_sweets": return "birthday.cake.fill"
-        case "prepared_meals", "ready_meals": return "takeoutbag.and.cup.and.straw.fill"
-        case "condiments_sauces": return "drop.fill"
-        case "household": return "house.fill"
-        case "personal_care": return "heart.fill"
-        case "baby_products": return "figure.child"
-        case "pet_supplies": return "pawprint.fill"
-        default: return "bag.fill"
-        }
+        transaction.category.categoryIcon
     }
 
     // MARK: - Custom Split Helpers

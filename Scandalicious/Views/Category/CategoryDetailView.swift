@@ -149,8 +149,8 @@ struct CategoryDetailView: View {
     private var emptyView: some View {
         VStack(spacing: 20) {
             Image.categorySymbol(category.icon)
-                .font(.system(size: 40, weight: .medium))
-                .foregroundColor(category.color)
+                .frame(width: 40, height: 40)
+                .foregroundStyle(category.color)
 
             Text("No Items Found")
                 .font(.system(size: 20, weight: .bold))
@@ -199,9 +199,8 @@ struct CategoryDetailView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
                     Image.categorySymbol(category.icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(category.color)
-                        .frame(width: 24)
+                        .foregroundStyle(category.color)
+                        .frame(width: 20, height: 20)
 
                     Text(category.name)
                         .font(.system(size: 20, weight: .bold, design: .rounded))

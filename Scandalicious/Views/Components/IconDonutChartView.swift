@@ -357,7 +357,7 @@ struct IconDonutChartView: View {
                 if let icon = centerIcon, let label = centerLabel {
                     VStack(spacing: 8) {
                         Image.categorySymbol(icon)
-                            .font(.system(size: size * 0.18, weight: .semibold))
+                            .frame(width: size * 0.18, height: size * 0.18)
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [

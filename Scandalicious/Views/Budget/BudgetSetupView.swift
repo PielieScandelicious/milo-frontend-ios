@@ -264,9 +264,9 @@ struct BudgetSetupView: View {
                     .fill(target.category.categoryColor.opacity(0.12))
                     .frame(width: 38, height: 38)
 
-                Image(systemName: target.category.categoryIcon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(target.category.categoryColor)
+                Image.categorySymbol(target.category.categoryIcon)
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(target.category.categoryColor)
             }
 
             // Name
@@ -536,9 +536,9 @@ struct CategoryPickerSheet: View {
                                             .fill(category.categoryColor.opacity(0.15))
                                             .frame(width: 38, height: 38)
 
-                                        Image(systemName: category.categoryIcon)
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(category.categoryColor)
+                                        Image.categorySymbol(category.categoryIcon)
+                                            .frame(width: 16, height: 16)
+                                            .foregroundStyle(category.categoryColor)
                                     }
 
                                     Text(category.normalizedCategoryName)

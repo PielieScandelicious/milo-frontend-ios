@@ -39,180 +39,20 @@ extension String {
     }
 }
 
-// MARK: - Category Icon Lookup
+// MARK: - Category Icon Lookup (Phosphor)
 extension String {
-    /// Get SF Symbol icon for a grocery category based on its name
+    /// Get Phosphor icon identifier for a grocery category based on its name.
+    /// Returns a Phosphor raw value string usable with `Image.categorySymbol()`.
     var categoryIcon: String {
-        let name = self.lowercased()
-
-        // Fresh Food
-        if name == "fruits" || name.contains("fruit") { return "custom.apple.fill" }
-        if name == "vegetables" || name.contains("veg") || name.contains("produce") { return "carrot.fill" }
-        if name == "seafood" || name.contains("seafood") || name.contains("fish") { return "fish.fill" }
-        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "custom.steak.fill" }
-        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "custom.cheese.fill" }
-        if name.contains("bakery") || name.contains("bread") { return "birthday.cake.fill" }
-
-        // Pantry & Frozen
-        if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "cabinet.fill" }
-        if name.contains("frozen") { return "snowflake" }
-        if name.contains("ready meal") || name.contains("prepared food") { return "takeoutbag.and.cup.and.straw.fill" }
-
-        // Snacks & Beverages
-        if name == "candy" || name.contains("candy") || name.contains("chocolate") || name.contains("sweet") { return "party.popper.fill" }
-        if name.contains("snack") { return "popcorn.fill" }
-        if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "mug.fill" }
-        if name.contains("beer") || name.contains("wine") || name.contains("alcohol") { return "wineglass.fill" }
-
-        // Household & Care
-        if name.contains("household consumable") || name.contains("paper/cleaning") { return "bubbles.and.sparkles.fill" }
-        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") { return "shower.fill" }
-
-        // Other
-        if name.contains("baby food") || name.contains("formula") { return "figure.and.child.holdinghands" }
-        if name.contains("pet food") || name.contains("pet supplies") { return "pawprint.fill" }
-        if name.contains("tobacco") { return "smoke.fill" }
-
-        // Legacy category names (for backward compatibility)
-        if name.contains("personal care") { return "shower.fill" }
-        if name.contains("household") { return "bubbles.and.sparkles.fill" }
-        if name.contains("pet") { return "pawprint.fill" }
-        if name.contains("baby") { return "figure.and.child.holdinghands" }
-        if name.contains("ready") || name.contains("meal") { return "takeoutbag.and.cup.and.straw.fill" }
-        if name.contains("drink") || name.contains("soda") || name.contains("soft") { return "mug.fill" }
-        if name.contains("water") { return "waterbottle.fill" }
-        if name.contains("sweet") { return "party.popper.fill" }
-        if name == "other" { return "tag.fill" }
-
-        return "tag.fill"
+        ExpenseCategory.from(name: self).phIconName
     }
 }
 
 // MARK: - Grocery Category Colors
 extension String {
-    /// Assigns premium, high-contrast colors to grocery categories
+    /// Assigns vibrant colors to grocery categories via the ExpenseCategory enum.
     var categoryColor: Color {
-        let categoryName = self.lowercased()
-
-        // Fruits - Vibrant Emerald Green
-        if categoryName == "fruits" || categoryName.contains("fruit") {
-            return Color(red: 0.18, green: 0.80, blue: 0.44)
-        }
-
-        // Vegetables - Fresh Teal Green
-        if categoryName == "vegetables" || categoryName.contains("vegetable") ||
-           categoryName.contains("salad") || categoryName.contains("produce") {
-            return Color(red: 0.20, green: 0.70, blue: 0.55)
-        }
-
-        // Seafood - Ocean Blue
-        if categoryName == "seafood" || categoryName.contains("seafood") ||
-           categoryName.contains("fish") || categoryName.contains("shrimp") {
-            return Color(red: 0.20, green: 0.55, blue: 0.85)
-        }
-
-        // Meat - Warm Amber Orange
-        if categoryName == "meat" || categoryName.contains("meat") ||
-           categoryName.contains("poultry") || categoryName.contains("chicken") ||
-           categoryName.contains("beef") {
-            return Color(red: 1.0, green: 0.58, blue: 0.20)
-        }
-
-        // Dairy - Electric Sky Blue
-        if categoryName.contains("dairy") || categoryName.contains("milk") ||
-           categoryName.contains("cheese") || categoryName.contains("yogurt") ||
-           categoryName.contains("egg") {
-            return Color(red: 0.25, green: 0.72, blue: 1.0)
-        }
-
-        // Bakery & Bread - Golden Yellow
-        if categoryName.contains("bakery") || categoryName.contains("bread") ||
-           categoryName.contains("pastry") || categoryName.contains("bake") {
-            return Color(red: 1.0, green: 0.78, blue: 0.22)
-        }
-
-        // Pantry - Warm Copper
-        if categoryName.contains("pantry") {
-            return Color(red: 0.85, green: 0.50, blue: 0.30)
-        }
-
-        // Frozen foods - Icy Cyan
-        if categoryName.contains("frozen") {
-            return Color(red: 0.40, green: 0.85, blue: 0.98)
-        }
-
-        // Ready meals - Sunset Orange
-        if categoryName.contains("ready") || categoryName.contains("prepared") {
-            return Color(red: 1.0, green: 0.50, blue: 0.30)
-        }
-
-        // Candy - Vivid Pink
-        if categoryName == "candy" || categoryName.contains("candy") ||
-           categoryName.contains("chocolate") || categoryName.contains("sweet") {
-            return Color(red: 0.92, green: 0.30, blue: 0.65)
-        }
-
-        // Snacks - Vivid Coral Red
-        if categoryName.contains("snack") || categoryName.contains("chips") ||
-           categoryName.contains("cookie") {
-            return Color(red: 1.0, green: 0.36, blue: 0.42)
-        }
-
-        // Beverages (Non-Alcoholic) - Bright Teal
-        if categoryName.contains("drink") || categoryName.contains("beverage") ||
-           categoryName.contains("juice") || categoryName.contains("water") {
-            return Color(red: 0.15, green: 0.82, blue: 0.78)
-        }
-
-        // Alcohol - Rich Burgundy
-        if categoryName.contains("alcohol") || categoryName.contains("beer") ||
-           categoryName.contains("wine") || categoryName.contains("spirit") {
-            return Color(red: 0.72, green: 0.15, blue: 0.30)
-        }
-
-        // Household & Cleaning - Royal Purple
-        if categoryName.contains("household") || categoryName.contains("cleaning") ||
-           categoryName.contains("detergent") || categoryName.contains("supplies") {
-            return Color(red: 0.55, green: 0.35, blue: 0.95)
-        }
-
-        // Personal Care - Vivid Magenta Pink
-        if categoryName.contains("personal") || categoryName.contains("care") ||
-           categoryName.contains("hygiene") || categoryName.contains("cosmetic") {
-            return Color(red: 0.95, green: 0.35, blue: 0.65)
-        }
-
-        // Baby & Kids - Soft Green
-        if categoryName.contains("baby") || categoryName.contains("formula") {
-            return Color(red: 0.40, green: 0.78, blue: 0.47)
-        }
-
-        // Pet Supplies - Muted Brown
-        if categoryName.contains("pet") {
-            return Color(red: 0.65, green: 0.55, blue: 0.40)
-        }
-
-        // Tobacco - Dark Red
-        if categoryName.contains("tobacco") {
-            return Color(red: 0.80, green: 0.20, blue: 0.20)
-        }
-
-        // "Other" category - Soft Steel
-        if categoryName == "other" {
-            return Color(red: 0.55, green: 0.58, blue: 0.65)
-        }
-
-        // Premium fallback colors for uncategorized items
-        let fallbackColors: [Color] = [
-            Color(red: 0.45, green: 0.70, blue: 0.95),   // Ocean blue
-            Color(red: 0.90, green: 0.55, blue: 0.35),   // Terracotta
-            Color(red: 0.65, green: 0.45, blue: 0.80),   // Lavender
-            Color(red: 0.35, green: 0.75, blue: 0.60),   // Jade
-        ]
-
-        // Use hash of category name to consistently assign same color
-        let hash = abs(categoryName.hashValue)
-        return fallbackColors[hash % fallbackColors.count]
+        ExpenseCategory.from(name: self).color
     }
 
     /// Returns hex color string for categories (for CategorySpendItem conversion)
@@ -223,105 +63,105 @@ extension String {
 
 // MARK: - Grocery Sub-Category Health Theming
 extension String {
-    /// Health-gradient color for grocery sub-categories (green=healthy → red=unhealthy).
+    /// Health-gradient color for grocery sub-categories (green=healthy -> red=unhealthy).
     /// Returns nil if this name is not a recognized grocery sub-category.
     var groceryHealthColor: Color? {
         let name = self.lowercased()
 
-        // Very healthy → emerald green
+        // Very healthy -> emerald green
         if name == "fruits" || name.contains("fruit") {
             return Color(red: 0.18, green: 0.80, blue: 0.44)
         }
-        // Very healthy → teal green
+        // Very healthy -> teal green
         if name == "vegetables" || name.contains("veg") || name.contains("produce") {
             return Color(red: 0.20, green: 0.78, blue: 0.50)
         }
-        // Healthy → soft green
+        // Healthy -> soft green
         if name.contains("baby food") || name.contains("formula") || name == "baby & kids" {
             return Color(red: 0.40, green: 0.78, blue: 0.47)
         }
-        // Healthy → teal-green
+        // Healthy -> teal-green
         if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" {
             return Color(red: 0.15, green: 0.78, blue: 0.68)
         }
-        // Healthy → blue-green
+        // Healthy -> blue-green
         if name.contains("dairy") || name.contains("cheese") || name.contains("egg") {
             return Color(red: 0.30, green: 0.75, blue: 0.65)
         }
-        // Moderately healthy → yellow-green
+        // Moderately healthy -> yellow-green
         if name == "meat" || name.contains("meat") || name.contains("poultry") {
             return Color(red: 0.55, green: 0.78, blue: 0.35)
         }
-        // Moderately healthy → blue-green
+        // Moderately healthy -> blue-green
         if name == "seafood" || name.contains("seafood") || name.contains("fish") {
             return Color(red: 0.40, green: 0.72, blue: 0.55)
         }
-        // Moderate → golden yellow
+        // Moderate -> golden yellow
         if name.contains("bakery") || name.contains("bread") {
             return Color(red: 0.92, green: 0.78, blue: 0.28)
         }
-        // Moderate → warm amber
+        // Moderate -> warm amber
         if name.contains("pantry") || name.contains("pasta") || name.contains("rice") {
             return Color(red: 0.88, green: 0.68, blue: 0.30)
         }
-        // Neutral → icy blue
+        // Neutral -> icy blue
         if name.contains("frozen") {
             return Color(red: 0.40, green: 0.80, blue: 0.95)
         }
-        // Non-food → muted brown
+        // Non-food -> muted brown
         if name.contains("pet food") || name.contains("pet supplies") || name == "pet supplies" {
             return Color(red: 0.65, green: 0.55, blue: 0.40)
         }
-        // Non-food → muted purple
+        // Non-food -> muted purple
         if name.contains("household consumable") || name.contains("paper/cleaning") || name == "household" {
             return Color(red: 0.58, green: 0.48, blue: 0.78)
         }
-        // Non-food → lavender pink
+        // Non-food -> lavender pink
         if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") || name == "personal care" {
             return Color(red: 0.75, green: 0.48, blue: 0.72)
         }
-        // Less healthy → orange
+        // Less healthy -> orange
         if name.contains("ready meal") || name.contains("prepared food") || name == "ready meals" {
             return Color(red: 1.0, green: 0.55, blue: 0.25)
         }
-        // Unhealthy → pink
+        // Unhealthy -> pink
         if name == "candy" || name.contains("candy") || name.contains("sweet") {
             return Color(red: 0.92, green: 0.30, blue: 0.65)
         }
-        // Unhealthy → coral red
+        // Unhealthy -> coral red
         if name.contains("snack") {
             return Color(red: 1.0, green: 0.36, blue: 0.36)
         }
-        // Very unhealthy → dark red
+        // Very unhealthy -> dark red
         if name.contains("tobacco") {
             return Color(red: 0.80, green: 0.20, blue: 0.20)
         }
         return nil
     }
 
-    /// Health-themed SF Symbol icon for grocery sub-categories.
+    /// Health-themed Phosphor icon identifier for grocery sub-categories.
     /// Returns nil if this name is not a recognized grocery sub-category.
     var groceryHealthIcon: String? {
         let name = self.lowercased()
-        if name == "fruits" || name.contains("fruit") { return "custom.apple.fill" }
-        if name == "vegetables" || name.contains("veg") || name.contains("produce") { return "carrot.fill" }
-        if name == "seafood" || name.contains("seafood") || name.contains("fish") { return "fish.fill" }
-        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "custom.steak.fill" }
-        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "custom.cheese.fill" }
-        if name.contains("bakery") || name.contains("bread") { return "birthday.cake.fill" }
-        if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "cabinet.fill" }
+        if name == "fruits" || name.contains("fruit") { return "apple-logo" }
+        if name == "vegetables" || name.contains("veg") || name.contains("produce") { return "carrot" }
+        if name == "seafood" || name.contains("seafood") || name.contains("fish") { return "fish" }
+        if name == "meat" || name.contains("meat") || name.contains("poultry") { return "bone" }
+        if name.contains("dairy") || name.contains("cheese") || name.contains("egg") { return "cheese" }
+        if name.contains("bakery") || name.contains("bread") { return "bread" }
+        if name.contains("pantry") || name.contains("pasta") || name.contains("rice") { return "grains" }
         if name.contains("frozen") { return "snowflake" }
-        if name == "candy" || name.contains("candy") || name.contains("sweet") || name.contains("confectionery") { return "party.popper.fill" }
-        if name.contains("snack") { return "popcorn.fill" }
-        if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "mug.fill" }
-        if name.contains("alcohol") || name.contains("beer") || name.contains("wine") || name.contains("spirit") { return "wineglass.fill" }
-        if name.contains("baby food") || name.contains("formula") || name.contains("baby") { return "figure.and.child.holdinghands" }
-        if name.contains("pet food") || name.contains("pet supplies") || name.contains("pet") { return "pawprint.fill" }
-        if name.contains("household") || name.contains("paper/cleaning") || name.contains("cleaning") { return "bubbles.and.sparkles.fill" }
-        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") || name == "personal care" { return "shower.fill" }
-        if name.contains("ready meal") || name.contains("prepared food") || name == "ready meals" { return "takeoutbag.and.cup.and.straw.fill" }
-        if name.contains("tobacco") { return "smoke.fill" }
-        if name == "other" { return "tag.fill" }
+        if name == "candy" || name.contains("candy") || name.contains("sweet") || name.contains("confectionery") { return "cookie" }
+        if name.contains("snack") { return "popcorn" }
+        if name.contains("beverage") || name.contains("non-alcoholic") || name == "drinks" { return "orange-slice" }
+        if name.contains("alcohol") || name.contains("beer") || name.contains("wine") || name.contains("spirit") { return "wine" }
+        if name.contains("baby food") || name.contains("formula") || name.contains("baby") { return "baby" }
+        if name.contains("pet food") || name.contains("pet supplies") || name.contains("pet") { return "paw-print" }
+        if name.contains("household") || name.contains("paper/cleaning") || name.contains("cleaning") { return "sparkle" }
+        if name.contains("hygiene") || name.contains("soap") || name.contains("shampoo") || name == "personal care" { return "pill" }
+        if name.contains("ready meal") || name.contains("prepared food") || name == "ready meals" { return "pizza" }
+        if name.contains("tobacco") { return "cigarette" }
+        if name == "other" { return "tag" }
         return nil
     }
 }
