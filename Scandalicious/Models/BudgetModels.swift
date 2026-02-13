@@ -139,8 +139,17 @@ struct CategoryBudgetProgress: Identifiable {
     let category: String
     let budgetAmount: Double
     let currentSpend: Double
+    let isOverBudget: Bool
 
     var id: String { category }
+
+    init(category: String, budgetAmount: Double, currentSpend: Double, isOverBudget: Bool? = nil) {
+        self.category = category
+        self.budgetAmount = budgetAmount
+        self.currentSpend = currentSpend
+        // Use provided value (from backend) or compute locally
+        self.isOverBudget = isOverBudget ?? ((currentSpend * 100).rounded() > (budgetAmount * 100).rounded())
+    }
 
     var remainingAmount: Double {
         max(0, budgetAmount - currentSpend)
@@ -148,11 +157,32 @@ struct CategoryBudgetProgress: Identifiable {
 
     var spendRatio: Double {
         guard budgetAmount > 0 else { return 0 }
-        return currentSpend / budgetAmount
+        // Round to cents before dividing to avoid floating-point artifacts
+        let spendCents = (currentSpend * 100).rounded()
+        let budgetCents = (budgetAmount * 100).rounded()
+        return spendCents / budgetCents
     }
 
-    var isOverBudget: Bool {
-        currentSpend > budgetAmount
+    /// The percentage as displayed (integer-rounded), used for color rules:
+    ///   0-84  → green (safe)
+    ///  85-99  → orange (warning)
+    ///   100+  → red (at or over budget)
+    ///
+    /// When the displayed euro amounts (rounded to whole euros) show the same
+    /// value (e.g. "€15 / €15"), the percentage is forced to 100% so the
+    /// display is consistent.
+    var displayedPercent: Int {
+        let rawPercent = Int((min(spendRatio, 9.99) * 100).rounded())
+        let displayedSpend = Int(currentSpend.rounded())
+        let displayedBudget = Int(budgetAmount.rounded())
+        if displayedSpend >= displayedBudget && rawPercent < 100 {
+            return 100
+        }
+        return rawPercent
+    }
+
+    var isWarning: Bool {
+        !isOverBudget && displayedPercent >= 85 && displayedPercent < 100
     }
 
     var overAmount: Double {
@@ -258,7 +288,7 @@ struct BudgetProgressResponse: Codable {
     func toBudgetProgress() -> BudgetProgress {
         BudgetProgress(
             budget: budget,
-            currentSpend: currentSpend,
+            currentSpend: (currentSpend * 100).rounded() / 100,
             daysElapsed: daysElapsed,
             daysInMonth: daysInMonth,
             categoryProgress: categoryProgress.map { $0.toCategoryBudgetProgress() }
@@ -288,10 +318,14 @@ struct CategoryProgressResponse: Codable {
     }
 
     func toCategoryBudgetProgress() -> CategoryBudgetProgress {
-        CategoryBudgetProgress(
+        let roundedSpent = (spentAmount * 100).rounded() / 100
+        let roundedLimit = (limitAmount * 100).rounded() / 100
+        print("[BudgetDebug] \(name): API spent=\(spentAmount) limit=\(limitAmount) → rounded spent=\(roundedSpent) limit=\(roundedLimit) isOver=\(isOverBudget)")
+        return CategoryBudgetProgress(
             category: name,
-            budgetAmount: limitAmount,
-            currentSpend: spentAmount
+            budgetAmount: roundedLimit,
+            currentSpend: roundedSpent,
+            isOverBudget: isOverBudget
         )
     }
 
@@ -299,8 +333,8 @@ struct CategoryProgressResponse: Codable {
         BudgetProgressItem(
             categoryId: categoryId,
             name: name,
-            limitAmount: limitAmount,
-            spentAmount: spentAmount,
+            limitAmount: (limitAmount * 100).rounded() / 100,
+            spentAmount: (spentAmount * 100).rounded() / 100,
             isOverBudget: isOverBudget,
             overBudgetAmount: overBudgetAmount
         )
@@ -356,7 +390,9 @@ struct BudgetProgressItem: Codable, Identifiable {
 
     var progressRatio: Double {
         guard limitAmount > 0 else { return 0 }
-        return spentAmount / limitAmount
+        let spendCents = (spentAmount * 100).rounded()
+        let limitCents = (limitAmount * 100).rounded()
+        return spendCents / limitCents
     }
 
     var clampedProgress: Double {
