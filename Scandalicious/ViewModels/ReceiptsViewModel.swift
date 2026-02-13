@@ -25,9 +25,12 @@ class ReceiptsViewModel: ObservableObject {
     /// Load receipts for a given period and optional store filter
     /// Pass "All" as period to load all receipts without date filtering
     func loadReceipts(period: String, storeName: String? = nil, reset: Bool = true) async {
+        let hadExistingData = !receipts.isEmpty
         if reset {
-            state = .loading
-            receipts = []
+            // Only show loading skeleton if no existing data (avoids flash during refresh)
+            if !hadExistingData {
+                state = .loading
+            }
             currentPage = 1
         }
 
@@ -52,7 +55,9 @@ class ReceiptsViewModel: ObservableObject {
             let response = try await apiService.fetchReceipts(filters: filters)
 
             if reset {
-                receipts = response.receipts
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    receipts = response.receipts
+                }
             } else {
                 receipts.append(contentsOf: response.receipts)
             }

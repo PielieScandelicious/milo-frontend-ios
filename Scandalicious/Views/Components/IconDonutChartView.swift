@@ -86,11 +86,17 @@ struct IconDonutChartView: View {
         return visibleSegments + [othersSegment]
     }
 
-    /// Track structural data changes (labels/count) to trigger re-animation.
+    /// Track structural data changes (labels/count) to trigger full re-animation.
     /// Uses labels instead of values so backend refresh with same categories won't restart animation.
     private var dataFingerprint: String {
         let labelFingerprint = displayData.map { $0.label }.joined(separator: "-")
         return "\(displayData.count)-\(labelFingerprint)-\(showAllSegments)"
+    }
+
+    /// Track value changes (amounts) for smooth segment proportion animation.
+    /// Changes when same stores/categories have updated amounts after sync.
+    private var valueFingerprint: String {
+        displayData.map { String(format: "%.2f", $0.value) }.joined(separator: "-")
     }
 
     /// Skip animation for small charts (store cards) to improve swipe performance
@@ -242,6 +248,7 @@ struct IconDonutChartView: View {
                     )
                 }
             }
+            .animation(.easeInOut(duration: 0.35), value: valueFingerprint) // Animate trim changes when proportions update
             .rotationEffect(.degrees(-90 + (shouldAnimate ? appearanceRotation : 0))) // Start from top + entrance spin
             .scaleEffect(shouldAnimate ? appearanceScale : 1.0)
 
