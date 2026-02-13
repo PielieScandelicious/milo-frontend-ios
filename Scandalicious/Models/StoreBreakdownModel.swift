@@ -256,11 +256,11 @@ class StoreDataManager: ObservableObject {
             }
 
             await MainActor.run {
-                // Update breakdowns for this specific period (don't replace all)
-                // First remove existing breakdowns for this period
-                self.storeBreakdowns.removeAll { $0.period == periodKey }
-                // Then add the new breakdowns
-                self.storeBreakdowns.append(contentsOf: breakdowns)
+                // Atomic replacement: build the new array first, then assign once
+                // to avoid an intermediate empty state that causes UI flicker
+                var updated = self.storeBreakdowns.filter { $0.period != periodKey }
+                updated.append(contentsOf: breakdowns)
+                self.storeBreakdowns = updated
 
                 // Update period aggregations
                 self.periodTotalSpends[periodKey] = summary.totalSpend
@@ -279,11 +279,14 @@ class StoreDataManager: ObservableObject {
                         storeCount: (summary.stores ?? []).count,
                         transactionCount: summary.transactionCount ?? 0,
                         totalItems: existingMetadata.totalItems,
-                        averageHealthScore: summary.averageHealthScore
+                        averageHealthScore: summary.averageHealthScore ?? existingMetadata.averageHealthScore
                     )
                 }
 
-                self.averageHealthScore = summary.averageHealthScore
+                // Only update health score if the summary includes one (preserve existing)
+                if let newScore = summary.averageHealthScore {
+                    self.averageHealthScore = newScore
+                }
                 self.isLoading = false
                 self.isRefreshing = false
                 self.lastFetchDate = Date()
@@ -444,9 +447,10 @@ class StoreDataManager: ObservableObject {
                 // Mark this period as loaded
                 self.loadedPeriods.insert(periodString)
 
-                // Update health score if this is the current period
-                if let metadata = self.periodMetadata.first, metadata.period == periodString {
-                    self.averageHealthScore = summary.averageHealthScore
+                // Update health score if this is the current period (only if new value exists)
+                if let metadata = self.periodMetadata.first, metadata.period == periodString,
+                   let newScore = summary.averageHealthScore {
+                    self.averageHealthScore = newScore
                 }
 
                 self.isRefreshing = false

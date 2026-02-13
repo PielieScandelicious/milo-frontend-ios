@@ -47,11 +47,9 @@ struct OverviewView: View {
     // Track if refreshWithRetry is currently running to prevent duplicate calls
     @State private var isRefreshWithRetryRunning = false
 
-    // Track when syncing just completed to show "Synced" confirmation
-    @State private var showSyncedConfirmation = false
-
-    // Track manual sync triggered by user tapping the sync button
+    // Track manual sync triggered by pull-to-refresh
     @State private var isManuallySyncing = false
+    @State private var showSyncedConfirmation = false
 
     @State private var selectedPeriod: String = {
         let dateFormatter = DateFormatter()
@@ -245,10 +243,17 @@ struct OverviewView: View {
     /// Called once when data loads or sort changes
     /// Includes guard to prevent redundant rebuilds
     private func rebuildBreakdownCache() {
-        // Compute hash of current breakdowns to detect actual changes
-        let currentHash = dataManager.storeBreakdowns.hashValue
+        // Compute hash that includes actual values (not just IDs)
+        // StoreBreakdown.hashValue only hashes id (storeName-period), missing spend amounts
+        var hasher = Hasher()
+        for b in dataManager.storeBreakdowns {
+            hasher.combine(b.id)
+            hasher.combine(b.totalStoreSpend)
+            hasher.combine(b.visitCount)
+        }
+        let currentHash = hasher.finalize()
 
-        // Skip rebuild if nothing changed
+        // Skip rebuild if nothing changed (structure AND values)
         if currentHash == lastBreakdownsHash && !cachedBreakdownsByPeriod.isEmpty {
             // Only update displayedBreakdowns if period changed
             if displayedBreakdownsPeriod != selectedPeriod {
@@ -277,15 +282,19 @@ struct OverviewView: View {
 
         // Batch all state updates together to minimize re-renders
         cachedBreakdownsByPeriod = newCache
+
+        // Rebuild segment/chart caches immediately for the selected period
+        // (avoids momentary empty state that causes pie chart flicker)
+        let segments = computeStoreSegments(for: selectedPeriod)
+        cachedSegmentsByPeriod = [selectedPeriod: segments]
+        cachedChartDataByPeriod = [selectedPeriod: segments.toIconChartData()]
+
+        // Update displayed breakdowns (animation provided by caller)
         displayedBreakdowns = newCache[selectedPeriod] ?? []
         displayedBreakdownsPeriod = selectedPeriod
 
         // Also update available periods cache
         updateAvailablePeriodsCache()
-
-        // Clear segment and chart data caches when breakdowns change (will be rebuilt lazily)
-        cachedSegmentsByPeriod.removeAll()
-        cachedChartDataByPeriod.removeAll()
     }
 
     /// Update cache for a specific period only
@@ -303,10 +312,12 @@ struct OverviewView: View {
         cachedSegmentsByPeriod[period] = segments
         cachedChartDataByPeriod[period] = segments.toIconChartData()
 
-        // Update displayedBreakdowns if this is the selected period
+        // Animate displayed breakdowns update for smooth data transition
         if period == selectedPeriod {
-            displayedBreakdowns = breakdowns
-            displayedBreakdownsPeriod = period
+            withAnimation(.easeInOut(duration: 0.3)) {
+                displayedBreakdowns = breakdowns
+                displayedBreakdownsPeriod = period
+            }
         }
     }
 
@@ -462,8 +473,15 @@ struct OverviewView: View {
                 rebuildBreakdownCache()
             }
             .onChange(of: dataManager.storeBreakdowns) { _, _ in
-                rebuildBreakdownCache()
-                cacheSegmentsForPeriod(selectedPeriod)
+                // Skip cache rebuild during manual sync to prevent flash of empty state
+                // (refreshData temporarily clears breakdowns before adding new ones)
+                guard !isManuallySyncing else { return }
+                // Wrap in animation so donut chart trim values and segment proportions
+                // animate smoothly instead of snapping during data refresh
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    rebuildBreakdownCache()
+                    cacheSegmentsForPeriod(selectedPeriod)
+                }
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active { checkForShareExtensionUploads() }
@@ -604,63 +622,48 @@ struct OverviewView: View {
             // Refresh current month data
             await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
 
-            // Invalidate caches that are affected by the new receipt:
-            // 1. Year summary in AppDataCache (new receipt changes year totals)
+            // Invalidate DISK caches (backend source of truth changed)
+            // Keep in-memory display caches alive to avoid flash - they'll be replaced with fresh data
             AppDataCache.shared.yearSummaryCache.removeValue(forKey: currentYear)
-
-            // 2. Pie chart cache for current month (categories may change)
-            pieChartSummaryCache.removeValue(forKey: currentMonthPeriod)
             AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: currentMonthPeriod)
-
-            // 3. Category items cache for current month (transactions changed)
             let keysToRemove = AppDataCache.shared.categoryItemsCache.keys.filter { $0.hasPrefix("\(currentMonthPeriod)|") }
             for key in keysToRemove {
                 AppDataCache.shared.categoryItemsCache.removeValue(forKey: key)
             }
-
-            // 4. Receipts cache for current month (new receipt added)
             AppDataCache.shared.invalidateReceipts(for: currentMonthPeriod)
 
-            // 5. Clear in-memory category items (transactions changed)
-            categoryItems.removeAll()
-
-            // 6. Refresh period metadata (totals and receipt counts change)
+            // Refresh period metadata (totals and receipt counts change)
             await dataManager.fetchPeriodMetadata()
 
-            // 7. Update available periods with fresh metadata (may include new periods)
+            // Update available periods with fresh metadata (may include new periods)
             await MainActor.run {
                 updateAvailablePeriodsCache()
             }
 
-            // 8. Always reload receipts for current month from backend and update cache
+            // Reload receipts for current month from backend and update cache
             await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
             if !receiptsViewModel.receipts.isEmpty {
                 AppDataCache.shared.updateReceipts(for: currentMonthPeriod, receipts: receiptsViewModel.receipts)
             }
 
-            // 9. Re-fetch data if user is currently viewing an affected period
+            // Re-fetch data if user is currently viewing an affected period
             if selectedPeriod == currentMonthPeriod {
                 updateDisplayedBreakdowns()
-                // Re-fetch pie chart / category data (was invalidated in step 2 above)
-                await fetchCategoryData(for: currentMonthPeriod)
+                // Force re-fetch pie chart / category data - new data replaces old seamlessly
+                await fetchCategoryData(for: currentMonthPeriod, force: true)
+                // Clear stale expanded category items (fresh data loaded above)
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        categoryItems.removeAll()
+                    }
+                }
+            } else {
+                // Not viewing affected period - safe to clear in-memory caches
+                pieChartSummaryCache.removeValue(forKey: currentMonthPeriod)
+                categoryItems.removeAll()
             }
 
             await rateLimitManager.syncFromBackend()
-
-            // Show "Synced" confirmation briefly
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showSyncedConfirmation = true
-                }
-            }
-
-            // Hide "Synced" confirmation after 2 seconds
-            try? await Task.sleep(for: .seconds(2))
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showSyncedConfirmation = false
-                }
-            }
         }
     }
 
@@ -677,21 +680,16 @@ struct OverviewView: View {
             // Also refresh the period metadata to get updated totals
             await dataManager.fetchPeriodMetadata()
 
-            // Invalidate year and all-time caches (deletion affects aggregates)
+            // Invalidate disk caches (keep in-memory display data to avoid flash)
             let deletedYear = String(affectedPeriod.suffix(4))
             if deletedYear.count == 4 && deletedYear.allSatisfy({ $0.isNumber }) {
                 AppDataCache.shared.yearSummaryCache.removeValue(forKey: deletedYear)
             }
-            // Invalidate pie chart and category caches for the affected period
-            pieChartSummaryCache.removeValue(forKey: affectedPeriod)
             AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: affectedPeriod)
-
-            // Invalidate category items cache for affected period
             let categoryKeysToRemove = AppDataCache.shared.categoryItemsCache.keys.filter { $0.hasPrefix("\(affectedPeriod)|") }
             for key in categoryKeysToRemove {
                 AppDataCache.shared.categoryItemsCache.removeValue(forKey: key)
             }
-            categoryItems.removeAll()
 
             // Update available periods with fresh metadata (period may have been emptied)
             await MainActor.run {
@@ -704,8 +702,13 @@ struct OverviewView: View {
                 cacheSegmentsForPeriod(affectedPeriod)
             }
 
-            // Re-fetch pie chart data for the affected period
-            await fetchCategoryData(for: affectedPeriod)
+            // Force re-fetch pie chart data, then clear stale expanded category items
+            await fetchCategoryData(for: affectedPeriod, force: true)
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    categoryItems.removeAll()
+                }
+            }
         }
     }
 
@@ -810,16 +813,22 @@ struct OverviewView: View {
 
     /// Fetches category breakdown data for a given period
     /// Used for the flippable pie chart back side
-    private func fetchCategoryData(for period: String) async {
-        // Skip if already cached
-        guard pieChartSummaryCache[period] == nil else { return }
+    private func fetchCategoryData(for period: String, force: Bool = false) async {
+        // Skip if already cached (unless forced refresh)
+        if !force {
+            guard pieChartSummaryCache[period] == nil else { return }
+        }
 
         // Parse period string to get month/year
         let components = parsePeriodComponents(period)
         guard components.month > 0 && components.year > 0 else { return }
 
-        await MainActor.run {
-            isLoadingCategoryData = true
+        // Only show loading skeleton if no existing data (avoids flash during refresh)
+        let hasExistingData = pieChartSummaryCache[period] != nil
+        if !hasExistingData {
+            await MainActor.run {
+                isLoadingCategoryData = true
+            }
         }
 
         do {
@@ -829,8 +838,10 @@ struct OverviewView: View {
             )
 
             await MainActor.run {
-                pieChartSummaryCache[period] = response
-                isLoadingCategoryData = false
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    pieChartSummaryCache[period] = response
+                    isLoadingCategoryData = false
+                }
 
                 // Sync to disk cache
                 AppDataCache.shared.updatePieChartSummary(for: period, summary: response)
@@ -1068,31 +1079,14 @@ struct OverviewView: View {
             isReceiptUploading = false
             isRefreshWithRetryRunning = false
 
-            // Show "Synced" confirmation briefly
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showSyncedConfirmation = true
-            }
-
-            // Keep period in loadedReceiptPeriods to prevent duplicate loads
-            // The loadReceipts call with reset:true will refresh the data
-
             // Notify other views that share extension sync is complete
             NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
 
             // Always update displayed breakdowns to ensure UI reflects latest data
-            // The filter inside updateDisplayedBreakdowns will handle period matching
             updateDisplayedBreakdowns()
 
             // Update refresh time for "Updated X ago" display
             lastRefreshTime = Date()
-        }
-
-        // Hide "Synced" confirmation after 2 seconds
-        try? await Task.sleep(for: .seconds(2))
-        await MainActor.run {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showSyncedConfirmation = false
-            }
         }
 
         // Reload receipts for current month if it's the selected period
@@ -1101,54 +1095,58 @@ struct OverviewView: View {
         }
     }
 
-    /// Manual sync triggered by user tapping the sync button
+    /// Manual sync triggered by pull-to-refresh — only refreshes the current period
     private func manualSync() async {
-        // Prevent duplicate syncs
-        guard !isManuallySyncing && !isReceiptUploading && !dataManager.isLoading else { return }
-
-        await MainActor.run {
-            isManuallySyncing = true
-            showSyncedConfirmation = false
+        // isManuallySyncing is already set by .refreshable before this Task starts
+        guard !isReceiptUploading && !dataManager.isLoading else {
+            await MainActor.run { isManuallySyncing = false }
+            return
         }
+
+        let syncStart = Date()
 
         let periodToSync = selectedPeriod
 
-        // Refresh store breakdowns for selected period
+        // Refresh store breakdowns for selected period only
         await dataManager.refreshData(for: .month, periodString: periodToSync)
 
-        // Refresh period metadata (totals, receipt counts)
-        await dataManager.fetchPeriodMetadata()
-
-        // Invalidate and re-fetch category data
-        pieChartSummaryCache.removeValue(forKey: periodToSync)
+        // Refresh category data for this period
         AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: periodToSync)
-        categoryItems.removeAll()
-        await fetchCategoryData(for: periodToSync)
+        await fetchCategoryData(for: periodToSync, force: true)
+        await MainActor.run {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                categoryItems.removeAll()
+            }
+        }
 
-        // Reload receipts
+        // Reload receipts for this period
         await receiptsViewModel.loadReceipts(period: periodToSync, storeName: nil, reset: true)
         if !receiptsViewModel.receipts.isEmpty {
             AppDataCache.shared.updateReceipts(for: periodToSync, receipts: receiptsViewModel.receipts)
         }
 
-        // Sync rate limit
-        await rateLimitManager.syncFromBackend()
+        // Ensure "Syncing" label is visible for at least 1.5s
+        let elapsed = Date().timeIntervalSince(syncStart)
+        let minimumSyncingDuration: TimeInterval = 1.5
+        if elapsed < minimumSyncingDuration {
+            try? await Task.sleep(for: .seconds(minimumSyncingDuration - elapsed))
+        }
 
-        // Update UI
+        // Transition to "Synced" — rebuild caches with fresh data
         await MainActor.run {
-            updateAvailablePeriodsCache()
-            updateDisplayedBreakdowns()
+            withAnimation(.easeInOut(duration: 0.35)) {
+                rebuildBreakdownCache()
+                cacheSegmentsForPeriod(selectedPeriod)
+            }
             lastRefreshTime = Date()
             isManuallySyncing = false
-
-            // Show "Synced" confirmation + haptic
             withAnimation(.easeInOut(duration: 0.3)) {
                 showSyncedConfirmation = true
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
 
-        // Hide "Synced" after 2 seconds
+        // Auto-hide "Synced" after 2 seconds
         try? await Task.sleep(for: .seconds(2))
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.3)) {
@@ -1255,6 +1253,14 @@ struct OverviewView: View {
         .coordinateSpace(name: "scrollView")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
             scrollOffset = max(0, value)
+        }
+        .refreshable {
+            // Set syncing flag immediately so the UI doesn't flash during refresh
+            isManuallySyncing = true
+            showSyncedConfirmation = false
+            // Fire the actual sync work in a non-cancellable task so .refreshable
+            // dismissal doesn't kill the minimum display time for the syncing sequence
+            Task { await manualSync() }
         }
     }
 
@@ -2328,7 +2334,7 @@ struct OverviewView: View {
         .padding(.horizontal, 20)
     }
 
-    /// Spending header: amount + syncing
+    /// Spending header: amount + syncing status
     private func spendingHeaderSection(spending: Double) -> some View {
         VStack(spacing: 8) {
             Text("SPENT THIS MONTH")
@@ -2343,7 +2349,7 @@ struct OverviewView: View {
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
 
             syncingIndicator()
-                .animation(.easeInOut(duration: 0.3), value: isSyncingActive)
+                .animation(.easeInOut(duration: 0.3), value: isManuallySyncing)
                 .animation(.easeInOut(duration: 0.3), value: showSyncedConfirmation)
         }
         .padding(.top, 20)
@@ -2351,16 +2357,10 @@ struct OverviewView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Whether any sync operation is in progress
-    private var isSyncingActive: Bool {
-        isManuallySyncing || (isCurrentPeriod && (dataManager.isLoading || isReceiptUploading))
-    }
-
-    /// Interactive sync button - tappable idle state, animated syncing state, green synced state
+    /// Syncing status shown during pull-to-refresh
     @ViewBuilder
     private func syncingIndicator() -> some View {
-        if isSyncingActive {
-            // Syncing state: blue spinning arrows + label
+        if isManuallySyncing {
             HStack(spacing: 4) {
                 SyncingArrowsView()
                     .font(.system(size: 11))
@@ -2370,7 +2370,6 @@ struct OverviewView: View {
             .foregroundColor(.blue)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
         } else if showSyncedConfirmation {
-            // Synced state: green checkmark + label
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11))
@@ -2379,23 +2378,9 @@ struct OverviewView: View {
             }
             .foregroundColor(.green)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
-        } else {
-            // Idle state: subtle tappable sync button
-            Button {
-                Task { await manualSync() }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 11, weight: .medium))
-                    Text("Sync")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundColor(.white.opacity(0.35))
-            }
-            .buttonStyle(.plain)
-            .transition(.opacity.combined(with: .scale(scale: 0.9)))
         }
     }
+
 
     /// Flip hint label
     private func flipHintLabel() -> some View {
@@ -2674,16 +2659,17 @@ struct OverviewView: View {
             flippableChartSection(period: period, segments: segments)
                 .id("chart-\(period)")
                 .transition(.identity)
+                .animation(.easeInOut(duration: 0.35), value: segments.count)
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
             }
 
-            if isPieChartFlipped, let score = healthScore {
-                CompactNutriBadge(score: score)
+            if isPieChartFlipped {
+                CompactNutriBadge(score: healthScore ?? 0)
                     .padding(.top, 12)
                     .padding(.bottom, 8)
-                    .transition(.opacity)
+                    .opacity(healthScore != nil ? 1 : 0)
             }
 
             rowsSection(
