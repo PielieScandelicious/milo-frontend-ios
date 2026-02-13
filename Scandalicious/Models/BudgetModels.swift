@@ -27,6 +27,10 @@ struct UserBudget: Codable, Identifiable {
         case updatedAt = "updated_at"
     }
 
+    var hasTotalBudget: Bool {
+        monthlyAmount > 0
+    }
+
     init(id: String, userId: String, monthlyAmount: Double, categoryAllocations: [CategoryAllocation]? = nil, isSmartBudget: Bool = true, createdAt: String = "", updatedAt: String = "") {
         self.id = id
         self.userId = userId
@@ -65,6 +69,10 @@ struct BudgetProgress {
     let daysElapsed: Int
     let daysInMonth: Int
     let categoryProgress: [CategoryBudgetProgress]
+
+    var hasTotalBudget: Bool {
+        budget.hasTotalBudget
+    }
 
     var remainingBudget: Double {
         max(0, budget.monthlyAmount - currentSpend)
