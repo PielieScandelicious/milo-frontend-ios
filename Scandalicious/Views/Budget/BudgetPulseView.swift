@@ -1308,7 +1308,7 @@ struct BudgetPulseView: View {
                 isExpanded.toggle()
             }
         }) {
-            HStack(spacing: isExpanded ? 0 : 14) {
+            HStack(spacing: 14) {
                 if !isExpanded {
                     MiniBudgetRing(
                         spendRatio: progress.spendRatio,
