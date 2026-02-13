@@ -203,7 +203,7 @@ struct ScanTab: View {
 
 // MARK: - ScandaLicious Tab
 struct ScandaLiciousTab: View {
-    @ObservedObject private var rateLimitManager = RateLimitManager.shared
+    @ObservedObject private var syncManager = AppSyncManager.shared
     @State private var isTabVisible = false
 
     var body: some View {
@@ -213,16 +213,15 @@ struct ScandaLiciousTab: View {
         }
         .overlay(alignment: .top) {
             VStack {
-                if isTabVisible && rateLimitManager.isReceiptUploading {
+                if isTabVisible && syncManager.syncState == .syncing {
                     syncingStatusBanner
                         .transition(.move(edge: .top).combined(with: .opacity))
-                } else if isTabVisible && rateLimitManager.showReceiptSynced {
+                } else if isTabVisible && syncManager.syncState == .synced {
                     syncedStatusBanner
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: syncManager.syncState)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
         }
         .onAppear {

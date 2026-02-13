@@ -12,6 +12,7 @@ struct ReceiptScanView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject private var rateLimitManager = RateLimitManager.shared
+    @ObservedObject private var syncManager = AppSyncManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @State private var showCamera = false
@@ -26,11 +27,7 @@ struct ReceiptScanView: View {
     @State private var showRateLimitAlert = false
     @State private var showCaptureSuccess = false
     @State private var showProfile = false
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var lastCheckedUploadTimestamp: TimeInterval = 0
 
-    // Syncing status for top banner
-    @State private var isSyncing = false
     @State private var isTabVisible = false
     @State private var contentOpacity: Double = 0
 
@@ -84,6 +81,19 @@ struct ReceiptScanView: View {
                     profileMenuButton
                 }
             }
+        }
+        .overlay(alignment: .top) {
+            VStack {
+                if isTabVisible && syncManager.syncState == .syncing {
+                    syncingStatusBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                } else if isTabVisible && syncManager.syncState == .synced {
+                    syncedStatusBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: syncManager.syncState)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
         }
         .onAppear {
             isTabVisible = true
@@ -175,30 +185,14 @@ struct ReceiptScanView: View {
             Text(rateLimitManager.receiptLimitMessage ?? "You've used all your receipt uploads for this month. Your limit will reset soon.")
         }
         .onAppear {
-            // Initialize lastCheckedUploadTimestamp to current value to avoid retriggering old uploads
-            initializeLastCheckedTimestamp()
             // Sync rate limit when view appears to ensure we have latest count
             Task {
                 await rateLimitManager.syncFromBackend()
             }
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            // Check for share extension uploads when app becomes active
-            if newPhase == .active {
-                checkForShareExtensionUploads()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // Early notification when app is about to enter foreground
-            checkForShareExtensionUploads()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            // Backup: Also check when app becomes active via notification (more reliable)
-            checkForShareExtensionUploads()
-        }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
-            // Refresh total count when a receipt is uploaded
-            loadTotalReceiptsCount()
+            // Refresh all stats when a receipt is uploaded (from any source)
+            loadAllTimeStats()
         }
         .animation(.easeInOut, value: uploadState)
     }
@@ -382,17 +376,6 @@ struct ReceiptScanView: View {
 
     private var mainContentView: some View {
         VStack(spacing: 20) {
-            // Syncing banner at top
-            if isTabVisible && (isSyncing || rateLimitManager.isReceiptUploading) {
-                syncingStatusBanner
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .padding(.top, 8)
-            } else if isTabVisible && rateLimitManager.showReceiptSynced {
-                syncedStatusBanner
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .padding(.top, 8)
-            }
-
             // Stats Section
             statsSection
                 .padding(.horizontal, 20)
@@ -433,9 +416,6 @@ struct ReceiptScanView: View {
             .ignoresSafeArea()
         )
         .opacity(contentOpacity)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSyncing)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.isReceiptUploading)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: rateLimitManager.showReceiptSynced)
     }
 
     // MARK: - Stats Section
@@ -1004,36 +984,24 @@ struct ReceiptScanView: View {
     // MARK: - Syncing Status Banners
 
     private var syncingStatusBanner: some View {
-        HStack(spacing: 10) {
-            // Spinning arrow animation
-            ScanSyncingArrowView()
-
+        HStack(spacing: 6) {
+            SyncingArrowsView()
             Text("Syncing")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .font(.system(size: 12, weight: .medium))
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(Color.blue.opacity(0.15))
-        )
+        .foregroundColor(.blue)
+        .padding(.top, 12)
     }
 
     private var syncedStatusBanner: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Image(systemName: "checkmark.icloud.fill")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 11))
             Text("Synced")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.green)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(Color.green.opacity(0.1))
-        )
+        .padding(.top, 12)
     }
 
     // MARK: - Load Stats
@@ -1139,8 +1107,7 @@ struct ReceiptScanView: View {
         // Upload receipt
         await MainActor.run {
             uploadState = .uploading
-            isSyncing = true
-            // Notify View tab to show syncing indicator
+            // Notify all tabs to show syncing indicator
             NotificationCenter.default.post(name: .receiptUploadStarted, object: nil)
         }
 
@@ -1149,7 +1116,6 @@ struct ReceiptScanView: View {
 
             await MainActor.run {
                 capturedImage = nil
-                isSyncing = false
 
                 switch response.status {
                 case .success, .completed:
@@ -1195,7 +1161,6 @@ struct ReceiptScanView: View {
         } catch let error as ReceiptUploadError {
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
-                isSyncing = false
 
                 // Handle rate limit exceeded specially
                 if case .rateLimitExceeded = error {
@@ -1219,7 +1184,6 @@ struct ReceiptScanView: View {
         } catch {
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
-                isSyncing = false
                 canRetryAfterError = true
                 errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
                 showError = true
@@ -1230,52 +1194,6 @@ struct ReceiptScanView: View {
         }
     }
 
-    // MARK: - Share Extension Upload Detection
-
-    /// Initialize the last checked timestamp from persisted storage
-    private func initializeLastCheckedTimestamp() {
-        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-        if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
-            // First try to load from persisted lastCheckedUploadTimestamp
-            let persistedLastChecked = sharedDefaults.double(forKey: "lastCheckedUploadTimestamp")
-            if persistedLastChecked > 0 {
-                lastCheckedUploadTimestamp = persistedLastChecked
-            } else {
-                // Fall back to current upload timestamp to prevent detecting old uploads as new
-                let existingTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-                if existingTimestamp > 0 {
-                    lastCheckedUploadTimestamp = existingTimestamp
-                    // Also persist it so future checks use this value
-                    sharedDefaults.set(existingTimestamp, forKey: "lastCheckedUploadTimestamp")
-                }
-            }
-        }
-    }
-
-    /// Checks if the Share Extension uploaded a receipt while the app was in the background
-    private func checkForShareExtensionUploads() {
-        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            return
-        }
-
-        // Check if there's a new upload timestamp
-        let uploadTimestamp = sharedDefaults.double(forKey: "receipt_upload_timestamp")
-
-        // If there's a new upload (timestamp is newer than last checked)
-        if uploadTimestamp > lastCheckedUploadTimestamp && uploadTimestamp > 0 {
-            // Update last checked timestamp and persist it
-            lastCheckedUploadTimestamp = uploadTimestamp
-            sharedDefaults.set(uploadTimestamp, forKey: "lastCheckedUploadTimestamp")
-
-            // Post notification so Overview tab shows syncing indicator
-            NotificationCenter.default.post(name: .shareExtensionUploadDetected, object: nil)
-
-            // Optimistically decrement the local rate limit counter
-            // This is a workaround for the backend rate-limit API returning 403
-            rateLimitManager.decrementReceiptLocal()
-        }
-    }
 }
 
 // MARK: - Capture Success Overlay
