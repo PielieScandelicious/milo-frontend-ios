@@ -30,9 +30,15 @@ struct CategoryBudgetDetailView: View {
     private var sortedCategories: [CategoryBudgetProgress] {
         switch sortOrder {
         case .worstFirst:
-            return progress.categoryProgress.sorted { $0.spendRatio > $1.spendRatio }
+            return progress.categoryProgress.sorted {
+                if $0.spendRatio != $1.spendRatio { return $0.spendRatio > $1.spendRatio }
+                return $0.currentSpend > $1.currentSpend
+            }
         case .bestFirst:
-            return progress.categoryProgress.sorted { $0.spendRatio < $1.spendRatio }
+            return progress.categoryProgress.sorted {
+                if $0.spendRatio != $1.spendRatio { return $0.spendRatio < $1.spendRatio }
+                return $0.currentSpend < $1.currentSpend
+            }
         case .highestSpend:
             return progress.categoryProgress.sorted { $0.currentSpend > $1.currentSpend }
         case .byGroup:
@@ -62,15 +68,15 @@ struct CategoryBudgetDetailView: View {
     }
 
     private var overBudgetCategories: [CategoryBudgetProgress] {
-        progress.categoryProgress.filter { $0.isOverBudget }
+        progress.categoryProgress.filter { $0.isOverBudget || $0.displayedPercent >= 100 }
     }
 
     private var warningCategories: [CategoryBudgetProgress] {
-        progress.categoryProgress.filter { !$0.isOverBudget && $0.spendRatio > 0.85 }
+        progress.categoryProgress.filter { $0.isWarning }
     }
 
     private var onTrackCategories: [CategoryBudgetProgress] {
-        progress.categoryProgress.filter { $0.spendRatio <= 0.85 }
+        progress.categoryProgress.filter { !$0.isOverBudget && !$0.isWarning && $0.displayedPercent < 100 }
     }
 
     var body: some View {
@@ -405,22 +411,28 @@ struct CategoryBudgetCard: View {
 
     @State private var animationProgress: CGFloat = 0
 
-    private var statusColor: Color {
-        if categoryProgress.isOverBudget {
-            return Color(red: 1.0, green: 0.4, blue: 0.4)
-        } else if categoryProgress.spendRatio > 0.85 {
-            return Color(red: 1.0, green: 0.75, blue: 0.3)
-        } else if categoryProgress.spendRatio > 0.6 {
-            return Color(red: 0.3, green: 0.7, blue: 1.0)
+    // MARK: - Color Constants
+
+    private static let greenColor = Color(red: 0.3, green: 0.8, blue: 0.5)
+    private static let orangeColor = Color(red: 1.0, green: 0.75, blue: 0.3)
+    private static let redColor = Color(red: 1.0, green: 0.4, blue: 0.4)
+
+    private var displayedPercent: Int { categoryProgress.displayedPercent }
+
+    private var barColor: Color {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
+            return Self.redColor
+        } else if categoryProgress.isWarning {
+            return Self.orangeColor
         } else {
-            return Color(red: 0.3, green: 0.8, blue: 0.5)
+            return Self.greenColor
         }
     }
 
     private var statusText: String {
-        if categoryProgress.isOverBudget {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
             return "€\(String(format: "%.0f", categoryProgress.overAmount)) over"
-        } else if categoryProgress.spendRatio > 0.85 {
+        } else if categoryProgress.isWarning {
             return "Almost at limit"
         } else {
             return "€\(String(format: "%.0f", categoryProgress.remainingAmount)) left"
@@ -428,12 +440,22 @@ struct CategoryBudgetCard: View {
     }
 
     private var statusIcon: String {
-        if categoryProgress.isOverBudget {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
             return "exclamationmark.triangle.fill"
-        } else if categoryProgress.spendRatio > 0.85 {
+        } else if categoryProgress.isWarning {
             return "exclamationmark.circle.fill"
         } else {
             return "checkmark.circle.fill"
+        }
+    }
+
+    private var spendAmountColor: Color {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
+            return Self.redColor
+        } else if categoryProgress.isWarning {
+            return Self.orangeColor
+        } else {
+            return .white
         }
     }
 
@@ -452,7 +474,7 @@ struct CategoryBudgetCard: View {
                     Circle()
                         .trim(from: 0, to: min(1.0, CGFloat(categoryProgress.spendRatio)) * animationProgress)
                         .stroke(
-                            statusColor,
+                            barColor,
                             style: StrokeStyle(lineWidth: 4, lineCap: .round)
                         )
                         .frame(width: 48, height: 48)
@@ -477,7 +499,7 @@ struct CategoryBudgetCard: View {
                         Text(statusText)
                             .font(.system(size: 12, weight: .medium))
                     }
-                    .foregroundColor(statusColor)
+                    .foregroundColor(barColor)
                 }
 
                 Spacer()
@@ -486,7 +508,7 @@ struct CategoryBudgetCard: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(String(format: "€%.0f", categoryProgress.currentSpend))
                         .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(categoryProgress.isOverBudget ? statusColor : .white)
+                        .foregroundColor(spendAmountColor)
 
                     Text(String(format: "of €%.0f", categoryProgress.budgetAmount))
                         .font(.system(size: 12, weight: .medium))
@@ -515,7 +537,7 @@ struct CategoryBudgetCard: View {
                     RoundedRectangle(cornerRadius: 4)
                         .fill(
                             LinearGradient(
-                                colors: [statusColor.opacity(0.8), statusColor],
+                                colors: [barColor.opacity(0.8), barColor],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -524,11 +546,10 @@ struct CategoryBudgetCard: View {
 
                     // Over budget indicator
                     if categoryProgress.isOverBudget {
-                        // Striped pattern for over-budget portion
                         RoundedRectangle(cornerRadius: 4)
                             .fill(
                                 LinearGradient(
-                                    colors: [Color.red.opacity(0.6), Color.red.opacity(0.8)],
+                                    colors: [Self.redColor.opacity(0.6), Self.redColor.opacity(0.8)],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
@@ -550,12 +571,25 @@ struct CategoryBudgetCard: View {
 
             // Percentage indicator
             HStack {
-                Text(String(format: "%.0f%% used", categoryProgress.spendRatio * 100))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
+                if categoryProgress.isWarning {
+                    HStack(spacing: 3) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("\(displayedPercent)% used")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(Self.orangeColor)
+                } else if categoryProgress.isOverBudget || displayedPercent >= 100 {
+                    Text("\(displayedPercent)% used")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Self.redColor)
+                } else {
+                    Text("\(displayedPercent)% used")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
 
                 Spacer()
-
             }
         }
         .padding(.horizontal, 16)
@@ -645,22 +679,26 @@ struct CompactCategoryBudgetItem: View {
 
     @State private var animationProgress: CGFloat = 0
 
-    private var statusColor: Color {
-        if categoryProgress.isOverBudget {
-            return Color(red: 1.0, green: 0.4, blue: 0.4)
-        } else if categoryProgress.spendRatio > 0.85 {
-            return Color(red: 1.0, green: 0.75, blue: 0.3)
-        } else if categoryProgress.spendRatio > 0.6 {
-            return Color(red: 0.3, green: 0.7, blue: 1.0)
+    private static let greenColor = Color(red: 0.3, green: 0.8, blue: 0.5)
+    private static let orangeColor = Color(red: 1.0, green: 0.75, blue: 0.3)
+    private static let redColor = Color(red: 1.0, green: 0.4, blue: 0.4)
+
+    private var displayedPercent: Int { categoryProgress.displayedPercent }
+
+    private var barColor: Color {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
+            return Self.redColor
+        } else if categoryProgress.isWarning {
+            return Self.orangeColor
         } else {
-            return Color(red: 0.3, green: 0.8, blue: 0.5)
+            return Self.greenColor
         }
     }
 
     private var statusIcon: String {
-        if categoryProgress.isOverBudget {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
             return "exclamationmark.triangle.fill"
-        } else if categoryProgress.spendRatio > 0.85 {
+        } else if categoryProgress.isWarning {
             return "exclamationmark.circle.fill"
         } else {
             return "checkmark.circle.fill"
@@ -668,12 +706,22 @@ struct CompactCategoryBudgetItem: View {
     }
 
     private var statusText: String {
-        if categoryProgress.isOverBudget {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
             return "Over"
-        } else if categoryProgress.spendRatio > 0.85 {
+        } else if categoryProgress.isWarning {
             return "Warning"
         } else {
             return "On track"
+        }
+    }
+
+    private var spendAmountColor: Color {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
+            return Self.redColor
+        } else if categoryProgress.isWarning {
+            return Self.orangeColor
+        } else {
+            return .white
         }
     }
 
@@ -687,7 +735,7 @@ struct CompactCategoryBudgetItem: View {
 
                 Circle()
                     .trim(from: 0, to: min(1.0, CGFloat(categoryProgress.spendRatio)) * animationProgress)
-                    .stroke(statusColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(barColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .frame(width: 40, height: 40)
                     .rotationEffect(.degrees(-90))
 
@@ -709,17 +757,17 @@ struct CompactCategoryBudgetItem: View {
                     Text(statusText)
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(statusColor)
+                .foregroundColor(barColor)
             }
 
             Spacer()
 
-            // Budget amounts - key info users want to see
+            // Budget amounts
             VStack(alignment: .trailing, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(String(format: "€%.0f", categoryProgress.currentSpend))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundColor(categoryProgress.isOverBudget ? statusColor : .white)
+                        .foregroundColor(spendAmountColor)
 
                     Text("/")
                         .font(.system(size: 12, weight: .medium))
@@ -735,7 +783,7 @@ struct CompactCategoryBudgetItem: View {
                      ? String(format: "€%.0f over", categoryProgress.overAmount)
                      : String(format: "€%.0f left", categoryProgress.remainingAmount))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(categoryProgress.isOverBudget ? statusColor : .white.opacity(0.4))
+                    .foregroundColor(categoryProgress.isOverBudget ? Self.redColor : .white.opacity(0.4))
             }
 
             // Remove button

@@ -15,27 +15,61 @@ struct CategoryAllocationBar: View {
 
     @State private var animationProgress: CGFloat = 0
 
+    // MARK: - Color Constants
+
+    private static let greenColor = Color(red: 0.3, green: 0.8, blue: 0.5)
+    private static let orangeColor = Color(red: 1.0, green: 0.75, blue: 0.3)
+    private static let redColor = Color(red: 1.0, green: 0.4, blue: 0.4)
+
+    // MARK: - Display Rules
+    //
+    //   0-84%  → green bar, green status
+    //  85-99%  → orange bar, orange status, orange percentage + warning icon
+    //   100%+  → red bar, red status (at or over budget)
+
+    private var displayedPercent: Int {
+        categoryProgress.displayedPercent
+    }
+
     private var fillRatio: CGFloat {
         min(1.0, CGFloat(categoryProgress.spendRatio))
     }
 
-    private var statusColor: Color {
-        categoryProgress.isOverBudget
-            ? Color(red: 1.0, green: 0.4, blue: 0.4)
-            : Color(red: 0.3, green: 0.8, blue: 0.5)
+    private var barColor: Color {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
+            return Self.redColor
+        } else if displayedPercent >= 85 {
+            return Self.orangeColor
+        } else {
+            return Self.greenColor
+        }
     }
 
     private var statusIcon: String {
-        categoryProgress.isOverBudget
-            ? "exclamationmark.triangle.fill"
-            : "checkmark.circle.fill"
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
+            return "exclamationmark.triangle.fill"
+        } else if displayedPercent >= 85 {
+            return "exclamationmark.circle.fill"
+        } else {
+            return "checkmark.circle.fill"
+        }
     }
 
     private var statusText: String {
-        if categoryProgress.isOverBudget {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
             return String(format: "€%.0f over", categoryProgress.overAmount)
         } else {
             return String(format: "€%.0f left", categoryProgress.remainingAmount)
+        }
+    }
+
+    private var spendAmountColor: Color {
+        if categoryProgress.isOverBudget || displayedPercent >= 100 {
+            return Self.redColor
+        } else if displayedPercent >= 85 {
+            return Self.orangeColor
+        } else {
+            return .white
         }
     }
 
@@ -63,7 +97,7 @@ struct CategoryAllocationBar: View {
                 HStack(spacing: 3) {
                     Text(String(format: "€%.0f", categoryProgress.currentSpend))
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundColor(categoryProgress.isOverBudget ? statusColor : .white)
+                        .foregroundColor(spendAmountColor)
 
                     Text("/")
                         .font(.system(size: 11, weight: .medium))
@@ -82,7 +116,7 @@ struct CategoryAllocationBar: View {
                         .fill(Color.white.opacity(0.1))
 
                     Capsule()
-                        .fill(statusColor)
+                        .fill(barColor)
                         .frame(width: geometry.size.width * fillRatio * animationProgress)
                 }
             }
@@ -96,13 +130,28 @@ struct CategoryAllocationBar: View {
                     Text(statusText)
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(statusColor)
+                .foregroundColor(barColor)
 
                 Spacer()
 
-                Text(String(format: "%.0f%%", min(categoryProgress.spendRatio, 9.99) * 100))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.35))
+                // Percentage with warning icon for 85-99%, red for 100%+
+                if displayedPercent >= 85 && displayedPercent < 100 && !categoryProgress.isOverBudget {
+                    HStack(spacing: 3) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("\(displayedPercent)%")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(Self.orangeColor)
+                } else if categoryProgress.isOverBudget || displayedPercent >= 100 {
+                    Text("\(displayedPercent)%")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Self.redColor)
+                } else {
+                    Text("\(displayedPercent)%")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.35))
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -123,7 +172,12 @@ struct CategoryAllocationBarList: View {
     var onSeeAll: (() -> Void)?
 
     private var sortedCategories: [CategoryBudgetProgress] {
-        categories.sorted { $0.currentSpend > $1.currentSpend }
+        categories.sorted {
+            if $0.spendRatio != $1.spendRatio {
+                return $0.spendRatio > $1.spendRatio
+            }
+            return $0.currentSpend > $1.currentSpend
+        }
     }
 
     var body: some View {
@@ -160,12 +214,12 @@ struct CategoryAllocationBarList: View {
 
 #Preview {
     let categories: [CategoryBudgetProgress] = [
-        CategoryBudgetProgress(category: "Meat & Fish", budgetAmount: 200, currentSpend: 165),
-        CategoryBudgetProgress(category: "Fresh Produce", budgetAmount: 150, currentSpend: 80),
-        CategoryBudgetProgress(category: "Dairy & Eggs", budgetAmount: 120, currentSpend: 130),
-        CategoryBudgetProgress(category: "Bakery", budgetAmount: 80, currentSpend: 72),
-        CategoryBudgetProgress(category: "Snacks & Sweets", budgetAmount: 60, currentSpend: 15),
-        CategoryBudgetProgress(category: "Drinks", budgetAmount: 100, currentSpend: 45)
+        CategoryBudgetProgress(category: "Dairy & Eggs", budgetAmount: 120, currentSpend: 130),   // 108% → red
+        CategoryBudgetProgress(category: "Meat & Fish", budgetAmount: 200, currentSpend: 200),    // 100% → red
+        CategoryBudgetProgress(category: "Bakery", budgetAmount: 80, currentSpend: 72),           //  90% → orange
+        CategoryBudgetProgress(category: "Fresh Produce", budgetAmount: 150, currentSpend: 80),   //  53% → green
+        CategoryBudgetProgress(category: "Snacks & Sweets", budgetAmount: 60, currentSpend: 15),  //  25% → green
+        CategoryBudgetProgress(category: "Drinks", budgetAmount: 100, currentSpend: 45)           //  45% → green
     ]
 
     ZStack {

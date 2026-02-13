@@ -50,6 +50,7 @@ struct BudgetPulseView: View {
     @State private var inlineTargets: [InlineTarget] = []
     @State private var isSmartBudget = true
     @State private var showCategoryPicker = false
+    @State private var showTotalBudget = true
     @FocusState private var focusedField: FocusField?
 
     private enum FocusField: Hashable {
@@ -115,6 +116,7 @@ struct BudgetPulseView: View {
                 selectedMode = nil
                 isMonthlyConfigured = false
                 isCategoriesConfigured = false
+                showTotalBudget = true
             }
             .sheet(isPresented: $showCategoryPicker) {
                 CategoryPickerSheet(
@@ -533,41 +535,97 @@ struct BudgetPulseView: View {
 
             // Monthly total (only when editing an existing budget)
             if hasExistingBudget {
-                VStack(spacing: 4) {
-                    Text("MONTHLY BUDGET")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.2)
-                        .foregroundColor(.white.opacity(0.3))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    HStack(spacing: 4) {
-                        Text("€")
-                            .font(.system(size: 20, weight: .semibold, design: .rounded))
+                if showTotalBudget {
+                    VStack(spacing: 4) {
+                        Text("MONTHLY BUDGET")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.2)
                             .foregroundColor(.white.opacity(0.3))
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                        TextField("0", text: $monthlyAmountText)
-                            .keyboardType(.numberPad)
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .focused($focusedField, equals: .monthly)
-                            .onChange(of: monthlyAmountText) { _, newValue in
-                                let filtered = newValue.filter { $0.isNumber }
-                                if filtered != newValue { monthlyAmountText = filtered }
-                                if let val = Double(filtered), val > 99999 {
-                                    monthlyAmountText = "99999"
+                        HStack(spacing: 4) {
+                            Text("€")
+                                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                                .foregroundColor(.white.opacity(0.3))
+
+                            TextField("0", text: $monthlyAmountText)
+                                .keyboardType(.numberPad)
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .focused($focusedField, equals: .monthly)
+                                .onChange(of: monthlyAmountText) { _, newValue in
+                                    let filtered = newValue.filter { $0.isNumber }
+                                    if filtered != newValue { monthlyAmountText = filtered }
+                                    if let val = Double(filtered), val > 99999 {
+                                        monthlyAmountText = "99999"
+                                    }
                                 }
+
+                            Text("/month")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.white.opacity(0.2))
+
+                            Spacer()
+
+                            Button {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    showTotalBudget = false
+                                    focusedField = nil
+                                }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white.opacity(0.2))
                             }
-
-                        Text("/month")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.2))
-
-                        Spacer()
+                            .buttonStyle(PlainButtonStyle())
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                } else {
+                    // Add total budget button
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            showTotalBudget = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            focusedField = .monthly
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("Add total budget")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundColor(Color(red: 0.3, green: 0.75, blue: 0.5))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
+
+                // Divider between monthly budget and category budgets
+                Rectangle()
+                    .fill(Color.white.opacity(0.06))
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+            }
+
+            // Category section title
+            if hasExistingBudget {
+                Text("CATEGORY BUDGETS")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundColor(.white.opacity(0.3))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
             }
 
             // Category list
@@ -585,9 +643,14 @@ struct BudgetPulseView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else {
-                // Category total
+                ForEach(Array(inlineTargets.enumerated()), id: \.element.id) { index, _ in
+                    setupCategoryRow(index: index)
+                }
+                .padding(.bottom, 4)
+
+                // Total saved
                 HStack {
-                    Text("TOTAL")
+                    Text("TOTAL SAVED")
                         .font(.system(size: 10, weight: .bold))
                         .tracking(1.0)
                         .foregroundColor(.white.opacity(0.3))
@@ -595,16 +658,11 @@ struct BudgetPulseView: View {
                     Spacer()
 
                     Text(String(format: "€%.0f", categoryBudgetTotal))
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.6))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.5))
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 8)
-
-                ForEach(Array(inlineTargets.enumerated()), id: \.element.id) { index, _ in
-                    setupCategoryRow(index: index)
-                }
-                .padding(.bottom, 4)
+                .padding(.top, 4)
             }
 
             // Add category
@@ -812,9 +870,8 @@ struct BudgetPulseView: View {
 
     private var canSaveCategories: Bool {
         if hasExistingBudget {
-            // When editing, allow saving with no categories (clears them)
-            // as long as the monthly amount is valid
-            return monthlyAmount > 0 && !viewModel.isSaving
+            // When editing, always allow saving — removing everything deletes the budget
+            return !viewModel.isSaving
         }
         return !inlineTargets.isEmpty && categoryBudgetTotal > 0 && !viewModel.isSaving
     }
@@ -948,7 +1005,8 @@ struct BudgetPulseView: View {
 
     private func startInlineSetup() {
         if let budget = viewModel.currentBudget {
-            monthlyAmountText = String(format: "%.0f", budget.monthlyAmount)
+            monthlyAmountText = budget.hasTotalBudget ? String(format: "%.0f", budget.monthlyAmount) : "500"
+            showTotalBudget = budget.hasTotalBudget
             inlineTargets = (budget.categoryAllocations ?? []).map {
                 InlineTarget(category: $0.category, amount: $0.amount)
             }
@@ -959,6 +1017,7 @@ struct BudgetPulseView: View {
             selectedMode = hasCats ? .byCategory : .total
         } else {
             monthlyAmountText = "500"
+            showTotalBudget = true
             inlineTargets = []
             isSmartBudget = true
             // New budget: show the mode chooser
@@ -980,6 +1039,7 @@ struct BudgetPulseView: View {
             selectedMode = nil
             isMonthlyConfigured = false
             isCategoriesConfigured = false
+            showTotalBudget = true
             if !viewModel.state.hasBudget {
                 isExpanded = false
             }
@@ -1020,8 +1080,8 @@ struct BudgetPulseView: View {
                     .map { CategoryAllocation(category: $0.category, amount: $0.amount) }
                 allocations = cats.isEmpty ? nil : cats
 
-                // If monthly is also configured, use that amount; otherwise sum categories
-                amount = isMonthlyConfigured ? monthlyAmount : cats.reduce(0.0) { $0 + $1.amount }
+                // If monthly is also configured, use that amount; otherwise 0 (category-only)
+                amount = isMonthlyConfigured ? monthlyAmount : 0
             } else {
                 // Monthly only
                 amount = monthlyAmount
@@ -1079,8 +1139,23 @@ struct BudgetPulseView: View {
                 .filter { $0.amount > 0 }
                 .map { CategoryAllocation(category: $0.category, amount: $0.amount) }
 
+            let effectiveAmount = showTotalBudget ? monthlyAmount : 0.0
+            let hasNothing = effectiveAmount == 0 && allocations.isEmpty
+
+            // If both total and categories are removed, delete the budget
+            if hasNothing {
+                let success = await viewModel.deleteBudget()
+                if success {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isSettingUp = false
+                        selectedMode = nil
+                    }
+                }
+                return
+            }
+
             let success = await viewModel.updateBudgetFull(request: UpdateBudgetRequest(
-                monthlyAmount: monthlyAmount,
+                monthlyAmount: effectiveAmount,
                 categoryAllocations: allocations,
                 isSmartBudget: isSmartBudget
             ))
@@ -1298,7 +1373,8 @@ struct BudgetPulseView: View {
     }
 
     private func collapsedHeader(_ progress: BudgetProgress) -> some View {
-        let isOver = progress.currentSpend > progress.budget.monthlyAmount
+        let hasTotalBudget = progress.hasTotalBudget
+        let isOver = hasTotalBudget && progress.currentSpend > progress.budget.monthlyAmount
         let remaining = max(0, progress.budget.monthlyAmount - progress.currentSpend)
         let overAmount = progress.currentSpend - progress.budget.monthlyAmount
         let accentColor = isOver ? budgetOverColor : budgetStatusColor
@@ -1309,7 +1385,7 @@ struct BudgetPulseView: View {
             }
         }) {
             HStack(spacing: 14) {
-                if !isExpanded {
+                if !isExpanded && hasTotalBudget {
                     MiniBudgetRing(
                         spendRatio: progress.spendRatio,
                         paceStatus: progress.paceStatus,
@@ -1319,13 +1395,31 @@ struct BudgetPulseView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.5)))
                 }
 
+                if !isExpanded && !hasTotalBudget {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: "square.grid.2x2.fill")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(Color(red: 0.5, green: 0.6, blue: 1.0))
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.5)))
+                }
+
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 5) {
+                    if hasTotalBudget {
                         Text(isOver
                              ? String(format: "€%.0f over budget", overAmount)
                              : String(format: "€%.0f left to spend", remaining))
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundColor(accentColor)
+                    } else {
+                        let catCount = progress.categoryProgress.count
+                        Text("\(catCount) category budget\(catCount == 1 ? "" : "s")")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
                     }
 
                     Text("\(progress.daysRemaining) days left")
@@ -1364,46 +1458,49 @@ struct BudgetPulseView: View {
     }
 
     private func expandedContent(_ progress: BudgetProgress) -> some View {
-        let isOver = progress.currentSpend > progress.budget.monthlyAmount
+        let hasTotalBudget = progress.hasTotalBudget
+        let isOver = hasTotalBudget && progress.currentSpend > progress.budget.monthlyAmount
         let remaining = max(0, progress.budget.monthlyAmount - progress.currentSpend)
         let overAmount = progress.currentSpend - progress.budget.monthlyAmount
         let accentColor = isOver ? budgetOverColor : budgetStatusColor
 
         return VStack(spacing: 14) {
-            // Section title
-            Text("Monthly Budget")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.5))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
+            if hasTotalBudget {
+                // Section title
+                Text("Monthly Budget")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.5))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
 
-            // Pie chart + budget info side by side (centered)
-            HStack(spacing: 14) {
-                BudgetPieChartView(progress: progress, size: 80)
+                // Pie chart + budget info side by side (centered)
+                HStack(spacing: 14) {
+                    BudgetPieChartView(progress: progress, size: 80)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(String(format: "€%.0f", progress.currentSpend))
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(accentColor)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(format: "€%.0f", progress.currentSpend))
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundColor(accentColor)
 
-                    Text(String(format: "spent of €%.0f", progress.budget.monthlyAmount))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
+                        Text(String(format: "spent of €%.0f", progress.budget.monthlyAmount))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
 
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(accentColor)
-                            .frame(width: 5, height: 5)
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(accentColor)
+                                .frame(width: 5, height: 5)
 
-                        Text(isOver
-                             ? String(format: "€%.0f over", overAmount)
-                             : String(format: "€%.0f remaining", remaining))
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(accentColor.opacity(0.85))
+                            Text(isOver
+                                 ? String(format: "€%.0f over", overAmount)
+                                 : String(format: "€%.0f remaining", remaining))
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(accentColor.opacity(0.85))
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
 
             // Category spending bars
             if !progress.categoryProgress.isEmpty {
