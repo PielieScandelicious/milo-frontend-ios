@@ -253,9 +253,9 @@ struct CategoryBudgetRing: View {
                 .rotationEffect(.degrees(-90))
 
             // Category icon
-            Image(systemName: categoryProgress.icon)
-                .font(.system(size: size * 0.32, weight: .semibold))
-                .foregroundColor(ringColor)
+            Image.categorySymbol(categoryProgress.icon)
+                .frame(width: size * 0.32, height: size * 0.32)
+                .foregroundStyle(ringColor)
         }
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {

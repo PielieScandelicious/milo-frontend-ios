@@ -82,12 +82,12 @@ struct CategoryAllocationBar: View {
                         .fill(categoryProgress.category.categoryColor.opacity(0.15))
                         .frame(width: 34, height: 34)
 
-                    Image(systemName: categoryProgress.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(categoryProgress.category.categoryColor)
+                    Image.categorySymbol(categoryProgress.icon)
+                        .frame(width: 15, height: 15)
+                        .foregroundStyle(categoryProgress.category.categoryColor)
                 }
 
-                Text(categoryProgress.category.normalizedCategoryName)
+                Text(CategoryRegistryManager.shared.displayNameForSubCategory(categoryProgress.category))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)

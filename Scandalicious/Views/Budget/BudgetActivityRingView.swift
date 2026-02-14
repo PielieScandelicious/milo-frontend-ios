@@ -89,8 +89,8 @@ struct BudgetActivityRingView: View {
                     .rotationEffect(.degrees(-90))
 
                 // Center content - icon
-                Image(systemName: item.icon)
-                    .font(.system(size: size * 0.28, weight: .semibold))
+                Image.categorySymbol(item.icon)
+                    .frame(width: size * 0.3, height: size * 0.3)
                     .foregroundStyle(ringColor)
             }
 
@@ -301,8 +301,8 @@ struct CompactActivityRing: View {
                     .font(.system(size: size * 0.26, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
             } else {
-                Image(systemName: item.icon)
-                    .font(.system(size: size * 0.35))
+                Image.categorySymbol(item.icon)
+                    .frame(width: size * 0.35, height: size * 0.35)
                     .foregroundStyle(ringColor)
             }
         }

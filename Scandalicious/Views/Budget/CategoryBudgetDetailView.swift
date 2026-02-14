@@ -134,7 +134,7 @@ struct CategoryBudgetDetailView: View {
             }
         }
         .confirmationDialog(
-            "Remove \(categoryToRemove?.normalizedCategoryName ?? "") target?",
+            "Remove \(categoryToRemove.map { CategoryRegistryManager.shared.displayNameForSubCategory($0) } ?? "") target?",
             isPresented: Binding(
                 get: { categoryToRemove != nil },
                 set: { if !$0 { categoryToRemove = nil } }
@@ -481,14 +481,14 @@ struct CategoryBudgetCard: View {
                         .rotationEffect(.degrees(-90))
 
                     // Icon
-                    Image(systemName: categoryProgress.icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(categoryProgress.category.categoryColor)
+                    Image.categorySymbol(categoryProgress.icon)
+                        .frame(width: 18, height: 18)
+                        .foregroundStyle(categoryProgress.category.categoryColor)
                 }
 
                 // Category info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(categoryProgress.category.normalizedCategoryName)
+                    Text(CategoryRegistryManager.shared.displayNameForSubCategory(categoryProgress.category))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
 
@@ -739,14 +739,14 @@ struct CompactCategoryBudgetItem: View {
                     .frame(width: 40, height: 40)
                     .rotationEffect(.degrees(-90))
 
-                Image(systemName: categoryProgress.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(categoryProgress.category.categoryColor)
+                Image.categorySymbol(categoryProgress.icon)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(categoryProgress.category.categoryColor)
             }
 
             // Category name and status
             VStack(alignment: .leading, spacing: 3) {
-                Text(categoryProgress.category.normalizedCategoryName)
+                Text(CategoryRegistryManager.shared.displayNameForSubCategory(categoryProgress.category))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
