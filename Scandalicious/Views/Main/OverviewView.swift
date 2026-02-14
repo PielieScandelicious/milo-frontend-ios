@@ -1830,7 +1830,19 @@ struct OverviewView: View {
                     Text(item.displayName)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(1)
+                        .lineLimit(2)
+
+                    if item.quantity > 1 {
+                        Text("×\(item.quantity)")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.08))
+                            )
+                    }
 
                     // Split participant avatars
                     if !friendsOnly.isEmpty {
@@ -1842,14 +1854,14 @@ struct OverviewView: View {
                     Text(description)
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.4))
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
 
                 HStack(spacing: 6) {
                     Text(item.storeName.capitalized)
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.4))
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     if let date = item.dateParsed {
                         Text("•")
@@ -1861,27 +1873,15 @@ struct OverviewView: View {
                     }
                 }
             }
+            .layoutPriority(1)
 
             Spacer()
 
-            // Quantity and price
-            HStack(spacing: 6) {
-                if item.quantity > 1 {
-                    Text("×\(item.quantity)")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.08))
-                        )
-                }
-
-                Text(String(format: "€%.2f", item.totalPrice))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.75))
-            }
+            Text(String(format: "€%.2f", item.totalPrice))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.75))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.vertical, 9)
         .padding(.horizontal, 4)
@@ -2793,12 +2793,13 @@ private struct StoreRowButton: View {
                     Text(segment.storeName.localizedCapitalized)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     Text("\(segment.percentage)%")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(segment.color.opacity(0.8))
                 }
+                .layoutPriority(1)
 
                 Spacer(minLength: 4)
 
@@ -2837,21 +2838,21 @@ private struct ExpandableCategoryRowHeader: View {
 
                 // Category icon
                 Image.categorySymbol(category.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(category.color)
-                    .frame(width: 20)
+                    .foregroundStyle(category.color)
+                    .frame(width: 16, height: 16)
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {
                     Text(category.name)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     Text("\(Int(category.percentage))%")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(category.color.opacity(0.8))
                 }
+                .layoutPriority(1)
 
                 Spacer(minLength: 4)
 
@@ -2893,21 +2894,21 @@ private struct CategoryRowButton: View {
 
                 // Category icon
                 Image.categorySymbol(category.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(category.color)
-                    .frame(width: 20)
+                    .foregroundStyle(category.color)
+                    .frame(width: 16, height: 16)
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {
                     Text(category.name)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     Text("\(Int(category.percentage))%")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(category.color.opacity(0.8))
                 }
+                .layoutPriority(1)
 
                 Spacer(minLength: 4)
 

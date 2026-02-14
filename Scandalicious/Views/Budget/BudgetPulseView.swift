@@ -947,9 +947,9 @@ struct BudgetPulseView: View {
                     .fill(target.category.categoryColor.opacity(0.15))
                     .frame(width: 32, height: 32)
 
-                Image(systemName: target.category.categoryIcon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(target.category.categoryColor)
+                Image.categorySymbol(target.category.categoryIcon)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(target.category.categoryColor)
             }
 
             Text(target.category.normalizedCategoryName)

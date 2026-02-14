@@ -540,7 +540,7 @@ struct EditableLineItemRow: View {
                     Text(item.displayItemName)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     if item.displayQuantity > 1 {
                         Text("×\(item.displayQuantity)")

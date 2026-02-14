@@ -31,12 +31,17 @@ struct CategoryGroupResponse: Codable, Identifiable {
 
 struct CategoryMidResponse: Codable, Identifiable {
     let name: String
+    let displayName: String?
     let subCategories: [String]
 
     var id: String { name }
 
+    /// Clean display name, falling back to raw name
+    var cleanName: String { displayName ?? name }
+
     enum CodingKeys: String, CodingKey {
         case name
+        case displayName = "display_name"
         case subCategories = "sub_categories"
     }
 }
@@ -49,6 +54,7 @@ struct UsedCategoryResponse: Codable {
 
 struct UsedCategory: Codable, Identifiable {
     let subCategory: String
+    let displayName: String?
     let category: String
     let group: String
     let totalSpent: Double
@@ -59,8 +65,12 @@ struct UsedCategory: Codable, Identifiable {
 
     var id: String { categoryId }
 
+    /// Clean display name, falling back to subCategory
+    var cleanName: String { displayName ?? subCategory }
+
     enum CodingKeys: String, CodingKey {
         case subCategory = "sub_category"
+        case displayName = "display_name"
         case category
         case group
         case totalSpent = "total_spent"
@@ -86,6 +96,8 @@ class CategoryRegistryManager: ObservableObject {
     private var subCategoryToGroup: [String: String] = [:]
     // Sub-category -> mid-level category name (e.g., "Fresh Produce (Fruit & Veg)" -> "Fruits & Vegetables")
     private var subCategoryToCategory: [String: String] = [:]
+    // Sub-category -> clean display name (e.g., "Alcohol (Beer, Cider, ...)" -> "Alcohol")
+    private var subCategoryToDisplayName: [String: String] = [:]
     // Mid-level category -> group name (e.g., "Fruits & Vegetables" -> "Fresh Food")
     private var categoryToGroup: [String: String] = [:]
 
@@ -133,6 +145,7 @@ class CategoryRegistryManager: ObservableObject {
         groupLookup.removeAll()
         subCategoryToGroup.removeAll()
         subCategoryToCategory.removeAll()
+        subCategoryToDisplayName.removeAll()
         categoryToGroup.removeAll()
 
         for group in response.groups {
@@ -142,6 +155,7 @@ class CategoryRegistryManager: ObservableObject {
                 for subCategory in category.subCategories {
                     subCategoryToGroup[subCategory] = group.name
                     subCategoryToCategory[subCategory] = category.name
+                    subCategoryToDisplayName[subCategory] = category.cleanName
                 }
             }
         }
@@ -158,6 +172,11 @@ class CategoryRegistryManager: ObservableObject {
     }
 
     // MARK: - Lookup Helpers
+
+    /// Get clean display name for a sub-category (e.g., "Alcohol (Beer, ...)" → "Alcohol")
+    func displayNameForSubCategory(_ subCategory: String) -> String {
+        subCategoryToDisplayName[subCategory] ?? subCategory
+    }
 
     func groupForSubCategory(_ subCategory: String) -> String {
         subCategoryToGroup[subCategory] ?? "Other"
@@ -188,9 +207,12 @@ class CategoryRegistryManager: ObservableObject {
         if let cached = groupLookup[group]?.icon { return cached }
         switch group {
         case "Fresh Food": return "leaf.fill"
-        case "Pantry & Frozen": return "cabinet.fill"
-        case "Snacks & Beverages": return "mug.fill"
-        case "Household & Care": return "bubbles.and.sparkles.fill"
+        case "Pantry & Staples": return "cabinet.fill"
+        case "Frozen": return "snowflake"
+        case "Drinks": return "mug.fill"
+        case "Snacks": return "popcorn.fill"
+        case "Household": return "bubbles.and.sparkles.fill"
+        case "Personal Care": return "heart.fill"
         case "Other": return "tag.fill"
         default: return "tag.fill"
         }
@@ -200,9 +222,12 @@ class CategoryRegistryManager: ObservableObject {
         if let cached = groupLookup[group]?.colorHex { return cached }
         switch group {
         case "Fresh Food": return "#2ECC71"
-        case "Pantry & Frozen": return "#E67E22"
-        case "Snacks & Beverages": return "#E74C3C"
-        case "Household & Care": return "#8E44AD"
+        case "Pantry & Staples": return "#E67E22"
+        case "Frozen": return "#3498DB"
+        case "Drinks": return "#E74C3C"
+        case "Snacks": return "#F39C12"
+        case "Household": return "#8E44AD"
+        case "Personal Care": return "#1ABC9C"
         case "Other": return "#95A5A6"
         default: return "#95A5A6"
         }
@@ -218,9 +243,12 @@ class CategoryRegistryManager: ObservableObject {
         // Pre-populate lookups with hardcoded values so the app works before API loads
         let fallbackGroups: [(String, String, String)] = [
             ("Fresh Food", "leaf.fill", "#2ECC71"),
-            ("Pantry & Frozen", "cabinet.fill", "#E67E22"),
-            ("Snacks & Beverages", "mug.fill", "#E74C3C"),
-            ("Household & Care", "bubbles.and.sparkles.fill", "#8E44AD"),
+            ("Pantry & Staples", "cabinet.fill", "#E67E22"),
+            ("Frozen", "snowflake", "#3498DB"),
+            ("Drinks", "mug.fill", "#E74C3C"),
+            ("Snacks", "popcorn.fill", "#F39C12"),
+            ("Household", "bubbles.and.sparkles.fill", "#8E44AD"),
+            ("Personal Care", "heart.fill", "#1ABC9C"),
             ("Other", "tag.fill", "#95A5A6"),
         ]
         for (name, icon, colorHex) in fallbackGroups {

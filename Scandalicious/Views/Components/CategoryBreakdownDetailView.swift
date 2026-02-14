@@ -217,7 +217,7 @@ struct CategoryBreakdownDetailView: View {
     private func selectedCenterContent(_ category: CategorySpendItem) -> some View {
         VStack(spacing: 4) {
             Image.categorySymbol(category.icon)
-                .font(.system(size: 24))
+                .frame(width: 24, height: 24)
                 .foregroundStyle(category.color)
 
             Text(category.name)
@@ -349,9 +349,8 @@ struct CategoryBreakdownDetailView: View {
 
             // Category icon
             Image.categorySymbol(category.icon)
-                .font(.system(size: 16))
                 .foregroundStyle(category.color)
-                .frame(width: 24)
+                .frame(width: 16, height: 16)
 
             // Category name + percentage
             VStack(alignment: .leading, spacing: 2) {
@@ -563,7 +562,7 @@ struct CategoryBreakdownDetailView: View {
                             Text(item.displayName)
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.white.opacity(0.9))
-                                .lineLimit(1)
+                                .lineLimit(2)
 
                             if item.quantity > 1 {
                                 Text("×\(item.quantity)")
@@ -587,7 +586,7 @@ struct CategoryBreakdownDetailView: View {
                             Text(description)
                                 .font(.system(size: 11))
                                 .foregroundColor(.white.opacity(0.45))
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
 
                         // Store name for context

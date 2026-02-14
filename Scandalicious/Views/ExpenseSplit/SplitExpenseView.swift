@@ -305,7 +305,7 @@ struct SplitItemRow: View {
                         .frame(width: 36, height: 36)
 
                     Image.categorySymbol(transaction.category.categoryIcon)
-                        .font(.system(size: 16))
+                        .frame(width: 16, height: 16)
                         .foregroundStyle(categoryColor)
                 }
 

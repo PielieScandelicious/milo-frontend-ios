@@ -286,9 +286,9 @@ struct ReceiptTransactionsView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Category header
             HStack {
-                Image.categorySymbol(categoryIcon(for: category))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(category.categoryColor)
+                Image.categorySymbol(category.categoryIcon)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(category.categoryColor)
 
                 Text(category)
                     .font(.system(size: 15, weight: .semibold))
@@ -366,10 +366,9 @@ struct ReceiptTransactionsView: View {
                             }
                         } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: subIcon)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(subColor)
-                                    .frame(width: 20)
+                                Image.categorySymbol(subIcon)
+                                    .foregroundStyle(subColor)
+                                    .frame(width: 16, height: 16)
 
                                 Text(subCategory)
                                     .font(.system(size: 14, weight: .semibold))
@@ -416,8 +415,8 @@ struct ReceiptTransactionsView: View {
     private func transactionRow(_ transaction: APIReceiptItem, colorOverride: Color? = nil) -> some View {
         let itemColor = colorOverride ?? transaction.categoryDisplayName.categoryColor
         let itemIcon = colorOverride != nil
-            ? (transaction.categoryDisplayName.groceryHealthIcon ?? categoryIcon(for: transaction.categoryDisplayName))
-            : categoryIcon(for: transaction.categoryDisplayName)
+            ? (transaction.categoryDisplayName.groceryHealthIcon ?? transaction.categoryDisplayName.categoryIcon)
+            : transaction.categoryDisplayName.categoryIcon
 
         return HStack(spacing: 12) {
             // Icon with quantity badge
@@ -427,9 +426,9 @@ struct ReceiptTransactionsView: View {
                         .fill(itemColor.opacity(0.2))
                         .frame(width: 50, height: 50)
 
-                    Image(systemName: itemIcon)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(itemColor)
+                    Image.categorySymbol(itemIcon)
+                        .frame(width: 22, height: 22)
+                        .foregroundStyle(itemColor)
                 }
 
                 if transaction.quantity > 1 {
@@ -454,13 +453,13 @@ struct ReceiptTransactionsView: View {
                         Text(transaction.displayName)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
-                            .lineLimit(1)
+                            .lineLimit(2)
 
                         if let description = transaction.displayDescription {
                             Text(description)
                                 .font(.system(size: 12, weight: .regular))
                                 .foregroundColor(.white.opacity(0.45))
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
                     }
 
@@ -519,25 +518,6 @@ struct ReceiptTransactionsView: View {
         )
     }
 
-    private func categoryIcon(for category: String) -> String {
-        switch category {
-        case "Meat & Fish": return "fish.fill"
-        case "Alcohol": return "wineglass.fill"
-        case "Drinks (Soft/Soda)", "Drinks (Water)": return "cup.and.saucer.fill"
-        case "Household": return "house.fill"
-        case "Snacks & Sweets": return "birthday.cake.fill"
-        case "Fresh Produce": return "leaf.fill"
-        case "Dairy & Eggs": return "cup.and.saucer.fill"
-        case "Ready Meals": return "takeoutbag.and.cup.and.straw.fill"
-        case "Bakery": return "birthday.cake.fill"
-        case "Pantry": return "cabinet.fill"
-        case "Personal Care": return "sparkles"
-        case "Frozen": return "snowflake"
-        case "Baby & Kids": return "figure.and.child.holdinghands"
-        case "Pet Supplies": return "pawprint.fill"
-        default: return "cart.fill"
-        }
-    }
 
 }
 

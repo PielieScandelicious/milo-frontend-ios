@@ -545,12 +545,12 @@ struct APITransactionRowView: View {
             ZStack(alignment: .topTrailing) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(categoryColor(for: transaction.category).opacity(0.2))
+                        .fill(transaction.category.categoryColor.opacity(0.2))
                         .frame(width: 50, height: 50)
 
-                    Image.categorySymbol(categoryIcon(for: transaction.category))
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(categoryColor(for: transaction.category))
+                    Image.categorySymbol(transaction.category.categoryIcon)
+                        .frame(width: 22, height: 22)
+                        .foregroundStyle(transaction.category.categoryColor)
                 }
 
                 // Quantity badge (only show if quantity > 1)
@@ -562,7 +562,7 @@ struct APITransactionRowView: View {
                         .padding(.vertical, 2)
                         .background(
                             Capsule()
-                                .fill(categoryColor(for: transaction.category))
+                                .fill(transaction.category.categoryColor)
                         )
                         .offset(x: 6, y: -4)
                 }
@@ -577,7 +577,7 @@ struct APITransactionRowView: View {
                             Text(transaction.displayName)
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
-                                .lineLimit(1)
+                                .lineLimit(2)
 
                             // Split participant avatars (inline with item name)
                             if !friendsOnly.isEmpty {
@@ -589,7 +589,7 @@ struct APITransactionRowView: View {
                             Text(description)
                                 .font(.system(size: 12, weight: .regular))
                                 .foregroundColor(.white.opacity(0.45))
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
                     }
 
@@ -649,27 +649,6 @@ struct APITransactionRowView: View {
         )
     }
 
-    private func categoryIcon(for category: String) -> String {
-        switch category {
-        case "Meat & Fish": return "fish.fill"
-        case "Alcohol": return "wineglass.fill"
-        case "Drinks (Soft/Soda)", "Drinks (Water)": return "cup.and.saucer.fill"
-        case "Household": return "house.fill"
-        case "Snacks & Sweets": return "birthday.cake.fill"
-        case "Fresh Produce": return "leaf.fill"
-        case "Dairy & Eggs": return "cup.and.saucer.fill"
-        case "Ready Meals": return "takeoutbag.and.cup.and.straw.fill"
-        case "Bakery": return "birthday.cake.fill"
-        case "Pantry": return "cabinet.fill"
-        case "Personal Care": return "sparkles"
-        default: return "cart.fill"
-        }
-    }
-
-    private func categoryColor(for category: String) -> Color {
-        // Use the smart category color extension
-        return category.categoryColor
-    }
 }
 
 // MARK: - Transaction Split Avatars

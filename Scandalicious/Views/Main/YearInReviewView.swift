@@ -104,9 +104,9 @@ struct YearInReviewView: View {
             VStack(spacing: 0) {
                 ForEach(Array(categories.prefix(5).enumerated()), id: \.element.id) { index, category in
                     HStack(spacing: 12) {
-                        Image.categorySymbol(category.groupIcon ?? "tag.fill")
-                            .font(.system(size: 14, weight: .medium))
+                        Image.categorySymbol(category.groupIcon ?? "tag")
                             .foregroundStyle(categoryColor(for: category))
+                            .frame(width: 16, height: 16)
                             .frame(width: 32, height: 32)
                             .background(categoryColor(for: category).opacity(0.12))
                             .clipShape(Circle())

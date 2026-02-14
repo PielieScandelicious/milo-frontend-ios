@@ -762,9 +762,8 @@ struct StoreDetailView: View {
                     // Health-themed icon for grocery sub-categories
                     if let icon = icon {
                         Image.categorySymbol(icon)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(segment.color)
-                            .frame(width: 20)
+                            .foregroundStyle(segment.color)
+                            .frame(width: 16, height: 16)
                     }
 
                     // Category name + percentage
@@ -976,7 +975,7 @@ private struct CategoryTransactionItemRow: View {
                     Text(transaction.displayName)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     if transaction.quantity > 1 {
                         Text("×\(transaction.quantity)")
@@ -999,7 +998,7 @@ private struct CategoryTransactionItemRow: View {
                     Text(description)
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.4))
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             }
 
