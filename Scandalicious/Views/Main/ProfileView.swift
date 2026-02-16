@@ -14,9 +14,10 @@ struct ProfileView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
 
-    @State private var firstName = ""
-    @State private var lastName = ""
+    @State private var nickname = ""
     @State private var selectedGender: Gender = .notSpecified
+    @State private var age = ""
+    @State private var selectedLanguage: ProfileLanguage?
     @State private var showManageSubscription = false
     @State private var isLoading = false
     @State private var isSaving = false
@@ -26,9 +27,10 @@ struct ProfileView: View {
     @State private var hasUnsavedChanges = false
 
     // Store original values to detect changes
-    @State private var originalFirstName = ""
-    @State private var originalLastName = ""
+    @State private var originalNickname = ""
     @State private var originalGender: Gender = .notSpecified
+    @State private var originalAge = ""
+    @State private var originalLanguage: ProfileLanguage?
 
     enum Gender: String, CaseIterable {
         case male = "Male"
@@ -58,27 +60,14 @@ struct ProfileView: View {
             // Personal Information
             Section {
                 HStack {
-                    Text("First Name")
+                    Text("Nickname")
                         .foregroundStyle(.primary)
                     Spacer()
-                    TextField("First Name", text: $firstName)
+                    TextField("Nickname", text: $nickname)
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                         .disabled(isLoading || isSaving)
-                        .onChange(of: firstName) { _, _ in
-                            checkForChanges()
-                        }
-                }
-
-                HStack {
-                    Text("Last Name")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    TextField("Last Name", text: $lastName)
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .disabled(isLoading || isSaving)
-                        .onChange(of: lastName) { _, _ in
+                        .onChange(of: nickname) { _, _ in
                             checkForChanges()
                         }
                 }
@@ -90,6 +79,34 @@ struct ProfileView: View {
                 }
                 .disabled(isLoading || isSaving)
                 .onChange(of: selectedGender) { _, _ in
+                    checkForChanges()
+                }
+
+                HStack {
+                    Text("Age")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    TextField("Age", text: $age)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .keyboardType(.numberPad)
+                        .disabled(isLoading || isSaving)
+                        .onChange(of: age) { _, newValue in
+                            let filtered = newValue.filter { $0.isNumber }
+                            if filtered.count > 3 { age = String(filtered.prefix(3)) }
+                            else if filtered != newValue { age = filtered }
+                            checkForChanges()
+                        }
+                }
+
+                Picker("Language", selection: $selectedLanguage) {
+                    Text("Not set").tag(ProfileLanguage?.none)
+                    ForEach(ProfileLanguage.allCases, id: \.self) { language in
+                        Text("\(language.flag) \(language.displayName)").tag(ProfileLanguage?.some(language))
+                    }
+                }
+                .disabled(isLoading || isSaving)
+                .onChange(of: selectedLanguage) { _, _ in
                     checkForChanges()
                 }
             } header: {
@@ -331,14 +348,16 @@ struct ProfileView: View {
         do {
             let profile = try await ProfileAPIService().getProfile()
             await MainActor.run {
-                firstName = profile.firstName ?? ""
-                lastName = profile.lastName ?? ""
+                nickname = profile.nickname ?? ""
                 selectedGender = Gender.from(apiValue: profile.gender)
+                age = profile.age != nil ? "\(profile.age!)" : ""
+                selectedLanguage = ProfileLanguage.from(apiValue: profile.language)
 
                 // Store original values
-                originalFirstName = firstName
-                originalLastName = lastName
+                originalNickname = nickname
                 originalGender = selectedGender
+                originalAge = age
+                originalLanguage = selectedLanguage
 
                 hasUnsavedChanges = false
                 isLoading = false
@@ -359,20 +378,22 @@ struct ProfileView: View {
 
         Task {
             do {
-                let trimmedFirstName = firstName.trimmingCharacters(in: .whitespaces)
-                let trimmedLastName = lastName.trimmingCharacters(in: .whitespaces)
+                let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
+                let ageValue = Int(age)
 
                 let profile = try await ProfileAPIService().updateProfile(
-                    firstName: trimmedFirstName.isEmpty ? nil : trimmedFirstName,
-                    lastName: trimmedLastName.isEmpty ? nil : trimmedLastName,
-                    gender: selectedGender.apiValue
+                    nickname: trimmedNickname.isEmpty ? nil : trimmedNickname,
+                    gender: selectedGender.apiValue,
+                    age: ageValue,
+                    language: selectedLanguage?.rawValue
                 )
 
                 await MainActor.run {
                     // Update original values
-                    originalFirstName = firstName
-                    originalLastName = lastName
+                    originalNickname = nickname
                     originalGender = selectedGender
+                    originalAge = age
+                    originalLanguage = selectedLanguage
 
                     hasUnsavedChanges = false
                     isSaving = false
@@ -394,9 +415,10 @@ struct ProfileView: View {
     }
 
     private func checkForChanges() {
-        hasUnsavedChanges = firstName != originalFirstName ||
-                           lastName != originalLastName ||
-                           selectedGender != originalGender
+        hasUnsavedChanges = nickname != originalNickname ||
+                           selectedGender != originalGender ||
+                           age != originalAge ||
+                           selectedLanguage != originalLanguage
     }
 }
 

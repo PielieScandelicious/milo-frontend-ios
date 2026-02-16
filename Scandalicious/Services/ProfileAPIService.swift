@@ -83,7 +83,7 @@ actor ProfileAPIService {
 
     // MARK: - Create or Update Profile
 
-    func updateProfile(firstName: String?, lastName: String?, gender: String?) async throws -> UserProfile {
+    func updateProfile(nickname: String?, gender: String?, age: Int?, language: String?) async throws -> UserProfile {
         guard let token = try await getFirebaseToken() else {
             throw ProfileError.unauthorized
         }
@@ -93,9 +93,10 @@ actor ProfileAPIService {
         }
 
         let profileUpdate = UserProfileUpdate(
-            firstName: firstName,
-            lastName: lastName,
-            gender: gender
+            nickname: nickname,
+            gender: gender,
+            age: age,
+            language: language
         )
 
         var request = URLRequest(url: url)

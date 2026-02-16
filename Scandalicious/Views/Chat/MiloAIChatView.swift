@@ -22,7 +22,7 @@ private extension Color {
 }
 
 // MARK: - Milo Dachshund Avatar (Apple-style head)
-private struct MiloDachshundView: View {
+struct MiloDachshundView: View {
     var size: CGFloat = 64
 
     // Base unit for proportional scaling
