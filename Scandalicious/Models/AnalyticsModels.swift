@@ -18,7 +18,7 @@ enum PeriodType: String, Codable, CaseIterable {
     case all
 
     var displayName: String {
-        if self == .all { return "All Time" }
+        if self == .all { return L("all_time") }
         return rawValue.capitalized
     }
 }

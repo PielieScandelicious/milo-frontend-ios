@@ -1238,7 +1238,7 @@ struct OverviewView: View {
                         selectedPeriod = availablePeriods[currentPeriodIndex - 1]
                     }
                 } label: {
-                    Text(shortenedPeriod(availablePeriods[currentPeriodIndex - 1]).uppercased())
+                    Text(availablePeriods[currentPeriodIndex - 1].localizedShortPeriod.uppercased())
                         .font(.system(size: 11, weight: .medium, design: .default))
                         .foregroundColor(.white.opacity(0.4))
                         .tracking(0.8)
@@ -1260,7 +1260,7 @@ struct OverviewView: View {
                         )
                 }
 
-                Text(selectedPeriod.uppercased())
+                Text(selectedPeriod.localizedPeriod.uppercased())
                     .font(.system(size: 13, weight: .bold, design: .default))
                     .foregroundColor(.white)
                     .tracking(1.5)
@@ -1317,7 +1317,7 @@ struct OverviewView: View {
                         selectedPeriod = availablePeriods[currentPeriodIndex + 1]
                     }
                 } label: {
-                    Text(shortenedPeriod(availablePeriods[currentPeriodIndex + 1]).uppercased())
+                    Text(availablePeriods[currentPeriodIndex + 1].localizedShortPeriod.uppercased())
                         .font(.system(size: 11, weight: .medium, design: .default))
                         .foregroundColor(.white.opacity(0.4))
                         .tracking(0.8)
@@ -1585,11 +1585,11 @@ struct OverviewView: View {
                     .foregroundColor(.white)
                 let subtitle: String = {
                     if isAllTime {
-                        return "\(storeCount) store\(storeCount == 1 ? "" : "s") all time"
+                        return "\(storeCount) \(L("stores_all_time"))"
                     } else if isYear {
-                        return "\(storeCount) store\(storeCount == 1 ? "" : "s") this year"
+                        return "\(storeCount) \(L("stores_this_year"))"
                     } else {
-                        return "\(storeCount) store\(storeCount == 1 ? "" : "s")"
+                        return "\(storeCount) \(storeCount == 1 ? L("store_singular") : L("stores_count"))"
                     }
                 }()
                 Text(subtitle)
@@ -1620,11 +1620,11 @@ struct OverviewView: View {
                     .foregroundColor(.white)
                 let subtitle: String = {
                     if isAllTime {
-                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies") all time"
+                        return "\(categoryCount) \(L("categories_all_time"))"
                     } else if isYear {
-                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies") this year"
+                        return "\(categoryCount) \(L("categories_this_year"))"
                     } else {
-                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")"
+                        return "\(categoryCount) \(categoryCount == 1 ? L("category_singular") : L("categories_count"))"
                     }
                 }()
                 Text(subtitle)
