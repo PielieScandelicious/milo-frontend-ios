@@ -565,6 +565,7 @@ struct OverviewView: View {
     }
 
     private func handleReceiptUploadSuccess() {
+        print("[OverviewView] 📩 handleReceiptUploadSuccess() called")
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
@@ -633,6 +634,11 @@ struct OverviewView: View {
             }
 
             await rateLimitManager.syncFromBackend()
+
+            // Refresh budget widget with latest spend data
+            print("[OverviewView] 🔄 About to call budgetViewModel.refreshProgress()")
+            await budgetViewModel.refreshProgress()
+            print("[OverviewView] ✅ budgetViewModel.refreshProgress() completed")
         }
     }
 

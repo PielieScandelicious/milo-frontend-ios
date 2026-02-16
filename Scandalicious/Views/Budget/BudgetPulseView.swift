@@ -1364,20 +1364,12 @@ struct BudgetPulseView: View {
         }
     }
 
-    private var budgetStatusColor: Color {
-        Color(red: 0.3, green: 0.8, blue: 0.5)
-    }
-
-    private var budgetOverColor: Color {
-        Color(red: 1.0, green: 0.4, blue: 0.4)
-    }
-
     private func collapsedHeader(_ progress: BudgetProgress) -> some View {
         let hasTotalBudget = progress.hasTotalBudget
         let isOver = hasTotalBudget && progress.currentSpend > progress.budget.monthlyAmount
         let remaining = max(0, progress.budget.monthlyAmount - progress.currentSpend)
         let overAmount = progress.currentSpend - progress.budget.monthlyAmount
-        let accentColor = isOver ? budgetOverColor : budgetStatusColor
+        let accentColor = progress.budgetStatusColor
 
         return Button(action: {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -1462,7 +1454,7 @@ struct BudgetPulseView: View {
         let isOver = hasTotalBudget && progress.currentSpend > progress.budget.monthlyAmount
         let remaining = max(0, progress.budget.monthlyAmount - progress.currentSpend)
         let overAmount = progress.currentSpend - progress.budget.monthlyAmount
-        let accentColor = isOver ? budgetOverColor : budgetStatusColor
+        let accentColor = progress.budgetStatusColor
 
         return VStack(spacing: 14) {
             if hasTotalBudget {
@@ -1487,9 +1479,15 @@ struct BudgetPulseView: View {
                             .foregroundColor(.white.opacity(0.4))
 
                         HStack(spacing: 4) {
-                            Circle()
-                                .fill(accentColor)
-                                .frame(width: 5, height: 5)
+                            if progress.spendRatio >= 0.85 {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(accentColor)
+                            } else {
+                                Circle()
+                                    .fill(accentColor)
+                                    .frame(width: 5, height: 5)
+                            }
 
                             Text(isOver
                                  ? String(format: "€%.0f over", overAmount)

@@ -154,6 +154,13 @@ struct MiniBudgetRing: View {
                 .frame(width: size, height: size)
                 .rotationEffect(.degrees(-90))
                 .animation(.spring(response: 0.8, dampingFraction: 0.8), value: animationProgress)
+
+            // Warning icon at 85%+ thresholds
+            if spendRatio >= 0.85 {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: size * 0.32, weight: .semibold))
+                    .foregroundColor(ringColor ?? paceStatus.color)
+            }
         }
         .onAppear {
             replayAnimation()

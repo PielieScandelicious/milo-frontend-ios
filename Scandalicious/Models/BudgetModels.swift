@@ -107,6 +107,20 @@ struct BudgetProgress {
         projectedEndOfMonth - budget.monthlyAmount
     }
 
+    /// Unified budget color following the same rules as category bars:
+    ///   spendRatio < 0.85  → green
+    ///   0.85 ..< 1.0       → orange
+    ///   >= 1.0             → red
+    var budgetStatusColor: Color {
+        if spendRatio >= 1.0 {
+            return Color(red: 1.0, green: 0.4, blue: 0.4)
+        } else if spendRatio >= 0.85 {
+            return Color(red: 1.0, green: 0.75, blue: 0.3)
+        } else {
+            return Color(red: 0.3, green: 0.8, blue: 0.5)
+        }
+    }
+
     var paceStatus: PaceStatus {
         let variance = spendRatio - expectedSpendRatio
 

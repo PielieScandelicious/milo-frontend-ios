@@ -164,6 +164,7 @@ class ReceiptProcessingManager: ObservableObject {
     }
 
     private func handleReceiptCompleted(_ receipt: ProcessingReceipt) {
+        print("[ReceiptProcessingMgr] 🎉 Receipt completed: \(receipt.storeName ?? "unknown") — posting .receiptUploadedSuccessfully")
         NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
 

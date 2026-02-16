@@ -25,10 +25,6 @@ private struct BudgetCategoryDonut: View {
 
     @State private var revealProgress: CGFloat = 0
 
-    private var isOverBudget: Bool {
-        progress.currentSpend > progress.budget.monthlyAmount
-    }
-
     private static let greenPalette: [Color] = [
         Color(red: 0.22, green: 0.72, blue: 0.45),
         Color(red: 0.28, green: 0.78, blue: 0.52),
@@ -38,6 +34,17 @@ private struct BudgetCategoryDonut: View {
         Color(red: 0.30, green: 0.65, blue: 0.50),
         Color(red: 0.32, green: 0.80, blue: 0.55),
         Color(red: 0.38, green: 0.70, blue: 0.46),
+    ]
+
+    private static let orangePalette: [Color] = [
+        Color(red: 1.00, green: 0.72, blue: 0.28),
+        Color(red: 0.98, green: 0.78, blue: 0.32),
+        Color(red: 0.95, green: 0.68, blue: 0.25),
+        Color(red: 1.00, green: 0.75, blue: 0.35),
+        Color(red: 0.92, green: 0.70, blue: 0.22),
+        Color(red: 0.96, green: 0.80, blue: 0.30),
+        Color(red: 0.94, green: 0.72, blue: 0.26),
+        Color(red: 0.98, green: 0.76, blue: 0.33),
     ]
 
     private static let redPalette: [Color] = [
@@ -52,7 +59,13 @@ private struct BudgetCategoryDonut: View {
     ]
 
     private var activePalette: [Color] {
-        isOverBudget ? Self.redPalette : Self.greenPalette
+        if progress.spendRatio >= 1.0 {
+            return Self.redPalette
+        } else if progress.spendRatio >= 0.85 {
+            return Self.orangePalette
+        } else {
+            return Self.greenPalette
+        }
     }
 
     private struct SliceData {
@@ -154,15 +167,8 @@ private struct BudgetTotalRing: View {
 
     @State private var animationProgress: CGFloat = 0
 
-    private var isOverBudget: Bool {
-        progress.currentSpend > progress.budget.monthlyAmount
-    }
-
-    // Same green/red as collapsedHeader's accentColor
     private var ringColor: Color {
-        isOverBudget
-            ? Color(red: 1.0, green: 0.4, blue: 0.4)
-            : Color(red: 0.3, green: 0.8, blue: 0.5)
+        progress.budgetStatusColor
     }
 
     private var strokeWidth: CGFloat {
