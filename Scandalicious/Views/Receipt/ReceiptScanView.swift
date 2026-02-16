@@ -279,7 +279,7 @@ struct ReceiptScanView: View {
 
                 // Receipt upload limit
                 Button(action: {}) {
-                    Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts", systemImage: receiptLimitIcon)
+                    Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) \(L("receipt_plural"))", systemImage: receiptLimitIcon)
                 }
                 .tint(receiptLimitColor)
             }
@@ -289,7 +289,7 @@ struct ReceiptScanView: View {
                 Button {
                     showProfile = true
                 } label: {
-                    Label("Profile", systemImage: "person.fill")
+                    Label(L("profile"), systemImage: "person.fill")
                 }
             }
         } label: {

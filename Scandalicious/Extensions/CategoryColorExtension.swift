@@ -99,6 +99,43 @@ private let _categoryNameToTranslationKey: [String: String] = [
     "Personal Care": "group_personal_care",
 ]
 
+// MARK: - Period Localization
+
+extension String {
+    /// Converts English period string (e.g., "February 2026") to user's language.
+    /// Returns "All" periods via L("all_time"). Keeps internal key unchanged.
+    var localizedPeriod: String {
+        if self == "All" { return L("all_time") }
+
+        let parser = DateFormatter()
+        parser.dateFormat = "MMMM yyyy"
+        parser.locale = Locale(identifier: "en_US")
+        guard let date = parser.date(from: self) else { return self }
+
+        let output = DateFormatter()
+        output.dateFormat = "MMMM yyyy"
+        let langCode = LanguageManager.currentLanguageCode
+        output.locale = Locale(identifier: langCode == "nl" ? "nl_BE" : langCode == "fr" ? "fr_BE" : "en_US")
+        return output.string(from: date)
+    }
+
+    /// Short localized period (e.g., "Feb 26" / "feb 26")
+    var localizedShortPeriod: String {
+        if self == "All" { return L("all_time") }
+
+        let parser = DateFormatter()
+        parser.dateFormat = "MMMM yyyy"
+        parser.locale = Locale(identifier: "en_US")
+        guard let date = parser.date(from: self) else { return self }
+
+        let output = DateFormatter()
+        output.dateFormat = "MMM yy"
+        let langCode = LanguageManager.currentLanguageCode
+        output.locale = Locale(identifier: langCode == "nl" ? "nl_BE" : langCode == "fr" ? "fr_BE" : "en_US")
+        return output.string(from: date)
+    }
+}
+
 // MARK: - Category Icon Lookup (Phosphor)
 extension String {
     /// Get Phosphor icon identifier for a grocery category based on its name.

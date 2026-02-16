@@ -151,7 +151,7 @@ struct StoreDetailView: View {
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
-            Text(storeBreakdown.period == "All" ? L("all_time") : storeBreakdown.period)
+            Text(storeBreakdown.period.localizedPeriod)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
 
