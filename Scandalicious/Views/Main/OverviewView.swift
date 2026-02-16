@@ -1658,12 +1658,19 @@ struct OverviewView: View {
                 Task { await batchFetchSplitData(for: cachedItems) }
             }
 
+            // Set loading state BEFORE withAnimation so expandedCategoryItemsSection
+            // renders skeleton content immediately (gives ClipReveal something to measure)
+            let needsLoad = categoryItems[category.id] == nil && loadingCategoryId != category.id
+            if needsLoad {
+                loadingCategoryId = category.id
+                categoryLoadError[category.id] = nil
+            }
+
             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                 expandedCategoryId = category.id
             }
 
-            // Fallback: load from API if not in cache or local state
-            if categoryItems[category.id] == nil && loadingCategoryId != category.id {
+            if needsLoad {
                 Task {
                     await loadCategoryItems(category, period: period)
                 }
@@ -2617,6 +2624,7 @@ struct OverviewView: View {
                     .onPreferenceChange(RowsOverflowHeightKey.self) { overflowRowsHeight = $0 }
                     .frame(height: showAllRows ? overflowRowsHeight : 0, alignment: .top)
                     .clipped()
+                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showAllRows ? overflowRowsHeight : 0)
                     .allowsHitTesting(showAllRows)
 
                     showAllRowsButton(
@@ -2703,6 +2711,7 @@ struct OverviewView: View {
                     .onPreferenceChange(RowsOverflowHeightKey.self) { overflowRowsHeight = $0 }
                     .frame(height: showAllRows ? overflowRowsHeight : 0, alignment: .top)
                     .clipped()
+                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showAllRows ? overflowRowsHeight : 0)
                     .allowsHitTesting(showAllRows)
 
                     showAllRowsButton(
@@ -2812,6 +2821,10 @@ private struct ClipReveal: ViewModifier {
     let isVisible: Bool
     @State private var contentHeight: CGFloat = 0
 
+    private var effectiveHeight: CGFloat {
+        isVisible ? contentHeight : 0
+    }
+
     func body(content: Content) -> some View {
         content
             .fixedSize(horizontal: false, vertical: true)
@@ -2822,8 +2835,9 @@ private struct ClipReveal: ViewModifier {
                         .onChange(of: geo.size.height) { _, h in contentHeight = h }
                 }
             )
-            .frame(height: isVisible ? contentHeight : 0, alignment: .top)
+            .frame(height: effectiveHeight, alignment: .top)
             .clipped()
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: effectiveHeight)
             .allowsHitTesting(isVisible)
     }
 }
