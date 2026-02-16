@@ -202,7 +202,7 @@ struct CategoryDetailView: View {
                         .foregroundStyle(category.color)
                         .frame(width: 20, height: 20)
 
-                    Text(category.name)
+                    Text(category.name.localizedCategoryName)
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                 }

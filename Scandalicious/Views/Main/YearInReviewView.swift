@@ -112,7 +112,7 @@ struct YearInReviewView: View {
                             .clipShape(Circle())
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(category.name)
+                            Text(category.name.localizedCategoryName)
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(.primary)
                             Text("\(category.transactionCount) \(category.transactionCount == 1 ? L("transaction_singular") : L("transaction_plural"))")

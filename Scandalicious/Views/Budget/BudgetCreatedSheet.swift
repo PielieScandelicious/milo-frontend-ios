@@ -294,7 +294,7 @@ struct BudgetCreatedSheet: View {
             }
 
             // Name
-            Text(allocation.category.normalizedCategoryName)
+            Text(allocation.category.localizedCategoryName)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white)
                 .lineLimit(1)

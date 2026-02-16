@@ -461,7 +461,7 @@ struct ReceiptScanView: View {
             // Top category
             insightPill(
                 icon: topCategories.first?.icon ?? "square.grid.2x2.fill",
-                value: topCategories.first?.name.normalizedCategoryName ?? "—",
+                value: topCategories.first?.name.localizedCategoryName ?? "—",
                 label: "#1 CATEGORY",
                 color: topCategories.first?.name.normalizedCategoryName.categoryColor ?? Color.purple
             )
@@ -700,7 +700,7 @@ struct ReceiptScanView: View {
                 .frame(width: 18, height: 18)
 
             // Category name
-            Text(category.name.normalizedCategoryName)
+            Text(category.name.localizedCategoryName)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)

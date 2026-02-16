@@ -193,7 +193,7 @@ struct BudgetActivityRingsGrid: View {
                                         .font(.system(size: 13, weight: .semibold))
                                         .foregroundStyle(registry.colorForGroup(section.group))
 
-                                    Text(section.group)
+                                    Text(registry.localizedGroupName(section.group))
                                         .font(.system(size: 14, weight: .semibold))
                                         .foregroundStyle(.white.opacity(0.7))
 

@@ -37,7 +37,67 @@ extension String {
 
         return self
     }
+
+    /// Localized category display name: normalizes then translates to current language.
+    /// Use this for UI display. Keep `normalizedCategoryName` for color/icon lookups.
+    var localizedCategoryName: String {
+        let normalized = self.normalizedCategoryName
+        if let key = _categoryNameToTranslationKey[normalized] {
+            return L(key)
+        }
+        return normalized
+    }
 }
+
+/// English display name → AppStrings key for category translations
+private let _categoryNameToTranslationKey: [String: String] = [
+    "Fruits": "cat_fruits",
+    "Vegetables": "cat_vegetables",
+    "Meat & Poultry": "cat_meat_poultry",
+    "Charcuterie & Salads": "cat_charcuterie_salads",
+    "Fish & Seafood": "cat_fish_seafood",
+    "Dairy, Eggs & Cheese": "cat_dairy_eggs_cheese",
+    "Dairy Eggs & Cheese": "cat_dairy_eggs_cheese",
+    "Bakery": "cat_bakery",
+    "Pastries": "cat_pastries",
+    "Grains, Pasta & Potatoes": "cat_grains_pasta_potatoes",
+    "Grains Pasta & Potatoes": "cat_grains_pasta_potatoes",
+    "Canned & Jarred Goods": "cat_canned_jarred",
+    "Sauces & Condiments": "cat_sauces_condiments",
+    "Breakfast & Cereal": "cat_breakfast_cereal",
+    "Baking & Flour": "cat_baking_flour",
+    "Frozen Ingredients": "cat_frozen_ingredients",
+    "Fries & Snacks": "cat_fries_snacks",
+    "Ready Meals & Pizza": "cat_ready_meals",
+    "Ready Meals": "cat_ready_meals",
+    "Water": "cat_water",
+    "Soda & Juices": "cat_soda_juices",
+    "Coffee & Tea": "cat_coffee_tea",
+    "Alcohol": "cat_alcohol",
+    "Chips, Nuts & Aperitif": "cat_chips_nuts",
+    "Chips Nuts & Aperitif": "cat_chips_nuts",
+    "Chocolate & Sweets": "cat_chocolate_sweets",
+    "Waste Bags": "cat_waste_bags",
+    "Cleaning & Paper Goods": "cat_cleaning",
+    "Cleaning": "cat_cleaning",
+    "Pharmacy & Hygiene": "cat_pharmacy_hygiene",
+    "Pharmacy": "cat_pharmacy_hygiene",
+    "Baby & Kids": "cat_baby_kids",
+    "Pet Supplies": "cat_pet_supplies",
+    "Tobacco": "cat_tobacco",
+    "Lottery & Scratch Cards": "cat_lottery",
+    "Lottery": "cat_lottery",
+    "Deposits": "cat_deposits",
+    "Other": "cat_other",
+    // Group names
+    "Fresh Food": "group_fresh_food",
+    "Pantry & Staples": "group_pantry_staples",
+    "Frozen": "group_frozen",
+    "Drinks": "group_drinks",
+    "Snacks": "group_snacks",
+    "Household": "group_household",
+    "Personal Care": "group_personal_care",
+]
 
 // MARK: - Category Icon Lookup (Phosphor)
 extension String {

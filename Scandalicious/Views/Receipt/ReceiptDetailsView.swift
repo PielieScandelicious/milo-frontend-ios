@@ -411,7 +411,7 @@ struct ReceiptItemRow: View {
                     }
 
                     // Category
-                    Text(transaction.category)
+                    Text(transaction.category.localizedCategoryName)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }

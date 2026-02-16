@@ -270,7 +270,7 @@ struct BudgetSetupView: View {
             }
 
             // Name
-            Text(target.category.normalizedCategoryName)
+            Text(target.category.localizedCategoryName)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white.opacity(0.85))
                 .lineLimit(1)
@@ -541,7 +541,7 @@ struct CategoryPickerSheet: View {
                                             .foregroundStyle(category.categoryColor)
                                     }
 
-                                    Text(category.normalizedCategoryName)
+                                    Text(category.localizedCategoryName)
                                         .font(.system(size: 15, weight: .medium))
                                         .foregroundColor(.white)
 
