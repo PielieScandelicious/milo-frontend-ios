@@ -370,7 +370,7 @@ struct ReceiptTransactionsView: View {
                                     .foregroundStyle(subColor)
                                     .frame(width: 16, height: 16)
 
-                                Text(subCategory)
+                                Text(subCategory.localizedCategoryName)
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(.white.opacity(0.6))
 

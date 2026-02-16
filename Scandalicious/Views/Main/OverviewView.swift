@@ -873,7 +873,7 @@ struct OverviewView: View {
                 value: category.totalSpent,
                 color: category.color,
                 iconName: category.icon,
-                label: category.name
+                label: category.name.localizedCategoryName
             )
         }
     }
@@ -2874,7 +2874,7 @@ private struct ExpandableCategoryRowHeader: View {
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(category.name)
+                    Text(category.name.localizedCategoryName)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(2)
@@ -2930,7 +2930,7 @@ private struct CategoryRowButton: View {
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(category.name)
+                    Text(category.name.localizedCategoryName)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(2)

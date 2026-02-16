@@ -1308,6 +1308,11 @@ struct CategorySpendItem: Codable, Identifiable {
         name.normalizedCategoryName
     }
 
+    /// Localized display name for UI (translates to user's language)
+    var localizedName: String {
+        name.localizedCategoryName
+    }
+
     /// Color from health-based gradient (green=healthy → red=unhealthy) if available,
     /// otherwise falls back to hex string or category-based color
     var color: Color {
@@ -1338,7 +1343,7 @@ struct CategorySpendItem: Codable, Identifiable {
             value: totalSpent,
             color: color,
             iconName: icon,
-            label: normalizedName
+            label: localizedName
         )
     }
 }

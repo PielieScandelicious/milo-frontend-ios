@@ -24,13 +24,14 @@ struct FlippableDonutChartView: View {
         segments.map { segment in
             // Normalize name and get icon from category name
             let normalizedName = segment.label.normalizedCategoryName
+            let localizedName = segment.label.localizedCategoryName
             let icon = normalizedName.categoryIcon
 
             return ChartData(
                 value: segment.value,
                 color: segment.color,
                 iconName: icon,
-                label: normalizedName
+                label: localizedName  // Localized for display; icon uses English normalizedName
             )
         }
     }

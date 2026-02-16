@@ -226,7 +226,7 @@ struct CategoryBreakdownDetailView: View {
                 .frame(width: 24, height: 24)
                 .foregroundStyle(category.color)
 
-            Text(category.name)
+            Text(category.name.localizedCategoryName)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -360,7 +360,7 @@ struct CategoryBreakdownDetailView: View {
 
             // Category name + percentage
             VStack(alignment: .leading, spacing: 2) {
-                Text(category.name)
+                Text(category.name.localizedCategoryName)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)

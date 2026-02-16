@@ -178,37 +178,37 @@ enum ExpenseCategory: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .fruits: return "Fruits"
-        case .vegetables: return "Vegetables"
-        case .meatAndPoultry: return "Meat & Poultry"
-        case .charcuterieAndDeli: return "Charcuterie & Deli"
-        case .fishAndSeafood: return "Fish & Seafood"
-        case .dairyEggsCheese: return "Dairy, Eggs & Cheese"
-        case .bakery: return "Bakery"
-        case .pastries: return "Pastries"
-        case .grainsAndPasta: return "Grains & Pasta"
-        case .cannedGoods: return "Canned Goods"
-        case .saucesAndCondiments: return "Sauces & Condiments"
-        case .breakfastAndCereal: return "Breakfast & Cereal"
-        case .bakingAndFlour: return "Baking & Flour"
-        case .frozenIngredients: return "Frozen Ingredients"
-        case .friesAndSnacks: return "Fries & Snacks"
-        case .readyMeals: return "Ready Meals"
-        case .water: return "Water"
-        case .sodaAndJuice: return "Soda & Juice"
-        case .coffeeAndTea: return "Coffee & Tea"
-        case .alcohol: return "Alcohol"
-        case .chipsAndNuts: return "Chips & Nuts"
-        case .chocolateAndSweets: return "Chocolate & Sweets"
-        case .wasteBags: return "Waste Bags"
-        case .cleaning: return "Cleaning"
-        case .pharmacy: return "Pharmacy & Hygiene"
-        case .babyAndKids: return "Baby & Kids"
-        case .petSupplies: return "Pet Supplies"
-        case .tobacco: return "Tobacco"
-        case .lottery: return "Lottery"
-        case .deposits: return "Deposits"
-        case .other: return "Other"
+        case .fruits: return L("cat_fruits")
+        case .vegetables: return L("cat_vegetables")
+        case .meatAndPoultry: return L("cat_meat_poultry")
+        case .charcuterieAndDeli: return L("cat_charcuterie_salads")
+        case .fishAndSeafood: return L("cat_fish_seafood")
+        case .dairyEggsCheese: return L("cat_dairy_eggs_cheese")
+        case .bakery: return L("cat_bakery")
+        case .pastries: return L("cat_pastries")
+        case .grainsAndPasta: return L("cat_grains_pasta_potatoes")
+        case .cannedGoods: return L("cat_canned_jarred")
+        case .saucesAndCondiments: return L("cat_sauces_condiments")
+        case .breakfastAndCereal: return L("cat_breakfast_cereal")
+        case .bakingAndFlour: return L("cat_baking_flour")
+        case .frozenIngredients: return L("cat_frozen_ingredients")
+        case .friesAndSnacks: return L("cat_fries_snacks")
+        case .readyMeals: return L("cat_ready_meals")
+        case .water: return L("cat_water")
+        case .sodaAndJuice: return L("cat_soda_juices")
+        case .coffeeAndTea: return L("cat_coffee_tea")
+        case .alcohol: return L("cat_alcohol")
+        case .chipsAndNuts: return L("cat_chips_nuts")
+        case .chocolateAndSweets: return L("cat_chocolate_sweets")
+        case .wasteBags: return L("cat_waste_bags")
+        case .cleaning: return L("cat_cleaning")
+        case .pharmacy: return L("cat_pharmacy_hygiene")
+        case .babyAndKids: return L("cat_baby_kids")
+        case .petSupplies: return L("cat_pet_supplies")
+        case .tobacco: return L("cat_tobacco")
+        case .lottery: return L("cat_lottery")
+        case .deposits: return L("cat_deposits")
+        case .other: return L("cat_other")
         }
     }
 

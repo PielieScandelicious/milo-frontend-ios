@@ -182,7 +182,7 @@ struct EditCategoryBudgetsSheet: View {
 
             // Name + edit indicator
             VStack(alignment: .leading, spacing: 1) {
-                Text(alloc.category.normalizedCategoryName)
+                Text(alloc.category.localizedCategoryName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)

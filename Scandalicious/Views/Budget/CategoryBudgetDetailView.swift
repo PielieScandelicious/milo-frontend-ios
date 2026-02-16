@@ -339,7 +339,7 @@ struct CategoryBudgetDetailView: View {
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(registry.colorForGroup(section.group))
 
-                                Text(section.group)
+                                Text(registry.localizedGroupName(section.group))
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundColor(.white)
 

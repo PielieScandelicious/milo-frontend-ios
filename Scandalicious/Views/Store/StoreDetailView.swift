@@ -356,8 +356,8 @@ struct StoreDetailView: View {
                     let cacheKey = cache.categoryItemsKey(period: period, category: category.name)
                     if let cachedItems = cache.categoryItemsCache[cacheKey] {
                         let storeFiltered = cachedItems.filter { $0.storeName == storeBreakdown.storeName }
-                        let normalizedName = category.name.normalizedCategoryName
-                        categoryTransactions[normalizedName] = storeFiltered
+                        let localizedName = category.name.localizedCategoryName
+                        categoryTransactions[localizedName] = storeFiltered
                     }
                 }
             }
@@ -534,6 +534,7 @@ struct StoreDetailView: View {
     private func categoryToSegment(category: Category) -> ChartSegment {
         // Normalize name in case backend returns enum-style names (e.g., "MEAT_FISH" -> "Meat & Fish")
         let normalizedName = category.name.normalizedCategoryName
+        let localizedName = category.name.localizedCategoryName
 
         let color: Color
         if let healthColor = normalizedName.groceryHealthColor {
@@ -547,7 +548,7 @@ struct StoreDetailView: View {
             endAngle: .degrees(0),
             color: color,
             value: category.spent,
-            label: normalizedName,
+            label: localizedName,
             percentage: category.percentage
         )
     }

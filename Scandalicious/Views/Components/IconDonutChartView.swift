@@ -610,11 +610,12 @@ extension Array where Element == CategoryBreakdown {
         return map { category in
             // Normalize name in case backend returns enum-style names (e.g., "BAKERY" -> "Bakery")
             let normalizedName = category.name.normalizedCategoryName
+            let localizedName = category.name.localizedCategoryName
             return ChartData(
                 value: category.spent,
                 color: normalizedName.categoryColor,
                 iconName: normalizedName.categoryIcon,
-                label: normalizedName
+                label: localizedName
             )
         }
     }
@@ -628,13 +629,14 @@ extension Array where Element == Category {
         return map { category in
             // Normalize name in case backend returns enum-style names (e.g., "BAKERY" -> "Bakery")
             let normalizedName = category.name.normalizedCategoryName
+            let localizedName = category.name.localizedCategoryName
             let icon = normalizedName.categoryIcon
 
             return ChartData(
                 value: category.spent,
                 color: normalizedName.categoryColor,
                 iconName: icon,
-                label: normalizedName
+                label: localizedName
             )
         }
     }
