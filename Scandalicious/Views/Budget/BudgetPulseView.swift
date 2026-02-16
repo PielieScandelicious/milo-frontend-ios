@@ -7,6 +7,15 @@
 
 import SwiftUI
 
+// MARK: - Height Measurement Key
+
+private struct ExpandedContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 // MARK: - Budget Mode
 
 private enum BudgetMode {
@@ -51,6 +60,7 @@ struct BudgetPulseView: View {
     @State private var isSmartBudget = true
     @State private var showCategoryPicker = false
     @State private var showTotalBudget = true
+    @State private var expandedContentHeight: CGFloat = 0
     @FocusState private var focusedField: FocusField?
 
     private enum FocusField: Hashable {
@@ -1357,10 +1367,17 @@ struct BudgetPulseView: View {
         VStack(spacing: 0) {
             collapsedHeader(progress)
 
-            if isExpanded {
-                expandedContent(progress)
-                    .transition(.identity)
-            }
+            expandedContent(progress)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: ExpandedContentHeightKey.self, value: geo.size.height)
+                    }
+                )
+                .onPreferenceChange(ExpandedContentHeightKey.self) { expandedContentHeight = $0 }
+                .frame(height: isExpanded ? expandedContentHeight : 0, alignment: .top)
+                .clipped()
+                .allowsHitTesting(isExpanded)
         }
     }
 

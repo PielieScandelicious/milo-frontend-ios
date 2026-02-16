@@ -23,6 +23,13 @@ enum SortOption: String, CaseIterable {
     case storeName = "Store Name"
 }
 
+private struct RowsOverflowHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 
 
 
@@ -57,6 +64,9 @@ struct OverviewView: View {
     @State private var categoryItems: [String: [APITransaction]] = [:]  // Loaded items per category
     @State private var loadingCategoryId: String?  // Currently loading category
     @State private var categoryLoadError: [String: String] = [:]  // Error messages per category
+    @State private var categoryCurrentPage: [String: Int] = [:]  // Current loaded page per category
+    @State private var categoryHasMore: [String: Bool] = [:]  // Whether more pages exist per category
+    @State private var categoryLoadingMore: String?  // Category currently loading more items
     @ObservedObject private var splitCache = SplitCacheManager.shared  // For split avatar display
     @State private var showingAllTransactions = false
     @State private var lastRefreshTime: Date?
@@ -82,6 +92,7 @@ struct OverviewView: View {
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
+    @State private var overflowRowsHeight: CGFloat = 0 // Measured height of overflow rows for clip animation
     @State private var chartRefreshToken: Int = 0 // Incremented on receipt upload to force pie chart re-animation
     @State private var budgetExpanded = false // Track if budget widget is expanded
     @State private var activeCardPage = 0 // 0=budget, 1=promos
@@ -635,12 +646,18 @@ struct OverviewView: View {
                 await MainActor.run {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
                     }
                 }
             } else {
                 // Not viewing affected period - safe to clear in-memory caches
                 pieChartSummaryCache.removeValue(forKey: currentMonthPeriod)
                 categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
             }
 
             await rateLimitManager.syncFromBackend()
@@ -695,6 +712,9 @@ struct OverviewView: View {
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
                 }
             }
         }
@@ -768,6 +788,9 @@ struct OverviewView: View {
 
             // Pre-populate categoryItems from cache for instant expansion
             categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
             for category in cachedPieChart.categories {
                 let key = cache.categoryItemsKey(period: newValue, category: category.name)
                 if let items = cache.categoryItemsCache[key] {
@@ -777,9 +800,15 @@ struct OverviewView: View {
         } else if pieChartSummaryCache[newValue] == nil {
             // No cached pie chart data - fetch from backend
             categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
             Task { await fetchCategoryData(for: newValue) }
         } else {
             categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
         }
 
         // Breakdowns should already be loaded; if not, fetch
@@ -1006,6 +1035,9 @@ struct OverviewView: View {
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.3)) {
                 categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
             }
         }
 
@@ -1597,6 +1629,20 @@ struct OverviewView: View {
 
     // MARK: - Expandable Category Functions
 
+    /// Batch-fetch split data for a list of items so rows don't fetch one-by-one during scroll
+    private func batchFetchSplitData(for items: [APITransaction]) async {
+        let receiptIds = Set(items.compactMap { $0.receiptId })
+        let uncachedIds = receiptIds.filter { !splitCache.hasSplit(for: $0) }
+        guard !uncachedIds.isEmpty else { return }
+        await withTaskGroup(of: Void.self) { group in
+            for receiptId in uncachedIds {
+                group.addTask {
+                    await self.splitCache.fetchSplit(for: receiptId)
+                }
+            }
+        }
+    }
+
     private func toggleCategoryExpansion(_ category: CategorySpendItem, period: String) {
         if expandedCategoryId == category.id {
             // Collapse
@@ -1608,6 +1654,8 @@ struct OverviewView: View {
             let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
             if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
                 categoryItems[category.id] = cachedItems
+                // Batch-fetch split data so rows don't fetch one-by-one
+                Task { await batchFetchSplitData(for: cachedItems) }
             }
 
             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
@@ -1640,7 +1688,8 @@ struct OverviewView: View {
             // Use the category name directly from the backend
             filters.category = category.name
 
-            filters.pageSize = 100
+            filters.page = 1
+            filters.pageSize = 10
 
             // Parse period to get date range (e.g., "January 2026")
             let dateFormatter = DateFormatter()
@@ -1663,10 +1712,15 @@ struct OverviewView: View {
 
             await MainActor.run {
                 categoryItems[category.id] = response.transactions
+                categoryCurrentPage[category.id] = 1
+                categoryHasMore[category.id] = response.page < response.totalPages
                 loadingCategoryId = nil
                 // Update cache
                 AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: response.transactions)
             }
+
+            // Batch-fetch split data so rows don't fetch one-by-one during scroll
+            await batchFetchSplitData(for: response.transactions)
         } catch {
             await MainActor.run {
                 categoryLoadError[category.id] = error.localizedDescription
@@ -1675,76 +1729,138 @@ struct OverviewView: View {
         }
     }
 
-    private func expandedCategoryItemsSection(_ category: CategorySpendItem) -> some View {
-        VStack(spacing: 0) {
-            if loadingCategoryId == category.id {
-                // Skeleton loading state
-                VStack(spacing: 8) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        SkeletonTransactionRow()
-                    }
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 8)
-            } else if let errorMsg = categoryLoadError[category.id] {
-                // Error state
-                VStack(spacing: 8) {
-                    Text("Failed to load items")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.orange)
-                    Text(errorMsg)
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.4))
-                        .multilineTextAlignment(.center)
-                    Button {
-                        Task { await loadCategoryItems(category, period: selectedPeriod) }
-                    } label: {
-                        Text("Retry")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.blue)
-                    }
-                }
-                .padding(.vertical, 12)
-            } else if let items = categoryItems[category.id] {
-                if items.isEmpty {
-                    // Empty state
-                    VStack(spacing: 6) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.3))
-                        Text("No items found")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
-                    .padding(.vertical, 16)
-                } else {
-                    // Items list with staggered appearance
-                    VStack(spacing: 0) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            expandedCategoryItemRow(item, category: category, isLast: index == items.count - 1)
-                                .transition(.opacity.combined(with: .offset(y: -4)))
-                                .animation(
-                                    .spring(response: 0.3, dampingFraction: 0.85)
-                                        .delay(Double(index) * 0.03),
-                                    value: expandedCategoryId
-                                )
-                        }
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-                }
-            } else {
-                // Fallback: items not yet available, show skeleton briefly
-                VStack(spacing: 8) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        SkeletonTransactionRow()
-                    }
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 8)
+    private func loadMoreCategoryItems(_ category: CategorySpendItem, period: String) async {
+        guard categoryHasMore[category.id] == true,
+              categoryLoadingMore != category.id else { return }
+
+        let nextPage = (categoryCurrentPage[category.id] ?? 1) + 1
+
+        await MainActor.run {
+            categoryLoadingMore = category.id
+        }
+
+        do {
+            var filters = TransactionFilters()
+            filters.category = category.name
+            filters.page = nextPage
+            filters.pageSize = 10
+
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+            dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+            if let parsedDate = dateFormatter.date(from: period) {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: "UTC")!
+
+                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
+                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+
+                filters.startDate = startOfMonth
+                filters.endDate = endOfMonth
+            }
+
+            let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
+
+            await MainActor.run {
+                let existing = categoryItems[category.id] ?? []
+                categoryItems[category.id] = existing + response.transactions
+                categoryCurrentPage[category.id] = nextPage
+                categoryHasMore[category.id] = response.page < response.totalPages
+                categoryLoadingMore = nil
+                // Update cache with accumulated items
+                AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: categoryItems[category.id] ?? [])
+            }
+
+            await batchFetchSplitData(for: response.transactions)
+        } catch {
+            await MainActor.run {
+                categoryLoadingMore = nil
             }
         }
-        .padding(.horizontal, 8)
+    }
+
+    @ViewBuilder
+    private func expandedCategoryItemsSection(_ category: CategorySpendItem) -> some View {
+        let hasContent = loadingCategoryId == category.id
+            || categoryLoadError[category.id] != nil
+            || categoryItems[category.id] != nil
+
+        if hasContent {
+            VStack(spacing: 0) {
+                if loadingCategoryId == category.id {
+                    // Skeleton loading state
+                    VStack(spacing: 8) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            SkeletonTransactionRow()
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 8)
+                } else if let errorMsg = categoryLoadError[category.id] {
+                    // Error state
+                    VStack(spacing: 8) {
+                        Text("Failed to load items")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.orange)
+                        Text(errorMsg)
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.4))
+                            .multilineTextAlignment(.center)
+                        Button {
+                            Task { await loadCategoryItems(category, period: selectedPeriod) }
+                        } label: {
+                            Text("Retry")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                } else if let items = categoryItems[category.id] {
+                    if items.isEmpty {
+                        // Empty state
+                        VStack(spacing: 6) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white.opacity(0.3))
+                            Text("No items found")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+                        .padding(.vertical, 16)
+                    } else {
+                        // Items list — scrollable, max 5 visible at a time
+                        ScrollView(.vertical, showsIndicators: true) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    expandedCategoryItemRow(item, category: category, isLast: index == items.count - 1)
+                                        .onAppear {
+                                            // Load more when last item appears
+                                            if index == items.count - 1 {
+                                                Task { await loadMoreCategoryItems(category, period: selectedPeriod) }
+                                            }
+                                        }
+                                }
+
+                                // Loading more indicator
+                                if categoryLoadingMore == category.id {
+                                    ProgressView()
+                                        .tint(.white.opacity(0.5))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                }
+                            }
+                        }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .frame(maxHeight: 5 * 50)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+        }
     }
 
     private func expandedCategoryItemRow(_ item: APITransaction, category: CategorySpendItem, isLast: Bool) -> some View {
@@ -1840,12 +1956,6 @@ struct OverviewView: View {
                     .fill(Color.white.opacity(0.05))
                     .frame(height: 0.5)
                     .padding(.leading, 32)
-            }
-        }
-        .task {
-            // Fetch split data if we have a receipt ID and it's not cached
-            if let receiptId = item.receiptId, !splitCache.hasSplit(for: receiptId) {
-                await splitCache.fetchSplit(for: receiptId)
             }
         }
     }
@@ -2422,7 +2532,6 @@ struct OverviewView: View {
     ) -> some View {
         VStack(spacing: 0) {
             if isPieChartFlipped && !categories.isEmpty {
-                let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
                 let hasMoreCategories = categories.count > maxVisibleRows
 
                 legendSectionTitle(
@@ -2430,9 +2539,9 @@ struct OverviewView: View {
                     count: categories.count
                 )
 
-                ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
+                // Always-visible rows (first maxVisibleRows)
+                ForEach(Array(categories.prefix(maxVisibleRows).enumerated()), id: \.element.id) { index, category in
                     VStack(spacing: 0) {
-                        // Subtle divider between rows (not before first)
                         if index > 0 {
                             LinearGradient(
                                 colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
@@ -2451,13 +2560,8 @@ struct OverviewView: View {
                             }
                         )
 
-                        if expandedCategoryId == category.id {
-                            expandedCategoryItemsSection(category)
-                                .transition(.asymmetric(
-                                    insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
-                                    removal: .opacity
-                                ))
-                        }
+                        expandedCategoryItemsSection(category)
+                            .clipReveal(isVisible: expandedCategoryId == category.id)
                     }
                     .opacity(storeRowsAppeared ? 1 : 0)
                     .offset(y: storeRowsAppeared ? 0 : 15)
@@ -2468,14 +2572,59 @@ struct OverviewView: View {
                     )
                 }
 
+                // Overflow rows (clipped when collapsed)
                 if hasMoreCategories {
+                    VStack(spacing: 0) {
+                        ForEach(Array(categories.dropFirst(maxVisibleRows).enumerated()), id: \.element.id) { index, category in
+                            VStack(spacing: 0) {
+                                LinearGradient(
+                                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(height: 0.5)
+                                .padding(.leading, 44)
+
+                                ExpandableCategoryRowHeader(
+                                    category: category,
+                                    isExpanded: expandedCategoryId == category.id,
+                                    onTap: {
+                                        toggleCategoryExpansion(category, period: period)
+                                    }
+                                )
+
+                                if expandedCategoryId == category.id {
+                                    expandedCategoryItemsSection(category)
+                                        .transaction { $0.animation = nil }
+                                        .clipped()
+                                }
+                            }
+                            .opacity(storeRowsAppeared ? 1 : 0)
+                            .offset(y: storeRowsAppeared ? 0 : 15)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index + maxVisibleRows) * 0.08),
+                                value: storeRowsAppeared
+                            )
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(key: RowsOverflowHeightKey.self, value: geo.size.height)
+                        }
+                    )
+                    .onPreferenceChange(RowsOverflowHeightKey.self) { overflowRowsHeight = $0 }
+                    .frame(height: showAllRows ? overflowRowsHeight : 0, alignment: .top)
+                    .clipped()
+                    .allowsHitTesting(showAllRows)
+
                     showAllRowsButton(
                         isExpanded: showAllRows,
                         totalCount: categories.count
                     )
                 }
             } else if !isPieChartFlipped && !segments.isEmpty {
-                let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
                 let hasMoreSegments = segments.count > maxVisibleRows
 
                 legendSectionTitle(
@@ -2483,9 +2632,9 @@ struct OverviewView: View {
                     count: segments.count
                 )
 
-                ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
+                // Always-visible rows (first maxVisibleRows)
+                ForEach(Array(segments.prefix(maxVisibleRows).enumerated()), id: \.element.id) { index, segment in
                     VStack(spacing: 0) {
-                        // Subtle divider between rows (not before first)
                         if index > 0 {
                             LinearGradient(
                                 colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
@@ -2514,7 +2663,48 @@ struct OverviewView: View {
                     )
                 }
 
+                // Overflow rows (clipped when collapsed)
                 if hasMoreSegments {
+                    VStack(spacing: 0) {
+                        ForEach(Array(segments.dropFirst(maxVisibleRows).enumerated()), id: \.element.id) { index, segment in
+                            VStack(spacing: 0) {
+                                LinearGradient(
+                                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(height: 0.5)
+                                .padding(.leading, 24)
+
+                                StoreRowButton(
+                                    segment: segment,
+                                    breakdowns: breakdowns,
+                                    onSelect: { breakdown, color in
+                                        selectedStoreColor = color
+                                        selectedBreakdown = breakdown
+                                    }
+                                )
+                            }
+                            .opacity(storeRowsAppeared ? 1 : 0)
+                            .offset(y: storeRowsAppeared ? 0 : 15)
+                            .animation(
+                                Animation.spring(response: 0.5, dampingFraction: 0.8)
+                                    .delay(Double(index + maxVisibleRows) * 0.08),
+                                value: storeRowsAppeared
+                            )
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(key: RowsOverflowHeightKey.self, value: geo.size.height)
+                        }
+                    )
+                    .onPreferenceChange(RowsOverflowHeightKey.self) { overflowRowsHeight = $0 }
+                    .frame(height: showAllRows ? overflowRowsHeight : 0, alignment: .top)
+                    .clipped()
+                    .allowsHitTesting(showAllRows)
+
                     showAllRowsButton(
                         isExpanded: showAllRows,
                         totalCount: segments.count
@@ -2538,7 +2728,7 @@ struct OverviewView: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 14)
-        .id("\(period)-\(isPieChartFlipped ? "categories" : "stores")-\(showAllRows)")
+        .id("\(period)-\(isPieChartFlipped ? "categories" : "stores")")
         .onAppear {
             if !storeRowsAppeared {
                 withAnimation {
@@ -2613,6 +2803,34 @@ struct OverviewView: View {
         withAnimation {
             selectedPeriod = availablePeriods[currentPeriodIndex + 1]
         }
+    }
+}
+
+// MARK: - Clip Reveal Modifier
+
+private struct ClipReveal: ViewModifier {
+    let isVisible: Bool
+    @State private var contentHeight: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .fixedSize(horizontal: false, vertical: true)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { contentHeight = geo.size.height }
+                        .onChange(of: geo.size.height) { _, h in contentHeight = h }
+                }
+            )
+            .frame(height: isVisible ? contentHeight : 0, alignment: .top)
+            .clipped()
+            .allowsHitTesting(isVisible)
+    }
+}
+
+extension View {
+    fileprivate func clipReveal(isVisible: Bool) -> some View {
+        modifier(ClipReveal(isVisible: isVisible))
     }
 }
 
