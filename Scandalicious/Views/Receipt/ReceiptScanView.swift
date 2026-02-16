@@ -12,7 +12,7 @@ struct ReceiptScanView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject private var rateLimitManager = RateLimitManager.shared
-    @ObservedObject private var syncManager = AppSyncManager.shared
+    @ObservedObject private var processingManager = ReceiptProcessingManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @State private var showCamera = false
@@ -81,19 +81,6 @@ struct ReceiptScanView: View {
                     profileMenuButton
                 }
             }
-        }
-        .overlay(alignment: .top) {
-            VStack {
-                if isTabVisible && syncManager.syncState == .syncing {
-                    syncingStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                } else if isTabVisible && syncManager.syncState == .synced {
-                    syncedStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: syncManager.syncState)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
         }
         .onAppear {
             isTabVisible = true
@@ -375,21 +362,29 @@ struct ReceiptScanView: View {
     // MARK: - Main Content View
 
     private var mainContentView: some View {
-        VStack(spacing: 20) {
-            // Stats Section
-            statsSection
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Processing receipts card
+                ProcessingReceiptsCard(manager: processingManager)
+                    .padding(.horizontal, 20)
 
-            // Share tip card
-            shareHintCard
-                .padding(.horizontal, 20)
+                // Stats Section
+                statsSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
 
-            // Wallet Pass Creator card
-            walletPassCard
-                .padding(.horizontal, 20)
+                // Share tip card
+                shareHintCard
+                    .padding(.horizontal, 20)
 
-            Spacer()
+                // Wallet Pass Creator card
+                walletPassCard
+                    .padding(.horizontal, 20)
+
+                Spacer()
+                    .frame(height: 80)
+            }
+            .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
@@ -980,29 +975,6 @@ struct ReceiptScanView: View {
         .buttonStyle(ScaleCardButtonStyle())
     }
 
-    // MARK: - Syncing Status Banners
-
-    private var syncingStatusBanner: some View {
-        HStack(spacing: 6) {
-            SyncingArrowsView()
-            Text("Syncing")
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(.blue)
-        .padding(.top, 12)
-    }
-
-    private var syncedStatusBanner: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "checkmark.icloud.fill")
-                .font(.system(size: 11))
-            Text("Synced")
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(.green)
-        .padding(.top, 12)
-    }
-
     // MARK: - Load Stats
 
     /// Load all-time stats from the new backend endpoint
@@ -1106,67 +1078,61 @@ struct ReceiptScanView: View {
         // Upload receipt
         await MainActor.run {
             uploadState = .uploading
-            // Notify all tabs to show syncing indicator
-            NotificationCenter.default.post(name: .receiptUploadStarted, object: nil)
         }
 
         do {
-            let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+            let result = try await ReceiptUploadService.shared.uploadReceipt(image: image)
 
             await MainActor.run {
                 capturedImage = nil
 
-                switch response.status {
-                case .success, .completed:
-                    uploadState = .success(response)
-                    uploadedReceipt = response
-                    recentReceipt = response  // Save for recent receipt card
-
-                    // Optimistically update rate limit counter
+                switch result {
+                case .accepted(let accepted):
+                    // Async processing — hand off to processing manager
+                    processingManager.addReceipt(accepted)
                     rateLimitManager.decrementReceiptLocal()
-
-                    // Update total receipts count
-                    totalReceiptsScanned += 1
-
-                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-
-                    Task {
-                        try? await Task.sleep(for: .seconds(1))
-                        await MainActor.run {
-                            uploadState = .idle
-                        }
-                    }
-
-                case .pending, .processing:
-                    uploadState = .processing
-                    canRetryAfterError = true
-                    errorMessage = "Receipt is still being processed. Please check back later."
-                    showError = true
                     uploadState = .idle
-                    // Clear syncing indicator in View tab
-                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
 
-                case .failed:
-                    uploadState = .failed("Receipt processing failed")
-                    canRetryAfterError = true
-                    errorMessage = "The receipt could not be processed. Please try again."
-                    showError = true
-                    UINotificationFeedbackGenerator().notificationOccurred(.error)
-                    // Clear syncing indicator in View tab
-                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
+                case .completed(let response):
+                    // Legacy synchronous response
+                    switch response.status {
+                    case .success, .completed:
+                        uploadState = .success(response)
+                        uploadedReceipt = response
+                        recentReceipt = response
+
+                        rateLimitManager.decrementReceiptLocal()
+                        totalReceiptsScanned += 1
+
+                        NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+
+                        Task {
+                            try? await Task.sleep(for: .seconds(1))
+                            await MainActor.run {
+                                uploadState = .idle
+                            }
+                        }
+
+                    case .pending, .processing:
+                        uploadState = .idle
+
+                    case .failed:
+                        uploadState = .failed("Receipt processing failed")
+                        canRetryAfterError = true
+                        errorMessage = "The receipt could not be processed. Please try again."
+                        showError = true
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    }
                 }
             }
         } catch let error as ReceiptUploadError {
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
 
-                // Handle rate limit exceeded specially
                 if case .rateLimitExceeded = error {
-                    canRetryAfterError = false // Can't retry - need to wait
+                    canRetryAfterError = false
                     errorMessage = error.rateLimitUserMessage ?? "Upload limit reached for this month."
-
-                    // Also sync rate limit manager
                     Task {
                         await RateLimitManager.shared.syncFromBackend()
                     }
@@ -1177,8 +1143,6 @@ struct ReceiptScanView: View {
 
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
-                // Clear syncing indicator in View tab
-                NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
             }
         } catch {
             await MainActor.run {
@@ -1187,8 +1151,6 @@ struct ReceiptScanView: View {
                 errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
-                // Clear syncing indicator in View tab
-                NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
             }
         }
     }

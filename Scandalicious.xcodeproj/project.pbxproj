@@ -583,7 +583,6 @@
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ScandaliciousShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				INFOPLIST_KEY_CFBundleDisplayName = "Scandalicious Share Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
@@ -616,7 +615,6 @@
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ScandaliciousShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				INFOPLIST_KEY_CFBundleDisplayName = "Scandalicious Share Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;

@@ -73,6 +73,13 @@ enum ReceiptUploadError: LocalizedError {
     }
 }
 
+// MARK: - Upload Result
+
+enum UploadResult: Sendable {
+    case accepted(ReceiptUploadAcceptedResponse)  // HTTP 202 — async processing
+    case completed(ReceiptUploadResponse)          // HTTP 200 — legacy synchronous
+}
+
 actor ReceiptUploadService {
     static let shared = ReceiptUploadService()
 
@@ -83,7 +90,7 @@ actor ReceiptUploadService {
 
     // MARK: - Upload Receipt
 
-    func uploadReceipt(image: UIImage) async throws -> ReceiptUploadResponse {
+    func uploadReceipt(image: UIImage) async throws -> UploadResult {
         // Get auth token
         let idToken = try await getAuthToken()
 
@@ -114,7 +121,7 @@ actor ReceiptUploadService {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = body
-        request.timeoutInterval = 90 // Increased timeout for Claude Vision API processing
+        request.timeoutInterval = 30 // Fast — backend returns 202 immediately
 
         // Use shared upload logic
         return try await performUpload(request: request)
@@ -122,7 +129,7 @@ actor ReceiptUploadService {
 
     // MARK: - Upload PDF Receipt
 
-    func uploadPDFReceipt(from pdfURL: URL) async throws -> ReceiptUploadResponse {
+    func uploadPDFReceipt(from pdfURL: URL) async throws -> UploadResult {
         // Get auth token
         let idToken = try await getAuthToken()
 
@@ -151,7 +158,7 @@ actor ReceiptUploadService {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = body
-        request.timeoutInterval = 90
+        request.timeoutInterval = 30
 
         // Perform upload (reuse same logic as image upload)
         return try await performUpload(request: request)
@@ -210,9 +217,33 @@ actor ReceiptUploadService {
         }
     }
 
+    // MARK: - Get Receipt Status (Polling)
+
+    func getReceiptStatus(receiptId: String) async throws -> ReceiptStatusResponse {
+        let idToken = try await getAuthToken()
+
+        guard let url = URL(string: "\(baseURL)/receipts/\(receiptId)/status") else {
+            throw ReceiptUploadError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw ReceiptUploadError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(ReceiptStatusResponse.self, from: data)
+    }
+
     // MARK: - Shared Upload Logic
 
-    private func performUpload(request: URLRequest) async throws -> ReceiptUploadResponse {
+    private func performUpload(request: URLRequest) async throws -> UploadResult {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -221,7 +252,19 @@ actor ReceiptUploadService {
             }
 
             switch httpResponse.statusCode {
-            case 200...299:
+            case 202:
+                // Async processing — backend accepted the receipt
+                do {
+                    let accepted = try JSONDecoder().decode(
+                        ReceiptUploadAcceptedResponse.self, from: data
+                    )
+                    return .accepted(accepted)
+                } catch {
+                    throw ReceiptUploadError.invalidResponse
+                }
+
+            case 200...201, 203...299:
+                // Legacy synchronous response
                 do {
                     let uploadResponse = try await decodeResponse(from: data)
 
@@ -229,7 +272,7 @@ actor ReceiptUploadService {
                         throw ReceiptUploadError.serverError("Receipt processing failed")
                     }
 
-                    return uploadResponse
+                    return .completed(uploadResponse)
                 } catch let decodingError as DecodingError {
                     logDecodingError(decodingError)
                     throw ReceiptUploadError.invalidResponse

@@ -582,7 +582,10 @@ class ShareViewController: UIViewController {
 
             Task {
                 do {
-                    let _ = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
+                    let result = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
+                    if case .accepted(let accepted) = result {
+                        self.persistProcessingReceipt(receiptId: accepted.receiptId, filename: accepted.filename)
+                    }
                 } catch {
                     // Error is logged but not shown - user already saw success
                 }
@@ -623,7 +626,10 @@ class ShareViewController: UIViewController {
 
             Task {
                 do {
-                    let _ = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+                    let result = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+                    if case .accepted(let accepted) = result {
+                        self.persistProcessingReceipt(receiptId: accepted.receiptId, filename: accepted.filename)
+                    }
                 } catch {
                     // Error is logged but not shown - user already saw success
                 }
@@ -684,6 +690,46 @@ class ShareViewController: UIViewController {
 
     private func updateStatus(_ newStatus: ReceiptStatusType) {
         showStatus(newStatus)
+    }
+
+    // MARK: - Persist Processing Receipt for Main App
+
+    /// Saves a processing receipt to app group UserDefaults so the main app's
+    /// ReceiptProcessingManager can pick it up and start polling.
+    private func persistProcessingReceipt(receiptId: String, filename: String) {
+        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else { return }
+
+        let storageKey = "activeProcessingReceipts"
+
+        // Read existing array
+        var receipts: [ProcessingReceipt] = []
+        if let data = sharedDefaults.data(forKey: storageKey),
+           let existing = try? JSONDecoder().decode([ProcessingReceipt].self, from: data) {
+            receipts = existing
+        }
+
+        // Append new receipt (avoid duplicates)
+        guard !receipts.contains(where: { $0.id == receiptId }) else { return }
+
+        let receipt = ProcessingReceipt(
+            id: receiptId,
+            filename: filename,
+            startedAt: Date(),
+            status: .pending,
+            storeName: nil,
+            totalAmount: nil,
+            itemsCount: 0,
+            errorMessage: nil,
+            detectedDate: nil,
+            completedAt: nil
+        )
+        receipts.append(receipt)
+
+        if let encoded = try? JSONEncoder().encode(receipts) {
+            sharedDefaults.set(encoded, forKey: storageKey)
+            sharedDefaults.synchronize()
+        }
     }
 
     // MARK: - Signal Main App to Refresh

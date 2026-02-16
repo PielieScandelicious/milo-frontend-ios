@@ -190,6 +190,71 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     }
 }
 
+// MARK: - Receipt Upload Accepted Response (HTTP 202)
+
+struct ReceiptUploadAcceptedResponse: Codable, Sendable, Equatable {
+    let receiptId: String
+    let status: ReceiptStatus
+    let filename: String
+
+    enum CodingKeys: String, CodingKey {
+        case receiptId = "receipt_id"
+        case status
+        case filename
+    }
+}
+
+// MARK: - Receipt Status Response (Polling)
+
+struct ReceiptStatusResponse: Codable, Sendable {
+    let receiptId: String
+    let status: ReceiptStatus
+    let filename: String?
+    let detectedDate: String?
+    let storeName: String?
+    let totalAmount: Double?
+    let itemsCount: Int
+    let errorMessage: String?
+
+    enum CodingKeys: String, CodingKey {
+        case receiptId = "receipt_id"
+        case status
+        case filename
+        case detectedDate = "detected_date"
+        case storeName = "store_name"
+        case totalAmount = "total_amount"
+        case itemsCount = "items_count"
+        case errorMessage = "error_message"
+    }
+}
+
+// MARK: - Processing Receipt (Local Tracking)
+
+struct ProcessingReceipt: Identifiable, Codable, Equatable {
+    let id: String          // receipt_id from backend
+    let filename: String
+    let startedAt: Date
+    var status: ReceiptStatus
+    var storeName: String?
+    var totalAmount: Double?
+    var itemsCount: Int
+    var errorMessage: String?
+    var detectedDate: String?
+    var completedAt: Date?
+
+    var isTerminal: Bool {
+        status == .completed || status == .success || status == .failed
+    }
+
+    var displayName: String {
+        if let store = storeName {
+            return store.localizedCapitalized
+        }
+        let name = (filename as NSString).deletingPathExtension
+        return name.count > 25 ? String(name.prefix(22)) + "..." : name
+    }
+}
+
 // MARK: - Receipt Upload State
 
 enum ReceiptUploadState: Equatable {

@@ -14,9 +14,7 @@ import Combine
 // MARK: - Notification for Receipt Upload
 extension Notification.Name {
     static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")
-    static let receiptUploadStarted = Notification.Name("receiptUploadStarted")
     static let receiptDeleted = Notification.Name("receiptDeleted")
-    static let shareExtensionUploadDetected = Notification.Name("shareExtensionUploadDetected")
 }
 
 enum SortOption: String, CaseIterable {
@@ -33,14 +31,11 @@ struct OverviewView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject var dataManager: StoreDataManager
     @ObservedObject var rateLimitManager = RateLimitManager.shared
-    @ObservedObject private var syncManager = AppSyncManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @StateObject private var budgetViewModel = BudgetViewModel()
     @StateObject private var promosViewModel = PromosViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
-    // Track if refreshWithRetry is currently running to prevent duplicate calls
-    @State private var isRefreshWithRetryRunning = false
 
     // Track manual sync triggered by pull-to-refresh (which period is syncing)
     @State private var manuallySyncingPeriod: String?
@@ -475,9 +470,6 @@ struct OverviewView: View {
                     cacheSegmentsForPeriod(selectedPeriod)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .shareExtensionUploadDetected)) { _ in
-                handleShareExtensionUpload()
-            }
     }
 
     // MARK: - Lifecycle Handlers
@@ -517,8 +509,8 @@ struct OverviewView: View {
                 // Build breakdown caches from preloaded data
                 rebuildBreakdownCache()
 
-                // Check for share extension uploads via centralized manager
-                syncManager.checkForShareExtensionUploads()
+                // Check for share extension uploads
+                AppSyncManager.shared.checkForShareExtensionUploads()
             }
         }
 
@@ -963,87 +955,10 @@ struct OverviewView: View {
 
     // MARK: - Share Extension Upload Handling
 
-    /// Called when AppSyncManager detects a share extension upload
-    private func handleShareExtensionUpload() {
-        if !isRefreshWithRetryRunning {
-            Task {
-                await refreshWithRetry()
-            }
-        }
-    }
-
-    /// Refreshes data with retry mechanism for share extension uploads
-    /// The share extension signals immediately but the upload + backend processing can take 5-15 seconds
-    private func refreshWithRetry() async {
-        // Mark as running
-        await MainActor.run {
-            isRefreshWithRetryRunning = true
-        }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentMonthPeriod = dateFormatter.string(from: Date())
-
-        // Capture current state to detect changes (not just count - also total spending for existing stores)
-        let initialBreakdowns = dataManager.storeBreakdowns.filter { $0.period == currentMonthPeriod }
-        let initialBreakdownCount = initialBreakdowns.count
-        let initialTotalSpending = initialBreakdowns.reduce(0.0) { $0 + $1.totalStoreSpend }
-        let initialTransactionCount = transactionManager.transactions.count
-
-        // Retry configuration: 3 seconds each, up to 4 attempts
-        let retryDelays: [Double] = [3.0, 3.0, 3.0, 3.0] // Total: up to 12 seconds of waiting
-        var dataChanged = false
-
-        for (_, delay) in retryDelays.enumerated() {
-            try? await Task.sleep(for: .seconds(delay))
-
-            await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
-
-            // Check if data changed (count OR total spending - handles uploads to existing stores)
-            let newBreakdowns = dataManager.storeBreakdowns.filter { $0.period == currentMonthPeriod }
-            let newBreakdownCount = newBreakdowns.count
-            let newTotalSpending = newBreakdowns.reduce(0.0) { $0 + $1.totalStoreSpend }
-            let newTransactionCount = transactionManager.transactions.count
-
-            // Detect change: new stores, more transactions, OR increased spending (same store, new receipt)
-            let countChanged = newBreakdownCount > initialBreakdownCount || newTransactionCount > initialTransactionCount
-            let spendingChanged = abs(newTotalSpending - initialTotalSpending) > 0.01
-
-            if countChanged || spendingChanged {
-                dataChanged = true
-                break
-            }
-        }
-
-        // Sync rate limit status
-        await rateLimitManager.syncFromBackend()
-
-        // Update UI on main thread
-        await MainActor.run {
-            // Clear running flag
-            isRefreshWithRetryRunning = false
-
-            // Notify other views that share extension sync is complete
-            NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
-
-            // Always update displayed breakdowns to ensure UI reflects latest data
-            updateDisplayedBreakdowns()
-
-            // Update refresh time for "Updated X ago" display
-            lastRefreshTime = Date()
-        }
-
-        // Reload receipts for current month if it's the selected period
-        if selectedPeriod == currentMonthPeriod {
-            await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
-        }
-    }
-
     /// Manual sync triggered by pull-to-refresh — only refreshes the current period
     private func manualSync() async {
         // manuallySyncingPeriod is already set by .refreshable before this Task starts
-        guard syncManager.syncState != .syncing && !dataManager.isLoading else {
+        guard !dataManager.isLoading else {
             await MainActor.run { manuallySyncingPeriod = nil }
             return
         }
@@ -2301,26 +2216,22 @@ struct OverviewView: View {
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
 
-            syncingIndicator(for: period, isCurrentMonth: isCurrentMonth)
+            syncingIndicator(for: period)
                 .animation(.easeInOut(duration: 0.3), value: manuallySyncingPeriod)
                 .animation(.easeInOut(duration: 0.3), value: syncedConfirmationPeriod)
-                .animation(.easeInOut(duration: 0.3), value: syncManager.syncState)
         }
         .padding(.top, 20)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
     }
 
-    /// Syncing status indicator (pull-to-refresh + receipt uploads)
-    /// Shows for: manual sync on the specific period being synced, or receipt upload sync on current month only
+    /// Syncing status indicator for manual pull-to-refresh
     @ViewBuilder
-    private func syncingIndicator(for period: String, isCurrentMonth: Bool) -> some View {
+    private func syncingIndicator(for period: String) -> some View {
         let isManualSyncing = manuallySyncingPeriod == period
         let isManualSynced = syncedConfirmationPeriod == period
-        let isUploadSyncing = isCurrentMonth && syncManager.syncState == .syncing
-        let isUploadSynced = isCurrentMonth && syncManager.syncState == .synced
 
-        if isManualSyncing || isUploadSyncing {
+        if isManualSyncing {
             HStack(spacing: 4) {
                 SyncingArrowsView()
                     .font(.system(size: 11))
@@ -2329,7 +2240,7 @@ struct OverviewView: View {
             }
             .foregroundColor(.blue)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
-        } else if isManualSynced || isUploadSynced {
+        } else if isManualSynced {
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11))
