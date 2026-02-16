@@ -252,7 +252,7 @@ struct IconDonutChartView: View {
                     )
                 }
             }
-            .animation(.easeInOut(duration: 0.35), value: valueFingerprint) // Animate trim changes when proportions update
+            .animation(.spring(response: 0.3, dampingFraction: 1.0), value: valueFingerprint) // Animate trim changes when proportions update
             .rotationEffect(.degrees(-90 + (shouldAnimate ? appearanceRotation : 0))) // Start from top + entrance spin
             .scaleEffect(shouldAnimate ? appearanceScale : 1.0)
 
@@ -281,7 +281,7 @@ struct IconDonutChartView: View {
                     }
                     // Brief pause, then expand outward + rotate — decelerates and locks in
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                        withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                             appearanceScale = 1.0
                             appearanceRotation = 0
                         }
@@ -309,7 +309,7 @@ struct IconDonutChartView: View {
                 appearanceRotation = -90
                 // Brief pause, then expand outward + rotate
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                    withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         appearanceScale = 1.0
                         appearanceRotation = 0
                     }
@@ -323,7 +323,7 @@ struct IconDonutChartView: View {
             appearanceScale = 0.85
             appearanceRotation = -90
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                     appearanceScale = 1.0
                     appearanceRotation = 0
                 }

@@ -1642,7 +1642,7 @@ struct OverviewView: View {
                 categoryLoadError[category.id] = nil
             }
 
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                 expandedCategoryId = category.id
             }
 
@@ -2009,7 +2009,7 @@ struct OverviewView: View {
         VStack(spacing: 0) {
             // Section header - seamless inline
             Button {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     isReceiptsSectionExpanded.toggle()
                     // Both state changes in the same transaction — SwiftUI
                     // computes the final layout (expanded + scrolled) and
@@ -2456,7 +2456,7 @@ struct OverviewView: View {
                             await fetchCategoryData(for: period)
                         }
                     }
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         isPieChartFlipped.toggle()
                         pieChartFlipDegrees += 180
                         showAllRows = false
@@ -2491,7 +2491,7 @@ struct OverviewView: View {
                 )
                 .contentShape(Circle())
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         isPieChartFlipped.toggle()
                         pieChartFlipDegrees += 180
                         showAllRows = false
