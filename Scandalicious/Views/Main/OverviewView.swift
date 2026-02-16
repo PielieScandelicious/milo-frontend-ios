@@ -81,6 +81,7 @@ struct OverviewView: View {
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
+    @State private var chartRefreshToken: Int = 0 // Incremented on receipt upload to force pie chart re-animation
     @State private var budgetExpanded = false // Track if budget widget is expanded
     @State private var activeCardPage = 0 // 0=budget, 1=promos
     @State private var cardDragOffset: CGFloat = 0 // Live drag offset for carousel
@@ -577,8 +578,18 @@ struct OverviewView: View {
         Task {
             try? await Task.sleep(for: .seconds(1))
 
-            // Refresh current month data
+            // Refresh current month data — this atomically updates storeBreakdowns,
+            // periodTotalSpends, and periodMetadata in one MainActor.run block.
+            // The onChange(of: storeBreakdowns) observer rebuilds chart caches,
+            // and the spending number animates via .contentTransition(.numericText()).
             await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
+
+            // Trigger pie chart expansion animation simultaneously with the data-driven
+            // spending number animation. Both fire in the same render cycle since
+            // refreshData already updated the data above.
+            if selectedPeriod == currentMonthPeriod {
+                chartRefreshToken += 1
+            }
 
             // Invalidate DISK caches (backend source of truth changed)
             // Keep in-memory display caches alive to avoid flash - they'll be replaced with fresh data
@@ -634,6 +645,9 @@ struct OverviewView: View {
 
             // Refresh the period data to update pie chart and total spending
             await dataManager.refreshData(for: .month, periodString: affectedPeriod)
+
+            // Trigger pie chart expansion animation with the updated data
+            chartRefreshToken += 1
 
             // Also refresh the period metadata to get updated totals
             await dataManager.fetchPeriodMetadata()
@@ -2283,7 +2297,8 @@ struct OverviewView: View {
                                 averageItemPrice: nil,
                                 centerIcon: "cart.fill",
                                 centerLabel: "Categories",
-                                showAllSegments: showAllRows
+                                showAllSegments: showAllRows,
+                                refreshToken: chartRefreshToken
                             )
                         } else if isLoadingCategoryData {
                             SkeletonDonutChart()
@@ -2316,7 +2331,8 @@ struct OverviewView: View {
                         averageItemPrice: nil,
                         centerIcon: "storefront.fill",
                         centerLabel: "Stores",
-                        showAllSegments: showAllRows
+                        showAllSegments: showAllRows,
+                        refreshToken: chartRefreshToken
                     )
                     .opacity(isPieChartFlipped ? 0 : 1)
                 }

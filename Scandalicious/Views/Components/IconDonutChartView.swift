@@ -38,6 +38,9 @@ struct IconDonutChartView: View {
     let centerIcon: String?
     let centerLabel: String?
     let showAllSegments: Bool
+    /// External trigger to force the expansion animation to replay (e.g., after receipt upload).
+    /// Increment this value to replay the scale+rotation animation without recreating the view.
+    let refreshToken: Int
 
     /// Maximum number of segments to show before grouping into "Others"
     private let maxVisibleSegments: Int = 6
@@ -112,7 +115,7 @@ struct IconDonutChartView: View {
         return false
     }
 
-    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil, showAllSegments: Bool = true) {
+    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil, showAllSegments: Bool = true, refreshToken: Int = 0) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
         self.size = size
@@ -123,6 +126,7 @@ struct IconDonutChartView: View {
         self.centerIcon = centerIcon
         self.centerLabel = centerLabel
         self.showAllSegments = showAllSegments
+        self.refreshToken = refreshToken
     }
 
     private var strokeWidth: CGFloat {
@@ -276,7 +280,7 @@ struct IconDonutChartView: View {
                         isSettling = false
                     }
                     // Brief pause, then expand outward + rotate — decelerates and locks in
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                         withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
                             appearanceScale = 1.0
                             appearanceRotation = 0
@@ -304,11 +308,24 @@ struct IconDonutChartView: View {
                 appearanceScale = 0.85
                 appearanceRotation = -90
                 // Brief pause, then expand outward + rotate
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                     withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
                         appearanceScale = 1.0
                         appearanceRotation = 0
                     }
+                }
+            }
+        }
+        // External refresh trigger — replays expansion animation (e.g., after receipt upload)
+        .onChange(of: refreshToken) { _, _ in
+            guard shouldAnimate else { return }
+            // Reset to contracted state and replay expansion
+            appearanceScale = 0.85
+            appearanceRotation = -90
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
+                    appearanceScale = 1.0
+                    appearanceRotation = 0
                 }
             }
         }
