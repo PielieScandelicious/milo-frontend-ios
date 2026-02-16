@@ -9,128 +9,258 @@ import SwiftUI
 
 struct OnboardingView: View {
     @EnvironmentObject var authManager: AuthenticationManager
-    @State private var firstName = ""
-    @State private var lastName = ""
-    @State private var selectedGender: ProfileGender = .preferNotToSay
+    @State private var nickname = ""
+    @State private var selectedGender: ProfileGender = .male
+    @State private var age = ""
+    @State private var selectedLanguage: ProfileLanguage = .english
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var appearAnimation = false
+
+    private var onboardingGenders: [ProfileGender] {
+        [.male, .female]
+    }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 32) {
-                    // Welcome Header
-                    VStack(spacing: 12) {
-                        Text("Welcome to Milo")
-                            .font(.system(size: 42, weight: .bold, design: .rounded))
-                            .foregroundStyle(.purple.gradient)
+        ZStack {
+            // Premium gradient background
+            LinearGradient(
+                colors: [
+                    Color(red: 0.15, green: 0.05, blue: 0.3),
+                    Color(red: 0.05, green: 0.05, blue: 0.15),
+                    Color.black
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
-                        Text("Let's personalize your experience")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, 60)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // Hero
+                    heroSection
+                        .padding(.top, 50)
+                        .padding(.bottom, 32)
 
-                    // Form
-                    VStack(spacing: 24) {
-                        // First Name
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("First Name")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
+                    // Compact form card
+                    formCard
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
 
-                            TextField("Enter your first name", text: $firstName)
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .cornerRadius(14)
-                                .textContentType(.givenName)
-                                .autocorrectionDisabled()
-                        }
-
-                        // Last Name
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Last Name")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-
-                            TextField("Enter your last name", text: $lastName)
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .cornerRadius(14)
-                                .textContentType(.familyName)
-                                .autocorrectionDisabled()
-                        }
-
-                        // Gender
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Gender")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-
-                            Picker("Gender", selection: $selectedGender) {
-                                ForEach(ProfileGender.allCases, id: \.self) { gender in
-                                    Text(gender.displayName).tag(gender)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-
-                    // Continue Button
-                    Button {
-                        saveProfile()
-                    } label: {
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            Text("Continue")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .frame(height: 56)
-                    .background(
-                        canContinue ?
-                        LinearGradient(
-                            colors: [Color.purple, Color.purple.opacity(0.8)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ) :
-                        LinearGradient(
-                            colors: [Color.gray, Color.gray],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: canContinue ? Color.purple.opacity(0.3) : Color.clear, radius: 10, x: 0, y: 5)
-                    .disabled(!canContinue || isLoading)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                    // Continue button
+                    continueButton
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 40)
                 }
-                .padding(.bottom, 40)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .interactiveDismissDisabled()
-            .alert("Error", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "An unknown error occurred")
             }
         }
         .preferredColorScheme(.dark)
+        .interactiveDismissDisabled()
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred")
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.8)) {
+                appearAnimation = true
+            }
+        }
     }
 
+    // MARK: - Hero Section
+
+    private var heroSection: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [.purple.opacity(0.4), .clear],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 50
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+
+                MiloDachshundView(size: 72)
+            }
+            .opacity(appearAnimation ? 1 : 0)
+            .scaleEffect(appearAnimation ? 1 : 0.5)
+
+            Text("Welcome")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .opacity(appearAnimation ? 1 : 0)
+                .offset(y: appearAnimation ? 0 : 20)
+
+            Text("Let's personalize your experience")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.5))
+                .opacity(appearAnimation ? 1 : 0)
+                .offset(y: appearAnimation ? 0 : 10)
+        }
+    }
+
+    // MARK: - Form Card
+
+    private var formCard: some View {
+        VStack(spacing: 16) {
+            // Nickname
+            HStack(spacing: 12) {
+                Image(systemName: "person.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.purple)
+                    .frame(width: 20)
+
+                TextField("Nickname", text: $nickname)
+                    .foregroundStyle(.white)
+                    .autocorrectionDisabled()
+                    .textContentType(.nickname)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.07))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                    )
+            )
+
+            // Age
+            HStack(spacing: 12) {
+                Image(systemName: "calendar")
+                    .font(.subheadline)
+                    .foregroundStyle(.purple)
+                    .frame(width: 20)
+
+                TextField("Age", text: $age)
+                    .foregroundStyle(.white)
+                    .keyboardType(.numberPad)
+                    .onChange(of: age) { _, newValue in
+                        let filtered = newValue.filter { $0.isNumber }
+                        if filtered.count > 3 { age = String(filtered.prefix(3)) }
+                        else if filtered != newValue { age = filtered }
+                    }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.07))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                    )
+            )
+
+            // Gender
+            HStack(spacing: 8) {
+                ForEach(onboardingGenders, id: \.self) { gender in
+                    Button {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            selectedGender = gender
+                        }
+                    } label: {
+                        Text(gender.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(selectedGender == gender ? .white : .white.opacity(0.4))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(selectedGender == gender
+                                          ? LinearGradient(colors: [.purple, .blue], startPoint: .leading, endPoint: .trailing)
+                                          : LinearGradient(colors: [.white.opacity(0.07), .white.opacity(0.07)], startPoint: .leading, endPoint: .trailing)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Language
+            HStack(spacing: 8) {
+                ForEach(ProfileLanguage.allCases, id: \.self) { language in
+                    Button {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            selectedLanguage = language
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(language.flag)
+                                .font(.callout)
+                            Text(language.displayName)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(selectedLanguage == language ? .white : .white.opacity(0.4))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(selectedLanguage == language
+                                      ? LinearGradient(colors: [.purple, .blue], startPoint: .leading, endPoint: .trailing)
+                                      : LinearGradient(colors: [.white.opacity(0.07), .white.opacity(0.07)], startPoint: .leading, endPoint: .trailing)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.white.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(.white.opacity(0.06), lineWidth: 1)
+                )
+        )
+    }
+
+    // MARK: - Continue Button
+
+    private var continueButton: some View {
+        Button {
+            saveProfile()
+        } label: {
+            HStack(spacing: 8) {
+                if isLoading {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Text("Get Started")
+                        .fontWeight(.semibold)
+                    Image(systemName: "arrow.right")
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                canContinue
+                ? LinearGradient(colors: [.purple, .blue], startPoint: .leading, endPoint: .trailing)
+                : LinearGradient(colors: [.gray.opacity(0.3), .gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
+            )
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: canContinue ? .purple.opacity(0.4) : .clear, radius: 12, x: 0, y: 6)
+        }
+        .disabled(!canContinue || isLoading)
+        .opacity(canContinue ? 1 : 0.6)
+    }
+
+    // MARK: - Logic
+
     private var canContinue: Bool {
-        !firstName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !lastName.trimmingCharacters(in: .whitespaces).isEmpty
+        !nickname.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !age.isEmpty &&
+        (Int(age) ?? 0) > 0
     }
 
     private func saveProfile() {
@@ -141,13 +271,14 @@ struct OnboardingView: View {
 
         Task {
             do {
-                let trimmedFirstName = firstName.trimmingCharacters(in: .whitespaces)
-                let trimmedLastName = lastName.trimmingCharacters(in: .whitespaces)
+                let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
+                let ageValue = Int(age)
 
                 let profile = try await ProfileAPIService().updateProfile(
-                    firstName: trimmedFirstName,
-                    lastName: trimmedLastName,
-                    gender: selectedGender.rawValue
+                    nickname: trimmedNickname,
+                    gender: selectedGender.rawValue,
+                    age: ageValue,
+                    language: selectedLanguage.rawValue
                 )
 
                 await MainActor.run {
