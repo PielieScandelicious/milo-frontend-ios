@@ -75,6 +75,7 @@ struct OverviewView: View {
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
     @State private var storeRowsAppeared = false // Track staggered animation state
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
+    @State private var receiptsScrollTarget: String? // Declarative scroll position binding
     @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
     @State private var isPieChartFlipped = true // Track if pie chart is showing categories (true) or stores (false)
     @State private var pieChartFlipDegrees: Double = 180 // Animation degrees for flip (starts at 180 for categories)
@@ -1121,44 +1122,32 @@ struct OverviewView: View {
 
     // MARK: - Main Content View
     private func mainContentView(bottomSafeArea: CGFloat) -> some View {
-        ScrollViewReader { scrollProxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 12) {
-                    overviewContentForPeriod(selectedPeriod)
-                    receiptsSection
-                        .id("receiptsSection")
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 12) {
+                overviewContentForPeriod(selectedPeriod)
+                    .id("overview")
+                receiptsSection
+                    .id("receiptsSection")
+            }
+            .scrollTargetLayout()
+            .padding(.top, 16)
+            .padding(.bottom, bottomSafeArea + 90)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(
+                            key: ScrollOffsetPreferenceKey.self,
+                            value: -proxy.frame(in: .named("scrollView")).origin.y
+                        )
                 }
-                .padding(.top, 16)
-                .padding(.bottom, bottomSafeArea + 90)
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear
-                            .preference(
-                                key: ScrollOffsetPreferenceKey.self,
-                                value: -proxy.frame(in: .named("scrollView")).origin.y
-                            )
-                    }
-                )
-            }
-            .coordinateSpace(name: "scrollView")
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                scrollOffset = max(0, value)
-            }
-            .onChange(of: isReceiptsSectionExpanded) { _, expanded in
-                if expanded {
-                    // Scroll so the receipts section lands just below the nav bar.
-                    // anchor .top puts the section at the scroll view's safe-area top
-                    // (below the navigation bar). A small delay lets the expansion
-                    // content lay out first so the target position is correct.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                            scrollProxy.scrollTo("receiptsSection", anchor: .top)
-                        }
-                    }
-                }
-            }
+            )
+        }
+        .scrollPosition(id: $receiptsScrollTarget, anchor: .top)
+        .coordinateSpace(name: "scrollView")
+        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+            scrollOffset = max(0, value)
         }
         .refreshable {
             // Set syncing flag immediately so the UI doesn't flash during refresh
@@ -1928,8 +1917,12 @@ struct OverviewView: View {
         VStack(spacing: 0) {
             // Section header - seamless inline
             Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                     isReceiptsSectionExpanded.toggle()
+                    // Both state changes in the same transaction — SwiftUI
+                    // computes the final layout (expanded + scrolled) and
+                    // animates to it in one pass. The header stays fixed.
+                    receiptsScrollTarget = isReceiptsSectionExpanded ? "receiptsSection" : nil
                 }
             } label: {
                 HStack(spacing: 10) {
@@ -1964,101 +1957,101 @@ struct OverviewView: View {
             }
             .buttonStyle(ReceiptsHeaderButtonStyle())
 
-            // Expandable content
-            if isReceiptsSectionExpanded {
-                VStack(spacing: 0) {
-                    switch receiptsSectionState {
-                    case .loading:
-                        SkeletonReceiptList(count: 3)
-                            .padding(.horizontal, 14)
+            // Expandable content — always rendered, height animates from 0.
+            // Content is clipped so it's progressively revealed as the card grows.
+            VStack(spacing: 0) {
+                switch receiptsSectionState {
+                case .loading:
+                    SkeletonReceiptList(count: 3)
+                        .padding(.horizontal, 14)
 
-                    case .empty:
-                        VStack(spacing: 8) {
-                            if isNewMonthStart {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 24))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.blue.opacity(0.6), .purple.opacity(0.4)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
+                case .empty:
+                    VStack(spacing: 8) {
+                        if isNewMonthStart {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 24))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue.opacity(0.6), .purple.opacity(0.4)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
                                     )
-                                Text("Scan your first receipt to get started")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.35))
-                            } else {
-                                Image(systemName: "doc.text")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.white.opacity(0.15))
-                                Text("No receipts for this period")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.35))
-                            }
+                                )
+                            Text("Scan your first receipt to get started")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.35))
+                        } else {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white.opacity(0.15))
+                            Text("No receipts for this period")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.35))
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-
-                    case .hasData:
-                        // Fixed-height scrollable container — shows ~5 receipts at a time
-                        ScrollView(.vertical, showsIndicators: true) {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(sortedReceipts.enumerated()), id: \.element.id) { index, receipt in
-                                    VStack(spacing: 0) {
-                                        // Subtle divider between receipts
-                                        if index > 0 {
-                                            Rectangle()
-                                                .fill(Color.white.opacity(0.06))
-                                                .frame(height: 0.5)
-                                                .padding(.horizontal, 14)
-                                        }
-
-                                        ExpandableReceiptCard(
-                                            receipt: receipt,
-                                            isExpanded: expandedReceiptId == receipt.id,
-                                            onTap: {
-                                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                                    if expandedReceiptId == receipt.id {
-                                                        expandedReceiptId = nil
-                                                    } else {
-                                                        expandedReceiptId = receipt.id
-                                                    }
-                                                }
-                                            },
-                                            onDelete: {
-                                                withAnimation(.easeInOut(duration: 0.3)) {
-                                                    deleteReceiptFromOverview(receipt)
-                                                }
-                                            },
-                                            onDeleteItem: { receiptId, itemId in
-                                                deleteReceiptItemFromOverview(receiptId: receiptId, itemId: itemId)
-                                            },
-                                            onSplit: {
-                                                receiptToSplit = receipt
-                                            }
-                                        )
-                                    }
-                                    .transition(.asymmetric(
-                                        insertion: .opacity,
-                                        removal: .move(edge: .leading).combined(with: .opacity)
-                                    ))
-                                }
-                            }
-                        }
-                        .scrollBounceBehavior(.basedOnSize)
-                        .frame(maxHeight: 5 * 42)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+
+                case .hasData:
+                    // Fixed-height scrollable container — shows ~5 receipts at a time
+                    ScrollView(.vertical, showsIndicators: true) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(sortedReceipts.enumerated()), id: \.element.id) { index, receipt in
+                                VStack(spacing: 0) {
+                                    // Subtle divider between receipts
+                                    if index > 0 {
+                                        Rectangle()
+                                            .fill(Color.white.opacity(0.06))
+                                            .frame(height: 0.5)
+                                            .padding(.horizontal, 14)
+                                    }
+
+                                    ExpandableReceiptCard(
+                                        receipt: receipt,
+                                        isExpanded: expandedReceiptId == receipt.id,
+                                        onTap: {
+                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                                if expandedReceiptId == receipt.id {
+                                                    expandedReceiptId = nil
+                                                } else {
+                                                    expandedReceiptId = receipt.id
+                                                }
+                                            }
+                                        },
+                                        onDelete: {
+                                            withAnimation(.easeInOut(duration: 0.3)) {
+                                                deleteReceiptFromOverview(receipt)
+                                            }
+                                        },
+                                        onDeleteItem: { receiptId, itemId in
+                                            deleteReceiptItemFromOverview(receiptId: receiptId, itemId: itemId)
+                                        },
+                                        onSplit: {
+                                            receiptToSplit = receipt
+                                        }
+                                    )
+                                }
+                                .transition(.asymmetric(
+                                    insertion: .opacity,
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                            }
+                        }
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .frame(maxHeight: 5 * 42)
                 }
-                .padding(.bottom, 8)
-                .transition(.opacity)
             }
+            .padding(.bottom, isReceiptsSectionExpanded ? 8 : 0)
+            .frame(maxHeight: isReceiptsSectionExpanded ? .infinity : 0)
+            .clipped()
         }
         .background(premiumCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(premiumCardBorder)
         .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 8)
         .padding(.horizontal, 16)
-        .padding(.top, isReceiptsSectionExpanded ? 12 : 8)
+        .padding(.top, 8)
         .overlay {
             if isDeletingReceipt {
                 ZStack {
