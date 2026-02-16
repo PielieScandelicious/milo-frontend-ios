@@ -250,8 +250,10 @@ struct ProcessingReceipt: Identifiable, Codable, Equatable {
         if let store = storeName {
             return store.localizedCapitalized
         }
-        let name = (filename as NSString).deletingPathExtension
-        return name.count > 25 ? String(name.prefix(22)) + "..." : name
+        // Show a user-friendly time label while the store name is still unknown
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return "Receipt \u{2022} \(formatter.string(from: startedAt))"
     }
 }
 

@@ -31,10 +31,12 @@ struct ReceiptScanView: View {
     @State private var isTabVisible = false
     @State private var contentOpacity: Double = 0
 
-    // Recent receipt tracking
-    @State private var recentReceipt: ReceiptUploadResponse?
+    // Receipt detail sheet (tapped from RecentReceiptsCard)
+    @State private var selectedReceipt: ReceiptUploadResponse?
     @State private var showRecentReceiptDetails = false
-    @State private var isRecentReceiptExpanded = false
+
+    // Recent receipts card
+    @State private var isRecentReceiptsExpanded = false
 
     // Wallet Pass Creator
     @State private var showWalletPassCreator = false
@@ -87,8 +89,13 @@ struct ReceiptScanView: View {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
                 contentOpacity = 1.0
             }
+            // Reload any receipts persisted by the share extension
+            processingManager.reloadPersistedReceipts()
             loadTotalReceiptsCount()
             loadAllTimeStats()
+            Task {
+                await receiptsViewModel.loadReceipts(period: "All", loadAll: false)
+            }
         }
         .onDisappear {
             isTabVisible = false
@@ -112,21 +119,19 @@ struct ReceiptScanView: View {
         }
         .sheet(isPresented: $showReceiptDetails) {
             showReceiptDetails = false
-            // Keep recent receipt for display
         } content: {
             if let receipt = uploadedReceipt {
                 ReceiptDetailsView(receipt: receipt) {
                     // Receipt was deleted - notify to refresh data
                     NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                    recentReceipt = nil
                 }
             }
         }
         .sheet(isPresented: $showRecentReceiptDetails) {
-            if let receipt = recentReceipt {
+            if let receipt = selectedReceipt {
                 ReceiptDetailsView(receipt: receipt) {
                     NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                    recentReceipt = nil
+                    selectedReceipt = nil
                 }
             }
         }
@@ -178,8 +183,15 @@ struct ReceiptScanView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
-            // Refresh all stats when a receipt is uploaded (from any source)
+            // Refresh all stats and receipt list when a receipt is uploaded (from any source)
             loadAllTimeStats()
+            Task {
+                await receiptsViewModel.loadReceipts(period: "All", loadAll: false)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Pick up any receipts uploaded via the share extension while app was in background
+            processingManager.reloadPersistedReceipts()
         }
         .animation(.easeInOut, value: uploadState)
     }
@@ -368,6 +380,17 @@ struct ReceiptScanView: View {
                 ProcessingReceiptsCard(manager: processingManager)
                     .padding(.horizontal, 20)
 
+                // Recent receipts history (collapsible, lazy-loaded)
+                RecentReceiptsCard(
+                    viewModel: receiptsViewModel,
+                    isExpanded: $isRecentReceiptsExpanded
+                ) { receipt in
+                    let response = receipt.toReceiptUploadResponse()
+                    selectedReceipt = response
+                    showRecentReceiptDetails = true
+                }
+                .padding(.horizontal, 20)
+
                 // Stats Section
                 statsSection
                     .padding(.horizontal, 20)
@@ -382,7 +405,7 @@ struct ReceiptScanView: View {
                     .padding(.horizontal, 20)
 
                 Spacer()
-                    .frame(height: 80)
+                    .frame(height: 120)
             }
             .padding(.top, 16)
         }
@@ -419,11 +442,6 @@ struct ReceiptScanView: View {
         VStack(spacing: 12) {
             // Top 3 Stores card
             topStoresCard
-
-            // Recent Receipt Card (if exists)
-            if let receipt = recentReceipt {
-                recentReceiptCard(receipt: receipt)
-            }
         }
     }
 
@@ -802,104 +820,6 @@ struct ReceiptScanView: View {
         }
     }
 
-    // MARK: - Recent Receipt Card
-
-    private func recentReceiptCard(receipt: ReceiptUploadResponse) -> some View {
-        ExpandableReceiptCard(
-            receipt: receipt,
-            isExpanded: isRecentReceiptExpanded,
-            onTap: {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    isRecentReceiptExpanded.toggle()
-                }
-            },
-            onDelete: {
-                Task {
-                    do {
-                        try await AnalyticsAPIService.shared.removeReceipt(receiptId: receipt.receiptId)
-                        NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                        withAnimation {
-                            recentReceipt = nil
-                            isRecentReceiptExpanded = false
-                        }
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    } catch {
-                        UINotificationFeedbackGenerator().notificationOccurred(.error)
-                    }
-                }
-            },
-            onDeleteItem: { receiptId, itemId in
-                deleteRecentReceiptItem(receiptId: receiptId, itemId: itemId)
-            },
-            accentColor: .green,
-            badgeText: "Recent Scan",
-            showDate: false,
-            showItemCount: false
-        )
-    }
-
-    // MARK: - Delete Recent Receipt Item
-
-    private func deleteRecentReceiptItem(receiptId: String, itemId: String) {
-        Task {
-            do {
-                let response = try await AnalyticsAPIService.shared.removeReceiptItem(receiptId: receiptId, itemId: itemId)
-
-                await MainActor.run {
-                    // Check if backend indicates the entire receipt was deleted
-                    if response.receiptDeleted == true {
-                        withAnimation {
-                            recentReceipt = nil
-                            isRecentReceiptExpanded = false
-                        }
-                        NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                    } else if var receipt = recentReceipt {
-                        // Remove the item from local state
-                        let updatedTransactions = receipt.transactions.filter { $0.itemId != itemId }
-
-                        if updatedTransactions.isEmpty {
-                            // No items left, remove the receipt
-                            withAnimation {
-                                recentReceipt = nil
-                                isRecentReceiptExpanded = false
-                            }
-                            NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                        } else {
-                            // Update receipt with remaining items
-                            let newTotal = response.updatedTotalAmount ?? updatedTransactions.reduce(0) { $0 + $1.itemPrice }
-                            let newHealthScore = response.updatedAverageHealthScore ?? {
-                                let scores = updatedTransactions.compactMap { $0.healthScore }
-                                guard !scores.isEmpty else { return nil as Double? }
-                                return Double(scores.reduce(0, +)) / Double(scores.count)
-                            }()
-
-                            withAnimation {
-                                recentReceipt = ReceiptUploadResponse(
-                                    receiptId: receipt.receiptId,
-                                    status: receipt.status,
-                                    storeName: receipt.storeName,
-                                    receiptDate: receipt.receiptDate,
-                                    totalAmount: newTotal,
-                                    itemsCount: response.updatedItemsCount ?? updatedTransactions.count,
-                                    transactions: updatedTransactions,
-                                    warnings: receipt.warnings,
-                                    averageHealthScore: newHealthScore,
-                                    isDuplicate: receipt.isDuplicate,
-                                    duplicateScore: receipt.duplicateScore
-                                )
-                            }
-                        }
-
-                        // Notify other views to refresh
-                        NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
-                    }
-                }
-            } catch {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-            }
-        }
-    }
-
     // MARK: - Share Hint Card
 
     private var shareHintCard: some View {
@@ -1045,10 +965,6 @@ struct ReceiptScanView: View {
     // MARK: - Process Receipt
 
     private func processReceipt(image: UIImage) async {
-        guard uploadState == .idle else {
-            return
-        }
-
         // Check image quality
         let qualityChecker = ReceiptQualityChecker()
         let qualityResult = await qualityChecker.checkQuality(of: image)
@@ -1099,7 +1015,6 @@ struct ReceiptScanView: View {
                     case .success, .completed:
                         uploadState = .success(response)
                         uploadedReceipt = response
-                        recentReceipt = response
 
                         rateLimitManager.decrementReceiptLocal()
                         totalReceiptsScanned += 1

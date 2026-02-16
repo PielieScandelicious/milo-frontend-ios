@@ -103,9 +103,10 @@ actor ReceiptUploadService {
         let boundary = UUID().uuidString
         var body = Data()
 
-        // Add image data
+        // Add image data with timestamped filename
+        let filename = Self.timestampedFilename(extension: "jpg")
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"receipt.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
         body.append(imageData)
         body.append("\r\n".data(using: .utf8)!)
@@ -140,9 +141,10 @@ actor ReceiptUploadService {
         let boundary = UUID().uuidString
         var body = Data()
 
-        // Add PDF data
+        // Add PDF data with timestamped filename
+        let filename = Self.timestampedFilename(extension: "pdf")
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"receipt.pdf\"\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: application/pdf\r\n\r\n".data(using: .utf8)!)
         body.append(pdfData)
         body.append("\r\n".data(using: .utf8)!)
@@ -366,6 +368,14 @@ actor ReceiptUploadService {
     private func decodeResponse(from data: Data) async throws -> ReceiptUploadResponse {
         let decoder = JSONDecoder()
         return try decoder.decode(ReceiptUploadResponse.self, from: data)
+    }
+
+    // MARK: - Filename Helper
+
+    private static func timestampedFilename(extension ext: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        return "Receipt_\(formatter.string(from: Date())).\(ext)"
     }
 
     // MARK: - Logging Helpers

@@ -111,12 +111,11 @@ struct ProcessingReceiptRow: View {
                 Text(receipt.displayName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
-                    .lineLimit(1)
 
                 statusLabel
             }
 
-            Spacer()
+            Spacer(minLength: 4)
 
             // Right side
             if receipt.isTerminal {
