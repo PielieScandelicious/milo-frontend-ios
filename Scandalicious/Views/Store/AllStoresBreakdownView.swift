@@ -139,10 +139,10 @@ struct AllStoresBreakdownView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Stores")
+                Text(L("stores"))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
-                Text("\(storeCount) store\(storeCount == 1 ? "" : "s")")
+                Text("\(storeCount) \(storeCount == 1 ? L("store_singular") : L("store_plural"))")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
             }
@@ -229,7 +229,7 @@ struct AllStoresDonutChart: View {
                     .font(.system(size: size * 0.16, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                 
-                Text("Total")
+                Text(L("total"))
                     .font(.system(size: size * 0.09, weight: .medium))
                     .foregroundColor(.white.opacity(0.6))
             }
@@ -288,7 +288,7 @@ struct NutriScoreHeader: View {
     }
 
     private var scoreLabel: String {
-        guard let score = healthScore else { return "No Data" }
+        guard let score = healthScore else { return L("no_data") }
         return score.healthScoreLabel
     }
 
@@ -311,7 +311,7 @@ struct NutriScoreHeader: View {
 
             // Score Details
             VStack(alignment: .leading, spacing: 4) {
-                Text("Nutri Score")
+                Text(L("nutri_score"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
                     .textCase(.uppercase)

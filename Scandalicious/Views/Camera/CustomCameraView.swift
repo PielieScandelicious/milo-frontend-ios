@@ -205,7 +205,7 @@ struct CustomCameraView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("Done")
+                    Text(L("done"))
                         .font(.system(size: 14, weight: .bold))
                 }
                 .foregroundColor(.black)
@@ -320,7 +320,7 @@ struct CustomCameraView: View {
                         .scaleEffect(1.2)
                 }
 
-                Text("Preparing preview...")
+                Text(L("preparing_preview"))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
             }
@@ -575,7 +575,7 @@ struct ReviewImageView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "arrow.up.circle.fill")
                                 .font(.system(size: 18, weight: .semibold))
-                            Text("Upload Receipt")
+                            Text(L("upload_receipt"))
                                 .font(.system(size: 16, weight: .bold))
                         }
                         .foregroundColor(.white)
@@ -591,7 +591,7 @@ struct ReviewImageView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "arrow.counterclockwise")
                                     .font(.system(size: 14, weight: .semibold))
-                                Text("Retake")
+                                Text(L("retake"))
                                     .font(.system(size: 14, weight: .semibold))
                             }
                             .foregroundColor(.red)
@@ -606,7 +606,7 @@ struct ReviewImageView: View {
                                 HStack(spacing: 6) {
                                     Image(systemName: "plus")
                                         .font(.system(size: 14, weight: .semibold))
-                                    Text("Add More")
+                                    Text(L("add_more"))
                                         .font(.system(size: 14, weight: .semibold))
                                 }
                                 .foregroundColor(.blue)
@@ -623,7 +623,7 @@ struct ReviewImageView: View {
                 .padding(.top, 12)
                 .background(Color(UIColor.systemBackground))
             }
-            .navigationTitle("Review")
+            .navigationTitle(L("review"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {

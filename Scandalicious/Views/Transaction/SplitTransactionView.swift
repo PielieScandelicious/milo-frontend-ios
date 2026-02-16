@@ -93,17 +93,17 @@ struct SplitTransactionView: View {
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Split Transaction")
+            .navigationTitle(L("split_transaction"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(L("cancel")) {
                         dismiss()
                     }
                 }
 
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Done") {
+                    Button(L("done")) {
                         dismiss()
                     }
                 }
@@ -178,7 +178,7 @@ struct SplitTransactionView: View {
                     .fontDesign(.rounded)
 
                 if transaction.quantity > 1 {
-                    Text("Qty: \(transaction.quantity)")
+                    Text("\(L("qty")): \(transaction.quantity)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -193,7 +193,7 @@ struct SplitTransactionView: View {
     private var friendsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Split with")
+                Text(L("split_with"))
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
@@ -201,7 +201,7 @@ struct SplitTransactionView: View {
                 Spacer()
 
                 if participants.count > 1 {
-                    Text("\(participants.count) people")
+                    Text("\(participants.count) \(L("people"))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -217,7 +217,7 @@ struct SplitTransactionView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "person.badge.plus")
                             .font(.title2)
-                        Text("Add friends to split with")
+                        Text(L("add_friends_split"))
                             .font(.subheadline)
                     }
                     .foregroundStyle(.secondary)
@@ -256,7 +256,7 @@ struct SplitTransactionView: View {
 
             // Amount display
             if splitMode == .equal {
-                Text("Each person pays")
+                Text(L("each_person_pays"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -265,7 +265,7 @@ struct SplitTransactionView: View {
                     .foregroundStyle(.primary)
             } else {
                 VStack(spacing: 4) {
-                    Text("Custom split")
+                    Text(L("custom_split"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -389,7 +389,7 @@ struct SplitTransactionView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("Split adds up correctly")
+                    Text(L("split_correct"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -415,7 +415,7 @@ struct SplitTransactionView: View {
                         Button {
                             distributeRemainder()
                         } label: {
-                            Text("Fix")
+                            Text(L("fix"))
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .padding(.horizontal, 12)
@@ -440,11 +440,11 @@ struct SplitTransactionView: View {
                 .foregroundStyle(.secondary.opacity(0.5))
                 .padding(.top, 40)
 
-            Text("Add friends to split")
+            Text(L("add_friends_split_tap"))
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Text("Tap the + button above to add people to split this expense with.")
+            Text(L("tap_plus_button"))
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -463,7 +463,7 @@ struct SplitTransactionView: View {
                 } label: {
                     HStack {
                         Image(systemName: "keyboard.chevron.compact.down")
-                        Text("Done Editing")
+                        Text(L("done_editing"))
                     }
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -478,7 +478,7 @@ struct SplitTransactionView: View {
             ShareLink(item: generateShareText()) {
                 HStack {
                     Image(systemName: "square.and.arrow.up")
-                    Text("Share Split")
+                    Text(L("share_split"))
                 }
                 .font(.headline)
                 .frame(maxWidth: .infinity)

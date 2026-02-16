@@ -47,9 +47,9 @@ enum ProfileGender: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .male: return "Male"
-        case .female: return "Female"
-        case .preferNotToSay: return "X"
+        case .male: return L("gender_male")
+        case .female: return L("gender_female")
+        case .preferNotToSay: return L("gender_x")
         }
     }
 }

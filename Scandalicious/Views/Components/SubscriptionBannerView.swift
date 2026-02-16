@@ -53,19 +53,19 @@ struct SubscriptionBannerView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Unlock Premium")
+                    Text(L("unlock_premium"))
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundStyle(.primary)
 
-                    Text("Start your 14-day free trial")
+                    Text(L("start_14day_trial"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                Text("Try Free")
+                Text(L("try_free"))
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)
@@ -113,7 +113,7 @@ struct SubscriptionInlineButton: View {
                 Button {
                     showPaywall = true
                 } label: {
-                    Label("Pro", systemImage: "crown.fill")
+                    Label(L("pro"), systemImage: "crown.fill")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
@@ -162,7 +162,7 @@ struct SubscriptionStatusCard: View {
                 Image(systemName: "crown.fill")
                     .foregroundStyle(.yellow)
 
-                Text("Premium Active")
+                Text(L("premium_active"))
                     .font(.headline)
                     .fontWeight(.semibold)
 
@@ -176,7 +176,7 @@ struct SubscriptionStatusCard: View {
 
                 Spacer()
 
-                Button("Manage") {
+                Button(L("manage")) {
                     showManageSubscriptions = true
                 }
                 .font(.subheadline)
@@ -203,7 +203,7 @@ struct SubscriptionStatusCard: View {
                     Image(systemName: "sparkles")
                         .foregroundStyle(.purple)
 
-                    Text("Upgrade to Premium")
+                    Text(L("upgrade_premium"))
                         .font(.headline)
                         .fontWeight(.semibold)
 
@@ -215,7 +215,7 @@ struct SubscriptionStatusCard: View {
                 }
 
                 HStack {
-                    Text("Unlock all features with a free trial")
+                    Text(L("unlock_features_trial"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -265,13 +265,13 @@ struct PremiumFeatureGate: ViewModifier {
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
 
-                    Text("Premium Feature")
+                    Text(L("premium_feature"))
                         .font(.headline)
 
                     Button {
                         showPaywall = true
                     } label: {
-                        Text("Unlock")
+                        Text(L("unlock"))
                             .fontWeight(.semibold)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 24)

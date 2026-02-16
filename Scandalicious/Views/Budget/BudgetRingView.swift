@@ -97,7 +97,7 @@ struct BudgetRingView: View {
                     .font(.system(size: size * 0.2, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
-                Text("left to spend")
+                Text(L("left_to_spend"))
                     .font(.system(size: size * 0.08, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
             } else {
@@ -467,7 +467,7 @@ struct ProjectedBudgetBar: View {
                 VStack(alignment: .leading, spacing: 16) {
                     // Under budget projection
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Under budget")
+                        Text(L("under_budget"))
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.5))
                         ProjectedBudgetBar(
@@ -479,7 +479,7 @@ struct ProjectedBudgetBar: View {
 
                     // Over budget projection
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Over budget projection")
+                        Text(L("over_budget_projection"))
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.5))
                         ProjectedBudgetBar(
@@ -491,7 +491,7 @@ struct ProjectedBudgetBar: View {
 
                     // Already over budget
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Already over budget")
+                        Text(L("already_over_budget"))
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.5))
                         ProjectedBudgetBar(

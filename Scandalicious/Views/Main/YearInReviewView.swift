@@ -35,9 +35,9 @@ struct YearInReviewView: View {
                     }
                 } else {
                     ContentUnavailableView(
-                        "No Data",
+                        L("no_data"),
                         systemImage: "chart.bar.xaxis",
-                        description: Text("No spending data for \(String(selectedYear))")
+                        description: Text("\(L("no_spending_data_for")) \(String(selectedYear))")
                     )
                     .padding(.top, 40)
                 }
@@ -45,7 +45,7 @@ struct YearInReviewView: View {
             .padding(.vertical, 16)
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Year in Review")
+        .navigationTitle(L("year_in_review"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             computeAvailableYears()
@@ -60,13 +60,13 @@ struct YearInReviewView: View {
 
     private func statsGrid(_ summary: YearSummaryResponse) -> some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            statCard(title: "Total Spent", value: String(format: "€%.2f", summary.totalSpend), icon: "creditcard.fill", color: .purple)
-            statCard(title: "Receipts", value: "\(summary.receiptCount)", icon: "receipt.fill", color: .blue)
-            statCard(title: "Items", value: "\(summary.totalItems)", icon: "bag.fill", color: .green)
+            statCard(title: L("total_spent"), value: String(format: "€%.2f", summary.totalSpend), icon: "creditcard.fill", color: .purple)
+            statCard(title: L("receipts"), value: "\(summary.receiptCount)", icon: "receipt.fill", color: .blue)
+            statCard(title: L("items"), value: "\(summary.totalItems)", icon: "bag.fill", color: .green)
             if let healthScore = summary.averageHealthScore, healthScore > 0 {
-                statCard(title: "Health Score", value: String(format: "%.1f", healthScore), icon: "heart.fill", color: .red)
+                statCard(title: L("health_score"), value: String(format: "%.1f", healthScore), icon: "heart.fill", color: .red)
             } else {
-                statCard(title: "Transactions", value: "\(summary.transactionCount)", icon: "list.bullet.rectangle.fill", color: .orange)
+                statCard(title: L("transactions"), value: "\(summary.transactionCount)", icon: "list.bullet.rectangle.fill", color: .orange)
             }
         }
         .padding(.horizontal, 16)
@@ -96,7 +96,7 @@ struct YearInReviewView: View {
 
     private func topCategoriesSection(_ categories: [CategoryBreakdown]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Top Categories")
+            Text(L("top_categories"))
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 16)
@@ -115,7 +115,7 @@ struct YearInReviewView: View {
                             Text(category.name)
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(.primary)
-                            Text("\(category.transactionCount) transaction\(category.transactionCount == 1 ? "" : "s")")
+                            Text("\(category.transactionCount) \(category.transactionCount == 1 ? L("transaction_singular") : L("transaction_plural"))")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -160,7 +160,7 @@ struct YearInReviewView: View {
         let maxSpend = sorted.map(\.totalSpend).max() ?? 1
 
         return VStack(alignment: .leading, spacing: 12) {
-            Text("Monthly Breakdown")
+            Text(L("monthly_breakdown"))
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 16)

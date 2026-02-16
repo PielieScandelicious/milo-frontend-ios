@@ -166,12 +166,12 @@ struct BarcodeCameraView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "barcode.viewfinder")
                         .font(.system(size: 18))
-                    Text("Position barcode within frame")
+                    Text(L("position_barcode_within_frame"))
                         .font(.system(size: 15, weight: .medium))
                 }
                 .foregroundStyle(.white.opacity(0.9))
 
-                Text("QR codes, barcodes, and loyalty cards")
+                Text(L("qr_barcodes_loyalty_cards"))
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.5))
             }
@@ -192,7 +192,7 @@ struct BarcodeCameraView: View {
                 }
             }
 
-            Text("Tap to capture or wait for auto-detect")
+            Text(L("tap_to_capture_or_autodetect"))
                 .font(.system(size: 12))
                 .foregroundStyle(.white.opacity(0.4))
         }
@@ -213,7 +213,7 @@ struct BarcodeCameraView: View {
                             .font(.system(size: 24))
                             .foregroundStyle(.green)
 
-                        Text("Barcode Detected!")
+                        Text(L("barcode_detected"))
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.white)
                     }

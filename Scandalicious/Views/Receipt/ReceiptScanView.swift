@@ -18,7 +18,7 @@ struct ReceiptScanView: View {
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
     @State private var errorMessage: String?
-    @State private var errorTitle: String = "Upload Failed"
+    @State private var errorTitle: String = L("upload_failed")
     @State private var showError = false
     @State private var uploadState: ReceiptUploadState = .idle
     @State private var uploadedReceipt: ReceiptUploadResponse?
@@ -113,7 +113,7 @@ struct ReceiptScanView: View {
             message: errorMessage ?? "Failed to process receipt",
             onRetry: canRetryAfterError ? {
                 errorMessage = nil
-                errorTitle = "Upload Failed"
+                errorTitle = L("upload_failed")
                 capturedImage = nil
                 uploadState = .idle
                 canRetryAfterError = false
@@ -179,10 +179,10 @@ struct ReceiptScanView: View {
                 }
             }
         }
-        .alert("Upload Limit Reached", isPresented: $showRateLimitAlert) {
-            Button("OK", role: .cancel) {}
+        .alert(L("upload_limit_reached"), isPresented: $showRateLimitAlert) {
+            Button(L("ok"), role: .cancel) {}
         } message: {
-            Text(rateLimitManager.receiptLimitMessage ?? "You've used all your receipt uploads for this month. Your limit will reset soon.")
+            Text(rateLimitManager.receiptLimitMessage ?? L("upload_limit_month"))
         }
         .onAppear {
             // Sync rate limit when view appears to ensure we have latest count
@@ -535,7 +535,7 @@ struct ReceiptScanView: View {
                         .foregroundStyle(Color.cyan)
                 }
 
-                Text("Top Stores")
+                Text(L("top_stores"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
 
@@ -544,7 +544,7 @@ struct ReceiptScanView: View {
                 // Flip hint
                 if !topCategories.isEmpty {
                     HStack(spacing: 4) {
-                        Text("Tap for categories")
+                        Text(L("tap_for_categories"))
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.white.opacity(0.3))
                         Image(systemName: "arrow.left.arrow.right")
@@ -565,7 +565,7 @@ struct ReceiptScanView: View {
                         Image(systemName: "storefront")
                             .font(.system(size: 28))
                             .foregroundStyle(.white.opacity(0.2))
-                        Text("No stores yet")
+                        Text(L("no_stores_yet"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.3))
                     }
@@ -610,7 +610,7 @@ struct ReceiptScanView: View {
                         .foregroundStyle(Color.purple)
                 }
 
-                Text("Top Categories")
+                Text(L("top_categories"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
 
@@ -618,7 +618,7 @@ struct ReceiptScanView: View {
 
                 // Flip hint
                 HStack(spacing: 4) {
-                    Text("Tap for stores")
+                    Text(L("tap_for_stores"))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.white.opacity(0.3))
                     Image(systemName: "arrow.left.arrow.right")
@@ -638,7 +638,7 @@ struct ReceiptScanView: View {
                         Image(systemName: "cart")
                             .font(.system(size: 28))
                             .foregroundStyle(.white.opacity(0.2))
-                        Text("No categories yet")
+                        Text(L("no_categories_yet"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.3))
                     }
@@ -712,7 +712,7 @@ struct ReceiptScanView: View {
                 Text("€\(category.totalSpent, specifier: "%.0f")")
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(medalColor)
-                Text("spent")
+                Text(L("spent"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.white.opacity(0.4))
             }
@@ -760,7 +760,7 @@ struct ReceiptScanView: View {
                 Text("\(visits)")
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(medalColor)
-                Text("visits")
+                Text(L("visits"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.white.opacity(0.4))
             }
@@ -914,11 +914,11 @@ struct ReceiptScanView: View {
                 .foregroundStyle(Color(red: 0.85, green: 0.2, blue: 0.6))
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("Got a digital receipt?")
+                Text(L("got_digital_receipt"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
 
-                Text("Use the Share button from any app")
+                Text(L("use_share_button"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
             }
@@ -957,11 +957,11 @@ struct ReceiptScanView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Wallet Pass Creator")
+                    Text(L("wallet_pass_creator"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
 
-                    Text("Create Apple Wallet loyalty cards to receive digital receipts")
+                    Text(L("wallet_pass_desc"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                         .lineLimit(2)
@@ -985,7 +985,7 @@ struct ReceiptScanView: View {
     private var syncingStatusBanner: some View {
         HStack(spacing: 6) {
             SyncingArrowsView()
-            Text("Syncing")
+            Text(L("syncing"))
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.blue)
@@ -996,7 +996,7 @@ struct ReceiptScanView: View {
         HStack(spacing: 4) {
             Image(systemName: "checkmark.icloud.fill")
                 .font(.system(size: 11))
-            Text("Synced")
+            Text(L("synced"))
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.green)
@@ -1095,7 +1095,7 @@ struct ReceiptScanView: View {
                 }
                 message += "Tips: Good lighting, hold steady, capture entire receipt"
 
-                errorTitle = "Quality Check Failed"
+                errorTitle = L("quality_check_failed")
                 errorMessage = message
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -1274,7 +1274,7 @@ struct CaptureSuccessOverlay: View {
                 }
 
                 // Done text with subtle styling
-                Text("Done")
+                Text(L("done"))
                     .font(.system(size: 26, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
                     .opacity(cardOpacity)

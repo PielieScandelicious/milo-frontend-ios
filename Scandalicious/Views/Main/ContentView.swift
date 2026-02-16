@@ -40,20 +40,20 @@ struct ContentView: View {
             TabView(selection: $selectedTab) {
                 ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
                     .tabItem {
-                        Label("Budget", systemImage: "creditcard.fill")
+                        Label(L("tab_budget"), systemImage: "creditcard.fill")
                     }
                     .tag(Tab.budget)
 
                 ScanTab()
                     .tabItem {
-                        Label("Home", systemImage: "house.fill")
+                        Label(L("tab_home"), systemImage: "house.fill")
                     }
                     .tag(Tab.home)
 
                 ScandaLiciousTab()
                     .tabItem {
                         Label {
-                            Text("Milo")
+                            Text(L("tab_milo"))
                         } icon: {
                             MiloTabIcon()
                         }
@@ -102,16 +102,16 @@ struct ContentView: View {
         }
         .onChange(of: selectedTab) { oldValue, newValue in
         }
-        .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
-            Button("Sign Out", role: .destructive) {
+        .confirmationDialog(L("sign_out"), isPresented: $showSignOutConfirmation) {
+            Button(L("sign_out"), role: .destructive) {
                 do {
                     try authManager.signOut()
                 } catch {
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L("cancel"), role: .cancel) {}
         } message: {
-            Text("Are you sure you want to sign out?")
+            Text(L("sign_out_confirm"))
         }
     }
 
@@ -241,7 +241,7 @@ struct ScandaLiciousTab: View {
     private var syncingStatusBanner: some View {
         HStack(spacing: 6) {
             SyncingArrowsView()
-            Text("Syncing")
+            Text(L("syncing"))
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.blue)
@@ -252,7 +252,7 @@ struct ScandaLiciousTab: View {
         HStack(spacing: 4) {
             Image(systemName: "checkmark.icloud.fill")
                 .font(.system(size: 11))
-            Text("Synced")
+            Text(L("synced"))
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundColor(.green)

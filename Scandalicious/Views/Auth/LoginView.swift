@@ -41,11 +41,11 @@ struct LoginView: View {
                             .font(.system(size: 60))
                             .foregroundStyle(.blue)
                         
-                        Text("Welcome to Milo")
+                        Text(L("welcome_to_milo"))
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
-                        Text(isSignUp ? "Create your account" : "Sign in to continue")
+                        Text(isSignUp ? L("create_account") : L("sign_in_continue"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -54,7 +54,7 @@ struct LoginView: View {
                     // Form
                     VStack(spacing: 16) {
                         // Email field
-                        TextField("Email", text: $email)
+                        TextField(L("email"), text: $email)
                             .padding()
                             .background(Color(red: 1.0, green: 1.0, blue: 1.0))
                             .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.1))
@@ -67,7 +67,7 @@ struct LoginView: View {
                             .colorScheme(.light)
                         
                         // Password field
-                        SecureField("Password", text: $password)
+                        SecureField(L("password"), text: $password)
                             .padding()
                             .background(Color(red: 1.0, green: 1.0, blue: 1.0))
                             .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.1))
@@ -96,7 +96,7 @@ struct LoginView: View {
                                     .progressViewStyle(.circular)
                                     .tint(.white)
                             } else {
-                                Text(isSignUp ? "Sign Up" : "Sign In")
+                                Text(isSignUp ? L("sign_up") : L("sign_in"))
                                     .fontWeight(.semibold)
                             }
                         }
@@ -109,7 +109,7 @@ struct LoginView: View {
                         
                         // Forgot Password
                         if !isSignUp {
-                            Button("Forgot Password?") {
+                            Button(L("forgot_password")) {
                                 showResetPassword = true
                             }
                             .font(.footnote)
@@ -124,7 +124,7 @@ struct LoginView: View {
                             .fill(.secondary.opacity(0.3))
                             .frame(height: 1)
                         
-                        Text("OR")
+                        Text(L("or"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 8)
@@ -147,7 +147,7 @@ struct LoginView: View {
                                 .font(.system(size: 20))
                                 .foregroundStyle(.black)
                             
-                            Text("Continue with Google")
+                            Text(L("continue_google"))
                                 .fontWeight(.semibold)
                         }
                     }
@@ -186,7 +186,7 @@ struct LoginView: View {
                         isSignUp.toggle()
                         errorMessage = ""
                     } label: {
-                        Text(isSignUp ? "Already have an account? **Sign In**" : "Don't have an account? **Sign Up**")
+                        Text(isSignUp ? L("already_have_account_signin") : L("dont_have_account_signup"))
                             .font(.footnote)
                     }
                     .disabled(isLoading)
@@ -194,20 +194,20 @@ struct LoginView: View {
                 }
             }
             .preferredColorScheme(.dark)
-            .alert("Reset Password", isPresented: $showResetPassword) {
-                TextField("Email", text: $email)
+            .alert(L("reset_password"), isPresented: $showResetPassword) {
+                TextField(L("email"), text: $email)
                     .textContentType(.emailAddress)
                     .autocapitalization(.none)
                     .keyboardType(.emailAddress)
-                
-                Button("Send Reset Link") {
+
+                Button(L("send_reset_link")) {
                     Task {
                         await handlePasswordReset()
                     }
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(L("cancel"), role: .cancel) {}
             } message: {
-                Text("Enter your email address to receive a password reset link.")
+                Text(L("enter_email_reset"))
             }
         }
     }
@@ -271,7 +271,7 @@ struct LoginView: View {
         
         do {
             try await authManager.resetPassword(email: email)
-            errorMessage = "Password reset email sent!"
+            errorMessage = L("password_reset_sent")
         } catch {
             errorMessage = error.localizedDescription
         }

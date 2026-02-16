@@ -72,7 +72,10 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Config/env.swift,
+				Localization/AppStrings.swift,
+				Localization/LanguageManager.swift,
 				Models/ReceiptModels.swift,
+				Models/UserProfile.swift,
 				Services/KeychainHelper.swift,
 				Services/ReceiptUploadService.swift,
 				Views/Receipt/ReceiptErrorView.swift,
@@ -583,7 +586,6 @@
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ScandaliciousShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				INFOPLIST_KEY_CFBundleDisplayName = "Scandalicious Share Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
@@ -616,7 +618,6 @@
 				DEVELOPMENT_TEAM = 9A8M33Z82L;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ScandaliciousShareExtension/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				INFOPLIST_KEY_CFBundleDisplayName = "Scandalicious Share Extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;

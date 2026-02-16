@@ -183,7 +183,7 @@ struct ReceiptTransactionsView: View {
                         HealthScoreBadge(score: Int(healthScore.rounded()), size: .medium, style: .subtle)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Health Score")
+                            Text(L("health_score"))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white.opacity(0.5))
 
@@ -222,7 +222,7 @@ struct ReceiptTransactionsView: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(searchText.isEmpty ? .white.opacity(0.4) : .white.opacity(0.6))
 
-            TextField("Search Items", text: $searchText)
+            TextField(L("search_items"), text: $searchText)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white)
                 .accentColor(.blue)
@@ -268,11 +268,11 @@ struct ReceiptTransactionsView: View {
                 .foregroundColor(.white.opacity(0.3))
                 .padding(.top, 40)
 
-            Text("No Results")
+            Text(L("no_results_search"))
                 .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
 
-            Text("Try adjusting your search")
+            Text(L("try_adjusting_search"))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
         }
@@ -331,7 +331,7 @@ struct ReceiptTransactionsView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(color)
 
-                Text("Groceries")
+                Text(L("groceries"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white.opacity(0.7))
                     .textCase(.uppercase)
@@ -479,7 +479,7 @@ struct ReceiptTransactionsView: View {
                         Text("•")
                             .foregroundColor(.white.opacity(0.3))
 
-                        Text("Qty: \(transaction.quantity)")
+                        Text("\(L("qty")): \(transaction.quantity)")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.5))
                     }

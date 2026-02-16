@@ -183,7 +183,7 @@ struct CategoryAllocationBarList: View {
     var body: some View {
         VStack(spacing: 4) {
             HStack {
-                Text("Budget by Category")
+                Text(L("budget_by_category"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
 
@@ -192,7 +192,7 @@ struct CategoryAllocationBarList: View {
                 if let onSeeAll, categories.count > maxVisible {
                     Button(action: onSeeAll) {
                         HStack(spacing: 4) {
-                            Text("See All (\(categories.count))")
+                            Text("\(L("see_all")) (\(categories.count))")
                                 .font(.system(size: 12, weight: .semibold))
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 10, weight: .semibold))

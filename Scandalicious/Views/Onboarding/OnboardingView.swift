@@ -57,10 +57,10 @@ struct OnboardingView: View {
         }
         .preferredColorScheme(.dark)
         .interactiveDismissDisabled()
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
+        .alert(L("error"), isPresented: $showError) {
+            Button(L("ok"), role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "An unknown error occurred")
+            Text(errorMessage ?? L("unknown_error"))
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.8)) {
@@ -90,13 +90,13 @@ struct OnboardingView: View {
             .opacity(appearAnimation ? 1 : 0)
             .scaleEffect(appearAnimation ? 1 : 0.5)
 
-            Text("Welcome")
+            Text(L("welcome"))
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .opacity(appearAnimation ? 1 : 0)
                 .offset(y: appearAnimation ? 0 : 20)
 
-            Text("Let's personalize your experience")
+            Text(L("personalize_experience"))
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.5))
                 .opacity(appearAnimation ? 1 : 0)
@@ -115,7 +115,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.purple)
                     .frame(width: 20)
 
-                TextField("Nickname", text: $nickname)
+                TextField(L("nickname"), text: $nickname)
                     .foregroundStyle(.white)
                     .autocorrectionDisabled()
                     .textContentType(.nickname)
@@ -138,7 +138,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.purple)
                     .frame(width: 20)
 
-                TextField("Age", text: $age)
+                TextField(L("age"), text: $age)
                     .foregroundStyle(.white)
                     .keyboardType(.numberPad)
                     .onChange(of: age) { _, newValue in
@@ -234,7 +234,7 @@ struct OnboardingView: View {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Text("Get Started")
+                    Text(L("get_started"))
                         .fontWeight(.semibold)
                     Image(systemName: "arrow.right")
                         .font(.subheadline.weight(.semibold))
@@ -282,6 +282,7 @@ struct OnboardingView: View {
                 )
 
                 await MainActor.run {
+                    LanguageManager.shared.currentLanguage = selectedLanguage
                     authManager.markProfileAsCompleted()
                     isLoading = false
                 }

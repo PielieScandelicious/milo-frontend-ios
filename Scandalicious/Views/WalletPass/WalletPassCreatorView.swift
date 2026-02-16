@@ -58,7 +58,7 @@ struct WalletPassCreatorView: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     if viewModel.canCreatePass {
-                        Button("Preview") {
+                        Button(L("preview")) {
                             showingPassPreview = true
                         }
                         .font(.system(size: 15, weight: .semibold))
@@ -93,7 +93,7 @@ struct WalletPassCreatorView: View {
         .onChange(of: selectedLogoItem) { _, newValue in
             handlePhotoSelection(newValue, isLogo: true)
         }
-        .confirmationDialog("Multiple Barcodes Found",
+        .confirmationDialog(L("multiple_barcodes_found"),
                            isPresented: $viewModel.showingBarcodeOptions,
                            titleVisibility: .visible) {
             ForEach(viewModel.detectedBarcodes) { barcode in
@@ -101,14 +101,14 @@ struct WalletPassCreatorView: View {
                     viewModel.selectBarcode(barcode)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L("cancel"), role: .cancel) {}
         } message: {
-            Text("Select the barcode you want to use")
+            Text(L("select_barcode_to_use"))
         }
-        .alert("Error", isPresented: $viewModel.showingError) {
-            Button("OK", role: .cancel) {}
+        .alert(L("error"), isPresented: $viewModel.showingError) {
+            Button(L("ok"), role: .cancel) {}
         } message: {
-            Text(viewModel.errorMessage ?? "An error occurred")
+            Text(viewModel.errorMessage ?? L("an_error_occurred"))
         }
         .sheet(isPresented: $showingPassPreview) {
             PassPreviewSheet(passData: viewModel.passData)
@@ -168,7 +168,7 @@ struct WalletPassCreatorView: View {
                                 }
                         }
 
-                        Text(viewModel.passData.storeName.isEmpty ? "Store Name" : viewModel.passData.storeName)
+                        Text(viewModel.passData.storeName.isEmpty ? L("store_name") : viewModel.passData.storeName)
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(viewModel.passData.colorPreset.foregroundColor)
 
@@ -202,7 +202,7 @@ struct WalletPassCreatorView: View {
                                 .font(.system(size: 32))
                                 .foregroundStyle(viewModel.passData.colorPreset.foregroundColor.opacity(0.3))
 
-                            Text("Scan barcode below")
+                            Text(L("scan_barcode_below"))
                                 .font(.system(size: 12))
                                 .foregroundStyle(viewModel.passData.colorPreset.labelColor.opacity(0.5))
                         }
@@ -220,13 +220,13 @@ struct WalletPassCreatorView: View {
 
     private var storeDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Store Details", icon: "building.2.fill")
+            sectionHeader(L("store_details"), icon: "building.2.fill")
 
             VStack(spacing: 12) {
                 // Store name field
                 PremiumTextField(
                     icon: "storefront",
-                    placeholder: "Store Name",
+                    placeholder: L("store_name"),
                     text: $viewModel.passData.storeName
                 )
             }
@@ -237,7 +237,7 @@ struct WalletPassCreatorView: View {
 
     private var barcodeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Loyalty Card Barcode", icon: "barcode.viewfinder")
+            sectionHeader(L("loyalty_card_barcode"), icon: "barcode.viewfinder")
 
             VStack(spacing: 12) {
                 // Barcode visualization when detected
@@ -268,7 +268,7 @@ struct WalletPassCreatorView: View {
                                     .font(.system(size: 16))
                                     .foregroundStyle(.green)
 
-                                Text("Barcode captured")
+                                Text(L("barcode_captured"))
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundStyle(.white.opacity(0.8))
                             }
@@ -282,7 +282,7 @@ struct WalletPassCreatorView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "arrow.counterclockwise")
                                         .font(.system(size: 12, weight: .semibold))
-                                    Text("Rescan")
+                                    Text(L("rescan"))
                                         .font(.system(size: 13, weight: .semibold))
                                 }
                                 .foregroundStyle(.white.opacity(0.5))
@@ -304,16 +304,16 @@ struct WalletPassCreatorView: View {
                     HStack(spacing: 12) {
                         BarcodeActionButton(
                             icon: "camera.fill",
-                            title: "Scan",
-                            subtitle: "Take photo"
+                            title: L("scan"),
+                            subtitle: L("take_photo")
                         ) {
                             viewModel.captureBarcode()
                         }
 
                         BarcodeActionButton(
                             icon: "photo.on.rectangle",
-                            title: "Upload",
-                            subtitle: "From photos"
+                            title: L("upload"),
+                            subtitle: L("from_photos")
                         ) {
                             viewModel.selectBarcodeFromPhotos()
                         }
@@ -323,7 +323,7 @@ struct WalletPassCreatorView: View {
                     DisclosureGroup {
                         PremiumTextField(
                             icon: "number",
-                            placeholder: "Enter barcode value",
+                            placeholder: L("enter_barcode_value"),
                             text: $viewModel.passData.barcodeValue
                         )
                         .padding(.top, 8)
@@ -331,7 +331,7 @@ struct WalletPassCreatorView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "keyboard")
                                 .font(.system(size: 12))
-                            Text("Enter manually")
+                            Text(L("enter_manually"))
                                 .font(.system(size: 13, weight: .medium))
                         }
                         .foregroundStyle(.white.opacity(0.5))
@@ -345,7 +345,7 @@ struct WalletPassCreatorView: View {
                 HStack {
                     ProgressView()
                         .tint(.white)
-                    Text("Detecting barcode...")
+                    Text(L("detecting_barcode"))
                         .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.7))
                 }
@@ -359,7 +359,7 @@ struct WalletPassCreatorView: View {
 
     private var colorSelectionSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Pass Color", icon: "paintpalette.fill")
+            sectionHeader(L("pass_color"), icon: "paintpalette.fill")
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -381,7 +381,7 @@ struct WalletPassCreatorView: View {
 
     private var logoSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("Store Logo", icon: "photo.fill")
+            sectionHeader(L("store_logo"), icon: "photo.fill")
 
             Button {
                 viewModel.selectLogo()
@@ -405,11 +405,11 @@ struct WalletPassCreatorView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(viewModel.passData.logoImage != nil ? "Change Logo" : "Add Logo")
+                        Text(viewModel.passData.logoImage != nil ? L("change_logo") : L("add_logo"))
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
 
-                        Text("Optional - appears on pass header")
+                        Text(L("optional_pass_header"))
                             .font(.system(size: 12))
                             .foregroundStyle(.white.opacity(0.5))
                     }
@@ -442,7 +442,7 @@ struct WalletPassCreatorView: View {
                 HStack(spacing: 12) {
                     ProgressView()
                         .tint(.white)
-                    Text("Creating Pass...")
+                    Text(L("creating_pass"))
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white)
                 }
@@ -675,11 +675,11 @@ struct PassPreviewSheet: View {
 
                     // Info text
                     VStack(spacing: 8) {
-                        Text("Pass Preview")
+                        Text(L("pass_preview"))
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.white)
 
-                        Text("This is how your loyalty card will appear in Apple Wallet")
+                        Text(L("pass_preview_description"))
                             .font(.system(size: 14))
                             .foregroundStyle(.white.opacity(0.6))
                             .multilineTextAlignment(.center)
@@ -692,7 +692,7 @@ struct PassPreviewSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                    Button(L("done")) {
                         dismiss()
                     }
                     .foregroundStyle(.white)
@@ -904,11 +904,11 @@ struct PassSuccessView: View {
                 // Title
                 if showContent {
                     VStack(spacing: 12) {
-                        Text("Pass Created!")
+                        Text(L("pass_created"))
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(.white)
 
-                        Text("Your \(passData.storeName) loyalty card is ready")
+                        Text("\(L("your")) \(passData.storeName) \(L("loyalty_card_ready"))")
                             .font(.system(size: 16))
                             .foregroundStyle(.white.opacity(0.7))
                             .multilineTextAlignment(.center)
@@ -936,11 +936,11 @@ struct PassSuccessView: View {
                                 .foregroundStyle(.blue)
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Coming Soon")
+                                Text(L("coming_soon"))
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(.white)
 
-                                Text("Direct Apple Wallet integration is being set up. For now, you can save or screenshot your pass.")
+                                Text(L("wallet_integration_coming_soon"))
                                     .font(.system(size: 13))
                                     .foregroundStyle(.white.opacity(0.6))
                             }
@@ -966,7 +966,7 @@ struct PassSuccessView: View {
                     Button {
                         onDone()
                     } label: {
-                        Text("Done")
+                        Text(L("done"))
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
