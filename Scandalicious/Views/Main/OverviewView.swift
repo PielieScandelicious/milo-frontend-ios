@@ -23,12 +23,6 @@ enum SortOption: String, CaseIterable {
     case storeName = "Store Name"
 }
 
-private struct RowsOverflowHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
 
 
 
@@ -83,7 +77,6 @@ struct OverviewView: View {
     @State private var cachedSegmentsByPeriod: [String: [StoreChartSegment]] = [:] // Cache segments
     @State private var cachedChartDataByPeriod: [String: [ChartData]] = [:] // Cache chart data for IconDonutChart
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
-    @State private var storeRowsAppeared = false // Track staggered animation state
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
     @State private var receiptsScrollTarget: String? // Declarative scroll position binding
     @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
@@ -92,7 +85,6 @@ struct OverviewView: View {
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
-    @State private var overflowRowsHeight: CGFloat = 0 // Measured height of overflow rows for clip animation
     @State private var chartRefreshToken: Int = 0 // Incremented on receipt upload to force pie chart re-animation
     @State private var budgetExpanded = false // Track if budget widget is expanded
     @State private var activeCardPage = 0 // 0=budget, 1=promos
@@ -742,14 +734,6 @@ struct OverviewView: View {
         activeCardPage = 0
         cardDragOffset = 0
 
-        // Reset store rows animation for staggered re-entry
-        storeRowsAppeared = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation {
-                storeRowsAppeared = true
-            }
-        }
-
         // Clear segment caches for fresh rendering
         cachedSegmentsByPeriod.removeAll()
         cachedChartDataByPeriod.removeAll()
@@ -1118,18 +1102,14 @@ struct OverviewView: View {
                 if horizontalAmount > 0 {
                     // Swipe right -> go to previous (older) period
                     if canGoToPreviousPeriod {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            goToPreviousPeriod()
-                        }
+                        goToPreviousPeriod()
                     } else {
                         triggerPeriodBoundaryFeedback(direction: 1)
                     }
                 } else {
                     // Swipe left -> go to next (newer) period
                     if canGoToNextPeriod {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            goToNextPeriod()
-                        }
+                        goToNextPeriod()
                     } else {
                         triggerPeriodBoundaryFeedback(direction: -1)
                     }
@@ -1207,9 +1187,7 @@ struct OverviewView: View {
             // Previous period (faded left)
             if canGoToPreviousPeriod {
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        selectedPeriod = availablePeriods[currentPeriodIndex - 1]
-                    }
+                    selectedPeriod = availablePeriods[currentPeriodIndex - 1]
                 } label: {
                     Text(shortenedPeriod(availablePeriods[currentPeriodIndex - 1]).uppercased())
                         .font(.system(size: 11, weight: .medium, design: .default))
@@ -1286,9 +1264,7 @@ struct OverviewView: View {
             // Next period (faded right)
             if canGoToNextPeriod {
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        selectedPeriod = availablePeriods[currentPeriodIndex + 1]
-                    }
+                    selectedPeriod = availablePeriods[currentPeriodIndex + 1]
                 } label: {
                     Text(shortenedPeriod(availablePeriods[currentPeriodIndex + 1]).uppercased())
                         .font(.system(size: 11, weight: .medium, design: .default))
@@ -1696,7 +1672,7 @@ struct OverviewView: View {
             filters.category = category.name
 
             filters.page = 1
-            filters.pageSize = 10
+            filters.pageSize = 5
 
             // Parse period to get date range (e.g., "January 2026")
             let dateFormatter = DateFormatter()
@@ -1736,9 +1712,14 @@ struct OverviewView: View {
         }
     }
 
+    /// Max items to keep loaded per category — keeps expand/collapse animation smooth
+    private static let maxCategoryItems = 10
+
     private func loadMoreCategoryItems(_ category: CategorySpendItem, period: String) async {
+        let existing = categoryItems[category.id] ?? []
         guard categoryHasMore[category.id] == true,
-              categoryLoadingMore != category.id else { return }
+              categoryLoadingMore != category.id,
+              existing.count < Self.maxCategoryItems else { return }
 
         let nextPage = (categoryCurrentPage[category.id] ?? 1) + 1
 
@@ -1750,7 +1731,7 @@ struct OverviewView: View {
             var filters = TransactionFilters()
             filters.category = category.name
             filters.page = nextPage
-            filters.pageSize = 10
+            filters.pageSize = 5
 
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "MMMM yyyy"
@@ -1772,9 +1753,12 @@ struct OverviewView: View {
 
             await MainActor.run {
                 let existing = categoryItems[category.id] ?? []
-                categoryItems[category.id] = existing + response.transactions
+                let combined = existing + response.transactions
+                // Cap at maxCategoryItems to keep the view lightweight
+                categoryItems[category.id] = Array(combined.prefix(Self.maxCategoryItems))
                 categoryCurrentPage[category.id] = nextPage
-                categoryHasMore[category.id] = response.page < response.totalPages
+                // Stop fetching if we've hit the cap or exhausted pages
+                categoryHasMore[category.id] = combined.count < Self.maxCategoryItems && response.page < response.totalPages
                 categoryLoadingMore = nil
                 // Update cache with accumulated items
                 AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: categoryItems[category.id] ?? [])
@@ -1977,17 +1961,8 @@ struct OverviewView: View {
 
     private func showAllRowsButton(isExpanded: Bool, totalCount: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                 showAllRows.toggle()
-                // Reset animation state to trigger staggered animation for new rows
-                if showAllRows {
-                    storeRowsAppeared = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        withAnimation {
-                            storeRowsAppeared = true
-                        }
-                    }
-                }
             }
         } label: {
             HStack(spacing: 5) {
@@ -2570,13 +2545,6 @@ struct OverviewView: View {
                         expandedCategoryItemsSection(category)
                             .clipReveal(isVisible: expandedCategoryId == category.id)
                     }
-                    .opacity(storeRowsAppeared ? 1 : 0)
-                    .offset(y: storeRowsAppeared ? 0 : 15)
-                    .animation(
-                        Animation.spring(response: 0.5, dampingFraction: 0.8)
-                            .delay(Double(index) * 0.08),
-                        value: storeRowsAppeared
-                    )
                 }
 
                 // Overflow rows (clipped when collapsed)
@@ -2600,32 +2568,12 @@ struct OverviewView: View {
                                     }
                                 )
 
-                                if expandedCategoryId == category.id {
-                                    expandedCategoryItemsSection(category)
-                                        .transaction { $0.animation = nil }
-                                        .clipped()
-                                }
+                                expandedCategoryItemsSection(category)
+                                    .clipReveal(isVisible: expandedCategoryId == category.id)
                             }
-                            .opacity(storeRowsAppeared ? 1 : 0)
-                            .offset(y: storeRowsAppeared ? 0 : 15)
-                            .animation(
-                                Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index + maxVisibleRows) * 0.08),
-                                value: storeRowsAppeared
-                            )
                         }
                     }
-                    .fixedSize(horizontal: false, vertical: true)
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear.preference(key: RowsOverflowHeightKey.self, value: geo.size.height)
-                        }
-                    )
-                    .onPreferenceChange(RowsOverflowHeightKey.self) { overflowRowsHeight = $0 }
-                    .frame(height: showAllRows ? overflowRowsHeight : 0, alignment: .top)
-                    .clipped()
-                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showAllRows ? overflowRowsHeight : 0)
-                    .allowsHitTesting(showAllRows)
+                    .clipReveal(isVisible: showAllRows)
 
                     showAllRowsButton(
                         isExpanded: showAllRows,
@@ -2662,13 +2610,6 @@ struct OverviewView: View {
                             }
                         )
                     }
-                    .opacity(storeRowsAppeared ? 1 : 0)
-                    .offset(y: storeRowsAppeared ? 0 : 15)
-                    .animation(
-                        Animation.spring(response: 0.5, dampingFraction: 0.8)
-                            .delay(Double(index) * 0.08),
-                        value: storeRowsAppeared
-                    )
                 }
 
                 // Overflow rows (clipped when collapsed)
@@ -2693,26 +2634,9 @@ struct OverviewView: View {
                                     }
                                 )
                             }
-                            .opacity(storeRowsAppeared ? 1 : 0)
-                            .offset(y: storeRowsAppeared ? 0 : 15)
-                            .animation(
-                                Animation.spring(response: 0.5, dampingFraction: 0.8)
-                                    .delay(Double(index + maxVisibleRows) * 0.08),
-                                value: storeRowsAppeared
-                            )
                         }
                     }
-                    .fixedSize(horizontal: false, vertical: true)
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear.preference(key: RowsOverflowHeightKey.self, value: geo.size.height)
-                        }
-                    )
-                    .onPreferenceChange(RowsOverflowHeightKey.self) { overflowRowsHeight = $0 }
-                    .frame(height: showAllRows ? overflowRowsHeight : 0, alignment: .top)
-                    .clipped()
-                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showAllRows ? overflowRowsHeight : 0)
-                    .allowsHitTesting(showAllRows)
+                    .clipReveal(isVisible: showAllRows)
 
                     showAllRowsButton(
                         isExpanded: showAllRows,
@@ -2737,14 +2661,6 @@ struct OverviewView: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 14)
-        .id("\(period)-\(isPieChartFlipped ? "categories" : "stores")")
-        .onAppear {
-            if !storeRowsAppeared {
-                withAnimation {
-                    storeRowsAppeared = true
-                }
-            }
-        }
     }
 
     /// Unified spending card combining amount, donut chart, and category/store rows
@@ -2759,9 +2675,6 @@ struct OverviewView: View {
             spendingHeaderSection(spending: spending, period: period)
 
             flippableChartSection(period: period, segments: segments)
-                .id("chart-\(period)")
-                .transition(.identity)
-                .animation(.easeInOut(duration: 0.35), value: segments.count)
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
@@ -2802,16 +2715,12 @@ struct OverviewView: View {
 
     private func goToPreviousPeriod() {
         guard canGoToPreviousPeriod else { return }
-        withAnimation {
-            selectedPeriod = availablePeriods[currentPeriodIndex - 1]
-        }
+        selectedPeriod = availablePeriods[currentPeriodIndex - 1]
     }
 
     private func goToNextPeriod() {
         guard canGoToNextPeriod else { return }
-        withAnimation {
-            selectedPeriod = availablePeriods[currentPeriodIndex + 1]
-        }
+        selectedPeriod = availablePeriods[currentPeriodIndex + 1]
     }
 }
 
@@ -2836,8 +2745,8 @@ private struct ClipReveal: ViewModifier {
                 }
             )
             .frame(height: effectiveHeight, alignment: .top)
+            .animation(.spring(response: 0.35, dampingFraction: 1.0), value: effectiveHeight)
             .clipped()
-            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: effectiveHeight)
             .allowsHitTesting(isVisible)
     }
 }
