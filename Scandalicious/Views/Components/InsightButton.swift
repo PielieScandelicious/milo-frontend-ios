@@ -24,7 +24,7 @@ struct InsightButton: View {
             HStack(spacing: 4) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .semibold))
-                Text("Daily Insight")
+                Text(L("daily_insight"))
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundColor(miloPurple)
@@ -144,11 +144,11 @@ struct InsightSheetView: View {
     private var title: String {
         switch insightType {
         case .totalSpending:
-            return "Daily Spending Insight"
+            return L("daily_spending_insight")
         case .healthScore:
-            return "Daily Health Insight"
+            return L("daily_health_insight")
         case .storeBreakdown(let storeName, _, _, _):
-            return "\(storeName) Daily Insight"
+            return "\(storeName) \(L("daily_insight"))"
         }
     }
 
@@ -209,7 +209,7 @@ struct InsightSheetView: View {
                         ProgressView()
                             .tint(accentColor)
 
-                        Text("Generating insight...")
+                        Text(L("generating_insight"))
                             .font(.system(size: 15, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
                     }
@@ -235,7 +235,7 @@ struct InsightSheetView: View {
                             DailyInsightCache.clear(for: insightType.cacheKey)
                             fetchInsight()
                         } label: {
-                            Text("Try Again")
+                            Text(L("try_again"))
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 20)
@@ -290,7 +290,7 @@ struct InsightSheetView: View {
                 Divider()
                     .background(Color.white.opacity(0.1))
 
-                Text("Insight by Milo")
+                Text(L("insight_by_milo"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
                     .padding(.top, 16)

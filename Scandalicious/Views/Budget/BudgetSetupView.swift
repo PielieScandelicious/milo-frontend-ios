@@ -69,16 +69,16 @@ struct BudgetSetupView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle(isEditing ? "Edit Budget" : "Set Budget")
+            .navigationTitle(isEditing ? L("edit_budget") : L("set_budget"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(L("cancel")) { dismiss() }
                         .foregroundColor(.white.opacity(0.6))
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Done") { focusedField = nil }
+                    Button(L("done")) { focusedField = nil }
                         .fontWeight(.semibold)
                 }
             }
@@ -118,7 +118,7 @@ struct BudgetSetupView: View {
 
     private var monthlySection: some View {
         VStack(spacing: 8) {
-            Text("MONTHLY BUDGET")
+            Text(L("monthly_budget"))
                 .font(.system(size: 11, weight: .bold))
                 .tracking(1.5)
                 .foregroundColor(.white.opacity(0.35))
@@ -144,7 +144,7 @@ struct BudgetSetupView: View {
                     }
             }
 
-            Text("per month")
+            Text(L("per_month"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.25))
         }
@@ -179,14 +179,14 @@ struct BudgetSetupView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("CATEGORY TARGETS")
+                Text(L("category_targets"))
                     .font(.system(size: 11, weight: .bold))
                     .tracking(1.2)
                     .foregroundColor(.white.opacity(0.4))
 
                 Spacer()
 
-                Text("Optional")
+                Text(L("optional"))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white.opacity(0.25))
                     .padding(.horizontal, 10)
@@ -225,7 +225,7 @@ struct BudgetSetupView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
-                    Text("Add category")
+                    Text(L("add_category"))
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .foregroundColor(Color(red: 0.45, green: 0.6, blue: 1.0))
@@ -240,8 +240,8 @@ struct BudgetSetupView: View {
 
             // Info text
             Text(categoryTargets.isEmpty
-                 ? "Set limits on categories you want to keep an eye on."
-                 : "Independent limits — they don't need to add up to your monthly budget.")
+                 ? L("set_limits_categories_eye")
+                 : L("independent_limits"))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.2))
                 .multilineTextAlignment(.center)
@@ -342,11 +342,11 @@ struct BudgetSetupView: View {
                 )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("Auto-renew monthly")
+                Text(L("auto_renew_monthly"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.9))
 
-                Text("Reuse this budget every month")
+                Text(L("reuse_budget_monthly"))
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(.white.opacity(0.3))
             }
@@ -372,7 +372,7 @@ struct BudgetSetupView: View {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Text(isEditing ? "Update Budget" : "Set Budget")
+                    Text(isEditing ? L("update_budget") : L("set_budget"))
                         .font(.system(size: 16, weight: .bold))
                 }
             }
@@ -512,7 +512,7 @@ struct CategoryPickerSheet: View {
                                 .font(.system(size: 14))
                                 .foregroundColor(.white.opacity(0.35))
 
-                            TextField("Search categories", text: $searchText)
+                            TextField(L("search_categories"), text: $searchText)
                                 .font(.system(size: 15))
                                 .foregroundColor(.white)
                         }
@@ -569,7 +569,7 @@ struct CategoryPickerSheet: View {
                                     .font(.system(size: 28))
                                     .foregroundColor(.white.opacity(0.2))
 
-                                Text("No categories found")
+                                Text(L("no_categories_found"))
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(.white.opacity(0.4))
                             }
@@ -579,11 +579,11 @@ struct CategoryPickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("Add Category")
+            .navigationTitle(L("add_category_nav"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(L("cancel")) { dismiss() }
                         .foregroundColor(.white.opacity(0.6))
                 }
             }

@@ -84,7 +84,7 @@ struct IconDonutChartView: View {
             value: othersValue,
             color: Color(white: 0.5),
             iconName: "ellipsis.circle.fill",
-            label: "\(othersCount) Others"
+            label: "\(othersCount) \(L("others"))"
         )
 
         return visibleSegments + [othersSegment]
@@ -401,7 +401,7 @@ struct IconDonutChartView: View {
                 // Display average item price if available
                 else if let avgPrice = averageItemPrice, avgPrice > 0 {
                     VStack(spacing: 2) {
-                        Text("AVG PRICE")
+                        Text(L("avg_price"))
                             .font(.system(size: size * 0.045, weight: .bold))
                             .tracking(0.5)
                             .foregroundColor(.white.opacity(0.4))
@@ -414,7 +414,7 @@ struct IconDonutChartView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
 
-                        Text("per item")
+                        Text(L("per_item"))
                             .font(.system(size: size * 0.05, weight: .medium))
                             .foregroundColor(.white.opacity(0.45))
                             .lineLimit(1)
@@ -440,7 +440,7 @@ struct IconDonutChartView: View {
                             .contentTransition(.numericText())
                             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: items)
 
-                        Text("items purchased")
+                        Text(L("items_purchased"))
                             .font(.system(size: size * 0.045, weight: .medium))
                             .foregroundColor(.white.opacity(0.4))
                     }

@@ -72,7 +72,10 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Config/env.swift,
+				Localization/AppStrings.swift,
+				Localization/LanguageManager.swift,
 				Models/ReceiptModels.swift,
+				Models/UserProfile.swift,
 				Services/KeychainHelper.swift,
 				Services/ReceiptUploadService.swift,
 				Views/Receipt/ReceiptErrorView.swift,

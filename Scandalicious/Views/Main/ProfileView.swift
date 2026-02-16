@@ -37,6 +37,14 @@ struct ProfileView: View {
         case female = "Female"
         case notSpecified = "X"
 
+        var displayName: String {
+            switch self {
+            case .male: return L("gender_male")
+            case .female: return L("gender_female")
+            case .notSpecified: return L("gender_x")
+            }
+        }
+
         var apiValue: String {
             switch self {
             case .male: return "male"
@@ -60,10 +68,10 @@ struct ProfileView: View {
             // Personal Information
             Section {
                 HStack {
-                    Text("Nickname")
+                    Text(L("nickname"))
                         .foregroundStyle(.primary)
                     Spacer()
-                    TextField("Nickname", text: $nickname)
+                    TextField(L("nickname"), text: $nickname)
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                         .disabled(isLoading || isSaving)
@@ -74,7 +82,7 @@ struct ProfileView: View {
 
                 Picker("Gender", selection: $selectedGender) {
                     ForEach(Gender.allCases, id: \.self) { gender in
-                        Text(gender.rawValue).tag(gender)
+                        Text(gender.displayName).tag(gender)
                     }
                 }
                 .disabled(isLoading || isSaving)
@@ -83,10 +91,10 @@ struct ProfileView: View {
                 }
 
                 HStack {
-                    Text("Age")
+                    Text(L("age"))
                         .foregroundStyle(.primary)
                     Spacer()
-                    TextField("Age", text: $age)
+                    TextField(L("age"), text: $age)
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                         .keyboardType(.numberPad)
@@ -99,8 +107,8 @@ struct ProfileView: View {
                         }
                 }
 
-                Picker("Language", selection: $selectedLanguage) {
-                    Text("Not set").tag(ProfileLanguage?.none)
+                Picker(L("language"), selection: $selectedLanguage) {
+                    Text(L("not_set")).tag(ProfileLanguage?.none)
                     ForEach(ProfileLanguage.allCases, id: \.self) { language in
                         Text("\(language.flag) \(language.displayName)").tag(ProfileLanguage?.some(language))
                     }
@@ -110,7 +118,7 @@ struct ProfileView: View {
                     checkForChanges()
                 }
             } header: {
-                Text("Personal Information")
+                Text(L("personal_information"))
             } footer: {
                 if hasUnsavedChanges {
                     Button {
@@ -120,10 +128,10 @@ struct ProfileView: View {
                             HStack {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle())
-                                Text("Saving...")
+                                Text(L("saving"))
                             }
                         } else {
-                            Text("Save Changes")
+                            Text(L("save_changes"))
                                 .fontWeight(.semibold)
                         }
                     }
@@ -138,20 +146,20 @@ struct ProfileView: View {
             // Account
             Section {
                 HStack {
-                    Text("Email")
+                    Text(L("email"))
                     Spacer()
-                    Text(authManager.user?.email ?? "Not available")
+                    Text(authManager.user?.email ?? L("not_available"))
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Account")
+                Text(L("account"))
             }
 
             // Subscription
             Section {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Current Plan")
+                        Text(L("current_plan"))
                             .foregroundStyle(.primary)
                         Spacer()
                         subscriptionStatusBadge
@@ -159,7 +167,7 @@ struct ProfileView: View {
 
                     if case .subscribed(let expirationDate, _) = subscriptionManager.subscriptionStatus {
                         HStack {
-                            Text("Renews On")
+                            Text(L("renews_on"))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Text(formatDate(expirationDate))
@@ -167,7 +175,7 @@ struct ProfileView: View {
                         }
                     } else if case .inTrial(let expirationDate, _) = subscriptionManager.subscriptionStatus {
                         HStack {
-                            Text("Trial Ends")
+                            Text(L("trial_ends"))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Text(formatDate(expirationDate))
@@ -180,7 +188,7 @@ struct ProfileView: View {
                         Button {
                             showManageSubscription = true
                         } label: {
-                            Text("Manage Subscription")
+                            Text(L("manage_subscription"))
                                 .fontWeight(.semibold)
                         }
                         .buttonStyle(.bordered)
@@ -189,7 +197,7 @@ struct ProfileView: View {
                     }
                 }
             } header: {
-                Text("Subscription")
+                Text(L("subscription"))
             }
 
             // Insights
@@ -197,10 +205,10 @@ struct ProfileView: View {
                 NavigationLink {
                     YearInReviewView()
                 } label: {
-                    Label("Year in Review", systemImage: "calendar.badge.clock")
+                    Label(L("year_in_review"), systemImage: "calendar.badge.clock")
                 }
             } header: {
-                Text("Insights")
+                Text(L("insights"))
             }
 
             // Sign Out
@@ -215,17 +223,17 @@ struct ProfileView: View {
                 } label: {
                     HStack {
                         Spacer()
-                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label(L("sign_out"), systemImage: "rectangle.portrait.and.arrow.right")
                         Spacer()
                     }
                 }
             }
         }
-        .navigationTitle("Profile")
+        .navigationTitle(L("profile"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") {
+                Button(L("done")) {
                     dismiss()
                 }
             }
@@ -241,15 +249,15 @@ struct ProfileView: View {
                 }
             }
         }
-        .alert("Success", isPresented: $showSaveSuccess) {
-            Button("OK", role: .cancel) {}
+        .alert(L("success"), isPresented: $showSaveSuccess) {
+            Button(L("ok"), role: .cancel) {}
         } message: {
-            Text("Your profile has been updated successfully")
+            Text(L("profile_updated"))
         }
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
+        .alert(L("error"), isPresented: $showError) {
+            Button(L("ok"), role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "An unknown error occurred")
+            Text(errorMessage ?? L("unknown_error"))
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
         .onAppear {
@@ -290,7 +298,7 @@ struct ProfileView: View {
         Group {
             switch subscriptionManager.subscriptionStatus {
             case .subscribed(_, let productId):
-                let planName = productId.contains("yearly") ? "Premium Yearly" : "Premium Monthly"
+                let planName = productId.contains("yearly") ? L("premium_yearly") : L("premium_monthly")
                 Text(planName)
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -300,7 +308,7 @@ struct ProfileView: View {
                     .background(Color(red: 0.45, green: 0.15, blue: 0.85))
                     .clipShape(Capsule())
             case .inTrial(_, let productId):
-                let planName = productId.contains("yearly") ? "Premium Yearly (Trial)" : "Premium Monthly (Trial)"
+                let planName = productId.contains("yearly") ? L("premium_yearly_trial") : L("premium_monthly_trial")
                 Text(planName)
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -310,7 +318,7 @@ struct ProfileView: View {
                     .background(Color(red: 0.55, green: 0.25, blue: 0.95))
                     .clipShape(Capsule())
             case .expired:
-                Text("Expired")
+                Text(L("expired"))
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(.white)
@@ -319,7 +327,7 @@ struct ProfileView: View {
                     .background(Color.orange)
                     .clipShape(Capsule())
             case .notSubscribed:
-                Text("Free")
+                Text(L("free"))
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(.white)
@@ -352,6 +360,7 @@ struct ProfileView: View {
                 selectedGender = Gender.from(apiValue: profile.gender)
                 age = profile.age != nil ? "\(profile.age!)" : ""
                 selectedLanguage = ProfileLanguage.from(apiValue: profile.language)
+                LanguageManager.shared.syncFromProfile(profile.language)
 
                 // Store original values
                 originalNickname = nickname
@@ -395,6 +404,9 @@ struct ProfileView: View {
                     originalAge = age
                     originalLanguage = selectedLanguage
 
+                    if let lang = selectedLanguage {
+                        LanguageManager.shared.currentLanguage = lang
+                    }
                     hasUnsavedChanges = false
                     isSaving = false
                     showSaveSuccess = true

@@ -140,15 +140,15 @@ struct BudgetPulseView: View {
                     }
                 }
             }
-            .alert("Remove Budget?", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Remove", role: .destructive) {
+            .alert(L("remove_target"), isPresented: $showDeleteConfirmation) {
+                Button(L("cancel"), role: .cancel) {}
+                Button(L("delete"), role: .destructive) {
                     Task { @MainActor in
                         let _ = await viewModel.deleteBudget()
                     }
                 }
             } message: {
-                Text("This will remove your budget tracking. You can set a new budget anytime.")
+                Text(L("remove_budget_confirm"))
             }
             .confirmationDialog(
                 "Remove \(categoryToRemove.map { CategoryRegistryManager.shared.displayNameForSubCategory($0) } ?? "") target?",
@@ -158,15 +158,15 @@ struct BudgetPulseView: View {
                 ),
                 titleVisibility: .visible
             ) {
-                Button("Remove Target", role: .destructive) {
+                Button(L("remove_target"), role: .destructive) {
                     if let category = categoryToRemove {
                         removeCategoryTarget(category)
                         categoryToRemove = nil
                     }
                 }
-                Button("Cancel", role: .cancel) { categoryToRemove = nil }
+                Button(L("cancel"), role: .cancel) { categoryToRemove = nil }
             } message: {
-                Text("This category will no longer be tracked against a target.")
+                Text(L("remove_category_confirm"))
             }
     }
 
@@ -223,7 +223,7 @@ struct BudgetPulseView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Set Budget")
+                Text(L("set_budget"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
 
@@ -241,7 +241,7 @@ struct BudgetPulseView: View {
             .padding(.top, 18)
             .padding(.bottom, 6)
 
-            Text("How do you want to track your groceries?")
+            Text(L("budget_question"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.4))
                 .padding(.horizontal, 20)
@@ -281,16 +281,16 @@ struct BudgetPulseView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Total monthly budget")
+                                Text(L("total_monthly_budget"))
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.white)
 
                                 if isMonthlyConfigured {
-                                    Text(String(format: "€%.0f / month", monthlyAmount))
+                                    Text(String(format: "€%.0f / \(L("per_month"))", monthlyAmount))
                                         .font(.system(size: 12, weight: .semibold))
                                         .foregroundColor(Color(red: 0.3, green: 0.8, blue: 0.5))
                                 } else {
-                                    Text("Set one amount for all groceries")
+                                    Text(L("set_one_amount"))
                                         .font(.system(size: 12, weight: .medium))
                                         .foregroundColor(.white.opacity(0.4))
                                 }
@@ -366,7 +366,7 @@ struct BudgetPulseView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Budget by category")
+                                Text(L("budget_by_category"))
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(.white)
 
@@ -376,7 +376,7 @@ struct BudgetPulseView: View {
                                         .font(.system(size: 12, weight: .semibold))
                                         .foregroundColor(Color(red: 0.5, green: 0.6, blue: 1.0))
                                 } else {
-                                    Text("Set limits per category")
+                                    Text(L("set_limits_category"))
                                         .font(.system(size: 12, weight: .medium))
                                         .foregroundColor(.white.opacity(0.4))
                                 }
@@ -447,7 +447,7 @@ struct BudgetPulseView: View {
                     if viewModel.isSaving {
                         ProgressView().tint(.white)
                     } else {
-                        Text("Create Budget")
+                        Text(L("create_budget"))
                             .font(.system(size: 15, weight: .bold))
                     }
                 }
@@ -480,11 +480,11 @@ struct BudgetPulseView: View {
     private var totalBudgetSetupView: some View {
         VStack(spacing: 0) {
             // Header
-            setupHeader(title: hasExistingBudget ? "Edit Budget" : "Monthly Budget")
+            setupHeader(title: hasExistingBudget ? L("edit_budget") : L("monthly_budget"))
 
             // Monthly amount
             VStack(spacing: 6) {
-                Text("MONTHLY BUDGET")
+                Text(L("monthly_budget"))
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.2)
                     .foregroundColor(.white.opacity(0.3))
@@ -510,7 +510,7 @@ struct BudgetPulseView: View {
                         }
                 }
 
-                Text("per month")
+                Text(L("per_month"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.2))
             }
@@ -533,13 +533,13 @@ struct BudgetPulseView: View {
     private var categoryBudgetSetupView: some View {
         VStack(spacing: 0) {
             // Header
-            setupHeader(title: hasExistingBudget ? "Edit Budget" : "Category Budgets")
+            setupHeader(title: hasExistingBudget ? L("edit_budget") : L("category_budgets"))
 
             // Monthly total (only when editing an existing budget)
             if hasExistingBudget {
                 if showTotalBudget {
                     VStack(spacing: 4) {
-                        Text("MONTHLY BUDGET")
+                        Text(L("monthly_budget"))
                             .font(.system(size: 10, weight: .bold))
                             .tracking(1.2)
                             .foregroundColor(.white.opacity(0.3))
@@ -564,7 +564,7 @@ struct BudgetPulseView: View {
                                     }
                                 }
 
-                            Text("/month")
+                            Text("/\(L("per_month"))")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.white.opacity(0.2))
 
@@ -600,7 +600,7 @@ struct BudgetPulseView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.system(size: 14, weight: .medium))
-                            Text("Add total budget")
+                            Text(L("total_monthly_budget"))
                                 .font(.system(size: 13, weight: .semibold))
                         }
                         .foregroundColor(Color(red: 0.3, green: 0.75, blue: 0.5))
@@ -622,7 +622,7 @@ struct BudgetPulseView: View {
 
             // Category section title
             if hasExistingBudget {
-                Text("CATEGORY BUDGETS")
+                Text(L("category_budgets"))
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.2)
                     .foregroundColor(.white.opacity(0.3))
@@ -639,7 +639,7 @@ struct BudgetPulseView: View {
                         .font(.system(size: 28, weight: .light))
                         .foregroundColor(.white.opacity(0.15))
 
-                    Text("Add categories you want to track")
+                    Text(L("add_categories_track"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.35))
                 }
@@ -653,7 +653,7 @@ struct BudgetPulseView: View {
 
                 // Total saved
                 HStack {
-                    Text("TOTAL SAVED")
+                    Text(L("total_saved"))
                         .font(.system(size: 10, weight: .bold))
                         .tracking(1.0)
                         .foregroundColor(.white.opacity(0.3))
@@ -673,7 +673,7 @@ struct BudgetPulseView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
-                    Text("Add category")
+                    Text(L("add_category"))
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .foregroundColor(Color(red: 0.45, green: 0.6, blue: 1.0))
@@ -767,11 +767,11 @@ struct BudgetPulseView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Auto-renew")
+                Text(L("auto_renew"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(isSmartBudget ? .white.opacity(0.85) : .white.opacity(0.35))
 
-                Text("Resets budget each month")
+                Text(L("resets_budget_month"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.25))
             }
@@ -814,7 +814,7 @@ struct BudgetPulseView: View {
                         if viewModel.isSaving {
                             ProgressView().tint(.white)
                         } else {
-                            Text("Save")
+                            Text(L("save"))
                                 .font(.system(size: 15, weight: .bold))
                         }
                     }
@@ -840,7 +840,7 @@ struct BudgetPulseView: View {
             } else {
                 // New budget: confirm and return to chooser
                 Button(action: confirmMonthlySetup) {
-                    Text("Done")
+                    Text(L("done"))
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(canSave ? .white : .white.opacity(0.3))
                         .frame(maxWidth: .infinity)
@@ -888,7 +888,7 @@ struct BudgetPulseView: View {
                         if viewModel.isSaving {
                             ProgressView().tint(.white)
                         } else {
-                            Text("Save")
+                            Text(L("save"))
                                 .font(.system(size: 15, weight: .bold))
                         }
                     }
@@ -914,7 +914,7 @@ struct BudgetPulseView: View {
             } else {
                 // New budget: confirm and return to chooser
                 Button(action: confirmCategorySetup) {
-                    Text("Done")
+                    Text(L("done"))
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(canSaveCategories ? .white : .white.opacity(0.3))
                         .frame(maxWidth: .infinity)
@@ -1213,11 +1213,11 @@ struct BudgetPulseView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Set Budget")
+                            Text(L("set_budget"))
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
 
-                            Text("Track your spending and stay on track")
+                            Text(L("track_spending"))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.white.opacity(0.5))
                         }
@@ -1254,7 +1254,7 @@ struct BudgetPulseView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "sparkles")
                                         .font(.system(size: 10, weight: .semibold))
-                                    Text("Budget")
+                                    Text(L("budget"))
                                         .font(.system(size: 11, weight: .semibold))
                                 }
                                 .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
@@ -1267,7 +1267,7 @@ struct BudgetPulseView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "trash.fill")
                                     .font(.system(size: 10, weight: .semibold))
-                                Text("Deleted")
+                                Text(L("deleted"))
                                     .font(.system(size: 11, weight: .semibold))
                             }
                             .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.3))
@@ -1279,7 +1279,7 @@ struct BudgetPulseView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Monthly Budget")
+                        Text(L("monthly_budget"))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(0.5))
 
@@ -1290,7 +1290,7 @@ struct BudgetPulseView: View {
 
                     if let allocations = history.categoryAllocations, !allocations.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Category Targets")
+                            Text(L("category_targets"))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.white.opacity(0.5))
 
@@ -1329,7 +1329,7 @@ struct BudgetPulseView: View {
                         .font(.system(size: 18))
                         .foregroundColor(.white.opacity(0.3))
 
-                    Text("No budget was set for this month")
+                    Text(L("no_budget_month"))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
 
@@ -1406,8 +1406,8 @@ struct BudgetPulseView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     if hasTotalBudget {
                         Text(isOver
-                             ? String(format: "€%.0f over budget", overAmount)
-                             : String(format: "€%.0f left to spend", remaining))
+                             ? String(format: "€%.0f \(L("over_budget"))", overAmount)
+                             : String(format: "€%.0f \(L("left_to_spend"))", remaining))
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundColor(accentColor)
                     } else {
@@ -1417,7 +1417,7 @@ struct BudgetPulseView: View {
                             .foregroundColor(.white)
                     }
 
-                    Text("\(progress.daysRemaining) days left")
+                    Text("\(progress.daysRemaining) \(L("days_left"))")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
                 }
@@ -1462,7 +1462,7 @@ struct BudgetPulseView: View {
         return VStack(spacing: 14) {
             if hasTotalBudget {
                 // Section title
-                Text("Monthly Budget")
+                Text(L("monthly_budget"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1477,7 +1477,7 @@ struct BudgetPulseView: View {
                             .font(.system(size: 22, weight: .bold, design: .rounded))
                             .foregroundColor(accentColor)
 
-                        Text(String(format: "spent of €%.0f", progress.budget.monthlyAmount))
+                        Text(String(format: "€%.0f", progress.budget.monthlyAmount))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.white.opacity(0.4))
 
@@ -1493,8 +1493,8 @@ struct BudgetPulseView: View {
                             }
 
                             Text(isOver
-                                 ? String(format: "€%.0f over", overAmount)
-                                 : String(format: "€%.0f remaining", remaining))
+                                 ? String(format: "€%.0f \(L("over"))", overAmount)
+                                 : String(format: "€%.0f \(L("left_to_spend"))", remaining))
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(accentColor.opacity(0.85))
                         }
@@ -1536,7 +1536,7 @@ struct BudgetPulseView: View {
                 .foregroundColor(.orange)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Couldn't load budget")
+                Text(L("couldnt_load_budget"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
 
@@ -1549,7 +1549,7 @@ struct BudgetPulseView: View {
             Spacer()
 
             Button(action: { Task { await viewModel.loadBudget() } }) {
-                Text("Retry")
+                Text(L("retry"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
             }

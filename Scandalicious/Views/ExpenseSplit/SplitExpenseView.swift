@@ -43,11 +43,11 @@ struct SplitExpenseView: View {
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Split Receipt")
+            .navigationTitle(L("split_receipt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(L("cancel")) {
                         dismiss()
                     }
                 }
@@ -56,7 +56,7 @@ struct SplitExpenseView: View {
                     if viewModel.isSaving {
                         ProgressView()
                     } else {
-                        Button("Done") {
+                        Button(L("done")) {
                             Task {
                                 await viewModel.saveSplit()
                                 if viewModel.error == nil {
@@ -96,8 +96,8 @@ struct SplitExpenseView: View {
                     }
                 )
             }
-            .alert("Error", isPresented: .constant(viewModel.error != nil)) {
-                Button("OK") {
+            .alert(L("error"), isPresented: .constant(viewModel.error != nil)) {
+                Button(L("ok")) {
                     viewModel.error = nil
                 }
             } message: {
@@ -147,7 +147,7 @@ struct SplitExpenseView: View {
     private var friendsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Friends")
+                Text(L("friends"))
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
@@ -175,7 +175,7 @@ struct SplitExpenseView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "person.badge.plus")
                             .font(.title2)
-                        Text("Add friends to split with")
+                        Text(L("add_friends_split"))
                             .font(.subheadline)
                     }
                     .foregroundStyle(.secondary)
@@ -266,7 +266,7 @@ struct SplitExpenseView: View {
             } label: {
                 HStack {
                     Image(systemName: "square.and.arrow.up")
-                    Text("View Summary & Share")
+                    Text(L("view_summary_share"))
                 }
                 .font(.headline)
                 .frame(maxWidth: .infinity)
@@ -324,7 +324,7 @@ struct SplitItemRow: View {
                     }
 
                     if transaction.quantity > 1 {
-                        Text("Qty: \(transaction.quantity)")
+                        Text("\(L("qty")): \(transaction.quantity)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -341,7 +341,7 @@ struct SplitItemRow: View {
             // Participant toggles
             if !participants.isEmpty {
                 HStack(spacing: 4) {
-                    Text("Split:")
+                    Text(L("split_label"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
 

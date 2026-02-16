@@ -149,11 +149,11 @@ struct FlippableAllTimeChartView: View {
                             .font(.system(size: size * 0.2))
                             .foregroundColor(.white.opacity(0.3))
 
-                        Text("No category data")
+                        Text(L("no_category_data"))
                             .font(.system(size: size * 0.08, weight: .medium))
                             .foregroundColor(.white.opacity(0.4))
 
-                        Text("Tap to flip back")
+                        Text(L("tap_to_flip_back"))
                             .font(.system(size: size * 0.06))
                             .foregroundColor(.white.opacity(0.25))
                     }

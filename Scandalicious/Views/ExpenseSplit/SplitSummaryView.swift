@@ -43,7 +43,7 @@ struct SplitSummaryView: View {
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Split Summary")
+            .navigationTitle(L("split_summary"))
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showShareSheet) {
                 ShareSheet(text: shareText)
@@ -69,7 +69,7 @@ struct SplitSummaryView: View {
             // Total
             if let total = receipt.totalAmount {
                 VStack(spacing: 4) {
-                    Text("Total")
+                    Text(L("total"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -79,7 +79,7 @@ struct SplitSummaryView: View {
             }
 
             // Participants count
-            Text("Split between \(results.count) \(results.count == 1 ? "person" : "people")")
+            Text("\(L("split_between")) \(results.count) \(results.count == 1 ? L("person") : L("people"))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -99,7 +99,7 @@ struct SplitSummaryView: View {
         } label: {
             HStack {
                 Image(systemName: "square.and.arrow.up")
-                Text("Share Split")
+                Text(L("share_split"))
             }
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -126,7 +126,7 @@ struct SplitSummaryView: View {
                         .tint(.blue)
                 } else {
                     Image(systemName: "checkmark")
-                    Text("Done")
+                    Text(L("done"))
                 }
             }
             .font(.headline)

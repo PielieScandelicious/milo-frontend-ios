@@ -315,10 +315,10 @@ struct ScandaLiciousAIChatView: View {
             }
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
-        .alert("Message Limit Reached", isPresented: $showRateLimitAlert) {
-            Button("OK", role: .cancel) {}
+        .alert(L("message_limit_reached"), isPresented: $showRateLimitAlert) {
+            Button(L("ok"), role: .cancel) {}
         } message: {
-            Text(rateLimitManager.rateLimitMessage ?? "You've used all your messages for this period. Your limit resets on \(rateLimitManager.resetDateFormatted).")
+            Text(rateLimitManager.rateLimitMessage ?? L("message_limit_period"))
         }
         .onAppear {
             viewModel.setTransactions(transactionManager.transactions)
@@ -478,7 +478,7 @@ struct ScandaLiciousAIChatView: View {
     
     private var textInputField: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Ask Milo anything...", text: $messageText, axis: .vertical)
+            TextField(L("ask_milo"), text: $messageText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 16))
                 .padding(.horizontal, 16)
@@ -660,11 +660,11 @@ struct WelcomeView: View {
                 .opacity(logoOpacity)
 
                 VStack(spacing: 6) {
-                    Text("Milo")
+                    Text(L("milo"))
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
 
-                    Text("Your helpfull shopping doggo")
+                    Text(L("milo_subtitle"))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                 }
@@ -677,10 +677,10 @@ struct WelcomeView: View {
                 SamplePromptCard(
                     icon: "fork.knife",
                     iconColor: Color(red: 1.0, green: 0.6, blue: 0.2),
-                    title: "Cook with what I bought",
-                    subtitle: "Recipes from my last haul"
+                    title: L("prompt_cook_title"),
+                    subtitle: L("prompt_cook_subtitle")
                 ) {
-                    messageText = "What meals can I cook using the items from my most recent grocery receipt?"
+                    messageText = L("prompt_cook_message")
                     onSend()
                 }
 
@@ -695,10 +695,10 @@ struct WelcomeView: View {
                 SamplePromptCard(
                     icon: "wand.and.stars",
                     iconColor: Color(red: 0.4, green: 0.75, blue: 1.0),
-                    title: "Predict my next list",
-                    subtitle: "What I'll need to restock soon"
+                    title: L("prompt_predict_title"),
+                    subtitle: L("prompt_predict_subtitle")
                 ) {
-                    messageText = "Based on my purchase history, what grocery items will I likely need to restock soon?"
+                    messageText = L("prompt_predict_message")
                     onSend()
                 }
 
@@ -713,10 +713,10 @@ struct WelcomeView: View {
                 SamplePromptCard(
                     icon: "chart.line.uptrend.xyaxis",
                     iconColor: Color(red: 1.0, green: 0.45, blue: 0.4),
-                    title: "Spot the price creep",
-                    subtitle: "Are my groceries getting pricier?"
+                    title: L("prompt_price_title"),
+                    subtitle: L("prompt_price_subtitle")
                 ) {
-                    messageText = "Are any of my regularly purchased grocery items getting more expensive over time?"
+                    messageText = L("prompt_price_message")
                     onSend()
                 }
 
@@ -731,10 +731,10 @@ struct WelcomeView: View {
                 SamplePromptCard(
                     icon: "heart.fill",
                     iconColor: Color(red: 1.0, green: 0.4, blue: 0.6),
-                    title: "Rate my basket",
-                    subtitle: "Nutrition score breakdown"
+                    title: L("prompt_health_title"),
+                    subtitle: L("prompt_health_subtitle")
                 ) {
-                    messageText = "Analyze the nutritional balance of my recent grocery purchases and give me a health score"
+                    messageText = L("prompt_health_message")
                     onSend()
                 }
             }
@@ -1184,7 +1184,7 @@ class ChatViewModel: ObservableObject {
                     messages[index] = ChatMessage(
                         id: assistantMessageId,
                         role: .assistant,
-                        content: "I'm sorry, I encountered an error: \(error.localizedDescription). Please try again.",
+                        content: "\(L("error_encountered")): \(error.localizedDescription). \(L("please_try_again"))",
                         timestamp: messages[index].timestamp
                     )
                 }

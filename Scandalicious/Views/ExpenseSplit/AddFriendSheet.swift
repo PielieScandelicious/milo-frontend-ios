@@ -23,7 +23,7 @@ struct AddFriendSheet: View {
             VStack(spacing: 0) {
                 // Name Input Section
                 VStack(spacing: 16) {
-                    Text("Add a friend to split with")
+                    Text(L("add_friend_split"))
                         .font(.headline)
                         .foregroundStyle(.secondary)
                         .padding(.top, 8)
@@ -42,7 +42,7 @@ struct AddFriendSheet: View {
                             }
                         }
 
-                        TextField("Friend's name", text: $friendName)
+                        TextField(L("friends_name"), text: $friendName)
                             .font(.title3)
                             .textFieldStyle(.plain)
                             .focused($isNameFocused)
@@ -61,7 +61,7 @@ struct AddFriendSheet: View {
                     Button {
                         addFriend()
                     } label: {
-                        Text("Add Friend")
+                        Text(L("add_friend"))
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -77,7 +77,7 @@ struct AddFriendSheet: View {
                 // Recent Friends Section
                 if !availableRecentFriends.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Recent Friends")
+                        Text(L("recent_friends"))
                             .font(.headline)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal)
@@ -100,11 +100,11 @@ struct AddFriendSheet: View {
                 Spacer()
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Add Friend")
+            .navigationTitle(L("add_friend"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(L("cancel")) {
                         dismiss()
                     }
                 }

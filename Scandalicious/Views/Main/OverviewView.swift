@@ -21,6 +21,14 @@ enum SortOption: String, CaseIterable {
     case highestSpend = "Highest Spend"
     case lowestSpend = "Lowest Spend"
     case storeName = "Store Name"
+
+    var displayLabel: String {
+        switch self {
+        case .highestSpend: return L("highest_spend")
+        case .lowestSpend: return L("lowest_spend")
+        case .storeName: return L("store_name_sort")
+        }
+    }
 }
 
 // MARK: - Shared DateFormatters (avoid allocating on every render)
@@ -359,7 +367,7 @@ struct OverviewView: View {
                 .font(.system(size: 50))
                 .foregroundStyle(.red)
 
-            Text("Failed to load data")
+            Text(L("failed_load_data"))
                 .font(.headline)
 
             Text(error)
@@ -373,7 +381,7 @@ struct OverviewView: View {
                     await dataManager.fetchFromBackend(for: .month, periodString: selectedPeriod)
                 }
             } label: {
-                Label("Retry", systemImage: "arrow.clockwise")
+                Label(L("retry"), systemImage: "arrow.clockwise")
                     .font(.headline)
                     .padding()
                     .background(Color.blue)
@@ -387,7 +395,7 @@ struct OverviewView: View {
 
     private var allTransactionsDestination: some View {
         TransactionListView(
-            storeName: "All Stores",
+            storeName: L("all_stores"),
             period: selectedPeriod,
             category: nil,
             categoryColor: nil
@@ -1437,7 +1445,7 @@ struct OverviewView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Stores")
+                Text(L("stores"))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                 let subtitle: String = {
@@ -1472,7 +1480,7 @@ struct OverviewView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Categories")
+                Text(L("categories"))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                 let subtitle: String = {
@@ -1716,7 +1724,7 @@ struct OverviewView: View {
                 } else if let errorMsg = categoryLoadError[category.id] {
                     // Error state
                     VStack(spacing: 8) {
-                        Text("Failed to load items")
+                        Text(L("failed_load_items"))
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.orange)
                         Text(errorMsg)
@@ -1726,7 +1734,7 @@ struct OverviewView: View {
                         Button {
                             Task { await loadCategoryItems(category, period: selectedPeriod) }
                         } label: {
-                            Text("Retry")
+                            Text(L("retry"))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.blue)
                         }
@@ -1739,7 +1747,7 @@ struct OverviewView: View {
                             Image(systemName: "tray")
                                 .font(.system(size: 24))
                                 .foregroundStyle(.white.opacity(0.3))
-                            Text("No items found")
+                            Text(L("no_items_found"))
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.4))
                         }
@@ -1941,7 +1949,7 @@ struct OverviewView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
 
-                    Text("Receipts")
+                    Text(L("receipts"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white.opacity(0.85))
 
@@ -1988,14 +1996,14 @@ struct OverviewView: View {
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                            Text("Scan your first receipt to get started")
+                            Text(L("scan_first_receipt"))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.white.opacity(0.35))
                         } else {
                             Image(systemName: "doc.text")
                                 .font(.system(size: 22))
                                 .foregroundColor(.white.opacity(0.15))
-                            Text("No receipts for this period")
+                            Text(L("no_receipts_period"))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.white.opacity(0.35))
                         }
@@ -2073,7 +2081,7 @@ struct OverviewView: View {
                     VStack(spacing: 12) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        Text("Deleting...")
+                        Text(L("deleting"))
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))
                     }
@@ -2085,11 +2093,11 @@ struct OverviewView: View {
                 }
             }
         }
-        .alert("Delete Failed", isPresented: Binding<Bool>(
+        .alert(L("delete_failed"), isPresented: Binding<Bool>(
             get: { receiptDeleteError != nil },
             set: { if !$0 { receiptDeleteError = nil } }
         )) {
-            Button("OK") {
+            Button(L("ok")) {
                 receiptDeleteError = nil
             }
         } message: {
@@ -2242,7 +2250,7 @@ struct OverviewView: View {
     /// Spending header: amount + syncing status
     private func spendingHeaderSection(spending: Double, period: String) -> some View {
         VStack(spacing: 8) {
-            Text("SPENT THIS MONTH")
+            Text(L("spent_this_month"))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
                 .tracking(1.2)
@@ -2272,7 +2280,7 @@ struct OverviewView: View {
             HStack(spacing: 4) {
                 SyncingArrowsView()
                     .font(.system(size: 11))
-                Text("Syncing")
+                Text(L("syncing"))
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.blue)
@@ -2281,7 +2289,7 @@ struct OverviewView: View {
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11))
-                Text("Synced")
+                Text(L("synced"))
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.green)
@@ -2295,7 +2303,7 @@ struct OverviewView: View {
         HStack(spacing: 4) {
             Image(systemName: "arrow.triangle.2.circlepath")
                 .font(.system(size: 9, weight: .medium))
-            Text(isPieChartFlipped ? "Tap for stores" : "Tap for categories")
+            Text(isPieChartFlipped ? L("tap_for_stores") : L("tap_for_categories"))
                 .font(.system(size: 10, weight: .medium))
         }
         .foregroundStyle(.white.opacity(0.25))
@@ -2319,7 +2327,7 @@ struct OverviewView: View {
                                 totalItems: nil,
                                 averageItemPrice: nil,
                                 centerIcon: "cart.fill",
-                                centerLabel: "Categories",
+                                centerLabel: L("categories"),
                                 showAllSegments: showAllRows,
                                 refreshToken: chartRefreshToken
                             )
@@ -2330,10 +2338,10 @@ struct OverviewView: View {
                                 Image(systemName: "cart")
                                     .font(.system(size: 36))
                                     .foregroundColor(.white.opacity(0.3))
-                                Text("No category data")
+                                Text(L("no_category_data"))
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(.white.opacity(0.4))
-                                Text("Tap to flip back")
+                                Text(L("tap_to_flip_back"))
                                     .font(.system(size: 11))
                                     .foregroundColor(.white.opacity(0.25))
                             }
@@ -2349,11 +2357,11 @@ struct OverviewView: View {
                         totalAmount: Double(totalReceiptsForPeriod(period)),
                         size: 170,
                         currencySymbol: "",
-                        subtitle: "receipts",
+                        subtitle: L("receipts"),
                         totalItems: nil,
                         averageItemPrice: nil,
                         centerIcon: "storefront.fill",
-                        centerLabel: "Stores",
+                        centerLabel: L("stores"),
                         showAllSegments: showAllRows,
                         refreshToken: chartRefreshToken
                     )
@@ -2390,7 +2398,7 @@ struct OverviewView: View {
                     EmptyPieChartView(
                         isNewMonth: isNewMonth,
                         icon: "cart.fill",
-                        label: "Categories"
+                        label: L("categories")
                     )
                     .opacity(isPieChartFlipped ? 1 : 0)
                     .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
@@ -2398,7 +2406,7 @@ struct OverviewView: View {
                     EmptyPieChartView(
                         isNewMonth: isNewMonth,
                         icon: "storefront.fill",
-                        label: "Stores"
+                        label: L("stores")
                     )
                     .opacity(isPieChartFlipped ? 0 : 1)
                 }
@@ -2435,7 +2443,7 @@ struct OverviewView: View {
                 let hasMoreCategories = categories.count > maxVisibleRows
 
                 legendSectionTitle(
-                    title: "Categories",
+                    title: L("categories"),
                     count: categories.count
                 )
 
@@ -2505,7 +2513,7 @@ struct OverviewView: View {
                 let hasMoreSegments = segments.count > maxVisibleRows
 
                 legendSectionTitle(
-                    title: "Stores",
+                    title: L("stores"),
                     count: segments.count
                 )
 
@@ -2568,15 +2576,15 @@ struct OverviewView: View {
             } else if isPieChartFlipped && categories.isEmpty {
                 emptyRowsSection(
                     icon: "cart",
-                    title: "Categories",
-                    subtitle: "No category data yet",
+                    title: L("categories"),
+                    subtitle: L("no_categories_yet"),
                     isNewMonth: isNewMonthStart && isCurrentPeriod
                 )
             } else if !isPieChartFlipped && segments.isEmpty {
                 emptyRowsSection(
                     icon: "storefront",
-                    title: "Stores",
-                    subtitle: "No stores visited yet",
+                    title: L("stores"),
+                    subtitle: L("no_stores_yet"),
                     isNewMonth: isNewMonthStart && isCurrentPeriod
                 )
             }
@@ -2981,7 +2989,7 @@ struct FilterSheet: View {
                                 selectedSort = option
                             } label: {
                                 HStack {
-                                    Text(option.rawValue)
+                                    Text(option.displayLabel)
                                         .foregroundColor(.white)
                                     Spacer()
                                     if selectedSort == option {
@@ -2992,18 +3000,18 @@ struct FilterSheet: View {
                             }
                         }
                     } header: {
-                        Text("Sort By")
+                        Text(L("sort_by"))
                             .foregroundColor(.white.opacity(0.6))
                     }
                     .listRowBackground(Color.white.opacity(0.05))
                 }
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle("Filters")
+            .navigationTitle(L("filters"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button(L("done")) {
                         dismiss()
                     }
                     .foregroundColor(.white)
@@ -3290,7 +3298,7 @@ struct CompactNutriBadge: View {
                     .transaction { $0.animation = nil }
             }
 
-            Text("NUTRI SCORE")
+            Text(L("nutri_score"))
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundColor(.white.opacity(0.4))
                 .tracking(0.8)
@@ -3388,7 +3396,7 @@ struct ModernHealthScoreBadge: View {
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.5, dampingFraction: 1.0), value: score)
 
-                Text("Nutri Score")
+                Text(L("nutri_score"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
                     .textCase(.uppercase)

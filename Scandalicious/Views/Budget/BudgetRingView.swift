@@ -91,7 +91,7 @@ struct BudgetRingView: View {
                     .font(.system(size: size * 0.2, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
-                Text("left to spend")
+                Text(L("left_to_spend"))
                     .font(.system(size: size * 0.08, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
             } else {

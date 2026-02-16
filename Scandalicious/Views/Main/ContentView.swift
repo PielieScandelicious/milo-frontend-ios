@@ -41,13 +41,13 @@ struct ContentView: View {
             TabView(selection: $selectedTab) {
                 ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
                     .tabItem {
-                        Label("Budget", systemImage: "creditcard.fill")
+                        Label(L("tab_budget"), systemImage: "creditcard.fill")
                     }
                     .tag(Tab.budget)
 
                 ScanTab()
                     .tabItem {
-                        Label("Home", systemImage: "house.fill")
+                        Label(L("tab_home"), systemImage: "house.fill")
                     }
                     .tag(Tab.home)
 
@@ -60,7 +60,7 @@ struct ContentView: View {
                 ScandaLiciousTab()
                     .tabItem {
                         Label {
-                            Text("Milo")
+                            Text(L("tab_milo"))
                         } icon: {
                             MiloTabIcon()
                         }
@@ -109,16 +109,16 @@ struct ContentView: View {
         }
         .onChange(of: selectedTab) { oldValue, newValue in
         }
-        .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
-            Button("Sign Out", role: .destructive) {
+        .confirmationDialog(L("sign_out"), isPresented: $showSignOutConfirmation) {
+            Button(L("sign_out"), role: .destructive) {
                 do {
                     try authManager.signOut()
                 } catch {
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L("cancel"), role: .cancel) {}
         } message: {
-            Text("Are you sure you want to sign out?")
+            Text(L("sign_out_confirm"))
         }
     }
 

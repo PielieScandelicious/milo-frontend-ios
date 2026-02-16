@@ -64,7 +64,7 @@ struct CategoryBreakdownDetailView: View {
                     contentView(data)
                 }
             }
-            .navigationTitle("Spending Breakdown")
+            .navigationTitle(L("spending_breakdown"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -92,7 +92,7 @@ struct CategoryBreakdownDetailView: View {
                 .scaleEffect(1.2)
                 .tint(.white)
 
-            Text("Loading breakdown...")
+            Text(L("loading_breakdown"))
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.6))
         }
@@ -106,7 +106,7 @@ struct CategoryBreakdownDetailView: View {
                 .font(.system(size: 50))
                 .foregroundStyle(.orange)
 
-            Text("Failed to load data")
+            Text(L("failed_load_data"))
                 .font(.headline)
                 .foregroundStyle(.white)
 
@@ -119,7 +119,7 @@ struct CategoryBreakdownDetailView: View {
             Button {
                 Task { await loadData() }
             } label: {
-                Label("Retry", systemImage: "arrow.clockwise")
+                Label(L("retry"), systemImage: "arrow.clockwise")
                     .font(.headline)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
@@ -143,7 +143,7 @@ struct CategoryBreakdownDetailView: View {
 
                 // Total spending
                 VStack(spacing: 4) {
-                    Text("Total Spent")
+                    Text(L("total_spent"))
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.5))
 
@@ -214,7 +214,7 @@ struct CategoryBreakdownDetailView: View {
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
 
-            Text("Categories")
+            Text(L("categories"))
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.5))
         }
@@ -248,7 +248,7 @@ struct CategoryBreakdownDetailView: View {
         let sortedCategories = data.categories.sorted { $0.totalSpent > $1.totalSpent }
 
         return LazyVStack(alignment: .leading, spacing: 12) {
-            Text("By Category")
+            Text(L("by_category"))
                 .font(.headline)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 4)
@@ -557,7 +557,7 @@ struct CategoryBreakdownDetailView: View {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.6)))
                     .scaleEffect(0.7)
-                Text("Loading...")
+                Text(L("loading"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
             }
@@ -565,7 +565,7 @@ struct CategoryBreakdownDetailView: View {
             .padding(.vertical, 8)
         } else if let errorMsg = categoryLoadError[category.id] {
             VStack(spacing: 8) {
-                Text("Failed to load items")
+                Text(L("failed_load_items"))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.orange)
                 Text(errorMsg)
@@ -575,7 +575,7 @@ struct CategoryBreakdownDetailView: View {
                 Button {
                     Task { await loadCategoryItems(category) }
                 } label: {
-                    Text("Retry")
+                    Text(L("retry"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.blue)
                 }
@@ -684,7 +684,7 @@ struct CategoryBreakdownDetailView: View {
                     .padding(.top, 4)
             }
         } else {
-            Text("No transactions")
+            Text(L("no_transactions"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.4))
         }

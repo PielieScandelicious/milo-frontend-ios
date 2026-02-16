@@ -97,7 +97,7 @@ struct ReceiptsListView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Receipts")
+                    Text(L("receipts"))
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.white)
 
@@ -134,15 +134,15 @@ struct ReceiptsListView: View {
                 await viewModel.loadReceipts(period: period, storeName: storeName)
             }
         }
-        .alert("Error", isPresented: .constant(viewModel.state.error != nil)) {
-            Button("OK") { }
+        .alert(L("error"), isPresented: .constant(viewModel.state.error != nil)) {
+            Button(L("ok")) { }
         } message: {
             if let error = viewModel.state.error {
                 Text(error)
             }
         }
-        .alert("Delete Failed", isPresented: .constant(deleteError != nil)) {
-            Button("OK") {
+        .alert(L("delete_failed"), isPresented: .constant(deleteError != nil)) {
+            Button(L("ok")) {
                 deleteError = nil
             }
         } message: {
@@ -161,7 +161,7 @@ struct ReceiptsListView: View {
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(1.2)
 
-                        Text("Deleting...")
+                        Text(L("deleting"))
                             .font(.system(size: 15, weight: .medium))
                             .foregroundColor(.white)
                     }
@@ -226,11 +226,11 @@ struct ReceiptsListView: View {
                 .foregroundColor(.white.opacity(0.3))
                 .padding(.top, 60)
 
-            Text("No Receipts")
+            Text(L("no_receipts"))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundColor(.white)
 
-            Text("No receipts found for this period")
+            Text(L("no_receipts_found"))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
                 .multilineTextAlignment(.center)

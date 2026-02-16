@@ -53,7 +53,7 @@ struct ReceiptUploadLimitView: View {
 
             // Warning message when exhausted
             if rateLimitManager.receiptLimitState == .exhausted {
-                Text("Upgrade for unlimited uploads")
+                Text(L("upgrade_unlimited_uploads"))
                     .font(.caption)
                     .foregroundColor(.orange)
                     .padding(.top, 2)

@@ -53,11 +53,11 @@ struct ShareExtensionView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Upload Receipt")
+            .navigationTitle(L("upload_receipt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(isComplete ? "Done" : "Cancel") {
+                    Button(isComplete ? L("done") : L("cancel")) {
                         cancelExtension()
                     }
                     .disabled(isProcessing && !isComplete)
@@ -72,18 +72,18 @@ struct ShareExtensionView: View {
     // MARK: - Subviews
     
     private var readyView: some View {
-        Text("Preparing to upload...")
+        Text(L("preparing_upload"))
             .font(.headline)
             .foregroundStyle(.secondary)
     }
     
     private var processingView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Uploading Receipts")
+            Text(L("uploading_receipts"))
                 .font(.headline)
-            
+
             if totalCount > 1 {
-                Text("\(uploadedCount) of \(totalCount) uploaded")
+                Text("\(uploadedCount) of \(totalCount) \(L("uploaded"))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -103,10 +103,10 @@ struct ShareExtensionView: View {
     
     private func errorView(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Receipt Processing Failed!")
+            Text(L("receipt_failed"))
                 .font(.headline)
 
-            Button("Dismiss") {
+            Button(L("dismiss")) {
                 cancelExtension()
             }
             .buttonStyle(.borderedProminent)
@@ -120,7 +120,7 @@ struct ShareExtensionView: View {
                     .font(.title)
                     .foregroundColor(.green)
 
-                Text("Receipt Uploaded!")
+                Text(L("receipt_uploaded"))
                     .font(.headline)
             }
 
@@ -158,7 +158,7 @@ struct ShareExtensionView: View {
                     HealthScoreBadge(score: Int(healthScore.rounded()), size: .medium, style: .subtle)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Health Score")
+                        Text(L("health_score"))
                             .font(.caption)
                             .foregroundColor(.secondary)
 
