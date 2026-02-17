@@ -124,6 +124,7 @@ struct OverviewView: View {
     @State private var sortedReceiptsCache: [APIReceipt] = [] // Cached sorted receipts
     @State private var budgetExpanded = false // Track if budget widget is expanded
     @State private var periodBounceOffset: CGFloat = 0 // Rubber-band effect when at period boundary
+    @State private var collapseTargetCategoryId: String? // Scroll anchor target when switching categories
     private let maxVisibleRows = 4 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
 
@@ -1134,12 +1135,11 @@ struct OverviewView: View {
                 }
             }
             .onChange(of: expandedCategoryId) { _, newId in
-                guard let id = newId else { return }
-                // Wait for ClipReveal expand animation to mostly settle
-                // before scrolling, so the scroll doesn't fight the expansion
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 1.0)) {
-                        scrollProxy.scrollTo("categoryRow_\(id)", anchor: UnitPoint(x: 0.5, y: 0.3))
+                if newId == nil, let targetId = collapseTargetCategoryId {
+                    // Collapsing toward another category — anchor scroll to keep
+                    // the tapped button fixed on screen while the old content collapses
+                    withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
+                        scrollProxy.scrollTo("categoryRow_\(targetId)", anchor: .center)
                     }
                 }
             }
@@ -1545,18 +1545,37 @@ struct OverviewView: View {
             // Another category is open — collapse it first, then expand the new one
             let previousId = expandedCategoryId!
 
-            withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
-                expandedCategoryId = nil
-            }
+            let categories = categoryDataForPeriod(period)
+            let expandedAbove: Bool = {
+                guard let ei = categories.firstIndex(where: { $0.id == previousId }),
+                      let ti = categories.firstIndex(where: { $0.id == category.id }) else { return false }
+                return ei < ti
+            }()
 
-            // Wait for collapse to settle, then expand the new category
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                // Clear previous category's pagination state
+            if expandedAbove {
+                // Expanded is above tapped — collapse first, anchor tapped button in place,
+                // then expand after collapse settles
+                collapseTargetCategoryId = category.id
+
+                withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
+                    expandedCategoryId = nil
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    categoryItems[previousId] = nil
+                    categoryCurrentPage[previousId] = nil
+                    categoryHasMore[previousId] = nil
+
+                    collapseTargetCategoryId = nil
+                    expandCategory(category, period: period)
+                }
+            } else {
+                // Expanded is below tapped — switch directly so collapse + expand
+                // happen simultaneously. Tapped button stays in place naturally.
+                expandCategory(category, period: period)
                 categoryItems[previousId] = nil
                 categoryCurrentPage[previousId] = nil
                 categoryHasMore[previousId] = nil
-
-                expandCategory(category, period: period)
             }
         } else {
             // Nothing open — expand directly
@@ -2608,6 +2627,9 @@ struct OverviewView: View {
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
+                    .opacity(showAllRows ? 0 : 1)
+                    .frame(height: showAllRows ? 0 : nil)
+                    .clipped()
                     .animation(nil, value: isPieChartFlipped)
             }
 
