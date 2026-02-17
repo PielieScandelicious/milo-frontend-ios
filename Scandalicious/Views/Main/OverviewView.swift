@@ -1163,6 +1163,14 @@ struct OverviewView: View {
                     }
                 }
             }
+            .onChange(of: expandedCategoryId) { _, newId in
+                guard let id = newId else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
+                        scrollProxy.scrollTo("categoryRow_\(id)", anchor: UnitPoint(x: 0.5, y: 0.3))
+                    }
+                }
+            }
             } // ScrollViewReader
         }
         .scrollPosition(id: $receiptsScrollTarget, anchor: .top)
@@ -2505,6 +2513,7 @@ struct OverviewView: View {
                         expandedCategoryItemsSection(category)
                             .clipReveal(isVisible: expandedCategoryId == category.id)
                     }
+                    .id("categoryRow_\(category.id)")
                 }
 
                 // Overflow rows (clipped when collapsed)
@@ -2531,6 +2540,7 @@ struct OverviewView: View {
                                 expandedCategoryItemsSection(category)
                                     .clipReveal(isVisible: expandedCategoryId == category.id)
                             }
+                            .id("categoryRow_\(category.id)")
                         }
                     }
                     .clipReveal(isVisible: showAllRows)
