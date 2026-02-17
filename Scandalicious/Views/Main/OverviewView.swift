@@ -86,6 +86,7 @@ struct OverviewView: View {
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
     @State private var chartRefreshToken: Int = 0 // Incremented on receipt upload to force pie chart re-animation
+    @State private var sortedReceiptsCache: [APIReceipt] = [] // Cached sorted receipts
     @State private var budgetExpanded = false // Track if budget widget is expanded
     @State private var activeCardPage = 0 // 0=budget, 1=promos
     @State private var cardDragOffset: CGFloat = 0 // Live drag offset for carousel
@@ -354,7 +355,6 @@ struct OverviewView: View {
                 .frame(maxWidth: .infinity)
                 .offset(y: -geometry.safeAreaInsets.top)
                 .opacity(purpleGradientOpacity)
-                .animation(.linear(duration: 0.1), value: scrollOffset)
                 .allowsHitTesting(false)
             }
             .ignoresSafeArea()
@@ -528,6 +528,7 @@ struct OverviewView: View {
                 receiptsViewModel.receipts = []
                 receiptsViewModel.state = .success([])
             }
+            rebuildSortedReceipts()
         }
 
         // Sync rate limit only once per session
@@ -617,6 +618,7 @@ struct OverviewView: View {
             if !receiptsViewModel.receipts.isEmpty {
                 AppDataCache.shared.updateReceipts(for: selectedPeriod, receipts: receiptsViewModel.receipts)
             }
+            rebuildSortedReceipts()
 
             // Also update cache for current month if user is viewing a different period
             if selectedPeriod != currentMonthPeriod {
@@ -759,8 +761,10 @@ struct OverviewView: View {
                 if !receiptsViewModel.receipts.isEmpty {
                     AppDataCache.shared.updateReceipts(for: newValue, receipts: receiptsViewModel.receipts)
                 }
+                rebuildSortedReceipts()
             }
         }
+        rebuildSortedReceipts()
 
         // Month period: budget + breakdowns + categories all from cache
         Task { await budgetViewModel.selectPeriod(newValue) }
@@ -1028,6 +1032,7 @@ struct OverviewView: View {
         if !receiptsViewModel.receipts.isEmpty {
             AppDataCache.shared.updateReceipts(for: periodToSync, receipts: receiptsViewModel.receipts)
         }
+        rebuildSortedReceipts()
 
         // Ensure "Syncing" label is visible for at least 1.5s
         let elapsed = Date().timeIntervalSince(syncStart)
@@ -1157,7 +1162,13 @@ struct OverviewView: View {
         .scrollPosition(id: $receiptsScrollTarget, anchor: .top)
         .coordinateSpace(name: "scrollView")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-            scrollOffset = max(0, value)
+            let newOffset = max(0, value)
+            // Only update when in the gradient fade zone (0–220px).
+            // Beyond that the gradient is fully invisible and further
+            // updates just cause needless re-renders during scroll.
+            if newOffset <= 220 || scrollOffset <= 220 {
+                scrollOffset = newOffset
+            }
         }
         .refreshable {
             // Set syncing flag immediately so the UI doesn't flash during refresh
@@ -2176,13 +2187,14 @@ struct OverviewView: View {
     }
 
     // MARK: - Transactions Section (Collapsible with glass design - Bank Imports)
-    /// Receipts sorted from newest to oldest
-    private var sortedReceipts: [APIReceipt] {
-        receiptsViewModel.receipts.sorted { receipt1, receipt2 in
-            // Parse dates and sort descending (newest first)
-            let date1 = receipt1.dateParsed ?? Date.distantPast
-            let date2 = receipt2.dateParsed ?? Date.distantPast
-            return date1 > date2
+    /// Cached sorted receipts — updated via rebuildSortedReceipts(), not on every render
+    private var sortedReceipts: [APIReceipt] { sortedReceiptsCache }
+
+    private func rebuildSortedReceipts() {
+        sortedReceiptsCache = receiptsViewModel.receipts.sorted { r1, r2 in
+            let d1 = r1.dateParsed ?? Date.distantPast
+            let d2 = r2.dateParsed ?? Date.distantPast
+            return d1 > d2
         }
     }
 
@@ -2195,6 +2207,7 @@ struct OverviewView: View {
         Task {
             do {
                 try await receiptsViewModel.deleteReceipt(receipt, period: selectedPeriod, storeName: nil)
+                rebuildSortedReceipts()
                 print("[Overview] deleteReceipt succeeded, receiptsVM.receipts.count AFTER=\(receiptsViewModel.receipts.count)")
             } catch {
                 print("[Overview] deleteReceipt FAILED: \(error.localizedDescription)")
