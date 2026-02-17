@@ -17,6 +17,13 @@ private let grassGreen = Color(red: 0.25, green: 0.60, blue: 0.28)
 private let sniffGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 private let sniffGreenDark = Color(red: 0.10, green: 0.65, blue: 0.40)
 
+// Store colors
+private let storeWall = Color(white: 0.10)
+private let storeWallLight = Color(white: 0.13)
+private let windowLit = Color(red: 0.95, green: 0.82, blue: 0.45)
+private let awningRed = Color(red: 0.65, green: 0.18, blue: 0.15)
+private let awningTeal = Color(red: 0.12, green: 0.50, blue: 0.45)
+
 // Ground level offset from ZStack center
 private let groundY: CGFloat = 40
 
@@ -32,6 +39,9 @@ struct DachshundSniffingView: View {
                 let t = timeline.date.timeIntervalSinceReferenceDate
 
                 ZStack {
+                    // Stores scrolling in the background
+                    MovingStoresLayer(time: t)
+
                     // Grass behind dachshund
                     MovingGrassLayer(time: t)
 
@@ -115,6 +125,151 @@ private struct MovingGrassLayer: View {
                 .rotationEffect(.degrees(sway), anchor: .bottom)
                 .offset(x: x, y: groundY - h / 2)
         }
+    }
+}
+
+// MARK: - Moving Stores Background
+
+/// Sporadic grocery store silhouettes scrolling slower than grass for parallax depth.
+private struct MovingStoresLayer: View {
+    let time: Double
+
+    private let virtualWidth: CGFloat = 700
+    private let scrollSpeed: Double = 12 // slower than grass (20) for parallax
+
+    // Each store: (baseX, width, height, style 0-4)
+    private let stores: [(CGFloat, CGFloat, CGFloat, Int)] = [
+        (40,  46, 60, 0),
+        (180, 56, 42, 1),
+        (330, 42, 52, 2),
+        (500, 50, 46, 3),
+        (620, 38, 56, 4),
+    ]
+
+    var body: some View {
+        let scrollOffset = CGFloat(fmod(time * scrollSpeed, Double(virtualWidth)))
+
+        ForEach(0..<stores.count, id: \.self) { i in
+            let store = stores[i]
+            let x = fmod(store.0 - scrollOffset + virtualWidth * 1.5, virtualWidth) - virtualWidth / 2
+
+            StoreBuilding(width: store.1, height: store.2, style: store.3, time: time)
+                .offset(x: x, y: groundY - store.2 / 2)
+        }
+    }
+}
+
+/// A single grocery store silhouette with windows, awning, door, and sign.
+private struct StoreBuilding: View {
+    let width: CGFloat
+    let height: CGFloat
+    let style: Int
+    let time: Double
+
+    private var wallColor: Color {
+        Color(white: 0.08 + Double(style) * 0.012)
+    }
+
+    private var awningColor: Color {
+        switch style % 3 {
+        case 0: return awningRed.opacity(0.35)
+        case 1: return awningTeal.opacity(0.35)
+        default: return sniffGreen.opacity(0.25)
+        }
+    }
+
+    private var cols: Int { width > 48 ? 3 : 2 }
+    private var rows: Int { height > 50 ? 3 : 2 }
+
+    var body: some View {
+        ZStack {
+            // Building body
+            RoundedRectangle(cornerRadius: 2)
+                .fill(wallColor)
+                .frame(width: width, height: height)
+
+            // Subtle edge highlight
+            RoundedRectangle(cornerRadius: 2)
+                .stroke(Color.white.opacity(0.05), lineWidth: 0.5)
+                .frame(width: width, height: height)
+
+            // Roof cap
+            Rectangle()
+                .fill(Color.white.opacity(0.07))
+                .frame(width: width + 4, height: 2)
+                .offset(y: -height / 2 + 1)
+
+            // Windows
+            VStack(spacing: 5) {
+                ForEach(0..<rows, id: \.self) { row in
+                    HStack(spacing: 4) {
+                        ForEach(0..<cols, id: \.self) { col in
+                            let flicker = sin(time * 0.8 + Double(row * 3 + col + style * 7)) > -0.3
+                            let lit = (row + col + style) % 3 != 0 && flicker
+                            RoundedRectangle(cornerRadius: 0.5)
+                                .fill(lit ? windowLit.opacity(0.18) : Color.white.opacity(0.03))
+                                .frame(width: 7, height: 6)
+                        }
+                    }
+                }
+            }
+            .offset(y: -height * 0.15)
+
+            // Awning
+            AwningShape()
+                .fill(awningColor)
+                .frame(width: width + 6, height: 7)
+                .offset(y: height / 2 - 12)
+
+            // Awning stripe
+            AwningShape()
+                .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                .frame(width: width + 6, height: 7)
+                .offset(y: height / 2 - 12)
+
+            // Store sign (small glowing rectangle above awning)
+            RoundedRectangle(cornerRadius: 1)
+                .fill(sniffGreen.opacity(0.10))
+                .frame(width: width * 0.45, height: 4)
+                .offset(y: height / 2 - 17)
+
+            // Door
+            RoundedRectangle(cornerRadius: 1)
+                .fill(Color.white.opacity(0.04))
+                .frame(width: 8, height: 10)
+                .offset(y: height / 2 - 5)
+
+            // Door handle dot
+            Circle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 1.5)
+                .offset(x: 2.5, y: height / 2 - 5)
+        }
+    }
+}
+
+/// Awning shape — slight trapezoid / scalloped bottom for a storefront look.
+private struct AwningShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+        path.move(to: CGPoint(x: 0, y: 0))
+        path.addLine(to: CGPoint(x: w, y: 0))
+        path.addLine(to: CGPoint(x: w - 3, y: h))
+        // Scalloped bottom edge
+        let scallops = 5
+        let scW = (w - 6) / CGFloat(scallops)
+        for i in stride(from: scallops - 1, through: 0, by: -1) {
+            let sx = 3 + CGFloat(i) * scW
+            path.addQuadCurve(
+                to: CGPoint(x: sx, y: h),
+                control: CGPoint(x: sx + scW / 2, y: h + 3)
+            )
+        }
+        path.addLine(to: CGPoint(x: 3, y: h))
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -336,8 +491,9 @@ struct DachshundBannerView: View {
             let t = timeline.date.timeIntervalSinceReferenceDate
 
             HStack(spacing: 12) {
-                // Mini scene: dachshund + grass
+                // Mini scene: stores + dachshund + grass
                 ZStack {
+                    miniStores(time: t)
                     miniGrass(time: t)
                     miniDachshund(time: t)
                         .offset(x: -6, y: 4)
@@ -386,6 +542,54 @@ struct DachshundBannerView: View {
                         lineWidth: 0.5
                     )
             )
+        }
+    }
+
+    // MARK: Mini stores (banner)
+
+    @ViewBuilder
+    private func miniStores(time: Double) -> some View {
+        let miniGround: CGFloat = 14
+        let virtualW: CGFloat = 180
+        let scroll = CGFloat(fmod(time * 8, Double(virtualW))) // slower parallax
+
+        // 3 tiny store silhouettes
+        let storeData: [(CGFloat, CGFloat, CGFloat)] = [
+            (10, 16, 18),   // (baseX, width, height)
+            (70, 20, 14),
+            (140, 14, 20),
+        ]
+
+        ForEach(0..<storeData.count, id: \.self) { i in
+            let store = storeData[i]
+            let x = fmod(store.0 - scroll + virtualW * 1.5, virtualW) - virtualW / 2
+            let w = store.1
+            let h = store.2
+
+            ZStack {
+                // Building
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color(white: 0.10))
+                    .frame(width: w, height: h)
+
+                // Tiny windows
+                HStack(spacing: 2) {
+                    RoundedRectangle(cornerRadius: 0.5)
+                        .fill(windowLit.opacity(0.15))
+                        .frame(width: 2.5, height: 2)
+                    RoundedRectangle(cornerRadius: 0.5)
+                        .fill(windowLit.opacity(0.10))
+                        .frame(width: 2.5, height: 2)
+                }
+                .offset(y: -h * 0.15)
+
+                // Tiny awning
+                Rectangle()
+                    .fill(i % 2 == 0 ? awningRed.opacity(0.25) : awningTeal.opacity(0.25))
+                    .frame(width: w + 2, height: 1.5)
+                    .offset(y: h / 2 - 3)
+            }
+            .offset(x: x, y: miniGround - h / 2)
         }
     }
 
