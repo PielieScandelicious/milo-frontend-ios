@@ -1134,6 +1134,7 @@ struct OverviewView: View {
     // MARK: - Main Content View
     private func mainContentView(bottomSafeArea: CGFloat) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
+            ScrollViewReader { scrollProxy in
             VStack(spacing: 12) {
                 overviewContentForPeriod(selectedPeriod)
                     .id("overview")
@@ -1154,6 +1155,15 @@ struct OverviewView: View {
                         )
                 }
             )
+            .onChange(of: showAllRows) { _, expanded in
+                guard expanded else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
+                        scrollProxy.scrollTo("showAllButton", anchor: .bottom)
+                    }
+                }
+            }
+            } // ScrollViewReader
         }
         .scrollPosition(id: $receiptsScrollTarget, anchor: .top)
         .coordinateSpace(name: "scrollView")
@@ -2529,6 +2539,7 @@ struct OverviewView: View {
                         isExpanded: showAllRows,
                         totalCount: categories.count
                     )
+                    .id("showAllButton")
                 }
             } else if !isPieChartFlipped && !segments.isEmpty {
                 let hasMoreSegments = segments.count > maxVisibleRows
@@ -2592,6 +2603,7 @@ struct OverviewView: View {
                         isExpanded: showAllRows,
                         totalCount: segments.count
                     )
+                    .id("showAllButton")
                 }
             } else if isPieChartFlipped && categories.isEmpty {
                 emptyRowsSection(
