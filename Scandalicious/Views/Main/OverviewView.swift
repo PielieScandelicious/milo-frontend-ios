@@ -124,6 +124,7 @@ struct OverviewView: View {
     @State private var sortedReceiptsCache: [APIReceipt] = [] // Cached sorted receipts
     @State private var budgetExpanded = false // Track if budget widget is expanded
     @State private var periodBounceOffset: CGFloat = 0 // Rubber-band effect when at period boundary
+    @State private var collapseDownCategoryId: String? // Category whose collapse should animate downward
     private let maxVisibleRows = 4 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
 
@@ -1133,16 +1134,6 @@ struct OverviewView: View {
                     }
                 }
             }
-            .onChange(of: expandedCategoryId) { _, newId in
-                guard let id = newId else { return }
-                // Wait for ClipReveal expand animation to mostly settle
-                // before scrolling, so the scroll doesn't fight the expansion
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 1.0)) {
-                        scrollProxy.scrollTo("categoryRow_\(id)", anchor: UnitPoint(x: 0.5, y: 0.3))
-                    }
-                }
-            }
             .onChange(of: isReceiptsSectionExpanded) { _, expanded in
                 guard expanded else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -1545,18 +1536,37 @@ struct OverviewView: View {
             // Another category is open — collapse it first, then expand the new one
             let previousId = expandedCategoryId!
 
-            withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
-                expandedCategoryId = nil
-            }
+            let categories = categoryDataForPeriod(period)
+            let expandedAbove: Bool = {
+                guard let ei = categories.firstIndex(where: { $0.id == previousId }),
+                      let ti = categories.firstIndex(where: { $0.id == category.id }) else { return false }
+                return ei < ti
+            }()
 
-            // Wait for collapse to settle, then expand the new category
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                // Clear previous category's pagination state
+            if expandedAbove {
+                // Expanded is above tapped — collapse downward toward the tapped button,
+                // then expand after collapse settles
+                collapseDownCategoryId = previousId
+
+                withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
+                    expandedCategoryId = nil
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    categoryItems[previousId] = nil
+                    categoryCurrentPage[previousId] = nil
+                    categoryHasMore[previousId] = nil
+
+                    collapseDownCategoryId = nil
+                    expandCategory(category, period: period)
+                }
+            } else {
+                // Expanded is below tapped — switch directly so collapse + expand
+                // happen simultaneously. Tapped button stays in place naturally.
+                expandCategory(category, period: period)
                 categoryItems[previousId] = nil
                 categoryCurrentPage[previousId] = nil
                 categoryHasMore[previousId] = nil
-
-                expandCategory(category, period: period)
             }
         } else {
             // Nothing open — expand directly
@@ -2469,7 +2479,7 @@ struct OverviewView: View {
                         )
 
                         expandedCategoryItemsSection(category)
-                            .clipReveal(isVisible: expandedCategoryId == category.id)
+                            .clipReveal(isVisible: expandedCategoryId == category.id, collapseDown: collapseDownCategoryId == category.id)
                     }
                     .id("categoryRow_\(category.id)")
                 }
@@ -2496,7 +2506,7 @@ struct OverviewView: View {
                                 )
 
                                 expandedCategoryItemsSection(category)
-                                    .clipReveal(isVisible: expandedCategoryId == category.id)
+                                    .clipReveal(isVisible: expandedCategoryId == category.id, collapseDown: collapseDownCategoryId == category.id)
                             }
                             .id("categoryRow_\(category.id)")
                         }
@@ -2608,6 +2618,9 @@ struct OverviewView: View {
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
+                    .opacity(showAllRows ? 0 : 1)
+                    .frame(height: showAllRows ? 0 : nil)
+                    .clipped()
                     .animation(nil, value: isPieChartFlipped)
             }
 
@@ -2664,8 +2677,15 @@ struct OverviewView: View {
 
 private struct ClipReveal: ViewModifier {
     let isVisible: Bool
+    let collapseDown: Bool
     @State private var contentHeight: CGFloat = 0
     @State private var displayedHeight: CGFloat = 0
+
+    /// When collapsing downward, pin content to bottom so the top gets clipped first,
+    /// creating the visual effect of the content collapsing toward the item below.
+    private var frameAlignment: Alignment {
+        (!isVisible && collapseDown) ? .bottom : .top
+    }
 
     func body(content: Content) -> some View {
         content
@@ -2687,7 +2707,7 @@ private struct ClipReveal: ViewModifier {
                         }
                 }
             )
-            .frame(height: displayedHeight, alignment: .top)
+            .frame(height: displayedHeight, alignment: frameAlignment)
             .clipped()
             .allowsHitTesting(isVisible)
             .onChange(of: isVisible) { _, visible in
@@ -2699,8 +2719,8 @@ private struct ClipReveal: ViewModifier {
 }
 
 extension View {
-    fileprivate func clipReveal(isVisible: Bool) -> some View {
-        modifier(ClipReveal(isVisible: isVisible))
+    fileprivate func clipReveal(isVisible: Bool, collapseDown: Bool = false) -> some View {
+        modifier(ClipReveal(isVisible: isVisible, collapseDown: collapseDown))
     }
 }
 
