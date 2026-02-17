@@ -85,6 +85,7 @@ struct OverviewView: View {
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
+    @State private var categoryScrollResetToken: Int = 0 // Incremented to force scroll reset on category switch
     @State private var chartRefreshToken: Int = 0 // Incremented on receipt upload to force pie chart re-animation
     @State private var sortedReceiptsCache: [APIReceipt] = [] // Cached sorted receipts
     @State private var budgetExpanded = false // Track if budget widget is expanded
@@ -728,6 +729,8 @@ struct OverviewView: View {
 
     private func handlePeriodChanged(newValue: String) {
         expandedReceiptId = nil
+        expandedCategoryId = nil
+        showAllRows = false
 
         // Reset carousel to budget page when switching periods
         // (past periods don't show promos, so avoid landing on a hidden page)
@@ -1635,6 +1638,16 @@ struct OverviewView: View {
                 expandedCategoryId = nil
             }
         } else {
+            // Clear previous category's pagination state so re-expanding starts fresh
+            if let previousId = expandedCategoryId {
+                categoryItems[previousId] = nil
+                categoryCurrentPage[previousId] = nil
+                categoryHasMore[previousId] = nil
+            }
+
+            // Force scroll reset by changing the token (recreates the ScrollView)
+            categoryScrollResetToken += 1
+
             // Pre-populate items from cache BEFORE animating expansion
             let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
             if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
@@ -1853,6 +1866,7 @@ struct OverviewView: View {
                             }
                         }
                         .scrollBounceBehavior(.basedOnSize)
+                        .id(categoryScrollResetToken) // Force scroll to top when switching categories
                         .frame(maxHeight: 5 * 50)
                         .padding(.top, 8)
                         .padding(.bottom, 4)
