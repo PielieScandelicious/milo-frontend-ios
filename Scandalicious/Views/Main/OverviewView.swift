@@ -2371,10 +2371,13 @@ struct OverviewView: View {
                             await fetchCategoryData(for: period)
                         }
                     }
+                    // Reset content state immediately (no animation — hidden by 3D flip)
+                    showAllRows = false
+                    expandedCategoryId = nil
+                    // Animate only the 3D flip rotation and opacity crossfade
                     withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                         isPieChartFlipped.toggle()
                         pieChartFlipDegrees += 180
-                        showAllRows = false
                     }
                 }
                 .onChange(of: period) { _, _ in
@@ -2406,10 +2409,10 @@ struct OverviewView: View {
                 )
                 .contentShape(Circle())
                 .onTapGesture {
+                    showAllRows = false
                     withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                         isPieChartFlipped.toggle()
                         pieChartFlipDegrees += 180
-                        showAllRows = false
                     }
                 }
                 .onChange(of: period) { _, _ in
@@ -2597,15 +2600,19 @@ struct OverviewView: View {
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
+                    .animation(nil, value: isPieChartFlipped)
             }
 
-            if isPieChartFlipped {
-                CompactNutriBadge(score: healthScore ?? 0)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-                    .opacity(healthScore != nil ? 1 : 0)
-                    .transition(.identity)
+            Group {
+                if isPieChartFlipped {
+                    CompactNutriBadge(score: healthScore ?? 0)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                        .opacity(healthScore != nil ? 1 : 0)
+                        .transition(.identity)
+                }
             }
+            .animation(nil, value: isPieChartFlipped)
 
             rowsSection(
                 period: period,
@@ -2613,6 +2620,7 @@ struct OverviewView: View {
                 categories: categories,
                 breakdowns: breakdowns
             )
+            .animation(nil, value: isPieChartFlipped)
         }
         .background(premiumCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 28))
