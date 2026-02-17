@@ -1087,7 +1087,7 @@ struct OverviewView: View {
             periodBounceOffset = direction * 20
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                 periodBounceOffset = 0
             }
         }
@@ -1120,17 +1120,17 @@ struct OverviewView: View {
             .onChange(of: showAllRows) { _, expanded in
                 guard expanded else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 1.0)) {
                         scrollProxy.scrollTo("showAllButton", anchor: .bottom)
                     }
                 }
             }
             .onChange(of: expandedCategoryId) { _, newId in
                 guard let id = newId else { return }
-                // Wait for ClipReveal expand animation to finish (~0.35s spring)
+                // Wait for ClipReveal expand animation to mostly settle
                 // before scrolling, so the scroll doesn't fight the expansion
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 1.0)) {
                         scrollProxy.scrollTo("categoryRow_\(id)", anchor: UnitPoint(x: 0.5, y: 0.3))
                     }
                 }
@@ -1138,7 +1138,7 @@ struct OverviewView: View {
             .onChange(of: isReceiptsSectionExpanded) { _, expanded in
                 guard expanded else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                         scrollProxy.scrollTo("receiptsSection", anchor: .top)
                     }
                 }
@@ -1273,7 +1273,7 @@ struct OverviewView: View {
             // Budget widget
             BudgetPulseView(viewModel: budgetViewModel, isExpanded: $budgetExpanded)
                 .padding(.horizontal, 16)
-                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: budgetExpanded)
+                .animation(.spring(response: 0.35, dampingFraction: 1.0), value: budgetExpanded)
 
             // Spending card with period swipe
             unifiedSpendingCardForPeriod(period)
@@ -1530,19 +1530,19 @@ struct OverviewView: View {
     private func toggleCategoryExpansion(_ category: CategorySpendItem, period: String) {
         if expandedCategoryId == category.id {
             // Collapse
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
                 expandedCategoryId = nil
             }
         } else if expandedCategoryId != nil {
             // Another category is open — collapse it first, then expand the new one
             let previousId = expandedCategoryId!
 
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
                 expandedCategoryId = nil
             }
 
             // Wait for collapse to settle, then expand the new category
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                 // Clear previous category's pagination state
                 categoryItems[previousId] = nil
                 categoryCurrentPage[previousId] = nil
@@ -1577,7 +1577,7 @@ struct OverviewView: View {
             categoryLoadError[category.id] = nil
         }
 
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
             expandedCategoryId = category.id
         }
 
@@ -1932,7 +1932,7 @@ struct OverviewView: View {
         VStack(spacing: 0) {
             // Section header - seamless inline
             Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                     isReceiptsSectionExpanded.toggle()
                 }
             } label: {
@@ -2021,7 +2021,7 @@ struct OverviewView: View {
                                         receipt: receipt,
                                         isExpanded: expandedReceiptId == receipt.id,
                                         onTap: {
-                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                                                 if expandedReceiptId == receipt.id {
                                                     expandedReceiptId = nil
                                                 } else {
@@ -2251,7 +2251,7 @@ struct OverviewView: View {
                 .font(.system(size: 44, weight: .heavy, design: .rounded))
                 .foregroundColor(.white)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
+                .animation(.spring(response: 0.5, dampingFraction: 1.0), value: spending)
 
             syncingIndicator(for: period)
                 .animation(.easeInOut(duration: 0.3), value: manuallySyncingPeriod)
@@ -2371,7 +2371,7 @@ struct OverviewView: View {
                             await fetchCategoryData(for: period)
                         }
                     }
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                         isPieChartFlipped.toggle()
                         pieChartFlipDegrees += 180
                         showAllRows = false
@@ -2406,7 +2406,7 @@ struct OverviewView: View {
                 )
                 .contentShape(Circle())
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                         isPieChartFlipped.toggle()
                         pieChartFlipDegrees += 180
                         showAllRows = false
@@ -2664,7 +2664,7 @@ private struct ClipReveal: ViewModifier {
                         .onChange(of: geo.size.height) { _, h in
                             contentHeight = h
                             if isVisible {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
                                     displayedHeight = h
                                 }
                             }
@@ -2675,7 +2675,7 @@ private struct ClipReveal: ViewModifier {
             .clipped()
             .allowsHitTesting(isVisible)
             .onChange(of: isVisible) { _, visible in
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
                     displayedHeight = visible ? contentHeight : 0
                 }
             }
@@ -2882,7 +2882,7 @@ private struct ExpandableCategoryRowHeader: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white.opacity(0.3))
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
-                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
+                    .animation(.spring(response: 0.35, dampingFraction: 1.0), value: isExpanded)
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 11)
@@ -2952,7 +2952,7 @@ private struct OverviewCategoryRowButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -3076,7 +3076,7 @@ struct AnimatedNumberText: View {
                 displayValue = value
             }
             .onChange(of: value) { oldValue, newValue in
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) {
                     displayValue = newValue
                 }
             }
@@ -3122,7 +3122,7 @@ struct PeriodDotsView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentIndex)
+        .animation(.spring(response: 0.3, dampingFraction: 1.0), value: currentIndex)
     }
 
     private var visibleRange: (start: Int, end: Int) {
@@ -3162,7 +3162,7 @@ struct PeriodNavButtonStyle: ButtonStyle {
                     .scaleEffect(configuration.isPressed ? 1.0 : 0.8)
             )
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -3172,7 +3172,7 @@ struct TotalSpendingCardButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -3182,7 +3182,7 @@ struct OverviewStoreRowButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .opacity(configuration.isPressed ? 0.8 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -3192,7 +3192,7 @@ struct ReceiptsHeaderButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -3256,7 +3256,7 @@ struct CompactNutriBadge: View {
     private func replayAnimation() {
         animatedProgress = 0
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) {
                 animatedProgress = 1.0
             }
         }
@@ -3275,7 +3275,7 @@ struct CompactNutriBadge: View {
                     .stroke(scoreColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .frame(width: 26, height: 26)
                     .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: animatedProgress)
+                    .animation(.spring(response: 0.5, dampingFraction: 1.0), value: animatedProgress)
                 Text(gradeLabel)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(scoreColor)
@@ -3378,7 +3378,7 @@ struct ModernHealthScoreBadge: View {
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .contentTransition(.numericText())
-                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: score)
+                    .animation(.spring(response: 0.5, dampingFraction: 1.0), value: score)
 
                 Text("Nutri Score")
                     .font(.system(size: 10, weight: .medium))
