@@ -28,6 +28,7 @@ struct ReceiptScanView: View {
     @State private var showCaptureSuccess = false
     @State private var showProfile = false
 
+    @Environment(\.selectedTabIndex) private var selectedTabIndex
     @State private var isTabVisible = false
     @State private var contentOpacity: Double = 0
 
@@ -100,6 +101,13 @@ struct ReceiptScanView: View {
         .onDisappear {
             isTabVisible = false
             contentOpacity = 0
+        }
+        .onChange(of: selectedTabIndex) { _, newTab in
+            if newTab != ContentView.Tab.home.rawValue && isRecentReceiptsExpanded {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isRecentReceiptsExpanded = false
+                }
+            }
         }
         .receiptErrorOverlay(
             isPresented: $showError,
