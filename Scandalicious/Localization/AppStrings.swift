@@ -542,7 +542,7 @@ enum AppStrings {
         "cat_coffee_tea": ["en": "Coffee & Tea", "nl": "Koffie & Thee", "fr": "Café & Thé"],
         "cat_alcohol": ["en": "Alcohol", "nl": "Alcohol", "fr": "Alcool"],
         "cat_chips_nuts": ["en": "Chips, Nuts & Aperitif", "nl": "Chips, Noten & Aperitief", "fr": "Chips, Noix & Apéritif"],
-        "cat_chocolate_sweets": ["en": "Chocolate & Sweets", "nl": "Chocolade & Snoep", "fr": "Chocolat & Confiseries"],
+        "cat_chocolate_sweets": ["en": "Chocolate, Biscuits & Sweets", "nl": "Chocolade, Koeken & Snoep", "fr": "Chocolat, Biscuits & Confiseries"],
         "cat_waste_bags": ["en": "Waste Bags", "nl": "Vuilniszakken", "fr": "Sacs poubelle"],
         "cat_cleaning": ["en": "Cleaning & Paper Goods", "nl": "Schoonmaak & Papier", "fr": "Nettoyage & Papier"],
         "cat_pharmacy_hygiene": ["en": "Pharmacy & Hygiene", "nl": "Apotheek & Hygiëne", "fr": "Pharmacie & Hygiène"],
@@ -550,6 +550,7 @@ enum AppStrings {
         "cat_pet_supplies": ["en": "Pet Supplies", "nl": "Huisdierbenodigdheden", "fr": "Animaux domestiques"],
         "cat_tobacco": ["en": "Tobacco", "nl": "Tabak", "fr": "Tabac"],
         "cat_lottery": ["en": "Lottery & Scratch Cards", "nl": "Lotto & Krasloten", "fr": "Loterie & Tickets à gratter"],
+        "cat_promos_discounts": ["en": "Promos & Discounts", "nl": "Promo's & Kortingen", "fr": "Promos & Réductions"],
         "cat_deposits": ["en": "Deposits", "nl": "Statiegeld", "fr": "Consignes"],
         "cat_other": ["en": "Other", "nl": "Andere", "fr": "Autres"],
     ]

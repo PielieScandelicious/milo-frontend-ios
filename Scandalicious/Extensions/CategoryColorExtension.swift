@@ -87,6 +87,7 @@ private let _categoryNameToTranslationKey: [String: String] = [
     "Tobacco": "cat_tobacco",
     "Lottery & Scratch Cards": "cat_lottery",
     "Lottery": "cat_lottery",
+    "Promos & Discounts": "cat_promos_discounts",
     "Deposits": "cat_deposits",
     "Other": "cat_other",
     // Group names

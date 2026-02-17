@@ -35,11 +35,15 @@ struct CategoryMidResponse: Codable, Identifiable {
     let subCategories: [String]
     let icon: String?
     let colorHex: String?
+    let budgetable: Bool?
 
     var id: String { name }
 
     /// Clean display name, falling back to raw name
     var cleanName: String { displayName ?? name }
+
+    /// Whether this category can be used for budgeting (excludes promos, deposits, etc.)
+    var isBudgetable: Bool { budgetable ?? true }
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -47,6 +51,7 @@ struct CategoryMidResponse: Codable, Identifiable {
         case subCategories = "sub_categories"
         case icon
         case colorHex = "color_hex"
+        case budgetable
     }
 }
 
@@ -188,6 +193,15 @@ class CategoryRegistryManager: ObservableObject {
         }
     }
 
+    /// Returns only categories that can be used for budget allocation
+    /// (excludes promos, deposits, and other non-product categories)
+    var budgetableCategories: [String] {
+        guard let hierarchy = hierarchy else { return [] }
+        return hierarchy.groups.flatMap { group in
+            group.categories.filter { $0.isBudgetable }.flatMap { $0.subCategories }
+        }
+    }
+
     // MARK: - Localized Name Lookups
 
     /// Maps English API display names → AppStrings L() keys for category translations
@@ -221,6 +235,7 @@ class CategoryRegistryManager: ObservableObject {
         "Pet Supplies": "cat_pet_supplies",
         "Tobacco": "cat_tobacco",
         "Lottery & Scratch Cards": "cat_lottery",
+        "Promos & Discounts": "cat_promos_discounts",
         "Deposits": "cat_deposits",
         "Other": "cat_other",
     ]
