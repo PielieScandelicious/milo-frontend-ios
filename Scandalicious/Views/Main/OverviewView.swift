@@ -2685,6 +2685,7 @@ struct OverviewView: View {
                     .padding(.top, 12)
                     .padding(.bottom, 8)
                     .opacity(healthScore != nil ? 1 : 0)
+                    .transition(.identity)
             }
 
             rowsSection(
@@ -2729,10 +2730,7 @@ struct OverviewView: View {
 private struct ClipReveal: ViewModifier {
     let isVisible: Bool
     @State private var contentHeight: CGFloat = 0
-
-    private var effectiveHeight: CGFloat {
-        isVisible ? contentHeight : 0
-    }
+    @State private var displayedHeight: CGFloat = 0
 
     func body(content: Content) -> some View {
         content
@@ -2740,14 +2738,28 @@ private struct ClipReveal: ViewModifier {
             .background(
                 GeometryReader { geo in
                     Color.clear
-                        .onAppear { contentHeight = geo.size.height }
-                        .onChange(of: geo.size.height) { _, h in contentHeight = h }
+                        .onAppear {
+                            contentHeight = geo.size.height
+                            displayedHeight = isVisible ? geo.size.height : 0
+                        }
+                        .onChange(of: geo.size.height) { _, h in
+                            contentHeight = h
+                            if isVisible {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    displayedHeight = h
+                                }
+                            }
+                        }
                 }
             )
-            .frame(height: effectiveHeight, alignment: .top)
-            .animation(.spring(response: 0.35, dampingFraction: 1.0), value: effectiveHeight)
+            .frame(height: displayedHeight, alignment: .top)
             .clipped()
             .allowsHitTesting(isVisible)
+            .onChange(of: isVisible) { _, visible in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    displayedHeight = visible ? contentHeight : 0
+                }
+            }
     }
 }
 
@@ -3244,6 +3256,8 @@ struct SyncingArrowsView: View {
 struct CompactNutriBadge: View {
     let score: Double
 
+    @State private var animatedProgress: CGFloat = 0
+
     private var scoreColor: Color {
         switch score {
         case 0..<1.5:
@@ -3279,6 +3293,15 @@ struct CompactNutriBadge: View {
         }
     }
 
+    private func replayAnimation() {
+        animatedProgress = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                animatedProgress = 1.0
+            }
+        }
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             // Grade letter with circular ring
@@ -3286,17 +3309,18 @@ struct CompactNutriBadge: View {
                 Circle()
                     .stroke(scoreColor.opacity(0.2), lineWidth: 2)
                     .frame(width: 26, height: 26)
+                    .transaction { $0.animation = nil }
                 Circle()
-                    .trim(from: 0, to: scoreProgress)
+                    .trim(from: 0, to: scoreProgress * animatedProgress)
                     .stroke(scoreColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .frame(width: 26, height: 26)
                     .rotationEffect(.degrees(-90))
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: animatedProgress)
                 Text(gradeLabel)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(scoreColor)
-                    .contentTransition(.numericText())
+                    .transaction { $0.animation = nil }
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: score)
 
             Text("NUTRI SCORE")
                 .font(.system(size: 9, weight: .semibold))
@@ -3313,6 +3337,13 @@ struct CompactNutriBadge: View {
                         .stroke(scoreColor.opacity(0.2), lineWidth: 0.5)
                 )
         )
+        .transaction { $0.animation = nil }
+        .onAppear {
+            replayAnimation()
+        }
+        .onChange(of: score) { _, _ in
+            replayAnimation()
+        }
     }
 }
 

@@ -605,6 +605,7 @@ struct CategoryBreakdownDetailView: View {
                                 Circle()
                                     .stroke(item.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
                             )
+                            .transition(.identity)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -624,11 +625,13 @@ struct CategoryBreakdownDetailView: View {
                                         Capsule()
                                             .fill(Color.white.opacity(0.08))
                                     )
+                                    .transition(.identity)
                             }
 
                             // Split participant avatars
                             if !friendsOnly.isEmpty {
                                 MiniSplitAvatars(participants: friendsOnly)
+                                    .transition(.identity)
                             }
                         }
 
@@ -637,6 +640,7 @@ struct CategoryBreakdownDetailView: View {
                                 .font(.system(size: 11))
                                 .foregroundColor(.white.opacity(0.45))
                                 .lineLimit(2)
+                                .transition(.identity)
                         }
 
                         // Store name for context
