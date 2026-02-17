@@ -86,6 +86,7 @@ struct OverviewView: View {
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
     @State private var categoryScrollResetToken: Int = 0 // Incremented to force scroll reset on category switch
+    @State private var receiptsScrollResetToken: Int = 0 // Incremented to force receipts scroll reset on period change
     @State private var chartRefreshToken: Int = 0 // Incremented on receipt upload to force pie chart re-animation
     @State private var sortedReceiptsCache: [APIReceipt] = [] // Cached sorted receipts
     @State private var budgetExpanded = false // Track if budget widget is expanded
@@ -731,6 +732,8 @@ struct OverviewView: View {
         expandedReceiptId = nil
         expandedCategoryId = nil
         showAllRows = false
+        isReceiptsSectionExpanded = false
+        receiptsScrollResetToken += 1
 
         // Reset carousel to budget page when switching periods
         // (past periods don't show promos, so avoid landing on a hidden page)
@@ -2154,6 +2157,7 @@ struct OverviewView: View {
                         }
                     }
                     .scrollBounceBehavior(.basedOnSize)
+                    .id(receiptsScrollResetToken) // Force scroll to top on period change
                     .frame(maxHeight: 5 * 42)
                 }
             }
