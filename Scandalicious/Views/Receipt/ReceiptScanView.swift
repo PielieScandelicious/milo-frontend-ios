@@ -903,6 +903,29 @@ struct ReceiptScanView: View {
         .buttonStyle(ScaleCardButtonStyle())
     }
 
+    // MARK: - Syncing Status Banners
+
+    private var syncingStatusBanner: some View {
+        HStack(spacing: 6) {
+            SyncingArrowsView()
+            Text(L("syncing"))
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.blue)
+        .padding(.top, 12)
+    }
+
+    private var syncedStatusBanner: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "checkmark.icloud.fill")
+                .font(.system(size: 11))
+            Text(L("synced"))
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.green)
+        .padding(.top, 12)
+    }
+
     // MARK: - Load Stats
 
     /// Load all-time stats from the new backend endpoint

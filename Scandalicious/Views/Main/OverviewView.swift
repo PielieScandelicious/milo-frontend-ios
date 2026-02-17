@@ -29,6 +29,7 @@ enum SortOption: String, CaseIterable {
         case .storeName: return L("store_name_sort")
         }
     }
+<<<<<<< HEAD
 }
 
 // MARK: - Shared DateFormatters (avoid allocating on every render)
@@ -60,6 +61,8 @@ private enum PeriodFormatters {
         f.dateFormat = "d MMM"
         return f
     }()
+=======
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 }
 
 
@@ -2259,7 +2262,18 @@ struct OverviewView: View {
 
     /// Spending header: amount + syncing status
     private func spendingHeaderSection(spending: Double, period: String) -> some View {
+<<<<<<< HEAD
         VStack(spacing: 8) {
+=======
+        let isCurrentMonth: Bool = {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM yyyy"
+            dateFormatter.locale = Locale(identifier: "en_US")
+            return period == dateFormatter.string(from: Date())
+        }()
+
+        return VStack(spacing: 8) {
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
             Text(L("spent_this_month"))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))

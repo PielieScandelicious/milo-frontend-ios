@@ -229,6 +229,27 @@ struct ScandaLiciousTab: View {
         }
         .id("ScandaLiciousTab") // Prevent recreation
     }
+
+    private var syncingStatusBanner: some View {
+        HStack(spacing: 6) {
+            SyncingArrowsView()
+            Text(L("syncing"))
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.blue)
+        .padding(.top, 12)
+    }
+
+    private var syncedStatusBanner: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "checkmark.icloud.fill")
+                .font(.system(size: 11))
+            Text(L("synced"))
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(.green)
+        .padding(.top, 12)
+    }
 }
 
 // MARK: - Milo Tab Icon

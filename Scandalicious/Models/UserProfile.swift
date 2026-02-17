@@ -15,6 +15,7 @@ struct UserProfile: Codable {
     var gender: String?
     var age: Int?
     var language: String?
+    var preferredStores: [String]?
     var profileCompleted: Bool
     let createdAt: String?
     let updatedAt: String?
@@ -27,6 +28,7 @@ struct UserProfile: Codable {
         case gender
         case age
         case language
+        case preferredStores = "preferred_stores"
         case profileCompleted = "profile_completed"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -38,6 +40,15 @@ struct UserProfileUpdate: Codable {
     var gender: String?
     var age: Int?
     var language: String?
+    var preferredStores: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case nickname
+        case gender
+        case age
+        case language
+        case preferredStores = "preferred_stores"
+    }
 }
 
 enum ProfileGender: String, CaseIterable {

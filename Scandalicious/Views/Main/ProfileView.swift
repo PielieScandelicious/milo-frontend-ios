@@ -18,6 +18,10 @@ struct ProfileView: View {
     @State private var selectedGender: Gender = .notSpecified
     @State private var age = ""
     @State private var selectedLanguage: ProfileLanguage?
+<<<<<<< HEAD
+=======
+    @State private var selectedStores: Set<GroceryStore> = []
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
     @State private var showManageSubscription = false
     @State private var isLoading = false
     @State private var isSaving = false
@@ -31,6 +35,17 @@ struct ProfileView: View {
     @State private var originalGender: Gender = .notSpecified
     @State private var originalAge = ""
     @State private var originalLanguage: ProfileLanguage?
+<<<<<<< HEAD
+=======
+    @State private var originalStores: Set<GroceryStore> = []
+
+    // Grid layout: 3 columns
+    private let storeColumns = [
+        GridItem(.flexible(), spacing: 8),
+        GridItem(.flexible(), spacing: 8),
+        GridItem(.flexible(), spacing: 8)
+    ]
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
     enum Gender: String, CaseIterable {
         case male = "Male"
@@ -119,27 +134,113 @@ struct ProfileView: View {
                 }
             } header: {
                 Text(L("personal_information"))
+<<<<<<< HEAD
+=======
+            }
+
+            // Grocery Stores
+            Section {
+                LazyVGrid(columns: storeColumns, spacing: 8) {
+                    let stores = GroceryStore.allCases
+                    let remainder = stores.count % 3
+                    let gridStores = remainder == 1 ? Array(stores.dropLast()) : stores
+
+                    ForEach(gridStores) { store in
+                        ProfileStoreChipView(
+                            store: store,
+                            isSelected: selectedStores.contains(store),
+                            isDisabled: isLoading || isSaving,
+                            onTap: {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                    if selectedStores.contains(store) {
+                                        selectedStores.remove(store)
+                                    } else {
+                                        selectedStores.insert(store)
+                                    }
+                                    checkForChanges()
+                                }
+                            }
+                        )
+                    }
+
+                    if remainder == 1, let lastStore = stores.last {
+                        Color.clear.frame(height: 1)
+                        ProfileStoreChipView(
+                            store: lastStore,
+                            isSelected: selectedStores.contains(lastStore),
+                            isDisabled: isLoading || isSaving,
+                            onTap: {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                    if selectedStores.contains(lastStore) {
+                                        selectedStores.remove(lastStore)
+                                    } else {
+                                        selectedStores.insert(lastStore)
+                                    }
+                                    checkForChanges()
+                                }
+                            }
+                        )
+                    }
+                }
+                .padding(.vertical, 4)
+            } header: {
+                HStack {
+                    Text(L("grocery_stores"))
+                    Spacer()
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            if selectedStores.count == GroceryStore.allCases.count {
+                                selectedStores.removeAll()
+                            } else {
+                                selectedStores = Set(GroceryStore.allCases)
+                            }
+                            checkForChanges()
+                        }
+                    } label: {
+                        Text(selectedStores.count == GroceryStore.allCases.count ? L("deselect_all") : L("select_all"))
+                            .font(.caption)
+                            .textCase(nil)
+                    }
+                }
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
             } footer: {
-                if hasUnsavedChanges {
+                Text(L("select_stores_subtitle"))
+            }
+
+            // Save Button (if changes)
+            if hasUnsavedChanges {
+                Section {
                     Button {
                         saveProfile()
                     } label: {
                         if isSaving {
                             HStack {
+                                Spacer()
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle())
                                 Text(L("saving"))
+<<<<<<< HEAD
                             }
                         } else {
                             Text(L("save_changes"))
                                 .fontWeight(.semibold)
+=======
+                                Spacer()
+                            }
+                        } else {
+                            HStack {
+                                Spacer()
+                                Text(L("save_changes"))
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
                         }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.purple)
                     .disabled(isSaving)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 }
             }
 
@@ -360,6 +461,10 @@ struct ProfileView: View {
                 selectedGender = Gender.from(apiValue: profile.gender)
                 age = profile.age != nil ? "\(profile.age!)" : ""
                 selectedLanguage = ProfileLanguage.from(apiValue: profile.language)
+<<<<<<< HEAD
+=======
+                selectedStores = GroceryStore.from(rawValues: profile.preferredStores)
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
                 LanguageManager.shared.syncFromProfile(profile.language)
 
                 // Store original values
@@ -367,6 +472,10 @@ struct ProfileView: View {
                 originalGender = selectedGender
                 originalAge = age
                 originalLanguage = selectedLanguage
+<<<<<<< HEAD
+=======
+                originalStores = selectedStores
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                 hasUnsavedChanges = false
                 isLoading = false
@@ -389,12 +498,21 @@ struct ProfileView: View {
             do {
                 let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
                 let ageValue = Int(age)
+<<<<<<< HEAD
+=======
+                let storeValues = selectedStores.isEmpty ? [] : selectedStores.map(\.rawValue)
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                 let profile = try await ProfileAPIService().updateProfile(
                     nickname: trimmedNickname.isEmpty ? nil : trimmedNickname,
                     gender: selectedGender.apiValue,
                     age: ageValue,
+<<<<<<< HEAD
                     language: selectedLanguage?.rawValue
+=======
+                    language: selectedLanguage?.rawValue,
+                    preferredStores: storeValues
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
                 )
 
                 await MainActor.run {
@@ -403,6 +521,10 @@ struct ProfileView: View {
                     originalGender = selectedGender
                     originalAge = age
                     originalLanguage = selectedLanguage
+<<<<<<< HEAD
+=======
+                    originalStores = selectedStores
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                     if let lang = selectedLanguage {
                         LanguageManager.shared.currentLanguage = lang
@@ -430,7 +552,53 @@ struct ProfileView: View {
         hasUnsavedChanges = nickname != originalNickname ||
                            selectedGender != originalGender ||
                            age != originalAge ||
+<<<<<<< HEAD
                            selectedLanguage != originalLanguage
+=======
+                           selectedLanguage != originalLanguage ||
+                           selectedStores != originalStores
+    }
+}
+
+// MARK: - Profile Store Chip View
+
+private struct ProfileStoreChipView: View {
+    let store: GroceryStore
+    let isSelected: Bool
+    let isDisabled: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 4) {
+                Image(store.logoImageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 55, maxHeight: 26)
+                    .frame(height: 26)
+                Text(store.displayName)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? store.accentColor.opacity(0.15) : Color.clear)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(
+                                isSelected ? store.accentColor.opacity(0.5) : Color.secondary.opacity(0.2),
+                                lineWidth: isSelected ? 1.5 : 1
+                            )
+                    )
+            )
+            .opacity(isSelected ? 1 : 0.6)
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
     }
 }
 

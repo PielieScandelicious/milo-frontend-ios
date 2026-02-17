@@ -383,27 +383,41 @@ struct WalletPassCreatorView: View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeader(L("store_logo"), icon: "photo.fill")
 
+            // Pre-loaded store logos grid
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
+                ForEach(GroceryStore.allCases) { store in
+                    Button {
+                        if let image = UIImage(named: store.logoImageName) {
+                            viewModel.setLogoImage(image)
+                        }
+                    } label: {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(height: 52)
+                            .overlay {
+                                Image(store.logoImageName)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: 50, maxHeight: 28)
+                            }
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                    }
+                }
+            }
+
+            // Gallery picker button
             Button {
                 viewModel.selectLogo()
             } label: {
-                HStack(spacing: 16) {
-                    if let logo = viewModel.passData.logoImage {
-                        Image(uiImage: logo)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 50, height: 50)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    } else {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(.white.opacity(0.08))
-                            .frame(width: 50, height: 50)
-                            .overlay {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.4))
-                            }
-                    }
+                HStack(spacing: 12) {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
 
+<<<<<<< HEAD
                     VStack(alignment: .leading, spacing: 4) {
                         Text(viewModel.passData.logoImage != nil ? L("change_logo") : L("add_logo"))
                             .font(.system(size: 15, weight: .semibold))
@@ -413,22 +427,54 @@ struct WalletPassCreatorView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(.white.opacity(0.5))
                     }
+=======
+                    Text(L("or_choose_from_gallery"))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+>>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.3))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.2))
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.white.opacity(0.04))
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.white.opacity(0.03))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
                 )
+            }
+
+            // Current logo preview
+            if let logo = viewModel.passData.logoImage {
+                HStack(spacing: 12) {
+                    Image(uiImage: logo)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Text(L("change_logo"))
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.5))
+
+                    Spacer()
+
+                    Button {
+                        viewModel.passData.logoImage = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.white.opacity(0.3))
+                    }
+                }
+                .padding(.horizontal, 4)
             }
         }
     }
