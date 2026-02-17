@@ -417,21 +417,9 @@ struct WalletPassCreatorView: View {
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
 
-<<<<<<< HEAD
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(viewModel.passData.logoImage != nil ? L("change_logo") : L("add_logo"))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-
-                        Text(L("optional_pass_header"))
-                            .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
-=======
                     Text(L("or_choose_from_gallery"))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                     Spacer()
 

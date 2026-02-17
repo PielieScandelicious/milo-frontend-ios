@@ -18,10 +18,7 @@ struct ProfileView: View {
     @State private var selectedGender: Gender = .notSpecified
     @State private var age = ""
     @State private var selectedLanguage: ProfileLanguage?
-<<<<<<< HEAD
-=======
     @State private var selectedStores: Set<GroceryStore> = []
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
     @State private var showManageSubscription = false
     @State private var isLoading = false
     @State private var isSaving = false
@@ -35,8 +32,6 @@ struct ProfileView: View {
     @State private var originalGender: Gender = .notSpecified
     @State private var originalAge = ""
     @State private var originalLanguage: ProfileLanguage?
-<<<<<<< HEAD
-=======
     @State private var originalStores: Set<GroceryStore> = []
 
     // Grid layout: 3 columns
@@ -45,7 +40,6 @@ struct ProfileView: View {
         GridItem(.flexible(), spacing: 8),
         GridItem(.flexible(), spacing: 8)
     ]
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
     enum Gender: String, CaseIterable {
         case male = "Male"
@@ -134,8 +128,6 @@ struct ProfileView: View {
                 }
             } header: {
                 Text(L("personal_information"))
-<<<<<<< HEAD
-=======
             }
 
             // Grocery Stores
@@ -202,7 +194,6 @@ struct ProfileView: View {
                             .textCase(nil)
                     }
                 }
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
             } footer: {
                 Text(L("select_stores_subtitle"))
             }
@@ -219,12 +210,6 @@ struct ProfileView: View {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle())
                                 Text(L("saving"))
-<<<<<<< HEAD
-                            }
-                        } else {
-                            Text(L("save_changes"))
-                                .fontWeight(.semibold)
-=======
                                 Spacer()
                             }
                         } else {
@@ -234,7 +219,6 @@ struct ProfileView: View {
                                     .fontWeight(.semibold)
                                 Spacer()
                             }
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -461,10 +445,7 @@ struct ProfileView: View {
                 selectedGender = Gender.from(apiValue: profile.gender)
                 age = profile.age != nil ? "\(profile.age!)" : ""
                 selectedLanguage = ProfileLanguage.from(apiValue: profile.language)
-<<<<<<< HEAD
-=======
                 selectedStores = GroceryStore.from(rawValues: profile.preferredStores)
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
                 LanguageManager.shared.syncFromProfile(profile.language)
 
                 // Store original values
@@ -472,10 +453,7 @@ struct ProfileView: View {
                 originalGender = selectedGender
                 originalAge = age
                 originalLanguage = selectedLanguage
-<<<<<<< HEAD
-=======
                 originalStores = selectedStores
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                 hasUnsavedChanges = false
                 isLoading = false
@@ -498,21 +476,14 @@ struct ProfileView: View {
             do {
                 let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
                 let ageValue = Int(age)
-<<<<<<< HEAD
-=======
                 let storeValues = selectedStores.isEmpty ? [] : selectedStores.map(\.rawValue)
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                 let profile = try await ProfileAPIService().updateProfile(
                     nickname: trimmedNickname.isEmpty ? nil : trimmedNickname,
                     gender: selectedGender.apiValue,
                     age: ageValue,
-<<<<<<< HEAD
-                    language: selectedLanguage?.rawValue
-=======
                     language: selectedLanguage?.rawValue,
                     preferredStores: storeValues
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
                 )
 
                 await MainActor.run {
@@ -521,10 +492,7 @@ struct ProfileView: View {
                     originalGender = selectedGender
                     originalAge = age
                     originalLanguage = selectedLanguage
-<<<<<<< HEAD
-=======
                     originalStores = selectedStores
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                     if let lang = selectedLanguage {
                         LanguageManager.shared.currentLanguage = lang
@@ -552,9 +520,6 @@ struct ProfileView: View {
         hasUnsavedChanges = nickname != originalNickname ||
                            selectedGender != originalGender ||
                            age != originalAge ||
-<<<<<<< HEAD
-                           selectedLanguage != originalLanguage
-=======
                            selectedLanguage != originalLanguage ||
                            selectedStores != originalStores
     }
@@ -598,7 +563,6 @@ private struct ProfileStoreChipView: View {
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
     }
 }
 

@@ -13,10 +13,7 @@ struct OnboardingView: View {
     @State private var selectedGender: ProfileGender = .male
     @State private var age = ""
     @State private var selectedLanguage: ProfileLanguage = .english
-<<<<<<< HEAD
-=======
     @State private var selectedStores: Set<GroceryStore> = []
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
@@ -25,8 +22,6 @@ struct OnboardingView: View {
     private var onboardingGenders: [ProfileGender] {
         [.male, .female]
     }
-<<<<<<< HEAD
-=======
 
     // Grid layout: 3 columns
     private let storeColumns = [
@@ -34,7 +29,6 @@ struct OnboardingView: View {
         GridItem(.flexible(), spacing: 10),
         GridItem(.flexible(), spacing: 10)
     ]
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
     var body: some View {
         ZStack {
@@ -60,10 +54,6 @@ struct OnboardingView: View {
                     // Compact form card
                     formCard
                         .padding(.horizontal, 24)
-<<<<<<< HEAD
-                        .padding(.bottom, 24)
-
-=======
                         .padding(.bottom, 20)
 
                     // Store selection
@@ -71,7 +61,6 @@ struct OnboardingView: View {
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
 
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
                     // Continue button
                     continueButton
                         .padding(.horizontal, 24)
@@ -247,8 +236,6 @@ struct OnboardingView: View {
         )
     }
 
-<<<<<<< HEAD
-=======
     // MARK: - Store Selection Card
 
     private var storeSelectionCard: some View {
@@ -335,7 +322,6 @@ struct OnboardingView: View {
         )
     }
 
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
     // MARK: - Continue Button
 
     private var continueButton: some View {
@@ -386,21 +372,14 @@ struct OnboardingView: View {
             do {
                 let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
                 let ageValue = Int(age)
-<<<<<<< HEAD
-=======
                 let storeValues = selectedStores.isEmpty ? nil : selectedStores.map(\.rawValue)
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
 
                 let profile = try await ProfileAPIService().updateProfile(
                     nickname: trimmedNickname,
                     gender: selectedGender.rawValue,
                     age: ageValue,
-<<<<<<< HEAD
-                    language: selectedLanguage.rawValue
-=======
                     language: selectedLanguage.rawValue,
                     preferredStores: storeValues
->>>>>>> f4b7918 (Add grocery store preferences, real store logos, and wallet pass logo picker)
                 )
 
                 await MainActor.run {
