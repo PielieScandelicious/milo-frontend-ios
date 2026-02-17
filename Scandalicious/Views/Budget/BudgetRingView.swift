@@ -228,135 +228,39 @@ struct CategoryBudgetRing: View {
         categoryProgress: []
     )
 
-    return ZStack {
+    ZStack {
         Color(white: 0.05).ignoresSafeArea()
 
         VStack(spacing: 40) {
             BudgetRingView(progress: sampleProgress, size: 120)
 
-                HStack(spacing: 24) {
-                    BudgetRingView(progress: sampleProgress, size: 100)
-                    BudgetRingView(progress: sampleProgress, size: 140)
-                }
+            HStack(spacing: 24) {
+                BudgetRingView(progress: sampleProgress, size: 100)
+                BudgetRingView(progress: sampleProgress, size: 140)
+            }
 
-                Text("Status Variations")
-                    .font(.headline)
-                    .foregroundColor(.white)
+            HStack(spacing: 16) {
+                MiniBudgetRing(spendRatio: 0.4, paceStatus: .underBudget)
+                MiniBudgetRing(spendRatio: 0.73, paceStatus: .onTrack)
+                MiniBudgetRing(spendRatio: 0.95, paceStatus: .slightlyOver)
+            }
 
-                HStack(spacing: 20) {
-                    // Under budget
-                    BudgetRingView(
-                        progress: BudgetProgress(
-                            budget: sampleBudget,
-                            currentSpend: 400,
-                            daysElapsed: 21,
-                            daysInMonth: 31,
-                            categoryProgress: []
-                        ),
-                        size: 100
+            HStack(spacing: 12) {
+                CategoryBudgetRing(
+                    categoryProgress: CategoryBudgetProgress(
+                        category: "Fresh Produce",
+                        budgetAmount: 100,
+                        currentSpend: 65
                     )
+                )
 
-                    // Over budget
-                    BudgetRingView(
-                        progress: overBudgetProgress,
-                        size: 100
+                CategoryBudgetRing(
+                    categoryProgress: CategoryBudgetProgress(
+                        category: "Snacks & Sweets",
+                        budgetAmount: 60,
+                        currentSpend: 72
                     )
-                }
-
-                Text("Mini Rings")
-                    .font(.headline)
-                    .foregroundColor(.white)
-
-                HStack(spacing: 16) {
-                    MiniBudgetRing(spendRatio: 0.4, paceStatus: .underBudget)
-                    MiniBudgetRing(spendRatio: 0.73, paceStatus: .onTrack)
-                    MiniBudgetRing(spendRatio: 0.95, paceStatus: .slightlyOver)
-                }
-
-                Text("Progress Bar")
-                    .font(.headline)
-                    .foregroundColor(.white)
-
-                VStack(spacing: 16) {
-                    BudgetProgressBar(progress: sampleProgress)
-                        .padding(.horizontal)
-
-                    BudgetProgressBar(progress: overBudgetProgress)
-                        .padding(.horizontal)
-                }
-
-                Text("Category Rings")
-                    .font(.headline)
-                    .foregroundColor(.white)
-
-                HStack(spacing: 12) {
-                    CategoryBudgetRing(
-                        categoryProgress: CategoryBudgetProgress(
-                            category: "Fresh Produce",
-                            budgetAmount: 100,
-                            currentSpend: 65
-                        )
-                    )
-
-                    CategoryBudgetRing(
-                        categoryProgress: CategoryBudgetProgress(
-                            category: "Snacks & Sweets",
-                            budgetAmount: 60,
-                            currentSpend: 72
-                        )
-                    )
-
-                    CategoryBudgetRing(
-                        categoryProgress: CategoryBudgetProgress(
-                            category: "Meat & Fish",
-                            budgetAmount: 120,
-                            currentSpend: 110
-                        )
-                    )
-                }
-
-                Text("Projected Budget Bar")
-                    .font(.headline)
-                    .foregroundColor(.white)
-
-                VStack(alignment: .leading, spacing: 16) {
-                    // Under budget projection
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("under_budget"))
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                        ProjectedBudgetBar(
-                            totalBudget: 850,
-                            currentSpend: 400,
-                            projectedSpend: 620
-                        )
-                    }
-
-                    // Over budget projection
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("over_budget_projection"))
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                        ProjectedBudgetBar(
-                            totalBudget: 850,
-                            currentSpend: 500,
-                            projectedSpend: 950
-                        )
-                    }
-
-                    // Already over budget
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("already_over_budget"))
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                        ProjectedBudgetBar(
-                            totalBudget: 850,
-                            currentSpend: 920,
-                            projectedSpend: 1100
-                        )
-                    }
-                }
-                .padding(.horizontal)
+                )
             }
         }
     }
