@@ -23,6 +23,37 @@ enum SortOption: String, CaseIterable {
     case storeName = "Store Name"
 }
 
+// MARK: - Shared DateFormatters (avoid allocating on every render)
+private enum PeriodFormatters {
+    static let periodFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        f.locale = Locale(identifier: "en_US")
+        return f
+    }()
+
+    static let periodUTCFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        f.locale = Locale(identifier: "en_US")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    static let shortPeriodFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM yy"
+        f.locale = Locale(identifier: "en_US")
+        return f
+    }()
+
+    static let dayMonthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM"
+        return f
+    }()
+}
+
 
 
 
@@ -41,12 +72,7 @@ struct OverviewView: View {
     @State private var manuallySyncingPeriod: String?
     @State private var syncedConfirmationPeriod: String?
 
-    @State private var selectedPeriod: String = {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
-        return dateFormatter.string(from: Date())
-    }()
+    @State private var selectedPeriod: String = PeriodFormatters.periodFormatter.string(from: Date())
     @State private var selectedSort: SortOption = .highestSpend
     @State private var showingFilterSheet = false
     @State private var displayedBreakdowns: [StoreBreakdown] = []
@@ -60,7 +86,7 @@ struct OverviewView: View {
     @State private var categoryCurrentPage: [String: Int] = [:]  // Current loaded page per category
     @State private var categoryHasMore: [String: Bool] = [:]  // Whether more pages exist per category
     @State private var categoryLoadingMore: String?  // Category currently loading more items
-    @ObservedObject private var splitCache = SplitCacheManager.shared  // For split avatar display
+    private let splitCache = SplitCacheManager.shared  // Access only — not observed to avoid re-rendering entire OverviewView on every split fetch
     @State private var showingAllTransactions = false
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
@@ -71,7 +97,7 @@ struct OverviewView: View {
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
     @State private var receiptToSplit: APIReceipt? // For expense split
-    @State private var scrollOffset: CGFloat = 0 // Track scroll for header fade effect
+    // scrollOffset removed — gradient header now manages its own scroll state via ScrollFadingGradientView
     @State private var cachedAvailablePeriods: [String] = [] // Cached for performance
     @State private var cachedSegmentsByPeriod: [String: [StoreChartSegment]] = [:] // Cache segments
     @State private var cachedChartDataByPeriod: [String: [ChartData]] = [:] // Cache chart data for IconDonutChart
@@ -100,11 +126,7 @@ struct OverviewView: View {
 
     // Check if the selected period is the current month
     private var isCurrentPeriod: Bool {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentPeriod = dateFormatter.string(from: Date())
-        return selectedPeriod == currentPeriod
+        selectedPeriod == PeriodFormatters.periodFormatter.string(from: Date())
     }
 
     /// Check if this is a fresh new month (first 3 days with no data yet)
@@ -140,26 +162,17 @@ struct OverviewView: View {
 
     /// Get the year from a month period string (e.g., "January 2026" -> 2026)
     private func yearFromPeriod(_ period: String) -> Int? {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        guard let date = dateFormatter.date(from: period) else { return nil }
+        guard let date = PeriodFormatters.periodFormatter.date(from: period) else { return nil }
         return Calendar.current.component(.year, from: date)
     }
 
     /// Parse month and year from period string (e.g., "January 2026" -> (month: 1, year: 2026))
     private func parsePeriodComponents(_ period: String) -> (month: Int, year: Int) {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        guard let date = dateFormatter.date(from: period) else {
-            // Fallback to current date
+        guard let date = PeriodFormatters.periodFormatter.date(from: period) else {
             let now = Date()
             return (Calendar.current.component(.month, from: now), Calendar.current.component(.year, from: now))
         }
-        let month = Calendar.current.component(.month, from: date)
-        let year = Calendar.current.component(.year, from: date)
-        return (month, year)
+        return (Calendar.current.component(.month, from: date), Calendar.current.component(.year, from: date))
     }
 
     /// Compute available periods from data manager - called once when data changes
@@ -167,11 +180,8 @@ struct OverviewView: View {
     private func computeAvailablePeriods() -> [String] {
         var monthPeriods: [String] = []
 
-        // Get the current month string (e.g., "February 2026")
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentMonthString = dateFormatter.string(from: Date())
+        let fmt = PeriodFormatters.periodFormatter
+        let currentMonthString = fmt.string(from: Date())
 
         // Use period metadata if available (from lightweight /analytics/periods endpoint)
         if !dataManager.periodMetadata.isEmpty {
@@ -190,20 +200,13 @@ struct OverviewView: View {
 
             // If no periods with data, show only the current month (empty state)
             if breakdownPeriods.isEmpty {
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "MMMM yyyy"
-                dateFormatter.locale = Locale(identifier: "en_US")
-                return [dateFormatter.string(from: Date())]
+                return [currentMonthString]
             }
 
             // Sort periods chronologically (oldest first, most recent last/right)
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-
             monthPeriods = breakdownPeriods.sorted { period1, period2 in
-                let date1 = dateFormatter.date(from: period1) ?? Date.distantPast
-                let date2 = dateFormatter.date(from: period2) ?? Date.distantPast
+                let date1 = fmt.date(from: period1) ?? Date.distantPast
+                let date2 = fmt.date(from: period2) ?? Date.distantPast
                 return date1 < date2  // Oldest first (left), most recent last (right)
             }
         }
@@ -338,25 +341,8 @@ struct OverviewView: View {
             // Base background
             appBackgroundColor.ignoresSafeArea()
 
-            // Teal gradient header (fades on scroll)
-            GeometryReader { geometry in
-                LinearGradient(
-                    stops: [
-                        .init(color: headerPurpleColor, location: 0.0),
-                        .init(color: headerPurpleColor.opacity(0.7), location: 0.25),
-                        .init(color: headerPurpleColor.opacity(0.3), location: 0.5),
-                        .init(color: Color.clear, location: 0.75)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
-                .frame(maxWidth: .infinity)
-                .offset(y: -geometry.safeAreaInsets.top)
-                .opacity(purpleGradientOpacity)
-                .allowsHitTesting(false)
-            }
-            .ignoresSafeArea()
+            // Teal gradient header (fades on scroll) — isolated view to avoid re-rendering OverviewView body on scroll
+            ScrollFadingGradientView(headerColor: headerPurpleColor)
 
             // Content
             if let error = dataManager.error {
@@ -567,10 +553,7 @@ struct OverviewView: View {
     private func handleReceiptUploadSuccess() {
         print("[OverviewView] 📩 handleReceiptUploadSuccess() called")
 
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentMonthPeriod = dateFormatter.string(from: Date())
+        let currentMonthPeriod = PeriodFormatters.periodFormatter.string(from: Date())
         let currentYear = String(Calendar.current.component(.year, from: Date()))
 
         // Keep period in loadedReceiptPeriods to prevent duplicate loads
@@ -716,10 +699,7 @@ struct OverviewView: View {
         dataManager.regenerateBreakdowns()
 
         if newValue.count > oldValue.count, let latestTransaction = newValue.first {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-            selectedPeriod = dateFormatter.string(from: latestTransaction.date)
+            selectedPeriod = PeriodFormatters.periodFormatter.string(from: latestTransaction.date)
         }
     }
 
@@ -1062,29 +1042,11 @@ struct OverviewView: View {
     }
 
     private var swipeableContentView: some View {
-        GeometryReader { geometry in
-            let bottomSafeArea = geometry.safeAreaInsets.bottom
-
-            // Main content with vertical scroll
-            mainContentView(bottomSafeArea: bottomSafeArea)
-        }
-        .ignoresSafeArea(edges: .bottom)
+        mainContentView()
+            .ignoresSafeArea(edges: .bottom)
     }
 
-    // Computed property for smooth gradient fade based on scroll
-    private var purpleGradientOpacity: Double {
-        // Start fading immediately, fully gone by 200px scroll
-        let fadeEnd: CGFloat = 200
-
-        if scrollOffset <= 0 {
-            return 1.0
-        } else if scrollOffset >= fadeEnd {
-            return 0.0
-        } else {
-            // Linear fade for predictable behavior
-            return Double(1.0 - (scrollOffset / fadeEnd))
-        }
-    }
+    // purpleGradientOpacity moved to ScrollFadingGradientView
 
     /// Swipe gesture for navigating between periods
     private var periodSwipeGesture: some Gesture {
@@ -1132,7 +1094,7 @@ struct OverviewView: View {
     }
 
     // MARK: - Main Content View
-    private func mainContentView(bottomSafeArea: CGFloat) -> some View {
+    private func mainContentView() -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             ScrollViewReader { scrollProxy in
             VStack(spacing: 12) {
@@ -1143,7 +1105,7 @@ struct OverviewView: View {
             }
             .scrollTargetLayout()
             .padding(.top, 16)
-            .padding(.bottom, bottomSafeArea + 90)
+            .safeAreaPadding(.bottom, 90)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
             .background(
@@ -1165,7 +1127,9 @@ struct OverviewView: View {
             }
             .onChange(of: expandedCategoryId) { _, newId in
                 guard let id = newId else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                // Wait for ClipReveal expand animation to finish (~0.35s spring)
+                // before scrolling, so the scroll doesn't fight the expansion
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
                         scrollProxy.scrollTo("categoryRow_\(id)", anchor: UnitPoint(x: 0.5, y: 0.3))
                     }
@@ -1182,15 +1146,6 @@ struct OverviewView: View {
             } // ScrollViewReader
         }
         .coordinateSpace(name: "scrollView")
-        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-            let newOffset = max(0, value)
-            // Only update when in the gradient fade zone (0–220px).
-            // Beyond that the gradient is fully invisible and further
-            // updates just cause needless re-renders during scroll.
-            if newOffset <= 220 || scrollOffset <= 220 {
-                scrollOffset = newOffset
-            }
-        }
         .refreshable {
             // Set syncing flag immediately so the UI doesn't flash during refresh
             manuallySyncingPeriod = selectedPeriod
@@ -1307,16 +1262,8 @@ struct OverviewView: View {
 
     // Shorten period to "Jan 26" format
     private func shortenedPeriod(_ period: String) -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-
-        guard let date = dateFormatter.date(from: period) else { return period }
-
-        let shortFormatter = DateFormatter()
-        shortFormatter.dateFormat = "MMM yy"
-        shortFormatter.locale = Locale(identifier: "en_US")
-        return shortFormatter.string(from: date)
+        guard let date = PeriodFormatters.periodFormatter.date(from: period) else { return period }
+        return PeriodFormatters.shortPeriodFormatter.string(from: date)
     }
 
 
@@ -1586,41 +1533,57 @@ struct OverviewView: View {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                 expandedCategoryId = nil
             }
-        } else {
-            // Clear previous category's pagination state so re-expanding starts fresh
-            if let previousId = expandedCategoryId {
+        } else if expandedCategoryId != nil {
+            // Another category is open — collapse it first, then expand the new one
+            let previousId = expandedCategoryId!
+
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                expandedCategoryId = nil
+            }
+
+            // Wait for collapse to settle, then expand the new category
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                // Clear previous category's pagination state
                 categoryItems[previousId] = nil
                 categoryCurrentPage[previousId] = nil
                 categoryHasMore[previousId] = nil
+
+                expandCategory(category, period: period)
             }
+        } else {
+            // Nothing open — expand directly
+            expandCategory(category, period: period)
+        }
+    }
 
-            // Force scroll reset by changing the token (recreates the ScrollView)
-            categoryScrollResetToken += 1
+    /// Shared logic for expanding a category row
+    private func expandCategory(_ category: CategorySpendItem, period: String) {
+        // Force scroll reset by changing the token (recreates the ScrollView)
+        categoryScrollResetToken += 1
 
-            // Pre-populate items from cache BEFORE animating expansion
-            let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
-            if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
-                categoryItems[category.id] = cachedItems
-                // Batch-fetch split data so rows don't fetch one-by-one
-                Task { await batchFetchSplitData(for: cachedItems) }
-            }
+        // Pre-populate items from cache BEFORE animating expansion
+        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
+        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
+            categoryItems[category.id] = cachedItems
+            // Batch-fetch split data so rows don't fetch one-by-one
+            Task { await batchFetchSplitData(for: cachedItems) }
+        }
 
-            // Set loading state BEFORE withAnimation so expandedCategoryItemsSection
-            // renders skeleton content immediately (gives ClipReveal something to measure)
-            let needsLoad = categoryItems[category.id] == nil && loadingCategoryId != category.id
-            if needsLoad {
-                loadingCategoryId = category.id
-                categoryLoadError[category.id] = nil
-            }
+        // Set loading state BEFORE withAnimation so expandedCategoryItemsSection
+        // renders skeleton content immediately (gives ClipReveal something to measure)
+        let needsLoad = categoryItems[category.id] == nil && loadingCategoryId != category.id
+        if needsLoad {
+            loadingCategoryId = category.id
+            categoryLoadError[category.id] = nil
+        }
 
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                expandedCategoryId = category.id
-            }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            expandedCategoryId = category.id
+        }
 
-            if needsLoad {
-                Task {
-                    await loadCategoryItems(category, period: period)
-                }
+        if needsLoad {
+            Task {
+                await loadCategoryItems(category, period: period)
             }
         }
     }
@@ -1646,12 +1609,7 @@ struct OverviewView: View {
             filters.pageSize = 5
 
             // Parse period to get date range (e.g., "January 2026")
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-            dateFormatter.timeZone = TimeZone(identifier: "UTC")
-
-            if let parsedDate = dateFormatter.date(from: period) {
+            if let parsedDate = PeriodFormatters.periodUTCFormatter.date(from: period) {
                 var calendar = Calendar(identifier: .gregorian)
                 calendar.timeZone = TimeZone(identifier: "UTC")!
 
@@ -1704,12 +1662,7 @@ struct OverviewView: View {
             filters.page = nextPage
             filters.pageSize = 5
 
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-            dateFormatter.timeZone = TimeZone(identifier: "UTC")
-
-            if let parsedDate = dateFormatter.date(from: period) {
+            if let parsedDate = PeriodFormatters.periodUTCFormatter.date(from: period) {
                 var calendar = Calendar(identifier: .gregorian)
                 calendar.timeZone = TimeZone(identifier: "UTC")!
 
@@ -1924,9 +1877,7 @@ struct OverviewView: View {
     }
 
     private func formatCategoryItemDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM"
-        return formatter.string(from: date)
+        PeriodFormatters.dayMonthFormatter.string(from: date)
     }
 
     // MARK: - Show All Rows Button
@@ -2290,14 +2241,7 @@ struct OverviewView: View {
 
     /// Spending header: amount + syncing status
     private func spendingHeaderSection(spending: Double, period: String) -> some View {
-        let isCurrentMonth: Bool = {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-            return period == dateFormatter.string(from: Date())
-        }()
-
-        return VStack(spacing: 8) {
+        VStack(spacing: 8) {
             Text("SPENT THIS MONTH")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
@@ -3070,6 +3014,48 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
+// MARK: - Scroll-Fading Gradient Header (isolated from OverviewView to avoid re-rendering the entire body on scroll)
+/// This view owns its own `scrollOffset` @State, so scroll-driven opacity changes
+/// only invalidate this small subtree — not the entire OverviewView.
+struct ScrollFadingGradientView: View {
+    let headerColor: Color
+    @State private var scrollOffset: CGFloat = 0
+
+    private var opacity: Double {
+        let fadeEnd: CGFloat = 200
+        if scrollOffset <= 0 { return 1.0 }
+        if scrollOffset >= fadeEnd { return 0.0 }
+        return Double(1.0 - (scrollOffset / fadeEnd))
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            LinearGradient(
+                stops: [
+                    .init(color: headerColor, location: 0.0),
+                    .init(color: headerColor.opacity(0.7), location: 0.25),
+                    .init(color: headerColor.opacity(0.3), location: 0.5),
+                    .init(color: Color.clear, location: 0.75)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
+            .frame(maxWidth: .infinity)
+            .offset(y: -geometry.safeAreaInsets.top)
+            .opacity(opacity)
+            .allowsHitTesting(false)
+        }
+        .ignoresSafeArea()
+        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+            let newOffset = max(0, value)
+            if newOffset <= 220 || scrollOffset <= 220 {
+                scrollOffset = newOffset
+            }
+        }
+    }
+}
+
 // MARK: - Animated Number Text
 /// Smoothly animates number changes with a counting effect
 struct AnimatedNumberText: View {
@@ -3212,15 +3198,14 @@ struct ReceiptsHeaderButtonStyle: ButtonStyle {
 
 // MARK: - Syncing Arrows View
 struct SyncingArrowsView: View {
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            let seconds = timeline.date.timeIntervalSinceReferenceDate
-            let rotation = seconds.truncatingRemainder(dividingBy: 1.0) * 360
+    @State private var isRotating = false
 
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 11, weight: .semibold))
-                .rotationEffect(.degrees(rotation))
-        }
+    var body: some View {
+        Image(systemName: "arrow.triangle.2.circlepath")
+            .font(.system(size: 11, weight: .semibold))
+            .rotationEffect(.degrees(isRotating ? 360 : 0))
+            .animation(.linear(duration: 1.0).repeatForever(autoreverses: false), value: isRotating)
+            .onAppear { isRotating = true }
     }
 }
 

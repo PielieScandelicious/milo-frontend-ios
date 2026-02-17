@@ -56,6 +56,7 @@ struct IconDonutChartView: View {
     @State private var centerRevealed = false // Controls center content reveal animation
     @State private var appearanceScale: CGFloat = 0.85 // Start slightly smaller than final size
     @State private var appearanceRotation: Double = -90 // Start rotated -90° (will spin clockwise)
+    @State private var hasPlayedInitialAnimation = false // Prevents re-animation on tab switch
 
     /// Whether the data needs grouping (more than maxVisibleSegments)
     private var needsGrouping: Bool {
@@ -270,8 +271,15 @@ struct IconDonutChartView: View {
         .frame(width: size, height: size)
         .onAppear {
             if shouldAnimate {
-                if !segments.isEmpty {
-                    // Segments start at center circle edge, center visible immediately
+                if hasPlayedInitialAnimation {
+                    // Returning from tab switch — restore final state instantly, no re-animation
+                    animationProgress = 1.0
+                    appearanceScale = 1.0
+                    appearanceRotation = 0
+                    centerRevealed = true
+                } else if !segments.isEmpty {
+                    // First appearance — play entrance animation
+                    hasPlayedInitialAnimation = true
                     animationProgress = 1.0
                     appearanceScale = 0.85
                     centerRevealed = true
@@ -338,14 +346,9 @@ struct IconDonutChartView: View {
             }
         }
         .onDisappear {
-            // Reset animation state so it plays again on next appearance
-            if shouldAnimate {
-                animationProgress = 0
-                selectedSegmentIndex = nil
-                centerRevealed = false
-                appearanceScale = 0.85
-                appearanceRotation = -90
-            }
+            // Only clear selection on disappear — don't reset animation state
+            // so the chart doesn't replay entrance animation on tab switch
+            selectedSegmentIndex = nil
         }
     }
 
