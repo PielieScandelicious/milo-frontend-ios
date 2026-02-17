@@ -12,7 +12,7 @@ struct ReceiptScanView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject private var rateLimitManager = RateLimitManager.shared
-    @ObservedObject private var syncManager = AppSyncManager.shared
+    @ObservedObject private var processingManager = ReceiptProcessingManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @State private var showCamera = false
@@ -31,10 +31,12 @@ struct ReceiptScanView: View {
     @State private var isTabVisible = false
     @State private var contentOpacity: Double = 0
 
-    // Recent receipt tracking
-    @State private var recentReceipt: ReceiptUploadResponse?
+    // Receipt detail sheet (tapped from RecentReceiptsCard)
+    @State private var selectedReceipt: ReceiptUploadResponse?
     @State private var showRecentReceiptDetails = false
-    @State private var isRecentReceiptExpanded = false
+
+    // Recent receipts card
+    @State private var isRecentReceiptsExpanded = false
 
     // Wallet Pass Creator
     @State private var showWalletPassCreator = false
@@ -82,26 +84,18 @@ struct ReceiptScanView: View {
                 }
             }
         }
-        .overlay(alignment: .top) {
-            VStack {
-                if isTabVisible && syncManager.syncState == .syncing {
-                    syncingStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                } else if isTabVisible && syncManager.syncState == .synced {
-                    syncedStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: syncManager.syncState)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
-        }
         .onAppear {
             isTabVisible = true
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
                 contentOpacity = 1.0
             }
+            // Reload any receipts persisted by the share extension
+            processingManager.reloadPersistedReceipts()
             loadTotalReceiptsCount()
             loadAllTimeStats()
+            Task {
+                await receiptsViewModel.loadReceipts(period: "All", loadAll: false)
+            }
         }
         .onDisappear {
             isTabVisible = false
@@ -125,21 +119,19 @@ struct ReceiptScanView: View {
         }
         .sheet(isPresented: $showReceiptDetails) {
             showReceiptDetails = false
-            // Keep recent receipt for display
         } content: {
             if let receipt = uploadedReceipt {
                 ReceiptDetailsView(receipt: receipt) {
                     // Receipt was deleted - notify to refresh data
                     NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                    recentReceipt = nil
                 }
             }
         }
         .sheet(isPresented: $showRecentReceiptDetails) {
-            if let receipt = recentReceipt {
+            if let receipt = selectedReceipt {
                 ReceiptDetailsView(receipt: receipt) {
                     NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                    recentReceipt = nil
+                    selectedReceipt = nil
                 }
             }
         }
@@ -191,8 +183,15 @@ struct ReceiptScanView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
-            // Refresh all stats when a receipt is uploaded (from any source)
+            // Refresh all stats and receipt list when a receipt is uploaded (from any source)
             loadAllTimeStats()
+            Task {
+                await receiptsViewModel.loadReceipts(period: "All", loadAll: false)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Pick up any receipts uploaded via the share extension while app was in background
+            processingManager.reloadPersistedReceipts()
         }
         .animation(.easeInOut, value: uploadState)
     }
@@ -375,21 +374,40 @@ struct ReceiptScanView: View {
     // MARK: - Main Content View
 
     private var mainContentView: some View {
-        VStack(spacing: 20) {
-            // Stats Section
-            statsSection
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Processing receipts card
+                ProcessingReceiptsCard(manager: processingManager)
+                    .padding(.horizontal, 20)
 
-            // Share tip card
-            shareHintCard
+                // Recent receipts history (collapsible, lazy-loaded)
+                RecentReceiptsCard(
+                    viewModel: receiptsViewModel,
+                    isExpanded: $isRecentReceiptsExpanded
+                ) { receipt in
+                    let response = receipt.toReceiptUploadResponse()
+                    selectedReceipt = response
+                    showRecentReceiptDetails = true
+                }
                 .padding(.horizontal, 20)
 
-            // Wallet Pass Creator card
-            walletPassCard
-                .padding(.horizontal, 20)
+                // Stats Section
+                statsSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
 
-            Spacer()
+                // Share tip card
+                shareHintCard
+                    .padding(.horizontal, 20)
+
+                // Wallet Pass Creator card
+                walletPassCard
+                    .padding(.horizontal, 20)
+
+                Spacer()
+                    .frame(height: 120)
+            }
+            .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
@@ -424,11 +442,6 @@ struct ReceiptScanView: View {
         VStack(spacing: 12) {
             // Top 3 Stores card
             topStoresCard
-
-            // Recent Receipt Card (if exists)
-            if let receipt = recentReceipt {
-                recentReceiptCard(receipt: receipt)
-            }
         }
     }
 
@@ -807,104 +820,6 @@ struct ReceiptScanView: View {
         }
     }
 
-    // MARK: - Recent Receipt Card
-
-    private func recentReceiptCard(receipt: ReceiptUploadResponse) -> some View {
-        ExpandableReceiptCard(
-            receipt: receipt,
-            isExpanded: isRecentReceiptExpanded,
-            onTap: {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    isRecentReceiptExpanded.toggle()
-                }
-            },
-            onDelete: {
-                Task {
-                    do {
-                        try await AnalyticsAPIService.shared.removeReceipt(receiptId: receipt.receiptId)
-                        NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                        withAnimation {
-                            recentReceipt = nil
-                            isRecentReceiptExpanded = false
-                        }
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    } catch {
-                        UINotificationFeedbackGenerator().notificationOccurred(.error)
-                    }
-                }
-            },
-            onDeleteItem: { receiptId, itemId in
-                deleteRecentReceiptItem(receiptId: receiptId, itemId: itemId)
-            },
-            accentColor: .green,
-            badgeText: "Recent Scan",
-            showDate: false,
-            showItemCount: false
-        )
-    }
-
-    // MARK: - Delete Recent Receipt Item
-
-    private func deleteRecentReceiptItem(receiptId: String, itemId: String) {
-        Task {
-            do {
-                let response = try await AnalyticsAPIService.shared.removeReceiptItem(receiptId: receiptId, itemId: itemId)
-
-                await MainActor.run {
-                    // Check if backend indicates the entire receipt was deleted
-                    if response.receiptDeleted == true {
-                        withAnimation {
-                            recentReceipt = nil
-                            isRecentReceiptExpanded = false
-                        }
-                        NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                    } else if var receipt = recentReceipt {
-                        // Remove the item from local state
-                        let updatedTransactions = receipt.transactions.filter { $0.itemId != itemId }
-
-                        if updatedTransactions.isEmpty {
-                            // No items left, remove the receipt
-                            withAnimation {
-                                recentReceipt = nil
-                                isRecentReceiptExpanded = false
-                            }
-                            NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                        } else {
-                            // Update receipt with remaining items
-                            let newTotal = response.updatedTotalAmount ?? updatedTransactions.reduce(0) { $0 + $1.itemPrice }
-                            let newHealthScore = response.updatedAverageHealthScore ?? {
-                                let scores = updatedTransactions.compactMap { $0.healthScore }
-                                guard !scores.isEmpty else { return nil as Double? }
-                                return Double(scores.reduce(0, +)) / Double(scores.count)
-                            }()
-
-                            withAnimation {
-                                recentReceipt = ReceiptUploadResponse(
-                                    receiptId: receipt.receiptId,
-                                    status: receipt.status,
-                                    storeName: receipt.storeName,
-                                    receiptDate: receipt.receiptDate,
-                                    totalAmount: newTotal,
-                                    itemsCount: response.updatedItemsCount ?? updatedTransactions.count,
-                                    transactions: updatedTransactions,
-                                    warnings: receipt.warnings,
-                                    averageHealthScore: newHealthScore,
-                                    isDuplicate: receipt.isDuplicate,
-                                    duplicateScore: receipt.duplicateScore
-                                )
-                            }
-                        }
-
-                        // Notify other views to refresh
-                        NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
-                    }
-                }
-            } catch {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-            }
-        }
-    }
-
     // MARK: - Share Hint Card
 
     private var shareHintCard: some View {
@@ -980,29 +895,6 @@ struct ReceiptScanView: View {
         .buttonStyle(ScaleCardButtonStyle())
     }
 
-    // MARK: - Syncing Status Banners
-
-    private var syncingStatusBanner: some View {
-        HStack(spacing: 6) {
-            SyncingArrowsView()
-            Text(L("syncing"))
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(.blue)
-        .padding(.top, 12)
-    }
-
-    private var syncedStatusBanner: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "checkmark.icloud.fill")
-                .font(.system(size: 11))
-            Text(L("synced"))
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(.green)
-        .padding(.top, 12)
-    }
-
     // MARK: - Load Stats
 
     /// Load all-time stats from the new backend endpoint
@@ -1073,10 +965,6 @@ struct ReceiptScanView: View {
     // MARK: - Process Receipt
 
     private func processReceipt(image: UIImage) async {
-        guard uploadState == .idle else {
-            return
-        }
-
         // Check image quality
         let qualityChecker = ReceiptQualityChecker()
         let qualityResult = await qualityChecker.checkQuality(of: image)
@@ -1106,67 +994,60 @@ struct ReceiptScanView: View {
         // Upload receipt
         await MainActor.run {
             uploadState = .uploading
-            // Notify all tabs to show syncing indicator
-            NotificationCenter.default.post(name: .receiptUploadStarted, object: nil)
         }
 
         do {
-            let response = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+            let result = try await ReceiptUploadService.shared.uploadReceipt(image: image)
 
             await MainActor.run {
                 capturedImage = nil
 
-                switch response.status {
-                case .success, .completed:
-                    uploadState = .success(response)
-                    uploadedReceipt = response
-                    recentReceipt = response  // Save for recent receipt card
-
-                    // Optimistically update rate limit counter
+                switch result {
+                case .accepted(let accepted):
+                    // Async processing — hand off to processing manager
+                    processingManager.addReceipt(accepted)
                     rateLimitManager.decrementReceiptLocal()
-
-                    // Update total receipts count
-                    totalReceiptsScanned += 1
-
-                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-
-                    Task {
-                        try? await Task.sleep(for: .seconds(1))
-                        await MainActor.run {
-                            uploadState = .idle
-                        }
-                    }
-
-                case .pending, .processing:
-                    uploadState = .processing
-                    canRetryAfterError = true
-                    errorMessage = "Receipt is still being processed. Please check back later."
-                    showError = true
                     uploadState = .idle
-                    // Clear syncing indicator in View tab
-                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
 
-                case .failed:
-                    uploadState = .failed("Receipt processing failed")
-                    canRetryAfterError = true
-                    errorMessage = "The receipt could not be processed. Please try again."
-                    showError = true
-                    UINotificationFeedbackGenerator().notificationOccurred(.error)
-                    // Clear syncing indicator in View tab
-                    NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
+                case .completed(let response):
+                    // Legacy synchronous response
+                    switch response.status {
+                    case .success, .completed:
+                        uploadState = .success(response)
+                        uploadedReceipt = response
+
+                        rateLimitManager.decrementReceiptLocal()
+                        totalReceiptsScanned += 1
+
+                        NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+
+                        Task {
+                            try? await Task.sleep(for: .seconds(1))
+                            await MainActor.run {
+                                uploadState = .idle
+                            }
+                        }
+
+                    case .pending, .processing:
+                        uploadState = .idle
+
+                    case .failed:
+                        uploadState = .failed("Receipt processing failed")
+                        canRetryAfterError = true
+                        errorMessage = "The receipt could not be processed. Please try again."
+                        showError = true
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    }
                 }
             }
         } catch let error as ReceiptUploadError {
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
 
-                // Handle rate limit exceeded specially
                 if case .rateLimitExceeded = error {
-                    canRetryAfterError = false // Can't retry - need to wait
+                    canRetryAfterError = false
                     errorMessage = error.rateLimitUserMessage ?? "Upload limit reached for this month."
-
-                    // Also sync rate limit manager
                     Task {
                         await RateLimitManager.shared.syncFromBackend()
                     }
@@ -1177,8 +1058,6 @@ struct ReceiptScanView: View {
 
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
-                // Clear syncing indicator in View tab
-                NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
             }
         } catch {
             await MainActor.run {
@@ -1187,8 +1066,6 @@ struct ReceiptScanView: View {
                 errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
-                // Clear syncing indicator in View tab
-                NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
             }
         }
     }

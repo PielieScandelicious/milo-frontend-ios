@@ -110,17 +110,16 @@ struct CategoryAllocationBar: View {
             }
 
             // Horizontal progress bar
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.1))
-
+            Capsule()
+                .fill(Color.white.opacity(0.1))
+                .frame(height: height)
+                .overlay(alignment: .leading) {
                     Capsule()
                         .fill(barColor)
-                        .frame(width: geometry.size.width * fillRatio * animationProgress)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .scaleEffect(x: fillRatio * animationProgress, y: 1, anchor: .leading)
+                        .frame(height: height)
                 }
-            }
-            .frame(height: height)
 
             // Bottom row: status + percentage
             HStack {
@@ -157,10 +156,9 @@ struct CategoryAllocationBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                animationProgress = 1.0
-            }
+            animationProgress = 1.0
         }
+        .animation(.easeOut(duration: 0.4), value: animationProgress)
     }
 }
 

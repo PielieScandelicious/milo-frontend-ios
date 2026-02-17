@@ -32,7 +32,8 @@ struct ContentView: View {
     enum Tab: Int, Hashable {
         case budget = 0
         case home = 1
-        case dobby = 2
+        case promos = 2
+        case dobby = 3
     }
 
     var body: some View {
@@ -49,6 +50,12 @@ struct ContentView: View {
                         Label(L("tab_home"), systemImage: "house.fill")
                     }
                     .tag(Tab.home)
+
+                PromosTab()
+                    .tabItem {
+                        Label("Deals", systemImage: "tag.fill")
+                    }
+                    .tag(Tab.promos)
 
                 ScandaLiciousTab()
                     .tabItem {
@@ -201,62 +208,26 @@ struct ScanTab: View {
     }
 }
 
+// MARK: - Promos Tab
+struct PromosTab: View {
+    @StateObject private var viewModel = PromosViewModel()
+
+    var body: some View {
+        NavigationStack {
+            PromosView(viewModel: viewModel)
+        }
+        .id("PromosTab") // Prevent recreation
+    }
+}
+
 // MARK: - ScandaLicious Tab
 struct ScandaLiciousTab: View {
-    @ObservedObject private var syncManager = AppSyncManager.shared
-    @State private var isTabVisible = false
-
     var body: some View {
         NavigationStack {
             ScandaLiciousAIChatView()
                 .toolbarBackground(.hidden, for: .navigationBar)
         }
-        .overlay(alignment: .top) {
-            VStack {
-                if isTabVisible && syncManager.syncState == .syncing {
-                    syncingStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                } else if isTabVisible && syncManager.syncState == .synced {
-                    syncedStatusBanner
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: syncManager.syncState)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTabVisible)
-        }
-        .onAppear {
-            // Delay slightly to trigger slide-in animation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    isTabVisible = true
-                }
-            }
-        }
-        .onDisappear {
-            isTabVisible = false
-        }
         .id("ScandaLiciousTab") // Prevent recreation
-    }
-
-    private var syncingStatusBanner: some View {
-        HStack(spacing: 6) {
-            SyncingArrowsView()
-            Text(L("syncing"))
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(.blue)
-        .padding(.top, 12)
-    }
-
-    private var syncedStatusBanner: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "checkmark.icloud.fill")
-                .font(.system(size: 11))
-            Text(L("synced"))
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(.green)
-        .padding(.top, 12)
     }
 }
 

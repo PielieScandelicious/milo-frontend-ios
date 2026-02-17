@@ -28,6 +28,12 @@ struct CategoryBreakdownDetailView: View {
     @State private var loadingCategoryId: String?
     @State private var categoryLoadError: [String: String] = [:]
 
+    // Pagination state per category
+    @State private var categoryCurrentPage: [String: Int] = [:]
+    @State private var categoryHasMorePages: [String: Bool] = [:]
+    @State private var categoryIsLoadingMore: [String: Bool] = [:]
+    @State private var categoryTotalCount: [String: Int] = [:]
+
     /// Observe split cache for updates
     @ObservedObject private var splitCache = SplitCacheManager.shared
 
@@ -241,7 +247,7 @@ struct CategoryBreakdownDetailView: View {
     private func categoryListSection(_ data: PieChartSummaryResponse) -> some View {
         let sortedCategories = data.categories.sorted { $0.totalSpent > $1.totalSpent }
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return LazyVStack(alignment: .leading, spacing: 12) {
             Text(L("by_category"))
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -277,8 +283,8 @@ struct CategoryBreakdownDetailView: View {
                     .frame(height: 1)
                     .padding(.horizontal, 14)
 
-                // VStack for spacing between items
-                VStack(spacing: 8) {
+                // LazyVStack for spacing between items (lazy rendering for pagination)
+                LazyVStack(spacing: 8) {
                     expandedItemsContent(category)
                 }
                 .padding(.horizontal, 14)
@@ -387,9 +393,16 @@ struct CategoryBreakdownDetailView: View {
 
     private func toggleCategoryExpansion(_ category: CategorySpendItem) {
         if expandedCategoryId == category.id {
-            // Collapse
+            // Collapse — clear items so re-expanding fetches fresh data
+            let id = category.id
             expandedCategoryId = nil
             selectedCategory = nil
+            categoryItems[id] = nil
+            categoryCurrentPage[id] = nil
+            categoryHasMorePages[id] = nil
+            categoryIsLoadingMore[id] = nil
+            categoryTotalCount[id] = nil
+            categoryLoadError[id] = nil
         } else {
             // Expand and load items
             expandedCategoryId = category.id
@@ -414,11 +427,9 @@ struct CategoryBreakdownDetailView: View {
 
         do {
             var filters = TransactionFilters()
-
-            // Use the category name directly from the backend
             filters.category = category.name
-
-            filters.pageSize = 100
+            filters.pageSize = 10
+            filters.page = 1
 
             // Set date range for the specific month/year
             var calendar = Calendar(identifier: .gregorian)
@@ -437,52 +448,102 @@ struct CategoryBreakdownDetailView: View {
 
             let response = try await apiService.getTransactions(filters: filters)
 
-            // Show items immediately - don't block UI waiting for splits
             await MainActor.run {
                 categoryItems[category.id] = response.transactions
+                categoryCurrentPage[category.id] = 1
+                categoryHasMorePages[category.id] = response.page < response.totalPages
+                categoryTotalCount[category.id] = response.total
                 loadingCategoryId = nil
             }
 
-            // Load split data in background (non-blocking) - avatars will appear progressively
-            // Use detached task so it doesn't block this function's completion
-            Task.detached { [weak splitCache] in
-                let uniqueReceiptIds = Set(response.transactions.compactMap { $0.receiptId })
-
-                // Load splits in parallel with limited concurrency to avoid overwhelming the backend
-                await withTaskGroup(of: Void.self) { group in
-                    var activeTasksCount = 0
-                    let maxConcurrentTasks = 5  // Limit concurrent API calls
-
-                    var remainingIds = Array(uniqueReceiptIds)
-
-                    while !remainingIds.isEmpty || activeTasksCount > 0 {
-                        // Add new tasks up to the limit
-                        while activeTasksCount < maxConcurrentTasks && !remainingIds.isEmpty {
-                            let receiptId = remainingIds.removeFirst()
-
-                            // Only fetch if not already cached
-                            guard let cache = splitCache, await !cache.hasSplit(for: receiptId) else {
-                                continue
-                            }
-
-                            group.addTask {
-                                await cache.fetchSplit(for: receiptId)
-                            }
-                            activeTasksCount += 1
-                        }
-
-                        // Wait for at least one task to complete
-                        if activeTasksCount > 0 {
-                            await group.next()
-                            activeTasksCount -= 1
-                        }
-                    }
-                }
-            }
+            // Load split data in background for the loaded page
+            loadSplitData(for: response.transactions)
         } catch {
             await MainActor.run {
                 categoryLoadError[category.id] = error.localizedDescription
                 loadingCategoryId = nil
+            }
+        }
+    }
+
+    // MARK: - Load More Category Items (Pagination)
+
+    private func loadMoreCategoryItems(_ category: CategorySpendItem) async {
+        let id = category.id
+        guard categoryHasMorePages[id] == true,
+              categoryIsLoadingMore[id] != true else { return }
+
+        categoryIsLoadingMore[id] = true
+
+        do {
+            let nextPage = (categoryCurrentPage[id] ?? 1) + 1
+            var filters = TransactionFilters()
+            filters.category = category.name
+            filters.pageSize = 10
+            filters.page = nextPage
+
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: "UTC")!
+
+            var components = DateComponents()
+            components.year = year
+            components.month = month
+            components.day = 1
+
+            if let startOfMonth = calendar.date(from: components),
+               let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) {
+                filters.startDate = startOfMonth
+                filters.endDate = endOfMonth
+            }
+
+            let response = try await apiService.getTransactions(filters: filters)
+
+            await MainActor.run {
+                categoryItems[id, default: []].append(contentsOf: response.transactions)
+                categoryCurrentPage[id] = nextPage
+                categoryHasMorePages[id] = response.page < response.totalPages
+                categoryIsLoadingMore[id] = false
+            }
+
+            // Load split data in background for the new page
+            loadSplitData(for: response.transactions)
+        } catch {
+            await MainActor.run {
+                categoryIsLoadingMore[id] = false
+            }
+        }
+    }
+
+    // MARK: - Load Split Data (Background)
+
+    private func loadSplitData(for transactions: [APITransaction]) {
+        Task.detached { [weak splitCache] in
+            let uniqueReceiptIds = Set(transactions.compactMap { $0.receiptId })
+
+            await withTaskGroup(of: Void.self) { group in
+                var activeTasksCount = 0
+                let maxConcurrentTasks = 5
+                var remainingIds = Array(uniqueReceiptIds)
+
+                while !remainingIds.isEmpty || activeTasksCount > 0 {
+                    while activeTasksCount < maxConcurrentTasks && !remainingIds.isEmpty {
+                        let receiptId = remainingIds.removeFirst()
+
+                        guard let cache = splitCache, await !cache.hasSplit(for: receiptId) else {
+                            continue
+                        }
+
+                        group.addTask {
+                            await cache.fetchSplit(for: receiptId)
+                        }
+                        activeTasksCount += 1
+                    }
+
+                    if activeTasksCount > 0 {
+                        await group.next()
+                        activeTasksCount -= 1
+                    }
+                }
             }
         }
     }
@@ -520,18 +581,7 @@ struct CategoryBreakdownDetailView: View {
                 }
             }
         } else if let items = categoryItems[category.id], !items.isEmpty {
-            // Sort by health score (healthiest first), then alphabetically
-            let sortedItems = items.sorted { t1, t2 in
-                let score1 = t1.healthScore
-                let score2 = t2.healthScore
-                if let s1 = score1, let s2 = score2 {
-                    return s1 > s2
-                }
-                if score1 != nil && score2 == nil { return true }
-                if score1 == nil && score2 != nil { return false }
-                return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
-            }
-            ForEach(sortedItems) { item in
+            ForEach(items) { item in
                 // Get split participants for this item
                 let splitParticipants: [SplitParticipantInfo] = {
                     guard let receiptId = item.receiptId else { return [] }
@@ -555,6 +605,7 @@ struct CategoryBreakdownDetailView: View {
                                 Circle()
                                     .stroke(item.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
                             )
+                            .transition(.identity)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -574,11 +625,13 @@ struct CategoryBreakdownDetailView: View {
                                         Capsule()
                                             .fill(Color.white.opacity(0.08))
                                     )
+                                    .transition(.identity)
                             }
 
                             // Split participant avatars
                             if !friendsOnly.isEmpty {
                                 MiniSplitAvatars(participants: friendsOnly)
+                                    .transition(.identity)
                             }
                         }
 
@@ -587,6 +640,7 @@ struct CategoryBreakdownDetailView: View {
                                 .font(.system(size: 11))
                                 .foregroundColor(.white.opacity(0.45))
                                 .lineLimit(2)
+                                .transition(.identity)
                         }
 
                         // Store name for context
@@ -602,6 +656,32 @@ struct CategoryBreakdownDetailView: View {
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(.white.opacity(0.7))
                 }
+            }
+
+            // Infinite scroll sentinel
+            if categoryHasMorePages[category.id] == true {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.5)))
+                        .scaleEffect(0.7)
+                    Text("Loading more...")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .onAppear {
+                    Task { await loadMoreCategoryItems(category) }
+                }
+            }
+
+            // Item count
+            if let total = categoryTotalCount[category.id], total > 0 {
+                Text("\(items.count) of \(total) items")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.3))
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
             }
         } else {
             Text(L("no_transactions"))

@@ -76,7 +76,15 @@ actor BudgetAPIService {
         if let month = month {
             queryItems.append(URLQueryItem(name: "month", value: month))
         }
-        return try await performRequest(endpoint: "/budgets/progress", method: "GET", queryItems: queryItems)
+        print("[BudgetAPI] GET /budgets/progress (month=\(month ?? "current"), baseURL=\(baseURL))")
+        do {
+            let result: BudgetProgressResponse = try await performRequest(endpoint: "/budgets/progress", method: "GET", queryItems: queryItems)
+            print("[BudgetAPI] ✅ Success: spend=€\(result.currentSpend), budget=€\(result.budget.monthlyAmount)")
+            return result
+        } catch {
+            print("[BudgetAPI] ❌ Error: \(error)")
+            throw error
+        }
     }
 
     // MARK: - Budget History
@@ -133,6 +141,12 @@ actor BudgetAPIService {
             case 401:
                 throw BudgetAPIError.unauthorized
             case 404:
+                // FastAPI wraps detail as: {"detail": {"error": "...", "code": "NO_BUDGET"}}
+                if let wrapper = try? JSONDecoder().decode([String: [String: String]].self, from: data),
+                   wrapper["detail"]?["code"] == "NO_BUDGET" {
+                    throw BudgetAPIError.noBudgetSet
+                }
+                // Fallback: flat format {"code": "NO_BUDGET"}
                 if let errorDict = try? JSONDecoder().decode([String: String].self, from: data),
                    errorDict["code"] == "NO_BUDGET" {
                     throw BudgetAPIError.noBudgetSet
@@ -190,6 +204,14 @@ actor BudgetAPIService {
             case 401:
                 throw BudgetAPIError.unauthorized
             case 404:
+                if let wrapper = try? JSONDecoder().decode([String: [String: String]].self, from: data),
+                   wrapper["detail"]?["code"] == "NO_BUDGET" {
+                    throw BudgetAPIError.noBudgetSet
+                }
+                if let errorDict = try? JSONDecoder().decode([String: String].self, from: data),
+                   errorDict["code"] == "NO_BUDGET" {
+                    throw BudgetAPIError.noBudgetSet
+                }
                 throw BudgetAPIError.notFound
             case 400...499:
                 let errorMessage = parseErrorMessage(from: data) ?? "Client error: \(httpResponse.statusCode)"

@@ -38,6 +38,9 @@ struct IconDonutChartView: View {
     let centerIcon: String?
     let centerLabel: String?
     let showAllSegments: Bool
+    /// External trigger to force the expansion animation to replay (e.g., after receipt upload).
+    /// Increment this value to replay the scale+rotation animation without recreating the view.
+    let refreshToken: Int
 
     /// Maximum number of segments to show before grouping into "Others"
     private let maxVisibleSegments: Int = 6
@@ -53,6 +56,7 @@ struct IconDonutChartView: View {
     @State private var centerRevealed = false // Controls center content reveal animation
     @State private var appearanceScale: CGFloat = 0.85 // Start slightly smaller than final size
     @State private var appearanceRotation: Double = -90 // Start rotated -90° (will spin clockwise)
+    @State private var hasPlayedInitialAnimation = false // Prevents re-animation on tab switch
 
     /// Whether the data needs grouping (more than maxVisibleSegments)
     private var needsGrouping: Bool {
@@ -112,7 +116,7 @@ struct IconDonutChartView: View {
         return false
     }
 
-    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil, showAllSegments: Bool = true) {
+    init(data: [ChartData], totalAmount: Double? = nil, size: CGFloat = 220, currencySymbol: String = "$", subtitle: String? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil, centerIcon: String? = nil, centerLabel: String? = nil, showAllSegments: Bool = true, refreshToken: Int = 0) {
         self.data = data
         self.totalAmount = totalAmount ?? data.reduce(0) { $0 + $1.value }
         self.size = size
@@ -123,6 +127,7 @@ struct IconDonutChartView: View {
         self.centerIcon = centerIcon
         self.centerLabel = centerLabel
         self.showAllSegments = showAllSegments
+        self.refreshToken = refreshToken
     }
 
     private var strokeWidth: CGFloat {
@@ -248,7 +253,7 @@ struct IconDonutChartView: View {
                     )
                 }
             }
-            .animation(.easeInOut(duration: 0.35), value: valueFingerprint) // Animate trim changes when proportions update
+            .animation(.spring(response: 0.3, dampingFraction: 1.0), value: valueFingerprint) // Animate trim changes when proportions update
             .rotationEffect(.degrees(-90 + (shouldAnimate ? appearanceRotation : 0))) // Start from top + entrance spin
             .scaleEffect(shouldAnimate ? appearanceScale : 1.0)
 
@@ -266,8 +271,15 @@ struct IconDonutChartView: View {
         .frame(width: size, height: size)
         .onAppear {
             if shouldAnimate {
-                if !segments.isEmpty {
-                    // Segments start at center circle edge, center visible immediately
+                if hasPlayedInitialAnimation {
+                    // Returning from tab switch — restore final state instantly, no re-animation
+                    animationProgress = 1.0
+                    appearanceScale = 1.0
+                    appearanceRotation = 0
+                    centerRevealed = true
+                } else if !segments.isEmpty {
+                    // First appearance — play entrance animation
+                    hasPlayedInitialAnimation = true
                     animationProgress = 1.0
                     appearanceScale = 0.85
                     centerRevealed = true
@@ -276,8 +288,8 @@ struct IconDonutChartView: View {
                         isSettling = false
                     }
                     // Brief pause, then expand outward + rotate — decelerates and locks in
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                             appearanceScale = 1.0
                             appearanceRotation = 0
                         }
@@ -304,11 +316,24 @@ struct IconDonutChartView: View {
                 appearanceScale = 0.85
                 appearanceRotation = -90
                 // Brief pause, then expand outward + rotate
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                    withAnimation(.interpolatingSpring(mass: 1.0, stiffness: 110, damping: 14)) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         appearanceScale = 1.0
                         appearanceRotation = 0
                     }
+                }
+            }
+        }
+        // External refresh trigger — replays expansion animation (e.g., after receipt upload)
+        .onChange(of: refreshToken) { _, _ in
+            guard shouldAnimate else { return }
+            // Reset to contracted state and replay expansion
+            appearanceScale = 0.85
+            appearanceRotation = -90
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    appearanceScale = 1.0
+                    appearanceRotation = 0
                 }
             }
         }
@@ -321,14 +346,9 @@ struct IconDonutChartView: View {
             }
         }
         .onDisappear {
-            // Reset animation state so it plays again on next appearance
-            if shouldAnimate {
-                animationProgress = 0
-                selectedSegmentIndex = nil
-                centerRevealed = false
-                appearanceScale = 0.85
-                appearanceRotation = -90
-            }
+            // Only clear selection on disappear — don't reset animation state
+            // so the chart doesn't replay entrance animation on tab switch
+            selectedSegmentIndex = nil
         }
     }
 

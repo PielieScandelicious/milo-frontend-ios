@@ -53,15 +53,9 @@ struct BudgetRingView: View {
             // Center content
             centerContent
         }
+        .animation(.easeInOut(duration: 0.3), value: fillRatio)
         .onAppear {
-            withAnimation(.spring(response: 1.0, dampingFraction: 0.8)) {
-                animationProgress = 1.0
-            }
-        }
-        .onChange(of: progress.currentSpend) { _, _ in
-            // Re-animate when progress changes
-            animationProgress = 0
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
                 animationProgress = 1.0
             }
         }
@@ -120,18 +114,6 @@ struct MiniBudgetRing: View {
     var size: CGFloat = 44
 
     @State private var animationProgress: CGFloat = 0
-    @Environment(\.selectedTabIndex) private var selectedTabIndex
-
-    private func replayAnimation() {
-        // Reset without animation, then animate in the next render pass.
-        // Without the delay, SwiftUI coalesces 1.0→0→1.0 into a no-op.
-        animationProgress = 0
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                animationProgress = 1.0
-            }
-        }
-    }
 
     var body: some View {
         ZStack {
@@ -154,57 +136,17 @@ struct MiniBudgetRing: View {
                 .frame(width: size, height: size)
                 .rotationEffect(.degrees(-90))
                 .animation(.spring(response: 0.8, dampingFraction: 0.8), value: animationProgress)
+                .animation(.easeInOut(duration: 0.3), value: spendRatio)
+
+            // Warning icon at 85%+ thresholds
+            if spendRatio >= 0.85 {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: size * 0.32, weight: .semibold))
+                    .foregroundColor(ringColor ?? paceStatus.color)
+            }
         }
         .onAppear {
-            replayAnimation()
-        }
-        .onChange(of: selectedTabIndex) { _, newValue in
-            // Replay sweep when switching to the View tab (rawValue 0)
-            if newValue == 0 {
-                replayAnimation()
-            }
-        }
-    }
-}
-
-// MARK: - Budget Progress Bar
-
-/// A horizontal progress bar alternative to the ring
-struct BudgetProgressBar: View {
-    let progress: BudgetProgress
-    var height: CGFloat = 8
-
-    @State private var animationProgress: CGFloat = 0
-
-    private var fillRatio: CGFloat {
-        min(1.0, CGFloat(progress.spendRatio))
-    }
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Background
-                RoundedRectangle(cornerRadius: height / 2)
-                    .fill(Color.white.opacity(0.1))
-
-                // Progress fill
-                RoundedRectangle(cornerRadius: height / 2)
-                    .fill(progress.paceStatus.ringGradient)
-                    .frame(width: geometry.size.width * fillRatio * animationProgress)
-
-                // Pace marker (where you "should" be)
-                let expectedPosition = geometry.size.width * CGFloat(progress.expectedSpendRatio)
-                Rectangle()
-                    .fill(Color.white.opacity(0.4))
-                    .frame(width: 2, height: height + 4)
-                    .offset(x: expectedPosition - 1)
-            }
-        }
-        .frame(height: height)
-        .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                animationProgress = 1.0
-            }
+            animationProgress = 1.0
         }
     }
 }
@@ -265,82 +207,6 @@ struct CategoryBudgetRing: View {
     }
 }
 
-// MARK: - Projected Budget Bar
-
-/// A horizontal bar visualizing current and projected spend against a category limit.
-/// Uses three layered capsules: background track, semi-transparent ghost bar for projection,
-/// and a solid bar for current spend.
-struct ProjectedBudgetBar: View {
-    let totalBudget: Double
-    let currentSpend: Double
-    let projectedSpend: Double
-    var height: CGFloat = 10
-
-    @State private var animationProgress: CGFloat = 0
-
-    private var currentRatio: CGFloat {
-        guard totalBudget > 0 else { return 0 }
-        return min(1.0, CGFloat(currentSpend / totalBudget))
-    }
-
-    private var projectedRatio: CGFloat {
-        guard totalBudget > 0 else { return 0 }
-        return min(1.0, CGFloat(projectedSpend / totalBudget))
-    }
-
-    private var isProjectedOverBudget: Bool {
-        projectedSpend > totalBudget
-    }
-
-    private var ghostBarColor: Color {
-        isProjectedOverBudget
-            ? Color(red: 1.0, green: 0.5, blue: 0.25)
-            : Color(red: 0.3, green: 0.75, blue: 0.45)
-    }
-
-    private var currentBarColor: Color {
-        if currentSpend > totalBudget {
-            return Color(red: 1.0, green: 0.4, blue: 0.4)
-        } else if isProjectedOverBudget {
-            return Color(red: 1.0, green: 0.65, blue: 0.2)
-        } else {
-            return Color(red: 0.3, green: 0.75, blue: 0.45)
-        }
-    }
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Layer 1 (Bottom): Gray background track — full budget
-                Capsule()
-                    .fill(Color.white.opacity(0.1))
-
-                // Layer 2 (Middle): Ghost bar — projected spend
-                Capsule()
-                    .fill(ghostBarColor.opacity(0.3))
-                    .frame(width: geometry.size.width * projectedRatio * animationProgress)
-
-                // Layer 3 (Top): Solid bar — current spend
-                Capsule()
-                    .fill(currentBarColor)
-                    .frame(width: geometry.size.width * currentRatio * animationProgress)
-            }
-        }
-        .frame(height: height)
-        .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                animationProgress = 1.0
-            }
-        }
-        .onChange(of: currentSpend) { _, _ in
-            animationProgress = 0
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                animationProgress = 1.0
-            }
-        }
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
@@ -362,22 +228,11 @@ struct ProjectedBudgetBar: View {
         categoryProgress: []
     )
 
-    let overBudgetProgress = BudgetProgress(
-        budget: sampleBudget,
-        currentSpend: 920,
-        daysElapsed: 25,
-        daysInMonth: 31,
-        categoryProgress: []
-    )
-
     return ZStack {
         Color(white: 0.05).ignoresSafeArea()
 
-        ScrollView {
-            VStack(spacing: 40) {
-                Text("Budget Ring Sizes")
-                    .font(.headline)
-                    .foregroundColor(.white)
+        VStack(spacing: 40) {
+            BudgetRingView(progress: sampleProgress, size: 120)
 
                 HStack(spacing: 24) {
                     BudgetRingView(progress: sampleProgress, size: 100)
@@ -503,7 +358,6 @@ struct ProjectedBudgetBar: View {
                 }
                 .padding(.horizontal)
             }
-            .padding()
         }
     }
 }

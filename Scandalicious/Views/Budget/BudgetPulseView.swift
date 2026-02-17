@@ -105,9 +105,9 @@ struct BudgetPulseView: View {
             .background(premiumCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(premiumCardBorder)
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isSettingUp)
-            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isExpanded)
-            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showingModeChooser)
+            .animation(.easeInOut(duration: 0.3), value: isSettingUp)
+            .animation(.easeInOut(duration: 0.3), value: isExpanded)
+            .animation(.easeInOut(duration: 0.25), value: showingModeChooser)
             .onReceive(NotificationCenter.default.publisher(for: .budgetDeleted)) { _ in
                 isExpanded = false
                 showingCategoryDetail = false
@@ -122,10 +122,11 @@ struct BudgetPulseView: View {
                 CategoryPickerSheet(
                     existingCategories: Set(inlineTargets.map { $0.category })
                 ) { category in
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    withAnimation(.easeInOut(duration: 0.25)) {
                         inlineTargets.append(InlineTarget(category: category))
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(350))
                         if let last = inlineTargets.last {
                             focusedField = .category(last.id)
                         }
@@ -251,11 +252,12 @@ struct BudgetPulseView: View {
                 // Total budget option
                 HStack(spacing: 0) {
                     Button {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
                             selectedMode = .total
                             showingModeChooser = false
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(300))
                             focusedField = .monthly
                         }
                     } label: {
@@ -309,7 +311,7 @@ struct BudgetPulseView: View {
                     // Remove button when configured
                     if isMonthlyConfigured {
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            withAnimation(.easeInOut(duration: 0.25)) {
                                 isMonthlyConfigured = false
                                 monthlyAmountText = "500"
                             }
@@ -339,7 +341,7 @@ struct BudgetPulseView: View {
                 // By category option
                 HStack(spacing: 0) {
                     Button {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
                             selectedMode = .byCategory
                             showingModeChooser = false
                         }
@@ -395,7 +397,7 @@ struct BudgetPulseView: View {
                     // Remove button when configured
                     if isCategoriesConfigured {
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            withAnimation(.easeInOut(duration: 0.25)) {
                                 isCategoriesConfigured = false
                                 inlineTargets = []
                             }
@@ -569,7 +571,7 @@ struct BudgetPulseView: View {
                             Spacer()
 
                             Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                withAnimation(.easeInOut(duration: 0.25)) {
                                     showTotalBudget = false
                                     focusedField = nil
                                 }
@@ -587,10 +589,11 @@ struct BudgetPulseView: View {
                 } else {
                     // Add total budget button
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
                             showTotalBudget = true
                         }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(300))
                             focusedField = .monthly
                         }
                     } label: {
@@ -700,7 +703,7 @@ struct BudgetPulseView: View {
             // Back button: new budget → mode chooser
             if !hasExistingBudget && selectedMode != nil {
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    withAnimation(.easeInOut(duration: 0.25)) {
                         showingModeChooser = true
                         selectedMode = nil
                         focusedField = nil
@@ -776,7 +779,7 @@ struct BudgetPulseView: View {
             Spacer()
 
             Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                withAnimation(.easeInOut(duration: 0.2)) {
                     isSmartBudget.toggle()
                 }
             } label: {
@@ -987,7 +990,7 @@ struct BudgetPulseView: View {
 
             Button {
                 focusedField = nil
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                withAnimation(.easeInOut(duration: 0.25)) {
                     let _ = inlineTargets.remove(at: index)
                 }
             } label: {
@@ -1025,7 +1028,7 @@ struct BudgetPulseView: View {
             selectedMode = nil
         }
 
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+        withAnimation(.easeInOut(duration: 0.3)) {
             isSettingUp = true
             isExpanded = true
         }
@@ -1033,7 +1036,7 @@ struct BudgetPulseView: View {
 
     private func cancelSetup() {
         focusedField = nil
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(.easeInOut(duration: 0.25)) {
             isSettingUp = false
             showingModeChooser = false
             selectedMode = nil
@@ -1049,7 +1052,7 @@ struct BudgetPulseView: View {
     /// "Done" in the total-budget sub-form → mark configured, return to chooser
     private func confirmMonthlySetup() {
         focusedField = nil
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(.easeInOut(duration: 0.25)) {
             isMonthlyConfigured = true
             showingModeChooser = true
             selectedMode = nil
@@ -1059,7 +1062,7 @@ struct BudgetPulseView: View {
     /// "Done" in the category sub-form → mark configured, return to chooser
     private func confirmCategorySetup() {
         focusedField = nil
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(.easeInOut(duration: 0.25)) {
             isCategoriesConfigured = true
             showingModeChooser = true
             selectedMode = nil
@@ -1099,7 +1102,7 @@ struct BudgetPulseView: View {
             print("[BudgetPulse] Create result: success=\(success), error=\(viewModel.saveError ?? "none")")
 
             if success {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                withAnimation(.easeInOut(duration: 0.25)) {
                     isSettingUp = false
                     showingModeChooser = false
                     selectedMode = nil
@@ -1122,7 +1125,7 @@ struct BudgetPulseView: View {
             ))
 
             if success {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                withAnimation(.easeInOut(duration: 0.25)) {
                     isSettingUp = false
                     selectedMode = nil
                 }
@@ -1146,7 +1149,7 @@ struct BudgetPulseView: View {
             if hasNothing {
                 let success = await viewModel.deleteBudget()
                 if success {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    withAnimation(.easeInOut(duration: 0.25)) {
                         isSettingUp = false
                         selectedMode = nil
                     }
@@ -1161,7 +1164,7 @@ struct BudgetPulseView: View {
             ))
 
             if success {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                withAnimation(.easeInOut(duration: 0.25)) {
                     isSettingUp = false
                     selectedMode = nil
                 }
@@ -1359,17 +1362,9 @@ struct BudgetPulseView: View {
 
             if isExpanded {
                 expandedContent(progress)
-                    .transition(.identity)
+                    .transition(.opacity)
             }
         }
-    }
-
-    private var budgetStatusColor: Color {
-        Color(red: 0.3, green: 0.8, blue: 0.5)
-    }
-
-    private var budgetOverColor: Color {
-        Color(red: 1.0, green: 0.4, blue: 0.4)
     }
 
     private func collapsedHeader(_ progress: BudgetProgress) -> some View {
@@ -1377,10 +1372,10 @@ struct BudgetPulseView: View {
         let isOver = hasTotalBudget && progress.currentSpend > progress.budget.monthlyAmount
         let remaining = max(0, progress.budget.monthlyAmount - progress.currentSpend)
         let overAmount = progress.currentSpend - progress.budget.monthlyAmount
-        let accentColor = isOver ? budgetOverColor : budgetStatusColor
+        let accentColor = progress.budgetStatusColor
 
         return Button(action: {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            withAnimation(.easeInOut(duration: 0.25)) {
                 isExpanded.toggle()
             }
         }) {
@@ -1462,7 +1457,7 @@ struct BudgetPulseView: View {
         let isOver = hasTotalBudget && progress.currentSpend > progress.budget.monthlyAmount
         let remaining = max(0, progress.budget.monthlyAmount - progress.currentSpend)
         let overAmount = progress.currentSpend - progress.budget.monthlyAmount
-        let accentColor = isOver ? budgetOverColor : budgetStatusColor
+        let accentColor = progress.budgetStatusColor
 
         return VStack(spacing: 14) {
             if hasTotalBudget {
@@ -1487,9 +1482,15 @@ struct BudgetPulseView: View {
                             .foregroundColor(.white.opacity(0.4))
 
                         HStack(spacing: 4) {
-                            Circle()
-                                .fill(accentColor)
-                                .frame(width: 5, height: 5)
+                            if progress.spendRatio >= 0.85 {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(accentColor)
+                            } else {
+                                Circle()
+                                    .fill(accentColor)
+                                    .frame(width: 5, height: 5)
+                            }
 
                             Text(isOver
                                  ? String(format: "€%.0f \(L("over"))", overAmount)
