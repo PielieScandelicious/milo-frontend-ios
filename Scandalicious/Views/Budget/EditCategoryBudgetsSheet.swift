@@ -54,12 +54,12 @@ struct EditCategoryBudgetsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(L("cancel")) { dismiss() }
                         .foregroundColor(.white.opacity(0.6))
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Done") { focusedField = nil }
+                    Button(L("done")) { focusedField = nil }
                         .fontWeight(.semibold)
                 }
             }
@@ -90,7 +90,7 @@ struct EditCategoryBudgetsSheet: View {
 
     private var headerInfo: some View {
         VStack(spacing: 10) {
-            Text("Monthly Budget")
+            Text(L("monthly_budget"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
 
@@ -147,7 +147,7 @@ struct EditCategoryBudgetsSheet: View {
                         .font(.system(size: 28))
                         .foregroundColor(.white.opacity(0.15))
 
-                    Text("No category targets yet")
+                    Text(L("no_category_targets"))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.35))
                 }
@@ -182,13 +182,13 @@ struct EditCategoryBudgetsSheet: View {
 
             // Name + edit indicator
             VStack(alignment: .leading, spacing: 1) {
-                Text(alloc.category.normalizedCategoryName)
+                Text(alloc.category.localizedCategoryName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
 
                 if alloc.isEdited {
-                    Text("Edited")
+                    Text(L("edited"))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(Color(red: 0.4, green: 0.65, blue: 1.0))
                 }
@@ -247,7 +247,7 @@ struct EditCategoryBudgetsSheet: View {
             HStack(spacing: 6) {
                 Image(systemName: "plus")
                     .font(.system(size: 12, weight: .bold))
-                Text("Add category target")
+                Text(L("add_category_target"))
                     .font(.system(size: 14, weight: .semibold))
             }
             .foregroundColor(Color(red: 0.4, green: 0.65, blue: 1.0))
@@ -270,7 +270,7 @@ struct EditCategoryBudgetsSheet: View {
     // MARK: - Info Text
 
     private var infoText: some View {
-        Text("Independent limits — they don't need to add up to your monthly budget.")
+        Text(L("independent_limits"))
             .font(.system(size: 11, weight: .medium))
             .foregroundColor(.white.opacity(0.25))
             .multilineTextAlignment(.center)
@@ -286,7 +286,7 @@ struct EditCategoryBudgetsSheet: View {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Text("Save Changes")
+                    Text(L("save_changes"))
                         .font(.system(size: 17, weight: .bold))
                 }
             }

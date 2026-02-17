@@ -14,16 +14,54 @@ import Combine
 // MARK: - Notification for Receipt Upload
 extension Notification.Name {
     static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")
-    static let receiptUploadStarted = Notification.Name("receiptUploadStarted")
     static let receiptDeleted = Notification.Name("receiptDeleted")
-    static let shareExtensionUploadDetected = Notification.Name("shareExtensionUploadDetected")
 }
 
 enum SortOption: String, CaseIterable {
     case highestSpend = "Highest Spend"
     case lowestSpend = "Lowest Spend"
     case storeName = "Store Name"
+
+    var displayLabel: String {
+        switch self {
+        case .highestSpend: return L("highest_spend")
+        case .lowestSpend: return L("lowest_spend")
+        case .storeName: return L("store_name_sort")
+        }
+    }
 }
+
+// MARK: - Shared DateFormatters (avoid allocating on every render)
+private enum PeriodFormatters {
+    static let periodFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        f.locale = Locale(identifier: "en_US")
+        return f
+    }()
+
+    static let periodUTCFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        f.locale = Locale(identifier: "en_US")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    static let shortPeriodFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM yy"
+        f.locale = Locale(identifier: "en_US")
+        return f
+    }()
+
+    static let dayMonthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM"
+        return f
+    }()
+}
+
 
 
 
@@ -33,25 +71,16 @@ struct OverviewView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject var dataManager: StoreDataManager
     @ObservedObject var rateLimitManager = RateLimitManager.shared
-    @ObservedObject private var syncManager = AppSyncManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @StateObject private var budgetViewModel = BudgetViewModel()
-    @StateObject private var promosViewModel = PromosViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
-    // Track if refreshWithRetry is currently running to prevent duplicate calls
-    @State private var isRefreshWithRetryRunning = false
 
     // Track manual sync triggered by pull-to-refresh (which period is syncing)
     @State private var manuallySyncingPeriod: String?
     @State private var syncedConfirmationPeriod: String?
 
-    @State private var selectedPeriod: String = {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
-        return dateFormatter.string(from: Date())
-    }()
+    @State private var selectedPeriod: String = PeriodFormatters.periodFormatter.string(from: Date())
     @State private var selectedSort: SortOption = .highestSpend
     @State private var showingFilterSheet = false
     @State private var displayedBreakdowns: [StoreBreakdown] = []
@@ -62,7 +91,10 @@ struct OverviewView: View {
     @State private var categoryItems: [String: [APITransaction]] = [:]  // Loaded items per category
     @State private var loadingCategoryId: String?  // Currently loading category
     @State private var categoryLoadError: [String: String] = [:]  // Error messages per category
-    @ObservedObject private var splitCache = SplitCacheManager.shared  // For split avatar display
+    @State private var categoryCurrentPage: [String: Int] = [:]  // Current loaded page per category
+    @State private var categoryHasMore: [String: Bool] = [:]  // Whether more pages exist per category
+    @State private var categoryLoadingMore: String?  // Category currently loading more items
+    private let splitCache = SplitCacheManager.shared  // Access only — not observed to avoid re-rendering entire OverviewView on every split fetch
     @State private var showingAllTransactions = false
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
@@ -73,22 +105,24 @@ struct OverviewView: View {
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
     @State private var receiptToSplit: APIReceipt? // For expense split
-    @State private var scrollOffset: CGFloat = 0 // Track scroll for header fade effect
+    // scrollOffset removed — gradient header now manages its own scroll state via ScrollFadingGradientView
     @State private var cachedAvailablePeriods: [String] = [] // Cached for performance
     @State private var cachedSegmentsByPeriod: [String: [StoreChartSegment]] = [:] // Cache segments
     @State private var cachedChartDataByPeriod: [String: [ChartData]] = [:] // Cache chart data for IconDonutChart
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
-    @State private var storeRowsAppeared = false // Track staggered animation state
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
+
     @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
     @State private var isPieChartFlipped = true // Track if pie chart is showing categories (true) or stores (false)
     @State private var pieChartFlipDegrees: Double = 180 // Animation degrees for flip (starts at 180 for categories)
     @State private var pieChartSummaryCache: [String: PieChartSummaryResponse] = [:] // Cache full summary data by period
     @State private var isLoadingCategoryData = false // Track if loading category data
     @State private var showAllRows = false // Track if showing all store/category rows or limited
+    @State private var categoryScrollResetToken: Int = 0 // Incremented to force scroll reset on category switch
+    @State private var receiptsScrollResetToken: Int = 0 // Incremented to force receipts scroll reset on period change
+    @State private var chartRefreshToken: Int = 0 // Incremented on receipt upload to force pie chart re-animation
+    @State private var sortedReceiptsCache: [APIReceipt] = [] // Cached sorted receipts
     @State private var budgetExpanded = false // Track if budget widget is expanded
-    @State private var activeCardPage = 0 // 0=budget, 1=promos
-    @State private var cardDragOffset: CGFloat = 0 // Live drag offset for carousel
     @State private var periodBounceOffset: CGFloat = 0 // Rubber-band effect when at period boundary
     private let maxVisibleRows = 4 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
@@ -100,11 +134,7 @@ struct OverviewView: View {
 
     // Check if the selected period is the current month
     private var isCurrentPeriod: Bool {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentPeriod = dateFormatter.string(from: Date())
-        return selectedPeriod == currentPeriod
+        selectedPeriod == PeriodFormatters.periodFormatter.string(from: Date())
     }
 
     /// Check if this is a fresh new month (first 3 days with no data yet)
@@ -140,26 +170,17 @@ struct OverviewView: View {
 
     /// Get the year from a month period string (e.g., "January 2026" -> 2026)
     private func yearFromPeriod(_ period: String) -> Int? {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        guard let date = dateFormatter.date(from: period) else { return nil }
+        guard let date = PeriodFormatters.periodFormatter.date(from: period) else { return nil }
         return Calendar.current.component(.year, from: date)
     }
 
     /// Parse month and year from period string (e.g., "January 2026" -> (month: 1, year: 2026))
     private func parsePeriodComponents(_ period: String) -> (month: Int, year: Int) {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        guard let date = dateFormatter.date(from: period) else {
-            // Fallback to current date
+        guard let date = PeriodFormatters.periodFormatter.date(from: period) else {
             let now = Date()
             return (Calendar.current.component(.month, from: now), Calendar.current.component(.year, from: now))
         }
-        let month = Calendar.current.component(.month, from: date)
-        let year = Calendar.current.component(.year, from: date)
-        return (month, year)
+        return (Calendar.current.component(.month, from: date), Calendar.current.component(.year, from: date))
     }
 
     /// Compute available periods from data manager - called once when data changes
@@ -167,11 +188,8 @@ struct OverviewView: View {
     private func computeAvailablePeriods() -> [String] {
         var monthPeriods: [String] = []
 
-        // Get the current month string (e.g., "February 2026")
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentMonthString = dateFormatter.string(from: Date())
+        let fmt = PeriodFormatters.periodFormatter
+        let currentMonthString = fmt.string(from: Date())
 
         // Use period metadata if available (from lightweight /analytics/periods endpoint)
         if !dataManager.periodMetadata.isEmpty {
@@ -190,20 +208,13 @@ struct OverviewView: View {
 
             // If no periods with data, show only the current month (empty state)
             if breakdownPeriods.isEmpty {
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "MMMM yyyy"
-                dateFormatter.locale = Locale(identifier: "en_US")
-                return [dateFormatter.string(from: Date())]
+                return [currentMonthString]
             }
 
             // Sort periods chronologically (oldest first, most recent last/right)
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-
             monthPeriods = breakdownPeriods.sorted { period1, period2 in
-                let date1 = dateFormatter.date(from: period1) ?? Date.distantPast
-                let date2 = dateFormatter.date(from: period2) ?? Date.distantPast
+                let date1 = fmt.date(from: period1) ?? Date.distantPast
+                let date2 = fmt.date(from: period2) ?? Date.distantPast
                 return date1 < date2  // Oldest first (left), most recent last (right)
             }
         }
@@ -338,26 +349,8 @@ struct OverviewView: View {
             // Base background
             appBackgroundColor.ignoresSafeArea()
 
-            // Teal gradient header (fades on scroll)
-            GeometryReader { geometry in
-                LinearGradient(
-                    stops: [
-                        .init(color: headerPurpleColor, location: 0.0),
-                        .init(color: headerPurpleColor.opacity(0.7), location: 0.25),
-                        .init(color: headerPurpleColor.opacity(0.3), location: 0.5),
-                        .init(color: Color.clear, location: 0.75)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
-                .frame(maxWidth: .infinity)
-                .offset(y: -geometry.safeAreaInsets.top)
-                .opacity(purpleGradientOpacity)
-                .animation(.linear(duration: 0.1), value: scrollOffset)
-                .allowsHitTesting(false)
-            }
-            .ignoresSafeArea()
+            // Teal gradient header (fades on scroll) — isolated view to avoid re-rendering OverviewView body on scroll
+            ScrollFadingGradientView(headerColor: headerPurpleColor)
 
             // Content
             if let error = dataManager.error {
@@ -374,7 +367,7 @@ struct OverviewView: View {
                 .font(.system(size: 50))
                 .foregroundStyle(.red)
 
-            Text("Failed to load data")
+            Text(L("failed_load_data"))
                 .font(.headline)
 
             Text(error)
@@ -388,7 +381,7 @@ struct OverviewView: View {
                     await dataManager.fetchFromBackend(for: .month, periodString: selectedPeriod)
                 }
             } label: {
-                Label("Retry", systemImage: "arrow.clockwise")
+                Label(L("retry"), systemImage: "arrow.clockwise")
                     .font(.headline)
                     .padding()
                     .background(Color.blue)
@@ -402,7 +395,7 @@ struct OverviewView: View {
 
     private var allTransactionsDestination: some View {
         TransactionListView(
-            storeName: "All Stores",
+            storeName: L("all_stores"),
             period: selectedPeriod,
             category: nil,
             categoryColor: nil
@@ -444,10 +437,7 @@ struct OverviewView: View {
             }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
-                // Reset entrance animation states for next appearance
-                viewAppeared = false
-                contentOpacity = 0
-                headerOpacity = 0
+                // Keep entrance animation states — no fade-in replay on tab switch back
             }
             .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
                 handleReceiptUploadSuccess()
@@ -475,9 +465,6 @@ struct OverviewView: View {
                     cacheSegmentsForPeriod(selectedPeriod)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .shareExtensionUploadDetected)) { _ in
-                handleShareExtensionUpload()
-            }
     }
 
     // MARK: - Lifecycle Handlers
@@ -503,22 +490,24 @@ struct OverviewView: View {
             }
         }
 
-        // Defer ALL heavy work to next run loop to allow smooth tab transition
+        // Compute available periods synchronously so the toolbar period
+        // navigation buttons are present on the very first frame (avoids jitter
+        // from buttons appearing after a delayed Task).
+        if cachedAvailablePeriods.isEmpty {
+            cachedAvailablePeriods = computeAvailablePeriods()
+        }
+
+        // Defer heavy work to next run loop to allow smooth tab transition
         Task {
             // Small delay to let the tab animation complete
             try? await Task.sleep(for: .milliseconds(100))
 
             await MainActor.run {
-                // Update periods cache (deferred to avoid blocking initial render)
-                if cachedAvailablePeriods.isEmpty {
-                    cachedAvailablePeriods = computeAvailablePeriods()
-                }
-
                 // Build breakdown caches from preloaded data
                 rebuildBreakdownCache()
 
-                // Check for share extension uploads via centralized manager
-                syncManager.checkForShareExtensionUploads()
+                // Check for share extension uploads
+                AppSyncManager.shared.checkForShareExtensionUploads()
             }
         }
 
@@ -534,6 +523,7 @@ struct OverviewView: View {
                 receiptsViewModel.receipts = []
                 receiptsViewModel.state = .success([])
             }
+            rebuildSortedReceipts()
         }
 
         // Sync rate limit only once per session
@@ -544,15 +534,12 @@ struct OverviewView: View {
             }
         }
 
-        // Load budget data
+        // Load budget and promo data — deferred to avoid competing with tab transition animation
         Task {
+            try? await Task.sleep(for: .milliseconds(150))
             await budgetViewModel.loadBudget()
         }
 
-        // Load promo recommendations
-        Task {
-            await promosViewModel.loadPromos()
-        }
 
         // Load category data from pre-populated cache
         let initialPeriod = selectedPeriod
@@ -572,11 +559,9 @@ struct OverviewView: View {
     }
 
     private func handleReceiptUploadSuccess() {
+        print("[OverviewView] 📩 handleReceiptUploadSuccess() called")
 
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentMonthPeriod = dateFormatter.string(from: Date())
+        let currentMonthPeriod = PeriodFormatters.periodFormatter.string(from: Date())
         let currentYear = String(Calendar.current.component(.year, from: Date()))
 
         // Keep period in loadedReceiptPeriods to prevent duplicate loads
@@ -585,8 +570,18 @@ struct OverviewView: View {
         Task {
             try? await Task.sleep(for: .seconds(1))
 
-            // Refresh current month data
+            // Refresh current month data — this atomically updates storeBreakdowns,
+            // periodTotalSpends, and periodMetadata in one MainActor.run block.
+            // The onChange(of: storeBreakdowns) observer rebuilds chart caches,
+            // and the spending number animates via .contentTransition(.numericText()).
             await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
+
+            // Trigger pie chart expansion animation simultaneously with the data-driven
+            // spending number animation. Both fire in the same render cycle since
+            // refreshData already updated the data above.
+            if selectedPeriod == currentMonthPeriod {
+                chartRefreshToken += 1
+            }
 
             // Invalidate DISK caches (backend source of truth changed)
             // Keep in-memory display caches alive to avoid flash - they'll be replaced with fresh data
@@ -606,10 +601,20 @@ struct OverviewView: View {
                 updateAvailablePeriodsCache()
             }
 
-            // Reload receipts for current month from backend and update cache
-            await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
+            // Reload receipts for the selected period (what the user is currently viewing)
+            await receiptsViewModel.loadReceipts(period: selectedPeriod, storeName: nil, reset: true)
             if !receiptsViewModel.receipts.isEmpty {
-                AppDataCache.shared.updateReceipts(for: currentMonthPeriod, receipts: receiptsViewModel.receipts)
+                AppDataCache.shared.updateReceipts(for: selectedPeriod, receipts: receiptsViewModel.receipts)
+            }
+            rebuildSortedReceipts()
+
+            // Also update cache for current month if user is viewing a different period
+            if selectedPeriod != currentMonthPeriod {
+                let tempVM = ReceiptsViewModel()
+                await tempVM.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
+                if !tempVM.receipts.isEmpty {
+                    AppDataCache.shared.updateReceipts(for: currentMonthPeriod, receipts: tempVM.receipts)
+                }
             }
 
             // Re-fetch data if user is currently viewing an affected period
@@ -621,15 +626,26 @@ struct OverviewView: View {
                 await MainActor.run {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
                     }
                 }
             } else {
                 // Not viewing affected period - safe to clear in-memory caches
                 pieChartSummaryCache.removeValue(forKey: currentMonthPeriod)
                 categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
             }
 
             await rateLimitManager.syncFromBackend()
+
+            // Refresh budget widget with latest spend data
+            print("[OverviewView] 🔄 About to call budgetViewModel.refreshProgress()")
+            await budgetViewModel.refreshProgress()
+            print("[OverviewView] ✅ budgetViewModel.refreshProgress() completed")
         }
     }
 
@@ -642,6 +658,9 @@ struct OverviewView: View {
 
             // Refresh the period data to update pie chart and total spending
             await dataManager.refreshData(for: .month, periodString: affectedPeriod)
+
+            // Trigger pie chart expansion animation with the updated data
+            chartRefreshToken += 1
 
             // Also refresh the period metadata to get updated totals
             await dataManager.fetchPeriodMetadata()
@@ -673,6 +692,9 @@ struct OverviewView: View {
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
                 }
             }
         }
@@ -685,28 +707,16 @@ struct OverviewView: View {
         dataManager.regenerateBreakdowns()
 
         if newValue.count > oldValue.count, let latestTransaction = newValue.first {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-            selectedPeriod = dateFormatter.string(from: latestTransaction.date)
+            selectedPeriod = PeriodFormatters.periodFormatter.string(from: latestTransaction.date)
         }
     }
 
     private func handlePeriodChanged(newValue: String) {
         expandedReceiptId = nil
-
-        // Reset carousel to budget page when switching periods
-        // (past periods don't show promos, so avoid landing on a hidden page)
-        activeCardPage = 0
-        cardDragOffset = 0
-
-        // Reset store rows animation for staggered re-entry
-        storeRowsAppeared = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation {
-                storeRowsAppeared = true
-            }
-        }
+        expandedCategoryId = nil
+        showAllRows = false
+        isReceiptsSectionExpanded = false
+        receiptsScrollResetToken += 1
 
         // Clear segment caches for fresh rendering
         cachedSegmentsByPeriod.removeAll()
@@ -735,8 +745,10 @@ struct OverviewView: View {
                 if !receiptsViewModel.receipts.isEmpty {
                     AppDataCache.shared.updateReceipts(for: newValue, receipts: receiptsViewModel.receipts)
                 }
+                rebuildSortedReceipts()
             }
         }
+        rebuildSortedReceipts()
 
         // Month period: budget + breakdowns + categories all from cache
         Task { await budgetViewModel.selectPeriod(newValue) }
@@ -746,6 +758,9 @@ struct OverviewView: View {
 
             // Pre-populate categoryItems from cache for instant expansion
             categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
             for category in cachedPieChart.categories {
                 let key = cache.categoryItemsKey(period: newValue, category: category.name)
                 if let items = cache.categoryItemsCache[key] {
@@ -755,9 +770,15 @@ struct OverviewView: View {
         } else if pieChartSummaryCache[newValue] == nil {
             // No cached pie chart data - fetch from backend
             categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
             Task { await fetchCategoryData(for: newValue) }
         } else {
             categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
         }
 
         // Breakdowns should already be loaded; if not, fetch
@@ -852,7 +873,7 @@ struct OverviewView: View {
                 value: category.totalSpent,
                 color: category.color,
                 iconName: category.icon,
-                label: category.name
+                label: category.name.localizedCategoryName
             )
         }
     }
@@ -963,87 +984,10 @@ struct OverviewView: View {
 
     // MARK: - Share Extension Upload Handling
 
-    /// Called when AppSyncManager detects a share extension upload
-    private func handleShareExtensionUpload() {
-        if !isRefreshWithRetryRunning {
-            Task {
-                await refreshWithRetry()
-            }
-        }
-    }
-
-    /// Refreshes data with retry mechanism for share extension uploads
-    /// The share extension signals immediately but the upload + backend processing can take 5-15 seconds
-    private func refreshWithRetry() async {
-        // Mark as running
-        await MainActor.run {
-            isRefreshWithRetryRunning = true
-        }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-        let currentMonthPeriod = dateFormatter.string(from: Date())
-
-        // Capture current state to detect changes (not just count - also total spending for existing stores)
-        let initialBreakdowns = dataManager.storeBreakdowns.filter { $0.period == currentMonthPeriod }
-        let initialBreakdownCount = initialBreakdowns.count
-        let initialTotalSpending = initialBreakdowns.reduce(0.0) { $0 + $1.totalStoreSpend }
-        let initialTransactionCount = transactionManager.transactions.count
-
-        // Retry configuration: 3 seconds each, up to 4 attempts
-        let retryDelays: [Double] = [3.0, 3.0, 3.0, 3.0] // Total: up to 12 seconds of waiting
-        var dataChanged = false
-
-        for (_, delay) in retryDelays.enumerated() {
-            try? await Task.sleep(for: .seconds(delay))
-
-            await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
-
-            // Check if data changed (count OR total spending - handles uploads to existing stores)
-            let newBreakdowns = dataManager.storeBreakdowns.filter { $0.period == currentMonthPeriod }
-            let newBreakdownCount = newBreakdowns.count
-            let newTotalSpending = newBreakdowns.reduce(0.0) { $0 + $1.totalStoreSpend }
-            let newTransactionCount = transactionManager.transactions.count
-
-            // Detect change: new stores, more transactions, OR increased spending (same store, new receipt)
-            let countChanged = newBreakdownCount > initialBreakdownCount || newTransactionCount > initialTransactionCount
-            let spendingChanged = abs(newTotalSpending - initialTotalSpending) > 0.01
-
-            if countChanged || spendingChanged {
-                dataChanged = true
-                break
-            }
-        }
-
-        // Sync rate limit status
-        await rateLimitManager.syncFromBackend()
-
-        // Update UI on main thread
-        await MainActor.run {
-            // Clear running flag
-            isRefreshWithRetryRunning = false
-
-            // Notify other views that share extension sync is complete
-            NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
-
-            // Always update displayed breakdowns to ensure UI reflects latest data
-            updateDisplayedBreakdowns()
-
-            // Update refresh time for "Updated X ago" display
-            lastRefreshTime = Date()
-        }
-
-        // Reload receipts for current month if it's the selected period
-        if selectedPeriod == currentMonthPeriod {
-            await receiptsViewModel.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
-        }
-    }
-
     /// Manual sync triggered by pull-to-refresh — only refreshes the current period
     private func manualSync() async {
         // manuallySyncingPeriod is already set by .refreshable before this Task starts
-        guard syncManager.syncState != .syncing && !dataManager.isLoading else {
+        guard !dataManager.isLoading else {
             await MainActor.run { manuallySyncingPeriod = nil }
             return
         }
@@ -1061,6 +1005,9 @@ struct OverviewView: View {
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.3)) {
                 categoryItems.removeAll()
+                    categoryCurrentPage.removeAll()
+                    categoryHasMore.removeAll()
+                    categoryLoadingMore = nil
             }
         }
 
@@ -1069,6 +1016,7 @@ struct OverviewView: View {
         if !receiptsViewModel.receipts.isEmpty {
             AppDataCache.shared.updateReceipts(for: periodToSync, receipts: receiptsViewModel.receipts)
         }
+        rebuildSortedReceipts()
 
         // Ensure "Syncing" label is visible for at least 1.5s
         let elapsed = Date().timeIntervalSince(syncStart)
@@ -1102,29 +1050,11 @@ struct OverviewView: View {
     }
 
     private var swipeableContentView: some View {
-        GeometryReader { geometry in
-            let bottomSafeArea = geometry.safeAreaInsets.bottom
-
-            // Main content with vertical scroll
-            mainContentView(bottomSafeArea: bottomSafeArea)
-        }
-        .ignoresSafeArea(edges: .bottom)
+        mainContentView()
+            .ignoresSafeArea(edges: .bottom)
     }
 
-    // Computed property for smooth gradient fade based on scroll
-    private var purpleGradientOpacity: Double {
-        // Start fading immediately, fully gone by 200px scroll
-        let fadeEnd: CGFloat = 200
-
-        if scrollOffset <= 0 {
-            return 1.0
-        } else if scrollOffset >= fadeEnd {
-            return 0.0
-        } else {
-            // Linear fade for predictable behavior
-            return Double(1.0 - (scrollOffset / fadeEnd))
-        }
-    }
+    // purpleGradientOpacity moved to ScrollFadingGradientView
 
     /// Swipe gesture for navigating between periods
     private var periodSwipeGesture: some Gesture {
@@ -1141,18 +1071,14 @@ struct OverviewView: View {
                 if horizontalAmount > 0 {
                     // Swipe right -> go to previous (older) period
                     if canGoToPreviousPeriod {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            goToPreviousPeriod()
-                        }
+                        goToPreviousPeriod()
                     } else {
                         triggerPeriodBoundaryFeedback(direction: 1)
                     }
                 } else {
                     // Swipe left -> go to next (newer) period
                     if canGoToNextPeriod {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            goToNextPeriod()
-                        }
+                        goToNextPeriod()
                     } else {
                         triggerPeriodBoundaryFeedback(direction: -1)
                     }
@@ -1169,21 +1095,25 @@ struct OverviewView: View {
             periodBounceOffset = direction * 20
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                 periodBounceOffset = 0
             }
         }
     }
 
     // MARK: - Main Content View
-    private func mainContentView(bottomSafeArea: CGFloat) -> some View {
+    private func mainContentView() -> some View {
         ScrollView(.vertical, showsIndicators: false) {
+            ScrollViewReader { scrollProxy in
             VStack(spacing: 12) {
                 overviewContentForPeriod(selectedPeriod)
+                    .id("overview")
                 receiptsSection
+                    .id("receiptsSection")
             }
+            .scrollTargetLayout()
             .padding(.top, 16)
-            .padding(.bottom, bottomSafeArea + 90)
+            .safeAreaPadding(.bottom, 90)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
             .background(
@@ -1195,11 +1125,35 @@ struct OverviewView: View {
                         )
                 }
             )
+            .onChange(of: showAllRows) { _, expanded in
+                guard expanded else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 1.0)) {
+                        scrollProxy.scrollTo("showAllButton", anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: expandedCategoryId) { _, newId in
+                guard let id = newId else { return }
+                // Wait for ClipReveal expand animation to mostly settle
+                // before scrolling, so the scroll doesn't fight the expansion
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 1.0)) {
+                        scrollProxy.scrollTo("categoryRow_\(id)", anchor: UnitPoint(x: 0.5, y: 0.3))
+                    }
+                }
+            }
+            .onChange(of: isReceiptsSectionExpanded) { _, expanded in
+                guard expanded else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
+                        scrollProxy.scrollTo("receiptsSection", anchor: .top)
+                    }
+                }
+            }
+            } // ScrollViewReader
         }
         .coordinateSpace(name: "scrollView")
-        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-            scrollOffset = max(0, value)
-        }
         .refreshable {
             // Set syncing flag immediately so the UI doesn't flash during refresh
             manuallySyncingPeriod = selectedPeriod
@@ -1226,11 +1180,9 @@ struct OverviewView: View {
             // Previous period (faded left)
             if canGoToPreviousPeriod {
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        selectedPeriod = availablePeriods[currentPeriodIndex - 1]
-                    }
+                    selectedPeriod = availablePeriods[currentPeriodIndex - 1]
                 } label: {
-                    Text(shortenedPeriod(availablePeriods[currentPeriodIndex - 1]).uppercased())
+                    Text(availablePeriods[currentPeriodIndex - 1].localizedShortPeriod.uppercased())
                         .font(.system(size: 11, weight: .medium, design: .default))
                         .foregroundColor(.white.opacity(0.4))
                         .tracking(0.8)
@@ -1252,7 +1204,7 @@ struct OverviewView: View {
                         )
                 }
 
-                Text(selectedPeriod.uppercased())
+                Text(selectedPeriod.localizedPeriod.uppercased())
                     .font(.system(size: 13, weight: .bold, design: .default))
                     .foregroundColor(.white)
                     .tracking(1.5)
@@ -1305,11 +1257,9 @@ struct OverviewView: View {
             // Next period (faded right)
             if canGoToNextPeriod {
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        selectedPeriod = availablePeriods[currentPeriodIndex + 1]
-                    }
+                    selectedPeriod = availablePeriods[currentPeriodIndex + 1]
                 } label: {
-                    Text(shortenedPeriod(availablePeriods[currentPeriodIndex + 1]).uppercased())
+                    Text(availablePeriods[currentPeriodIndex + 1].localizedShortPeriod.uppercased())
                         .font(.system(size: 11, weight: .medium, design: .default))
                         .foregroundColor(.white.opacity(0.4))
                         .tracking(0.8)
@@ -1320,101 +1270,24 @@ struct OverviewView: View {
 
     // Shorten period to "Jan 26" format
     private func shortenedPeriod(_ period: String) -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-
-        guard let date = dateFormatter.date(from: period) else { return period }
-
-        let shortFormatter = DateFormatter()
-        shortFormatter.dateFormat = "MMM yy"
-        shortFormatter.locale = Locale(identifier: "en_US")
-        return shortFormatter.string(from: date)
+        guard let date = PeriodFormatters.periodFormatter.date(from: period) else { return period }
+        return PeriodFormatters.shortPeriodFormatter.string(from: date)
     }
 
 
     // MARK: - Overview Content
     private func overviewContentForPeriod(_ period: String) -> some View {
         return VStack(spacing: 16) {
-            // Swipeable carousel: Budget + Promos
-            cardCarousel
+            // Budget widget
+            BudgetPulseView(viewModel: budgetViewModel, isExpanded: $budgetExpanded)
+                .padding(.horizontal, 16)
+                .animation(.spring(response: 0.35, dampingFraction: 1.0), value: budgetExpanded)
 
             // Spending card with period swipe
             unifiedSpendingCardForPeriod(period)
                 .offset(x: periodBounceOffset)
                 .contentShape(Rectangle())
                 .simultaneousGesture(periodSwipeGesture)
-        }
-    }
-
-    /// Swipeable carousel: Budget + Promos (current period only shows both)
-    /// Uses a single BudgetPulseView instance with offset-based paging (no TabView)
-    /// so expanding/collapsing is smooth with no flash.
-    private var cardCarousel: some View {
-        let screenWidth = UIScreen.main.bounds.width
-        let showPromos = isCurrentPeriod
-
-        return VStack(spacing: 8) {
-            // Carousel area
-            ZStack(alignment: .top) {
-                // Budget widget - single instance, always rendered
-                BudgetPulseView(viewModel: budgetViewModel, isExpanded: $budgetExpanded)
-                    .padding(.horizontal, 16)
-                    .offset(x: (budgetExpanded || !showPromos) ? 0 : CGFloat(-activeCardPage) * screenWidth + cardDragOffset)
-                    .allowsHitTesting(budgetExpanded || !showPromos || activeCardPage == 0)
-
-                // Promo card - only shown for current period
-                if showPromos && !budgetExpanded {
-                    PromoBannerCard(viewModel: promosViewModel)
-                        .padding(.horizontal, 16)
-                        .offset(x: CGFloat(1 - activeCardPage) * screenWidth + cardDragOffset)
-                        .allowsHitTesting(activeCardPage == 1)
-                }
-            }
-            .clipped()
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                (budgetExpanded || !showPromos) ? nil :
-                DragGesture(minimumDistance: 20, coordinateSpace: .local)
-                    .onChanged { value in
-                        if abs(value.translation.width) > abs(value.translation.height) {
-                            cardDragOffset = value.translation.width
-                        }
-                    }
-                    .onEnded { value in
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if value.translation.width < -50 && activeCardPage < 1 {
-                                activeCardPage = 1
-                            } else if value.translation.width > 50 && activeCardPage > 0 {
-                                activeCardPage = 0
-                            }
-                            cardDragOffset = 0
-                        }
-                    }
-            )
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
-
-            // Page dots - only shown for current period with promos
-            if showPromos && !budgetExpanded {
-                HStack(spacing: 6) {
-                    ForEach(0..<2, id: \.self) { index in
-                        Capsule()
-                            .fill(activeCardPage == index ? Color.white.opacity(0.5) : Color.white.opacity(0.15))
-                            .frame(width: activeCardPage == index ? 16 : 6, height: 4)
-                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
-                    }
-                }
-                .transition(.opacity)
-            }
-        }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: budgetExpanded)
-        .onChange(of: budgetExpanded) { _, expanded in
-            if expanded {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    activeCardPage = 0
-                    cardDragOffset = 0
-                }
-            }
         }
     }
 
@@ -1572,16 +1445,16 @@ struct OverviewView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Stores")
+                Text(L("stores"))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                 let subtitle: String = {
                     if isAllTime {
-                        return "\(storeCount) store\(storeCount == 1 ? "" : "s") all time"
+                        return "\(storeCount) \(L("stores_all_time"))"
                     } else if isYear {
-                        return "\(storeCount) store\(storeCount == 1 ? "" : "s") this year"
+                        return "\(storeCount) \(L("stores_this_year"))"
                     } else {
-                        return "\(storeCount) store\(storeCount == 1 ? "" : "s")"
+                        return "\(storeCount) \(storeCount == 1 ? L("store_singular") : L("stores_count"))"
                     }
                 }()
                 Text(subtitle)
@@ -1607,16 +1480,16 @@ struct OverviewView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Categories")
+                Text(L("categories"))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                 let subtitle: String = {
                     if isAllTime {
-                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies") all time"
+                        return "\(categoryCount) \(L("categories_all_time"))"
                     } else if isYear {
-                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies") this year"
+                        return "\(categoryCount) \(L("categories_this_year"))"
                     } else {
-                        return "\(categoryCount) categor\(categoryCount == 1 ? "y" : "ies")"
+                        return "\(categoryCount) \(categoryCount == 1 ? L("category_singular") : L("categories_count"))"
                     }
                 }()
                 Text(subtitle)
@@ -1648,28 +1521,77 @@ struct OverviewView: View {
 
     // MARK: - Expandable Category Functions
 
+    /// Batch-fetch split data for a list of items so rows don't fetch one-by-one during scroll
+    private func batchFetchSplitData(for items: [APITransaction]) async {
+        let receiptIds = Set(items.compactMap { $0.receiptId })
+        let uncachedIds = receiptIds.filter { !splitCache.hasSplit(for: $0) }
+        guard !uncachedIds.isEmpty else { return }
+        await withTaskGroup(of: Void.self) { group in
+            for receiptId in uncachedIds {
+                group.addTask {
+                    await self.splitCache.fetchSplit(for: receiptId)
+                }
+            }
+        }
+    }
+
     private func toggleCategoryExpansion(_ category: CategorySpendItem, period: String) {
         if expandedCategoryId == category.id {
             // Collapse
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
                 expandedCategoryId = nil
             }
+        } else if expandedCategoryId != nil {
+            // Another category is open — collapse it first, then expand the new one
+            let previousId = expandedCategoryId!
+
+            withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
+                expandedCategoryId = nil
+            }
+
+            // Wait for collapse to settle, then expand the new category
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                // Clear previous category's pagination state
+                categoryItems[previousId] = nil
+                categoryCurrentPage[previousId] = nil
+                categoryHasMore[previousId] = nil
+
+                expandCategory(category, period: period)
+            }
         } else {
-            // Pre-populate items from cache BEFORE animating expansion
-            let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
-            if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
-                categoryItems[category.id] = cachedItems
-            }
+            // Nothing open — expand directly
+            expandCategory(category, period: period)
+        }
+    }
 
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
-                expandedCategoryId = category.id
-            }
+    /// Shared logic for expanding a category row
+    private func expandCategory(_ category: CategorySpendItem, period: String) {
+        // Force scroll reset by changing the token (recreates the ScrollView)
+        categoryScrollResetToken += 1
 
-            // Fallback: load from API if not in cache or local state
-            if categoryItems[category.id] == nil && loadingCategoryId != category.id {
-                Task {
-                    await loadCategoryItems(category, period: period)
-                }
+        // Pre-populate items from cache BEFORE animating expansion
+        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
+        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
+            categoryItems[category.id] = cachedItems
+            // Batch-fetch split data so rows don't fetch one-by-one
+            Task { await batchFetchSplitData(for: cachedItems) }
+        }
+
+        // Set loading state BEFORE withAnimation so expandedCategoryItemsSection
+        // renders skeleton content immediately (gives ClipReveal something to measure)
+        let needsLoad = categoryItems[category.id] == nil && loadingCategoryId != category.id
+        if needsLoad {
+            loadingCategoryId = category.id
+            categoryLoadError[category.id] = nil
+        }
+
+        withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
+            expandedCategoryId = category.id
+        }
+
+        if needsLoad {
+            Task {
+                await loadCategoryItems(category, period: period)
             }
         }
     }
@@ -1691,15 +1613,11 @@ struct OverviewView: View {
             // Use the category name directly from the backend
             filters.category = category.name
 
-            filters.pageSize = 100
+            filters.page = 1
+            filters.pageSize = 5
 
             // Parse period to get date range (e.g., "January 2026")
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-            dateFormatter.timeZone = TimeZone(identifier: "UTC")
-
-            if let parsedDate = dateFormatter.date(from: period) {
+            if let parsedDate = PeriodFormatters.periodUTCFormatter.date(from: period) {
                 var calendar = Calendar(identifier: .gregorian)
                 calendar.timeZone = TimeZone(identifier: "UTC")!
 
@@ -1714,10 +1632,15 @@ struct OverviewView: View {
 
             await MainActor.run {
                 categoryItems[category.id] = response.transactions
+                categoryCurrentPage[category.id] = 1
+                categoryHasMore[category.id] = response.page < response.totalPages
                 loadingCategoryId = nil
                 // Update cache
                 AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: response.transactions)
             }
+
+            // Batch-fetch split data so rows don't fetch one-by-one during scroll
+            await batchFetchSplitData(for: response.transactions)
         } catch {
             await MainActor.run {
                 categoryLoadError[category.id] = error.localizedDescription
@@ -1726,76 +1649,142 @@ struct OverviewView: View {
         }
     }
 
-    private func expandedCategoryItemsSection(_ category: CategorySpendItem) -> some View {
-        VStack(spacing: 0) {
-            if loadingCategoryId == category.id {
-                // Skeleton loading state
-                VStack(spacing: 8) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        SkeletonTransactionRow()
-                    }
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 8)
-            } else if let errorMsg = categoryLoadError[category.id] {
-                // Error state
-                VStack(spacing: 8) {
-                    Text("Failed to load items")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.orange)
-                    Text(errorMsg)
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.4))
-                        .multilineTextAlignment(.center)
-                    Button {
-                        Task { await loadCategoryItems(category, period: selectedPeriod) }
-                    } label: {
-                        Text("Retry")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.blue)
-                    }
-                }
-                .padding(.vertical, 12)
-            } else if let items = categoryItems[category.id] {
-                if items.isEmpty {
-                    // Empty state
-                    VStack(spacing: 6) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.3))
-                        Text("No items found")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
-                    .padding(.vertical, 16)
-                } else {
-                    // Items list with staggered appearance
-                    VStack(spacing: 0) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            expandedCategoryItemRow(item, category: category, isLast: index == items.count - 1)
-                                .transition(.opacity.combined(with: .offset(y: -4)))
-                                .animation(
-                                    .spring(response: 0.3, dampingFraction: 0.85)
-                                        .delay(Double(index) * 0.03),
-                                    value: expandedCategoryId
-                                )
-                        }
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-                }
-            } else {
-                // Fallback: items not yet available, show skeleton briefly
-                VStack(spacing: 8) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        SkeletonTransactionRow()
-                    }
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 8)
+    /// Max items to keep loaded per category — keeps expand/collapse animation smooth
+    private static let maxCategoryItems = 10
+
+    private func loadMoreCategoryItems(_ category: CategorySpendItem, period: String) async {
+        let existing = categoryItems[category.id] ?? []
+        guard categoryHasMore[category.id] == true,
+              categoryLoadingMore != category.id,
+              existing.count < Self.maxCategoryItems else { return }
+
+        let nextPage = (categoryCurrentPage[category.id] ?? 1) + 1
+
+        await MainActor.run {
+            categoryLoadingMore = category.id
+        }
+
+        do {
+            var filters = TransactionFilters()
+            filters.category = category.name
+            filters.page = nextPage
+            filters.pageSize = 5
+
+            if let parsedDate = PeriodFormatters.periodUTCFormatter.date(from: period) {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: "UTC")!
+
+                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
+                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+
+                filters.startDate = startOfMonth
+                filters.endDate = endOfMonth
+            }
+
+            let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
+
+            await MainActor.run {
+                let existing = categoryItems[category.id] ?? []
+                let combined = existing + response.transactions
+                // Cap at maxCategoryItems to keep the view lightweight
+                categoryItems[category.id] = Array(combined.prefix(Self.maxCategoryItems))
+                categoryCurrentPage[category.id] = nextPage
+                // Stop fetching if we've hit the cap or exhausted pages
+                categoryHasMore[category.id] = combined.count < Self.maxCategoryItems && response.page < response.totalPages
+                categoryLoadingMore = nil
+                // Update cache with accumulated items
+                AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: categoryItems[category.id] ?? [])
+            }
+
+            await batchFetchSplitData(for: response.transactions)
+        } catch {
+            await MainActor.run {
+                categoryLoadingMore = nil
             }
         }
-        .padding(.horizontal, 8)
+    }
+
+    @ViewBuilder
+    private func expandedCategoryItemsSection(_ category: CategorySpendItem) -> some View {
+        let hasContent = loadingCategoryId == category.id
+            || categoryLoadError[category.id] != nil
+            || categoryItems[category.id] != nil
+
+        if hasContent {
+            VStack(spacing: 0) {
+                if loadingCategoryId == category.id {
+                    // Skeleton loading state
+                    VStack(spacing: 8) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            SkeletonTransactionRow()
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 8)
+                } else if let errorMsg = categoryLoadError[category.id] {
+                    // Error state
+                    VStack(spacing: 8) {
+                        Text(L("failed_load_items"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.orange)
+                        Text(errorMsg)
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.4))
+                            .multilineTextAlignment(.center)
+                        Button {
+                            Task { await loadCategoryItems(category, period: selectedPeriod) }
+                        } label: {
+                            Text(L("retry"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                } else if let items = categoryItems[category.id] {
+                    if items.isEmpty {
+                        // Empty state
+                        VStack(spacing: 6) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white.opacity(0.3))
+                            Text(L("no_items_found"))
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+                        .padding(.vertical, 16)
+                    } else {
+                        // Items list — scrollable, max 5 visible at a time
+                        ScrollView(.vertical, showsIndicators: true) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    expandedCategoryItemRow(item, category: category, isLast: index == items.count - 1)
+                                        .onAppear {
+                                            // Load more when last item appears
+                                            if index == items.count - 1 {
+                                                Task { await loadMoreCategoryItems(category, period: selectedPeriod) }
+                                            }
+                                        }
+                                }
+
+                                // Loading more indicator
+                                if categoryLoadingMore == category.id {
+                                    ProgressView()
+                                        .tint(.white.opacity(0.5))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                }
+                            }
+                        }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .id(categoryScrollResetToken) // Force scroll to top when switching categories
+                        .frame(maxHeight: 5 * 50)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+        }
     }
 
     private func expandedCategoryItemRow(_ item: APITransaction, category: CategorySpendItem, isLast: Bool) -> some View {
@@ -1893,35 +1882,18 @@ struct OverviewView: View {
                     .padding(.leading, 32)
             }
         }
-        .task {
-            // Fetch split data if we have a receipt ID and it's not cached
-            if let receiptId = item.receiptId, !splitCache.hasSplit(for: receiptId) {
-                await splitCache.fetchSplit(for: receiptId)
-            }
-        }
     }
 
     private func formatCategoryItemDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM"
-        return formatter.string(from: date)
+        PeriodFormatters.dayMonthFormatter.string(from: date)
     }
 
     // MARK: - Show All Rows Button
 
     private func showAllRowsButton(isExpanded: Bool, totalCount: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                 showAllRows.toggle()
-                // Reset animation state to trigger staggered animation for new rows
-                if showAllRows {
-                    storeRowsAppeared = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        withAnimation {
-                            storeRowsAppeared = true
-                        }
-                    }
-                }
             }
         } label: {
             HStack(spacing: 5) {
@@ -1968,7 +1940,7 @@ struct OverviewView: View {
         VStack(spacing: 0) {
             // Section header - seamless inline
             Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                     isReceiptsSectionExpanded.toggle()
                 }
             } label: {
@@ -1977,7 +1949,7 @@ struct OverviewView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
 
-                    Text("Receipts")
+                    Text(L("receipts"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white.opacity(0.85))
 
@@ -2004,42 +1976,44 @@ struct OverviewView: View {
             }
             .buttonStyle(ReceiptsHeaderButtonStyle())
 
-            // Expandable content
-            if isReceiptsSectionExpanded {
-                VStack(spacing: 0) {
-                    switch receiptsSectionState {
-                    case .loading:
-                        SkeletonReceiptList(count: 3)
-                            .padding(.horizontal, 14)
+            // Expandable content — always rendered, height animates from 0.
+            // Content is clipped so it's progressively revealed as the card grows.
+            VStack(spacing: 0) {
+                switch receiptsSectionState {
+                case .loading:
+                    SkeletonReceiptList(count: 3)
+                        .padding(.horizontal, 14)
 
-                    case .empty:
-                        VStack(spacing: 8) {
-                            if isNewMonthStart {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 24))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.blue.opacity(0.6), .purple.opacity(0.4)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
+                case .empty:
+                    VStack(spacing: 8) {
+                        if isNewMonthStart {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 24))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue.opacity(0.6), .purple.opacity(0.4)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
                                     )
-                                Text("Scan your first receipt to get started")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.35))
-                            } else {
-                                Image(systemName: "doc.text")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.white.opacity(0.15))
-                                Text("No receipts for this period")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.35))
-                            }
+                                )
+                            Text(L("scan_first_receipt"))
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.35))
+                        } else {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white.opacity(0.15))
+                            Text(L("no_receipts_period"))
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.35))
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
 
-                    case .hasData:
+                case .hasData:
+                    // Fixed-height scrollable container — shows ~5 receipts at a time
+                    ScrollView(.vertical, showsIndicators: true) {
                         LazyVStack(spacing: 0) {
                             ForEach(Array(sortedReceipts.enumerated()), id: \.element.id) { index, receipt in
                                 VStack(spacing: 0) {
@@ -2055,7 +2029,7 @@ struct OverviewView: View {
                                         receipt: receipt,
                                         isExpanded: expandedReceiptId == receipt.id,
                                         onTap: {
-                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                                                 if expandedReceiptId == receipt.id {
                                                     expandedReceiptId = nil
                                                 } else {
@@ -2081,25 +2055,16 @@ struct OverviewView: View {
                                     removal: .move(edge: .leading).combined(with: .opacity)
                                 ))
                             }
-
-                            // Load more indicator
-                            if receiptsViewModel.hasMorePages {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.3)))
-                                    .scaleEffect(0.7)
-                                    .padding(.vertical, 14)
-                                    .onAppear {
-                                        Task {
-                                            await receiptsViewModel.loadNextPage(period: selectedPeriod, storeName: nil)
-                                        }
-                                    }
-                            }
                         }
                     }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .id(receiptsScrollResetToken) // Force scroll to top on period change
+                    .frame(maxHeight: 5 * 42)
                 }
-                .padding(.bottom, 8)
-                .transition(.opacity)
             }
+            .padding(.bottom, isReceiptsSectionExpanded ? 8 : 0)
+            .frame(maxHeight: isReceiptsSectionExpanded ? .infinity : 0)
+            .clipped()
         }
         .background(premiumCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -2116,7 +2081,7 @@ struct OverviewView: View {
                     VStack(spacing: 12) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        Text("Deleting...")
+                        Text(L("deleting"))
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))
                     }
@@ -2128,11 +2093,11 @@ struct OverviewView: View {
                 }
             }
         }
-        .alert("Delete Failed", isPresented: Binding<Bool>(
+        .alert(L("delete_failed"), isPresented: Binding<Bool>(
             get: { receiptDeleteError != nil },
             set: { if !$0 { receiptDeleteError = nil } }
         )) {
-            Button("OK") {
+            Button(L("ok")) {
                 receiptDeleteError = nil
             }
         } message: {
@@ -2141,13 +2106,14 @@ struct OverviewView: View {
     }
 
     // MARK: - Transactions Section (Collapsible with glass design - Bank Imports)
-    /// Receipts sorted from newest to oldest
-    private var sortedReceipts: [APIReceipt] {
-        receiptsViewModel.receipts.sorted { receipt1, receipt2 in
-            // Parse dates and sort descending (newest first)
-            let date1 = receipt1.dateParsed ?? Date.distantPast
-            let date2 = receipt2.dateParsed ?? Date.distantPast
-            return date1 > date2
+    /// Cached sorted receipts — updated via rebuildSortedReceipts(), not on every render
+    private var sortedReceipts: [APIReceipt] { sortedReceiptsCache }
+
+    private func rebuildSortedReceipts() {
+        sortedReceiptsCache = receiptsViewModel.receipts.sorted { r1, r2 in
+            let d1 = r1.dateParsed ?? Date.distantPast
+            let d2 = r2.dateParsed ?? Date.distantPast
+            return d1 > d2
         }
     }
 
@@ -2160,6 +2126,7 @@ struct OverviewView: View {
         Task {
             do {
                 try await receiptsViewModel.deleteReceipt(receipt, period: selectedPeriod, storeName: nil)
+                rebuildSortedReceipts()
                 print("[Overview] deleteReceipt succeeded, receiptsVM.receipts.count AFTER=\(receiptsViewModel.receipts.count)")
             } catch {
                 print("[Overview] deleteReceipt FAILED: \(error.localizedDescription)")
@@ -2282,15 +2249,8 @@ struct OverviewView: View {
 
     /// Spending header: amount + syncing status
     private func spendingHeaderSection(spending: Double, period: String) -> some View {
-        let isCurrentMonth: Bool = {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "MMMM yyyy"
-            dateFormatter.locale = Locale(identifier: "en_US")
-            return period == dateFormatter.string(from: Date())
-        }()
-
-        return VStack(spacing: 8) {
-            Text("SPENT THIS MONTH")
+        VStack(spacing: 8) {
+            Text(L("spent_this_month"))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
                 .tracking(1.2)
@@ -2299,41 +2259,37 @@ struct OverviewView: View {
                 .font(.system(size: 44, weight: .heavy, design: .rounded))
                 .foregroundColor(.white)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: spending)
+                .animation(.spring(response: 0.5, dampingFraction: 1.0), value: spending)
 
-            syncingIndicator(for: period, isCurrentMonth: isCurrentMonth)
+            syncingIndicator(for: period)
                 .animation(.easeInOut(duration: 0.3), value: manuallySyncingPeriod)
                 .animation(.easeInOut(duration: 0.3), value: syncedConfirmationPeriod)
-                .animation(.easeInOut(duration: 0.3), value: syncManager.syncState)
         }
         .padding(.top, 20)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
     }
 
-    /// Syncing status indicator (pull-to-refresh + receipt uploads)
-    /// Shows for: manual sync on the specific period being synced, or receipt upload sync on current month only
+    /// Syncing status indicator for manual pull-to-refresh
     @ViewBuilder
-    private func syncingIndicator(for period: String, isCurrentMonth: Bool) -> some View {
+    private func syncingIndicator(for period: String) -> some View {
         let isManualSyncing = manuallySyncingPeriod == period
         let isManualSynced = syncedConfirmationPeriod == period
-        let isUploadSyncing = isCurrentMonth && syncManager.syncState == .syncing
-        let isUploadSynced = isCurrentMonth && syncManager.syncState == .synced
 
-        if isManualSyncing || isUploadSyncing {
+        if isManualSyncing {
             HStack(spacing: 4) {
                 SyncingArrowsView()
                     .font(.system(size: 11))
-                Text("Syncing")
+                Text(L("syncing"))
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.blue)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
-        } else if isManualSynced || isUploadSynced {
+        } else if isManualSynced {
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 11))
-                Text("Synced")
+                Text(L("synced"))
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.green)
@@ -2347,7 +2303,7 @@ struct OverviewView: View {
         HStack(spacing: 4) {
             Image(systemName: "arrow.triangle.2.circlepath")
                 .font(.system(size: 9, weight: .medium))
-            Text(isPieChartFlipped ? "Tap for stores" : "Tap for categories")
+            Text(isPieChartFlipped ? L("tap_for_stores") : L("tap_for_categories"))
                 .font(.system(size: 10, weight: .medium))
         }
         .foregroundStyle(.white.opacity(0.25))
@@ -2371,8 +2327,9 @@ struct OverviewView: View {
                                 totalItems: nil,
                                 averageItemPrice: nil,
                                 centerIcon: "cart.fill",
-                                centerLabel: "Categories",
-                                showAllSegments: showAllRows
+                                centerLabel: L("categories"),
+                                showAllSegments: showAllRows,
+                                refreshToken: chartRefreshToken
                             )
                         } else if isLoadingCategoryData {
                             SkeletonDonutChart()
@@ -2381,10 +2338,10 @@ struct OverviewView: View {
                                 Image(systemName: "cart")
                                     .font(.system(size: 36))
                                     .foregroundColor(.white.opacity(0.3))
-                                Text("No category data")
+                                Text(L("no_category_data"))
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(.white.opacity(0.4))
-                                Text("Tap to flip back")
+                                Text(L("tap_to_flip_back"))
                                     .font(.system(size: 11))
                                     .foregroundColor(.white.opacity(0.25))
                             }
@@ -2400,12 +2357,13 @@ struct OverviewView: View {
                         totalAmount: Double(totalReceiptsForPeriod(period)),
                         size: 170,
                         currencySymbol: "",
-                        subtitle: "receipts",
+                        subtitle: L("receipts"),
                         totalItems: nil,
                         averageItemPrice: nil,
                         centerIcon: "storefront.fill",
-                        centerLabel: "Stores",
-                        showAllSegments: showAllRows
+                        centerLabel: L("stores"),
+                        showAllSegments: showAllRows,
+                        refreshToken: chartRefreshToken
                     )
                     .opacity(isPieChartFlipped ? 0 : 1)
                 }
@@ -2421,10 +2379,13 @@ struct OverviewView: View {
                             await fetchCategoryData(for: period)
                         }
                     }
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    // Reset content state immediately (no animation — hidden by 3D flip)
+                    showAllRows = false
+                    expandedCategoryId = nil
+                    // Animate only the 3D flip rotation and opacity crossfade
+                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                         isPieChartFlipped.toggle()
                         pieChartFlipDegrees += 180
-                        showAllRows = false
                     }
                 }
                 .onChange(of: period) { _, _ in
@@ -2437,7 +2398,7 @@ struct OverviewView: View {
                     EmptyPieChartView(
                         isNewMonth: isNewMonth,
                         icon: "cart.fill",
-                        label: "Categories"
+                        label: L("categories")
                     )
                     .opacity(isPieChartFlipped ? 1 : 0)
                     .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
@@ -2445,7 +2406,7 @@ struct OverviewView: View {
                     EmptyPieChartView(
                         isNewMonth: isNewMonth,
                         icon: "storefront.fill",
-                        label: "Stores"
+                        label: L("stores")
                     )
                     .opacity(isPieChartFlipped ? 0 : 1)
                 }
@@ -2456,10 +2417,10 @@ struct OverviewView: View {
                 )
                 .contentShape(Circle())
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    showAllRows = false
+                    withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
                         isPieChartFlipped.toggle()
                         pieChartFlipDegrees += 180
-                        showAllRows = false
                     }
                 }
                 .onChange(of: period) { _, _ in
@@ -2479,17 +2440,16 @@ struct OverviewView: View {
     ) -> some View {
         VStack(spacing: 0) {
             if isPieChartFlipped && !categories.isEmpty {
-                let displayCategories = showAllRows ? categories : Array(categories.prefix(maxVisibleRows))
                 let hasMoreCategories = categories.count > maxVisibleRows
 
                 legendSectionTitle(
-                    title: "Categories",
+                    title: L("categories"),
                     count: categories.count
                 )
 
-                ForEach(Array(displayCategories.enumerated()), id: \.element.id) { index, category in
+                // Always-visible rows (first maxVisibleRows)
+                ForEach(Array(categories.prefix(maxVisibleRows).enumerated()), id: \.element.id) { index, category in
                     VStack(spacing: 0) {
-                        // Subtle divider between rows (not before first)
                         if index > 0 {
                             LinearGradient(
                                 colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
@@ -2508,41 +2468,58 @@ struct OverviewView: View {
                             }
                         )
 
-                        if expandedCategoryId == category.id {
-                            expandedCategoryItemsSection(category)
-                                .transition(.asymmetric(
-                                    insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
-                                    removal: .opacity
-                                ))
-                        }
+                        expandedCategoryItemsSection(category)
+                            .clipReveal(isVisible: expandedCategoryId == category.id)
                     }
-                    .opacity(storeRowsAppeared ? 1 : 0)
-                    .offset(y: storeRowsAppeared ? 0 : 15)
-                    .animation(
-                        Animation.spring(response: 0.5, dampingFraction: 0.8)
-                            .delay(Double(index) * 0.08),
-                        value: storeRowsAppeared
-                    )
+                    .id("categoryRow_\(category.id)")
                 }
 
+                // Overflow rows (clipped when collapsed)
                 if hasMoreCategories {
+                    VStack(spacing: 0) {
+                        ForEach(Array(categories.dropFirst(maxVisibleRows).enumerated()), id: \.element.id) { index, category in
+                            VStack(spacing: 0) {
+                                LinearGradient(
+                                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(height: 0.5)
+                                .padding(.leading, 44)
+
+                                ExpandableCategoryRowHeader(
+                                    category: category,
+                                    isExpanded: expandedCategoryId == category.id,
+                                    onTap: {
+                                        toggleCategoryExpansion(category, period: period)
+                                    }
+                                )
+
+                                expandedCategoryItemsSection(category)
+                                    .clipReveal(isVisible: expandedCategoryId == category.id)
+                            }
+                            .id("categoryRow_\(category.id)")
+                        }
+                    }
+                    .clipReveal(isVisible: showAllRows)
+
                     showAllRowsButton(
                         isExpanded: showAllRows,
                         totalCount: categories.count
                     )
+                    .id("showAllButton")
                 }
             } else if !isPieChartFlipped && !segments.isEmpty {
-                let displaySegments = showAllRows ? segments : Array(segments.prefix(maxVisibleRows))
                 let hasMoreSegments = segments.count > maxVisibleRows
 
                 legendSectionTitle(
-                    title: "Stores",
+                    title: L("stores"),
                     count: segments.count
                 )
 
-                ForEach(Array(displaySegments.enumerated()), id: \.element.id) { index, segment in
+                // Always-visible rows (first maxVisibleRows)
+                ForEach(Array(segments.prefix(maxVisibleRows).enumerated()), id: \.element.id) { index, segment in
                     VStack(spacing: 0) {
-                        // Subtle divider between rows (not before first)
                         if index > 0 {
                             LinearGradient(
                                 colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
@@ -2562,47 +2539,58 @@ struct OverviewView: View {
                             }
                         )
                     }
-                    .opacity(storeRowsAppeared ? 1 : 0)
-                    .offset(y: storeRowsAppeared ? 0 : 15)
-                    .animation(
-                        Animation.spring(response: 0.5, dampingFraction: 0.8)
-                            .delay(Double(index) * 0.08),
-                        value: storeRowsAppeared
-                    )
                 }
 
+                // Overflow rows (clipped when collapsed)
                 if hasMoreSegments {
+                    VStack(spacing: 0) {
+                        ForEach(Array(segments.dropFirst(maxVisibleRows).enumerated()), id: \.element.id) { index, segment in
+                            VStack(spacing: 0) {
+                                LinearGradient(
+                                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(height: 0.5)
+                                .padding(.leading, 24)
+
+                                StoreRowButton(
+                                    segment: segment,
+                                    breakdowns: breakdowns,
+                                    onSelect: { breakdown, color in
+                                        selectedStoreColor = color
+                                        selectedBreakdown = breakdown
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    .clipReveal(isVisible: showAllRows)
+
                     showAllRowsButton(
                         isExpanded: showAllRows,
                         totalCount: segments.count
                     )
+                    .id("showAllButton")
                 }
             } else if isPieChartFlipped && categories.isEmpty {
                 emptyRowsSection(
                     icon: "cart",
-                    title: "Categories",
-                    subtitle: "No category data yet",
+                    title: L("categories"),
+                    subtitle: L("no_categories_yet"),
                     isNewMonth: isNewMonthStart && isCurrentPeriod
                 )
             } else if !isPieChartFlipped && segments.isEmpty {
                 emptyRowsSection(
                     icon: "storefront",
-                    title: "Stores",
-                    subtitle: "No stores visited yet",
+                    title: L("stores"),
+                    subtitle: L("no_stores_yet"),
                     isNewMonth: isNewMonthStart && isCurrentPeriod
                 )
             }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 14)
-        .id("\(period)-\(isPieChartFlipped ? "categories" : "stores")-\(showAllRows)")
-        .onAppear {
-            if !storeRowsAppeared {
-                withAnimation {
-                    storeRowsAppeared = true
-                }
-            }
-        }
     }
 
     /// Unified spending card combining amount, donut chart, and category/store rows
@@ -2617,20 +2605,22 @@ struct OverviewView: View {
             spendingHeaderSection(spending: spending, period: period)
 
             flippableChartSection(period: period, segments: segments)
-                .id("chart-\(period)")
-                .transition(.identity)
-                .animation(.easeInOut(duration: 0.35), value: segments.count)
 
             if !segments.isEmpty || !categories.isEmpty {
                 flipHintLabel()
+                    .animation(nil, value: isPieChartFlipped)
             }
 
-            if isPieChartFlipped {
-                CompactNutriBadge(score: healthScore ?? 0)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-                    .opacity(healthScore != nil ? 1 : 0)
+            Group {
+                if isPieChartFlipped {
+                    CompactNutriBadge(score: healthScore ?? 0)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                        .opacity(healthScore != nil ? 1 : 0)
+                        .transition(.identity)
+                }
             }
+            .animation(nil, value: isPieChartFlipped)
 
             rowsSection(
                 period: period,
@@ -2638,6 +2628,7 @@ struct OverviewView: View {
                 categories: categories,
                 breakdowns: breakdowns
             )
+            .animation(nil, value: isPieChartFlipped)
         }
         .background(premiumCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 28))
@@ -2660,16 +2651,56 @@ struct OverviewView: View {
 
     private func goToPreviousPeriod() {
         guard canGoToPreviousPeriod else { return }
-        withAnimation {
-            selectedPeriod = availablePeriods[currentPeriodIndex - 1]
-        }
+        selectedPeriod = availablePeriods[currentPeriodIndex - 1]
     }
 
     private func goToNextPeriod() {
         guard canGoToNextPeriod else { return }
-        withAnimation {
-            selectedPeriod = availablePeriods[currentPeriodIndex + 1]
-        }
+        selectedPeriod = availablePeriods[currentPeriodIndex + 1]
+    }
+}
+
+// MARK: - Clip Reveal Modifier
+
+private struct ClipReveal: ViewModifier {
+    let isVisible: Bool
+    @State private var contentHeight: CGFloat = 0
+    @State private var displayedHeight: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .fixedSize(horizontal: false, vertical: true)
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear {
+                            contentHeight = geo.size.height
+                            displayedHeight = isVisible ? geo.size.height : 0
+                        }
+                        .onChange(of: geo.size.height) { _, h in
+                            contentHeight = h
+                            if isVisible {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
+                                    displayedHeight = h
+                                }
+                            }
+                        }
+                }
+            )
+            .frame(height: displayedHeight, alignment: .top)
+            .clipped()
+            .allowsHitTesting(isVisible)
+            .onChange(of: isVisible) { _, visible in
+                withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
+                    displayedHeight = visible ? contentHeight : 0
+                }
+            }
+    }
+}
+
+extension View {
+    fileprivate func clipReveal(isVisible: Bool) -> some View {
+        modifier(ClipReveal(isVisible: isVisible))
     }
 }
 
@@ -2843,7 +2874,7 @@ private struct ExpandableCategoryRowHeader: View {
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(category.name)
+                    Text(category.name.localizedCategoryName)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(2)
@@ -2867,7 +2898,7 @@ private struct ExpandableCategoryRowHeader: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white.opacity(0.3))
                     .rotationEffect(.degrees(isExpanded ? -180 : 0))
-                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
+                    .animation(.spring(response: 0.35, dampingFraction: 1.0), value: isExpanded)
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 11)
@@ -2899,7 +2930,7 @@ private struct CategoryRowButton: View {
 
                 // Category name + percentage
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(category.name)
+                    Text(category.name.localizedCategoryName)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(2)
@@ -2937,7 +2968,7 @@ private struct OverviewCategoryRowButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -2958,7 +2989,7 @@ struct FilterSheet: View {
                                 selectedSort = option
                             } label: {
                                 HStack {
-                                    Text(option.rawValue)
+                                    Text(option.displayLabel)
                                         .foregroundColor(.white)
                                     Spacer()
                                     if selectedSort == option {
@@ -2969,18 +3000,18 @@ struct FilterSheet: View {
                             }
                         }
                     } header: {
-                        Text("Sort By")
+                        Text(L("sort_by"))
                             .foregroundColor(.white.opacity(0.6))
                     }
                     .listRowBackground(Color.white.opacity(0.05))
                 }
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle("Filters")
+            .navigationTitle(L("filters"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button(L("done")) {
                         dismiss()
                     }
                     .foregroundColor(.white)
@@ -2996,6 +3027,48 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+// MARK: - Scroll-Fading Gradient Header (isolated from OverviewView to avoid re-rendering the entire body on scroll)
+/// This view owns its own `scrollOffset` @State, so scroll-driven opacity changes
+/// only invalidate this small subtree — not the entire OverviewView.
+struct ScrollFadingGradientView: View {
+    let headerColor: Color
+    @State private var scrollOffset: CGFloat = 0
+
+    private var opacity: Double {
+        let fadeEnd: CGFloat = 200
+        if scrollOffset <= 0 { return 1.0 }
+        if scrollOffset >= fadeEnd { return 0.0 }
+        return Double(1.0 - (scrollOffset / fadeEnd))
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            LinearGradient(
+                stops: [
+                    .init(color: headerColor, location: 0.0),
+                    .init(color: headerColor.opacity(0.7), location: 0.25),
+                    .init(color: headerColor.opacity(0.3), location: 0.5),
+                    .init(color: Color.clear, location: 0.75)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: geometry.size.height * 0.45 + geometry.safeAreaInsets.top)
+            .frame(maxWidth: .infinity)
+            .offset(y: -geometry.safeAreaInsets.top)
+            .opacity(opacity)
+            .allowsHitTesting(false)
+        }
+        .ignoresSafeArea()
+        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+            let newOffset = max(0, value)
+            if newOffset <= 220 || scrollOffset <= 220 {
+                scrollOffset = newOffset
+            }
+        }
     }
 }
 
@@ -3019,7 +3092,7 @@ struct AnimatedNumberText: View {
                 displayValue = value
             }
             .onChange(of: value) { oldValue, newValue in
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) {
                     displayValue = newValue
                 }
             }
@@ -3065,7 +3138,7 @@ struct PeriodDotsView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentIndex)
+        .animation(.spring(response: 0.3, dampingFraction: 1.0), value: currentIndex)
     }
 
     private var visibleRange: (start: Int, end: Int) {
@@ -3105,7 +3178,7 @@ struct PeriodNavButtonStyle: ButtonStyle {
                     .scaleEffect(configuration.isPressed ? 1.0 : 0.8)
             )
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -3115,7 +3188,7 @@ struct TotalSpendingCardButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -3125,7 +3198,7 @@ struct OverviewStoreRowButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .opacity(configuration.isPressed ? 0.8 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
@@ -3135,21 +3208,20 @@ struct ReceiptsHeaderButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
 // MARK: - Syncing Arrows View
 struct SyncingArrowsView: View {
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            let seconds = timeline.date.timeIntervalSinceReferenceDate
-            let rotation = seconds.truncatingRemainder(dividingBy: 1.0) * 360
+    @State private var isRotating = false
 
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 11, weight: .semibold))
-                .rotationEffect(.degrees(rotation))
-        }
+    var body: some View {
+        Image(systemName: "arrow.triangle.2.circlepath")
+            .font(.system(size: 11, weight: .semibold))
+            .rotationEffect(.degrees(isRotating ? 360 : 0))
+            .animation(.linear(duration: 1.0).repeatForever(autoreverses: false), value: isRotating)
+            .onAppear { isRotating = true }
     }
 }
 
@@ -3159,6 +3231,8 @@ struct SyncingArrowsView: View {
 // MARK: - Compact Nutri Badge (inline pill for unified card)
 struct CompactNutriBadge: View {
     let score: Double
+
+    @State private var animatedProgress: CGFloat = 0
 
     private var scoreColor: Color {
         switch score {
@@ -3195,6 +3269,15 @@ struct CompactNutriBadge: View {
         }
     }
 
+    private func replayAnimation() {
+        animatedProgress = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) {
+                animatedProgress = 1.0
+            }
+        }
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             // Grade letter with circular ring
@@ -3202,19 +3285,20 @@ struct CompactNutriBadge: View {
                 Circle()
                     .stroke(scoreColor.opacity(0.2), lineWidth: 2)
                     .frame(width: 26, height: 26)
+                    .transaction { $0.animation = nil }
                 Circle()
-                    .trim(from: 0, to: scoreProgress)
+                    .trim(from: 0, to: scoreProgress * animatedProgress)
                     .stroke(scoreColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .frame(width: 26, height: 26)
                     .rotationEffect(.degrees(-90))
+                    .animation(.spring(response: 0.5, dampingFraction: 1.0), value: animatedProgress)
                 Text(gradeLabel)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(scoreColor)
-                    .contentTransition(.numericText())
+                    .transaction { $0.animation = nil }
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: score)
 
-            Text("NUTRI SCORE")
+            Text(L("nutri_score"))
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundColor(.white.opacity(0.4))
                 .tracking(0.8)
@@ -3229,6 +3313,13 @@ struct CompactNutriBadge: View {
                         .stroke(scoreColor.opacity(0.2), lineWidth: 0.5)
                 )
         )
+        .transaction { $0.animation = nil }
+        .onAppear {
+            replayAnimation()
+        }
+        .onChange(of: score) { _, _ in
+            replayAnimation()
+        }
     }
 }
 
@@ -3303,9 +3394,9 @@ struct ModernHealthScoreBadge: View {
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .contentTransition(.numericText())
-                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: score)
+                    .animation(.spring(response: 0.5, dampingFraction: 1.0), value: score)
 
-                Text("Nutri Score")
+                Text(L("nutri_score"))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
                     .textCase(.uppercase)

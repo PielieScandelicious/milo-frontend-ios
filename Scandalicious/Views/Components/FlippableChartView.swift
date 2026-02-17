@@ -24,13 +24,14 @@ struct FlippableDonutChartView: View {
         segments.map { segment in
             // Normalize name and get icon from category name
             let normalizedName = segment.label.normalizedCategoryName
+            let localizedName = segment.label.localizedCategoryName
             let icon = normalizedName.categoryIcon
 
             return ChartData(
                 value: segment.value,
                 color: segment.color,
                 iconName: icon,
-                label: normalizedName
+                label: localizedName  // Localized for display; icon uses English normalizedName
             )
         }
     }
@@ -149,11 +150,11 @@ struct FlippableAllTimeChartView: View {
                             .font(.system(size: size * 0.2))
                             .foregroundColor(.white.opacity(0.3))
 
-                        Text("No category data")
+                        Text(L("no_category_data"))
                             .font(.system(size: size * 0.08, weight: .medium))
                             .foregroundColor(.white.opacity(0.4))
 
-                        Text("Tap to flip back")
+                        Text(L("tap_to_flip_back"))
                             .font(.system(size: size * 0.06))
                             .foregroundColor(.white.opacity(0.25))
                     }

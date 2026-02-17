@@ -163,7 +163,7 @@ struct BudgetCreatedSheet: View {
 
     private var budgetAmountSection: some View {
         VStack(spacing: 12) {
-            Text("Budget Created!")
+            Text(L("budget_created"))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundColor(.white)
 
@@ -180,7 +180,7 @@ struct BudgetCreatedSheet: View {
                     )
                 )
 
-            Text("per month")
+            Text(L("per_month"))
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
         }
@@ -201,7 +201,7 @@ struct BudgetCreatedSheet: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Monthly Savings Target")
+                Text(L("monthly_savings_target"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.6))
 
@@ -235,7 +235,7 @@ struct BudgetCreatedSheet: View {
         VStack(spacing: 16) {
             // Header
             HStack {
-                Text("Category Budgets")
+                Text(L("category_budgets"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
 
@@ -247,7 +247,7 @@ struct BudgetCreatedSheet: View {
                         .foregroundColor(.white.opacity(0.4))
                 }
 
-                Text("\(categoryAllocations.count) categories")
+                Text("\(categoryAllocations.count) \(L("categories_found"))")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
             }
@@ -294,7 +294,7 @@ struct BudgetCreatedSheet: View {
             }
 
             // Name
-            Text(allocation.category.normalizedCategoryName)
+            Text(allocation.category.localizedCategoryName)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white)
                 .lineLimit(1)
@@ -328,7 +328,7 @@ struct BudgetCreatedSheet: View {
     private var continueButton: some View {
         Button(action: onDismiss) {
             HStack(spacing: 10) {
-                Text("Start Tracking")
+                Text(L("start_tracking"))
                     .font(.system(size: 17, weight: .bold))
 
                 Image(systemName: "arrow.right")

@@ -151,7 +151,7 @@ struct StoreDetailView: View {
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
-            Text(storeBreakdown.period == "All" ? "All Time" : storeBreakdown.period)
+            Text(storeBreakdown.period.localizedPeriod)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
 
@@ -239,7 +239,7 @@ struct StoreDetailView: View {
 
             FlippableDonutChartView(
                 title: "",
-                subtitle: currentVisitCount == 1 ? "receipt" : "receipts",
+                subtitle: currentVisitCount == 1 ? L("receipt_singular") : L("receipt_plural"),
                 totalAmount: Double(currentVisitCount),
                 segments: sortedCategories.toChartSegments(),
                 size: 170,
@@ -259,7 +259,7 @@ struct StoreDetailView: View {
             if !currentCategories.isEmpty {
                 VStack(spacing: 0) {
                     legendSectionTitle(
-                        title: "Categories",
+                        title: L("categories"),
                         count: currentCategories.count
                     )
 
@@ -356,8 +356,8 @@ struct StoreDetailView: View {
                     let cacheKey = cache.categoryItemsKey(period: period, category: category.name)
                     if let cachedItems = cache.categoryItemsCache[cacheKey] {
                         let storeFiltered = cachedItems.filter { $0.storeName == storeBreakdown.storeName }
-                        let normalizedName = category.name.normalizedCategoryName
-                        categoryTransactions[normalizedName] = storeFiltered
+                        let localizedName = category.name.localizedCategoryName
+                        categoryTransactions[localizedName] = storeFiltered
                     }
                 }
             }
@@ -517,7 +517,7 @@ struct StoreDetailView: View {
                 Image(systemName: showAllCategories ? "chevron.up" : "chevron.down")
                     .font(.system(size: 10, weight: .bold))
 
-                Text(showAllCategories ? "Show Less" : "Show All \(currentCategories.count)")
+                Text(showAllCategories ? L("show_less") : "\(L("show_all")) \(currentCategories.count)")
                     .font(.system(size: 12, weight: .semibold))
             }
             .foregroundStyle(.white.opacity(0.35))
@@ -534,6 +534,7 @@ struct StoreDetailView: View {
     private func categoryToSegment(category: Category) -> ChartSegment {
         // Normalize name in case backend returns enum-style names (e.g., "MEAT_FISH" -> "Meat & Fish")
         let normalizedName = category.name.normalizedCategoryName
+        let localizedName = category.name.localizedCategoryName
 
         let color: Color
         if let healthColor = normalizedName.groceryHealthColor {
@@ -547,7 +548,7 @@ struct StoreDetailView: View {
             endAngle: .degrees(0),
             color: color,
             value: category.spent,
-            label: normalizedName,
+            label: localizedName,
             percentage: category.percentage
         )
     }
@@ -570,7 +571,7 @@ struct StoreDetailView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
 
-                    Text("Receipts")
+                    Text(L("receipts"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white.opacity(0.85))
 
@@ -609,7 +610,7 @@ struct StoreDetailView: View {
                             Image(systemName: "doc.text")
                                 .font(.system(size: 22))
                                 .foregroundColor(.white.opacity(0.15))
-                            Text("No receipts for this store")
+                            Text(L("no_receipts_for_store"))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.white.opacity(0.35))
                         }
@@ -813,7 +814,7 @@ struct StoreDetailView: View {
                     } else if let transactions = categoryTransactions[segment.label], !transactions.isEmpty {
                         CategoryTransactionsContent(transactions: transactions)
                     } else {
-                        Text("No transactions")
+                        Text(L("no_transactions"))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.4))
                             .padding(.vertical, 8)

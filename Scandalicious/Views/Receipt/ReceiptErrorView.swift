@@ -52,7 +52,7 @@ struct ReceiptStatusView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.clockwise")
                                     .font(.system(size: 16, weight: .semibold))
-                                Text("Try Again")
+                                Text(L("try_again"))
                                     .font(.system(size: 17, weight: .semibold))
                             }
                             .frame(maxWidth: .infinity)
@@ -69,7 +69,7 @@ struct ReceiptStatusView: View {
                     Button {
                         onDismiss()
                     } label: {
-                        Text(canRetry ? "Cancel" : "Dismiss")
+                        Text(canRetry ? L("cancel") : L("dismiss"))
                             .font(.system(size: 17, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -136,11 +136,11 @@ struct ReceiptStatusView: View {
     private var statusTitle: String {
         switch status {
         case .uploading:
-            return "Uploading Receipt..."
+            return L("uploading_receipt")
         case .processing:
-            return "Processing..."
+            return L("processing")
         case .success:
-            return "Done!"
+            return L("done_excl")
         case .failed(_, _, let title):
             return title
         }
@@ -183,7 +183,7 @@ struct ReceiptErrorView: View {
     let onDismiss: () -> Void
 
     init(
-        title: String = "Upload Failed",
+        title: String = L("upload_failed"),
         message: String,
         onRetry: (() -> Void)? = nil,
         onDismiss: @escaping () -> Void
@@ -248,7 +248,7 @@ extension View {
     /// Legacy error overlay - kept for backward compatibility
     func receiptErrorOverlay(
         isPresented: Binding<Bool>,
-        title: String = "Processing Failed!",
+        title: String = L("processing_failed"),
         message: String,
         onRetry: (() -> Void)? = nil
     ) -> some View {
@@ -339,7 +339,7 @@ class ReceiptStatusViewController: UIViewController {
     
     private let retryButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("Try Again", for: .normal)
+        button.setTitle(L("try_again"), for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
         button.setTitleColor(.white, for: .normal)
         button.backgroundColor = .systemBlue
@@ -351,7 +351,7 @@ class ReceiptStatusViewController: UIViewController {
     
     private let dismissButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("Dismiss", for: .normal)
+        button.setTitle(L("dismiss"), for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 17, weight: .medium)
         button.setTitleColor(.white, for: .normal)
         button.backgroundColor = UIColor.white.withAlphaComponent(0.1)
@@ -516,7 +516,7 @@ class ReceiptStatusViewController: UIViewController {
 
         switch status {
         case .uploading(let subtitle):
-            titleLabel.text = "Uploading Receipt..."
+            titleLabel.text = L("uploading_receipt")
             messageLabel.text = subtitle
             messageLabel.isHidden = subtitle.isEmpty
             messageLabelHeightConstraint?.isActive = subtitle.isEmpty
@@ -536,7 +536,7 @@ class ReceiptStatusViewController: UIViewController {
             }
 
         case .processing(let subtitle):
-            titleLabel.text = "Processing..."
+            titleLabel.text = L("processing")
             messageLabel.text = subtitle
             messageLabel.isHidden = subtitle.isEmpty
             messageLabelHeightConstraint?.isActive = subtitle.isEmpty
@@ -556,7 +556,7 @@ class ReceiptStatusViewController: UIViewController {
             }
 
         case .success(let message):
-            titleLabel.text = "Done!"
+            titleLabel.text = L("done_excl")
             messageLabel.text = message
             messageLabel.isHidden = message.isEmpty
             messageLabelHeightConstraint?.isActive = message.isEmpty
@@ -586,7 +586,7 @@ class ReceiptStatusViewController: UIViewController {
             setupErrorIcon()
             retryButton.isHidden = !canRetry || onRetry == nil
             dismissButton.isHidden = false
-            dismissButton.setTitle(canRetry ? "Cancel" : "Dismiss", for: .normal)
+            dismissButton.setTitle(canRetry ? L("cancel") : L("dismiss"), for: .normal)
 
             // Disable min height for failed state (has buttons, needs more space)
             containerMinHeightConstraint?.isActive = false

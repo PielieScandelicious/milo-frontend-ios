@@ -20,11 +20,11 @@ struct CategoryBudgetDetailView: View {
     @State private var categoryToRemove: String?
 
     enum CategorySortOrder: String, CaseIterable {
-        case worstFirst = "Needs Attention"
-        case bestFirst = "On Track First"
-        case highestSpend = "Highest Spend"
-        case byGroup = "By Group"
-        case alphabetical = "A-Z"
+        case worstFirst = "needs_attention"
+        case bestFirst = "on_track_first"
+        case highestSpend = "highest_spend"
+        case byGroup = "by_group"
+        case alphabetical = "a_z"
     }
 
     private var sortedCategories: [CategoryBudgetProgress] {
@@ -110,7 +110,7 @@ struct CategoryBudgetDetailView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 14, weight: .semibold))
-                            Text("Edit")
+                            Text(L("edit"))
                                 .font(.system(size: 15, weight: .semibold))
                         }
                         .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
@@ -118,7 +118,7 @@ struct CategoryBudgetDetailView: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(L("done")) { dismiss() }
                         .foregroundColor(.white.opacity(0.7))
                 }
             }
@@ -141,15 +141,15 @@ struct CategoryBudgetDetailView: View {
             ),
             titleVisibility: .visible
         ) {
-            Button("Remove Target", role: .destructive) {
+            Button(L("remove_target"), role: .destructive) {
                 if let category = categoryToRemove {
                     onRemoveCategory?(category)
                     categoryToRemove = nil
                 }
             }
-            Button("Cancel", role: .cancel) { categoryToRemove = nil }
+            Button(L("cancel"), role: .cancel) { categoryToRemove = nil }
         } message: {
-            Text("This category will no longer be tracked against a target.")
+            Text(L("remove_category_confirm"))
         }
     }
 
@@ -172,7 +172,7 @@ struct CategoryBudgetDetailView: View {
                         .font(.system(size: 13, weight: .semibold))
                     Text("•")
                         .foregroundColor(.white.opacity(0.3))
-                    Text("\(progress.daysRemaining) days left")
+                    Text("\(progress.daysRemaining) \(L("days_left"))")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
                 }
@@ -188,7 +188,7 @@ struct CategoryBudgetDetailView: View {
         HStack(spacing: 0) {
             statusCard(
                 count: overBudgetCategories.count,
-                label: "Over Budget",
+                label: L("over_budget"),
                 color: Color(red: 1.0, green: 0.4, blue: 0.4),
                 icon: "exclamationmark.triangle.fill"
             )
@@ -200,7 +200,7 @@ struct CategoryBudgetDetailView: View {
 
             statusCard(
                 count: warningCategories.count,
-                label: "Warning",
+                label: L("warning"),
                 color: Color(red: 1.0, green: 0.75, blue: 0.3),
                 icon: "exclamationmark.circle.fill"
             )
@@ -212,7 +212,7 @@ struct CategoryBudgetDetailView: View {
 
             statusCard(
                 count: onTrackCategories.count,
-                label: "On Track",
+                label: L("on_track"),
                 color: Color(red: 0.3, green: 0.8, blue: 0.5),
                 icon: "checkmark.circle.fill"
             )
@@ -275,7 +275,7 @@ struct CategoryBudgetDetailView: View {
                 ForEach(CategorySortOrder.allCases, id: \.self) { order in
                     Button(action: { sortOrder = order }) {
                         HStack {
-                            Text(order.rawValue)
+                            Text(L(order.rawValue))
                             if sortOrder == order {
                                 Image(systemName: "checkmark")
                             }
@@ -284,7 +284,7 @@ struct CategoryBudgetDetailView: View {
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Text(sortOrder.rawValue)
+                    Text(L(sortOrder.rawValue))
                         .font(.system(size: 13, weight: .semibold))
                     Image(systemName: "chevron.down")
                         .font(.system(size: 10, weight: .semibold))
@@ -339,7 +339,7 @@ struct CategoryBudgetDetailView: View {
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundColor(registry.colorForGroup(section.group))
 
-                                Text(section.group)
+                                Text(registry.localizedGroupName(section.group))
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundColor(.white)
 
@@ -431,11 +431,11 @@ struct CategoryBudgetCard: View {
 
     private var statusText: String {
         if categoryProgress.isOverBudget || displayedPercent >= 100 {
-            return "€\(String(format: "%.0f", categoryProgress.overAmount)) over"
+            return "€\(String(format: "%.0f", categoryProgress.overAmount)) \(L("over"))"
         } else if categoryProgress.isWarning {
-            return "Almost at limit"
+            return L("almost_at_limit")
         } else {
-            return "€\(String(format: "%.0f", categoryProgress.remainingAmount)) left"
+            return "€\(String(format: "%.0f", categoryProgress.remainingAmount)) \(L("left_to_spend"))"
         }
     }
 
@@ -575,16 +575,16 @@ struct CategoryBudgetCard: View {
                     HStack(spacing: 3) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 9, weight: .semibold))
-                        Text("\(displayedPercent)% used")
+                        Text("\(displayedPercent)% \(L("used"))")
                             .font(.system(size: 11, weight: .semibold))
                     }
                     .foregroundColor(Self.orangeColor)
                 } else if categoryProgress.isOverBudget || displayedPercent >= 100 {
-                    Text("\(displayedPercent)% used")
+                    Text("\(displayedPercent)% \(L("used"))")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Self.redColor)
                 } else {
-                    Text("\(displayedPercent)% used")
+                    Text("\(displayedPercent)% \(L("used"))")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.4))
                 }
@@ -622,7 +622,7 @@ struct CategoryBudgetGrid: View {
         VStack(spacing: 8) {
             // Header
             HStack {
-                Text("Categories")
+                Text(L("category_budgets"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
 
@@ -631,7 +631,7 @@ struct CategoryBudgetGrid: View {
                 if let onSeeAll = onSeeAll, !categories.isEmpty {
                     Button(action: onSeeAll) {
                         HStack(spacing: 4) {
-                            Text(categories.count > 5 ? "See All (\(categories.count))" : "Details")
+                            Text(categories.count > 5 ? "\(L("see_all")) (\(categories.count))" : L("see_all"))
                                 .font(.system(size: 12, weight: .semibold))
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 10, weight: .semibold))
@@ -643,7 +643,7 @@ struct CategoryBudgetGrid: View {
 
             // List of category items with budget amounts
             if displayCategories.isEmpty {
-                Text("No category budgets set")
+                Text(L("no_budget_data"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.4))
                     .frame(maxWidth: .infinity)
@@ -707,11 +707,11 @@ struct CompactCategoryBudgetItem: View {
 
     private var statusText: String {
         if categoryProgress.isOverBudget || displayedPercent >= 100 {
-            return "Over"
+            return L("over")
         } else if categoryProgress.isWarning {
-            return "Warning"
+            return L("warning")
         } else {
-            return "On track"
+            return L("on_track")
         }
     }
 
@@ -780,8 +780,8 @@ struct CompactCategoryBudgetItem: View {
 
                 // Remaining or over amount
                 Text(categoryProgress.isOverBudget
-                     ? String(format: "€%.0f over", categoryProgress.overAmount)
-                     : String(format: "€%.0f left", categoryProgress.remainingAmount))
+                     ? String(format: "€%.0f \(L("over"))", categoryProgress.overAmount)
+                     : String(format: "€%.0f \(L("left_to_spend"))", categoryProgress.remainingAmount))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(categoryProgress.isOverBudget ? Self.redColor : .white.opacity(0.4))
             }

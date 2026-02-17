@@ -350,7 +350,7 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                                     HStack(spacing: 8) {
                                         Image(systemName: "person.2.fill")
                                             .font(.system(size: 14, weight: .medium))
-                                        Text("Split with Friends")
+                                        Text(L("split_with_friends"))
                                             .font(.system(size: 14, weight: .semibold))
                                     }
                                     .foregroundColor(.blue)
@@ -377,7 +377,7 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                                         HStack(spacing: 6) {
                                             Image(systemName: isEditMode ? "checkmark" : "pencil")
                                                 .font(.system(size: 13, weight: .medium))
-                                            Text(isEditMode ? "Done" : "Edit Items")
+                                            Text(isEditMode ? L("done") : L("edit_items"))
                                                 .font(.system(size: 13, weight: .semibold))
                                         }
                                         .foregroundColor(isEditMode ? .green.opacity(0.9) : .white.opacity(0.7))
@@ -399,7 +399,7 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                                         HStack(spacing: 6) {
                                             Image(systemName: "trash")
                                                 .font(.system(size: 13, weight: .medium))
-                                            Text("Delete Receipt")
+                                            Text(L("delete_receipt"))
                                                 .font(.system(size: 13, weight: .semibold))
                                         }
                                         .foregroundColor(.red.opacity(0.8))
@@ -417,7 +417,7 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                                         }
                                         Button("Cancel", role: .cancel) {}
                                     } message: {
-                                        Text("Are you sure you want to delete this receipt? This action cannot be undone.")
+                                        Text(L("delete_receipt_confirm"))
                                     }
                                 }
                             }

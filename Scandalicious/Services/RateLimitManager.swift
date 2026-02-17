@@ -125,7 +125,7 @@ class RateLimitManager: ObservableObject {
 
     /// Formatted message usage string
     var usageDisplayString: String {
-        "\(messagesRemaining)/\(messagesLimit) messages"
+        "\(messagesRemaining)/\(messagesLimit) \(L("messages"))"
     }
 
     /// Message to display when rate limited
@@ -134,9 +134,11 @@ class RateLimitManager: ObservableObject {
         if let endDate = periodEndDate {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .full
-            return "Message limit reached. Resets \(formatter.localizedString(for: endDate, relativeTo: Date()))"
+            let langCode = LanguageManager.currentLanguageCode
+            formatter.locale = Locale(identifier: langCode == "nl" ? "nl_BE" : langCode == "fr" ? "fr_BE" : "en_US")
+            return "\(L("message_limit_resets")) \(formatter.localizedString(for: endDate, relativeTo: Date()))"
         }
-        return "Message limit reached for this period."
+        return L("message_limit_period")
     }
 
     /// Formatted reset date

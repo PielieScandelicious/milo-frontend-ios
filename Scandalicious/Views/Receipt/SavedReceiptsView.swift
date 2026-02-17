@@ -20,7 +20,7 @@ struct SavedReceiptsView: View {
             
             deprecatedFeatureMessage
         }
-        .navigationTitle("Saved Receipts")
+        .navigationTitle(L("saved_receipts"))
         .navigationBarTitleDisplayMode(.large)
     }
     
@@ -31,11 +31,11 @@ struct SavedReceiptsView: View {
                 .font(.system(size: 60))
                 .foregroundStyle(.blue)
             
-            Text("All Receipts Are Cloud-Based")
+            Text(L("all_cloud_based"))
                 .font(.title2.bold())
                 .foregroundStyle(.white)
-            
-            Text("Receipts are now automatically uploaded to the cloud when you scan them. Local storage has been disabled.")
+
+            Text(L("cloud_based_desc"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -45,21 +45,21 @@ struct SavedReceiptsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("Automatic cloud backup")
+                    Text(L("automatic_backup"))
                         .foregroundStyle(.white)
                 }
-                
+
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("Access from any device")
+                    Text(L("access_any_device"))
                         .foregroundStyle(.white)
                 }
-                
+
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("Automatic processing")
+                    Text(L("automatic_processing"))
                         .foregroundStyle(.white)
                 }
             }

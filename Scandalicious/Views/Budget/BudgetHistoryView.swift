@@ -30,11 +30,11 @@ struct BudgetHistoryView: View {
                     historyListView
                 }
             }
-            .navigationTitle("Budget History")
+            .navigationTitle(L("budget_history"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(L("done")) { dismiss() }
                         .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
                 }
             }
@@ -55,7 +55,7 @@ struct BudgetHistoryView: View {
                 .scaleEffect(1.2)
                 .tint(Color(red: 0.3, green: 0.7, blue: 1.0))
 
-            Text("Loading history...")
+            Text(L("loading_history"))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white.opacity(0.6))
         }
@@ -69,7 +69,7 @@ struct BudgetHistoryView: View {
                 .font(.system(size: 48))
                 .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.3))
 
-            Text("Failed to load history")
+            Text(L("failed_load_history"))
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
 
@@ -84,7 +84,7 @@ struct BudgetHistoryView: View {
                     await viewModel.loadBudgetHistory()
                 }
             } label: {
-                Text("Retry")
+                Text(L("retry"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 24)
@@ -103,11 +103,11 @@ struct BudgetHistoryView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.white.opacity(0.3))
 
-            Text("No Budget History")
+            Text(L("no_budget_history"))
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
 
-            Text("Your budget history will appear here once you've set budgets for multiple months.")
+            Text(L("budget_history_appear"))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
@@ -142,7 +142,7 @@ struct BudgetHistoryView: View {
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
 
-            Text("Budget tracking history")
+            Text(L("budget_history"))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white.opacity(0.6))
         }
@@ -165,7 +165,7 @@ struct BudgetHistoryView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 11, weight: .semibold))
-                            Text("Budget")
+                            Text(L("budget"))
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
@@ -178,7 +178,7 @@ struct BudgetHistoryView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "trash.fill")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("Deleted")
+                        Text(L("deleted"))
                             .font(.system(size: 12, weight: .semibold))
                     }
                     .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.3))
@@ -195,7 +195,7 @@ struct BudgetHistoryView: View {
             // Budget amount
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Monthly Budget")
+                    Text(L("monthly_budget"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.6))
 
@@ -210,7 +210,7 @@ struct BudgetHistoryView: View {
             // Category allocations (if available)
             if let allocations = history.categoryAllocations, !allocations.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Category Allocations")
+                    Text(L("category_allocations"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.6))
 
@@ -221,7 +221,7 @@ struct BudgetHistoryView: View {
                                     .fill(allocation.category.categoryColor)
                                     .frame(width: 8, height: 8)
 
-                                Text(allocation.category.normalizedCategoryName)
+                                Text(allocation.category.localizedCategoryName)
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(.white.opacity(0.8))
 

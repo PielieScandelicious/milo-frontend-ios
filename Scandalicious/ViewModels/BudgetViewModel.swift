@@ -63,6 +63,7 @@ class BudgetViewModel: ObservableObject {
 
     private let apiService = BudgetAPIService.shared
     private var notificationObserver: NSObjectProtocol?
+    private var receiptUploadObserver: NSObjectProtocol?
     private var categoryAllocationsObserver: NSObjectProtocol?
 
     private let displayFormatter: DateFormatter = {
@@ -94,7 +95,22 @@ class BudgetViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            print("[BudgetVM] 📩 Received .receiptsDataDidChange notification")
             Task { @MainActor in
+                await self?.refreshProgress()
+            }
+        }
+
+        receiptUploadObserver = NotificationCenter.default.addObserver(
+            forName: .receiptUploadedSuccessfully,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("[BudgetVM] 📩 Received .receiptUploadedSuccessfully notification")
+            Task { @MainActor in
+                // Delay to let backend finish cache invalidation after receipt processing
+                try? await Task.sleep(for: .seconds(2))
+                print("[BudgetVM] ⏱️ Post-delay, calling refreshProgress()")
                 await self?.refreshProgress()
             }
         }
@@ -128,6 +144,9 @@ class BudgetViewModel: ObservableObject {
 
     deinit {
         if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = receiptUploadObserver {
             NotificationCenter.default.removeObserver(observer)
         }
         if let observer = categoryAllocationsObserver {
@@ -165,53 +184,75 @@ class BudgetViewModel: ObservableObject {
 
     private func loadCurrentMonthProgress() async {
         let cache = AppDataCache.shared
+        print("[BudgetVM] loadCurrentMonthProgress() — cache.budgetProgressCache=\(cache.budgetProgressCache != nil), cache.budgetStatusChecked=\(cache.budgetStatusChecked)")
 
         if let cached = cache.budgetProgressCache {
+            print("[BudgetVM] Using cached budget: spend=€\(cached.currentSpend), budget=€\(cached.budget.monthlyAmount)")
             state = .active(cached.toBudgetProgress())
             Task {
                 do {
                     let progressResponse = try await apiService.getBudgetProgress()
+                    print("[BudgetVM] Background refresh succeeded: spend=€\(progressResponse.currentSpend)")
                     state = .active(progressResponse.toBudgetProgress())
                     cache.updateBudgetProgress(progressResponse)
+                } catch let error as BudgetAPIError {
+                    switch error {
+                    case .notFound, .noBudgetSet:
+                        print("[BudgetVM] Background refresh: budget no longer exists, clearing cache")
+                        AppDataCache.shared.budgetProgressCache = nil
+                        AppDataCache.shared.budgetStatusChecked = true
+                        AppDataCache.shared.scheduleSaveToDisk()
+                        state = .noBudget
+                    default:
+                        print("[BudgetVM] Background refresh failed: \(error)")
+                    }
                 } catch {
-                    // Keep cached data on refresh failure
+                    print("[BudgetVM] Background refresh failed: \(error)")
                 }
             }
             return
         }
 
         if cache.budgetStatusChecked {
+            print("[BudgetVM] budgetStatusChecked=true, no cache → setting .noBudget, fetching in background")
             state = .noBudget
             Task {
                 do {
                     let progressResponse = try await apiService.getBudgetProgress()
+                    print("[BudgetVM] Background fetch found budget! spend=€\(progressResponse.currentSpend), budget=€\(progressResponse.budget.monthlyAmount)")
                     state = .active(progressResponse.toBudgetProgress())
                     cache.updateBudgetProgress(progressResponse)
                 } catch {
-                    // Still no budget
+                    print("[BudgetVM] Background fetch failed (still no budget): \(error)")
                 }
             }
             return
         }
 
+        print("[BudgetVM] No cache, first load → setting .loading, fetching from API")
         state = .loading
 
         do {
             let progressResponse = try await apiService.getBudgetProgress()
+            print("[BudgetVM] Initial fetch succeeded: spend=€\(progressResponse.currentSpend), budget=€\(progressResponse.budget.monthlyAmount), categories=\(progressResponse.categoryProgress.count)")
             state = .active(progressResponse.toBudgetProgress())
             cache.updateBudgetProgress(progressResponse)
             cache.budgetStatusChecked = true
             cache.scheduleSaveToDisk()
         } catch let error as BudgetAPIError {
+            print("[BudgetVM] Initial fetch BudgetAPIError: \(error)")
             switch error {
             case .noBudgetSet, .notFound:
+                print("[BudgetVM] → No budget set on backend, setting .noBudget")
                 state = .noBudget
                 cache.budgetStatusChecked = true
                 cache.scheduleSaveToDisk()
             default:
+                print("[BudgetVM] → Other API error: \(error.localizedDescription)")
                 state = .error(error.localizedDescription)
             }
         } catch {
+            print("[BudgetVM] Initial fetch unexpected error: \(error)")
             state = .error(error.localizedDescription)
         }
     }
@@ -236,14 +277,32 @@ class BudgetViewModel: ObservableObject {
     }
 
     func refreshProgress() async {
-        guard case .active = state else { return }
+        print("[BudgetVM] refreshProgress() called, state=\(state)")
+        guard case .active(let currentProgress) = state else {
+            print("[BudgetVM] ❌ refreshProgress() skipped — state is not .active")
+            return
+        }
+        print("[BudgetVM] 🔄 Fetching budget progress from API (current spend: €\(currentProgress.currentSpend))")
 
         do {
             let progressResponse = try await apiService.getBudgetProgress()
-            state = .active(progressResponse.toBudgetProgress())
+            let newProgress = progressResponse.toBudgetProgress()
+            print("[BudgetVM] ✅ API returned: spend=€\(newProgress.currentSpend), budget=€\(newProgress.budget.monthlyAmount), categories=\(newProgress.categoryProgress.count)")
+            state = .active(newProgress)
             AppDataCache.shared.updateBudgetProgress(progressResponse)
+        } catch let error as BudgetAPIError {
+            switch error {
+            case .notFound, .noBudgetSet:
+                print("[BudgetVM] ❌ refreshProgress(): budget no longer exists, clearing cache")
+                AppDataCache.shared.budgetProgressCache = nil
+                AppDataCache.shared.budgetStatusChecked = true
+                AppDataCache.shared.scheduleSaveToDisk()
+                state = .noBudget
+            default:
+                print("[BudgetVM] ❌ refreshProgress() API error: \(error)")
+            }
         } catch {
-            // Don't change state on refresh failure
+            print("[BudgetVM] ❌ refreshProgress() API error: \(error)")
         }
     }
 

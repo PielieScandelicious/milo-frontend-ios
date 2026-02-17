@@ -600,7 +600,7 @@ struct APITransactionRowView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Text(transaction.category)
+                    Text(transaction.category.localizedCategoryName)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
 

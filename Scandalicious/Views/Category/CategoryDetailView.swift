@@ -152,11 +152,11 @@ struct CategoryDetailView: View {
                 .frame(width: 40, height: 40)
                 .foregroundStyle(category.color)
 
-            Text("No Items Found")
+            Text(L("no_items_found"))
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
 
-            Text("No \(category.name.lowercased()) items in this period")
+            Text(L("no_items_in_period"))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
         }
@@ -202,12 +202,12 @@ struct CategoryDetailView: View {
                         .foregroundStyle(category.color)
                         .frame(width: 20, height: 20)
 
-                    Text(category.name)
+                    Text(category.name.localizedCategoryName)
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                 }
 
-                Text(period == "All" ? "All Time" : period)
+                Text(period.localizedPeriod)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
 

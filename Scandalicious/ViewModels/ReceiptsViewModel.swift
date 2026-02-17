@@ -22,9 +22,10 @@ class ReceiptsViewModel: ObservableObject {
     private let apiService = AnalyticsAPIService.shared
     private var filters = ReceiptFilters()
 
-    /// Load receipts for a given period and optional store filter
-    /// Pass "All" as period to load all receipts without date filtering
-    func loadReceipts(period: String, storeName: String? = nil, reset: Bool = true) async {
+    /// Load receipts for a given period and optional store filter.
+    /// Pass "All" as period to load all receipts without date filtering.
+    /// Set `loadAll` to false for lazy pagination (only first page loaded).
+    func loadReceipts(period: String, storeName: String? = nil, reset: Bool = true, loadAll: Bool = true) async {
         let hadExistingData = !receipts.isEmpty
         if reset {
             // Only show loading skeleton if no existing data (avoids flash during refresh)
@@ -66,8 +67,8 @@ class ReceiptsViewModel: ObservableObject {
             hasMorePages = response.page < response.totalPages
             state = .success(receipts)
 
-            // Auto-load remaining pages to show all receipts at initial load
-            if reset && hasMorePages {
+            // Auto-load remaining pages unless caller opted for lazy pagination
+            if loadAll && reset && hasMorePages {
                 await loadAllRemainingPages(period: period, storeName: storeName)
             }
 
@@ -95,11 +96,11 @@ class ReceiptsViewModel: ObservableObject {
         hasMorePages = false
     }
 
-    /// Load next page of receipts
+    /// Load next page of receipts (always single-page, never auto-loads all)
     func loadNextPage(period: String, storeName: String? = nil) async {
         guard hasMorePages else { return }
         currentPage += 1
-        await loadReceipts(period: period, storeName: storeName, reset: false)
+        await loadReceipts(period: period, storeName: storeName, reset: false, loadAll: false)
     }
 
     /// Refresh receipts

@@ -110,17 +110,16 @@ struct CategoryAllocationBar: View {
             }
 
             // Horizontal progress bar
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.1))
-
+            Capsule()
+                .fill(Color.white.opacity(0.1))
+                .frame(height: height)
+                .overlay(alignment: .leading) {
                     Capsule()
                         .fill(barColor)
-                        .frame(width: geometry.size.width * fillRatio * animationProgress)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .scaleEffect(x: fillRatio * animationProgress, y: 1, anchor: .leading)
+                        .frame(height: height)
                 }
-            }
-            .frame(height: height)
 
             // Bottom row: status + percentage
             HStack {
@@ -157,10 +156,9 @@ struct CategoryAllocationBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                animationProgress = 1.0
-            }
+            animationProgress = 1.0
         }
+        .animation(.easeOut(duration: 0.4), value: animationProgress)
     }
 }
 
@@ -183,7 +181,7 @@ struct CategoryAllocationBarList: View {
     var body: some View {
         VStack(spacing: 4) {
             HStack {
-                Text("Budget by Category")
+                Text(L("budget_by_category"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
 
@@ -192,7 +190,7 @@ struct CategoryAllocationBarList: View {
                 if let onSeeAll, categories.count > maxVisible {
                     Button(action: onSeeAll) {
                         HStack(spacing: 4) {
-                            Text("See All (\(categories.count))")
+                            Text("\(L("see_all")) (\(categories.count))")
                                 .font(.system(size: 12, weight: .semibold))
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 10, weight: .semibold))

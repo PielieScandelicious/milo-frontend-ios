@@ -53,10 +53,10 @@ struct ReceiptDetailsView: View {
                 .padding()
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Receipt Details")
+            .navigationTitle(L("receipt_details"))
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Delete Failed", isPresented: $showDeleteError) {
-                Button("OK", role: .cancel) {}
+            .alert(L("delete_failed"), isPresented: $showDeleteError) {
+                Button(L("ok"), role: .cancel) {}
             } message: {
                 Text(deleteError ?? "An unknown error occurred")
             }
@@ -83,11 +83,11 @@ struct ReceiptDetailsView: View {
                 .foregroundStyle(.orange)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Duplicate Receipt")
+                Text(L("duplicate_receipt"))
                     .font(.headline)
                     .foregroundStyle(.primary)
 
-                Text("This receipt was already uploaded before. The items have not been added again.")
+                Text(L("duplicate_receipt_msg"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -140,7 +140,7 @@ struct ReceiptDetailsView: View {
             // Total Amount
             if let totalAmount = receipt.totalAmount {
                 VStack(spacing: 4) {
-                    Text("Total")
+                    Text(L("total"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -159,7 +159,7 @@ struct ReceiptDetailsView: View {
                     HealthScoreGauge(score: healthScore, size: 60, showLabel: false)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Health Score")
+                        Text(L("health_score"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 
@@ -198,11 +198,11 @@ struct ReceiptDetailsView: View {
                     .foregroundStyle(.blue)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Split with Friends")
+                    Text(L("split_with_friends"))
                         .font(.headline)
                         .foregroundStyle(.primary)
 
-                    Text("Divide this receipt among friends")
+                    Text(L("divide_receipt"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -224,7 +224,7 @@ struct ReceiptDetailsView: View {
 
     private var itemsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Items")
+            Text(L("items"))
                 .font(.headline)
                 .padding(.horizontal, 4)
 
@@ -242,11 +242,11 @@ struct ReceiptDetailsView: View {
                 .font(.system(size: 50))
                 .foregroundStyle(.secondary)
 
-            Text("No items found")
+            Text(L("no_items_found_receipt"))
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Text("The receipt was uploaded successfully, but no items were detected.")
+            Text(L("no_items_detected"))
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -288,7 +288,7 @@ struct ReceiptDetailsView: View {
                 } else {
                     Image(systemName: "trash")
                 }
-                Text(isDeleting ? "Deleting..." : "Delete Receipt")
+                Text(isDeleting ? L("deleting") : L("delete_receipt"))
             }
             .frame(maxWidth: .infinity)
             .padding()
@@ -398,7 +398,7 @@ struct ReceiptItemRow: View {
                 HStack(spacing: 8) {
                     // Quantity (show if > 1)
                     if transaction.quantity > 1 {
-                        Text("Qty: \(transaction.quantity)")
+                        Text("\(L("qty")): \(transaction.quantity)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -411,7 +411,7 @@ struct ReceiptItemRow: View {
                     }
 
                     // Category
-                    Text(transaction.category)
+                    Text(transaction.category.localizedCategoryName)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }

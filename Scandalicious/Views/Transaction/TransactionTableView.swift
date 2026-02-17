@@ -584,7 +584,7 @@ struct APITransactionTableRow: View {
                     .lineLimit(2)
             }
 
-            Text(transaction.category)
+            Text(transaction.category.localizedCategoryName)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
                 .lineLimit(1)

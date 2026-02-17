@@ -86,21 +86,21 @@ struct PaywallView: View {
                 selectedProduct = yearly
             }
         }
-        .alert("Error", isPresented: .init(
+        .alert(L("error"), isPresented: .init(
             get: { subscriptionManager.errorMessage != nil },
             set: { if !$0 { subscriptionManager.errorMessage = nil } }
         )) {
-            Button("OK") { subscriptionManager.errorMessage = nil }
+            Button(L("ok")) { subscriptionManager.errorMessage = nil }
         } message: {
             Text(subscriptionManager.errorMessage ?? "")
         }
-        .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
-            Button("Sign Out", role: .destructive) {
+        .confirmationDialog(L("sign_out"), isPresented: $showSignOutConfirmation) {
+            Button(L("sign_out"), role: .destructive) {
                 try? authManager.signOut()
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L("cancel"), role: .cancel) {}
         } message: {
-            Text("Are you sure you want to sign out?")
+            Text(L("sign_out_confirm"))
         }
     }
 
@@ -112,7 +112,7 @@ struct PaywallView: View {
                 Button {
                     showSignOutConfirmation = true
                 } label: {
-                    Text("Sign Out")
+                    Text(L("sign_out"))
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
                 }
@@ -160,11 +160,11 @@ struct PaywallView: View {
                     )
             }
 
-            Text("Meet Milo")
+            Text(L("meet_milo"))
                 .font(.system(size: 32, weight: .bold))
                 .foregroundStyle(.white)
 
-            Text("Your AI shopping assistant")
+            Text(L("your_ai_assistant"))
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.7))
         }
@@ -174,10 +174,10 @@ struct PaywallView: View {
 
     private var featuresSection: some View {
         HStack(spacing: 20) {
-            FeatureItem(icon: "doc.text.viewfinder", label: "Scan")
-            FeatureItem(icon: "chart.bar.fill", label: "Analyze")
-            FeatureItem(icon: "heart.fill", label: "Health")
-            FeatureItem(icon: "bubble.left.fill", label: "Chat")
+            FeatureItem(icon: "doc.text.viewfinder", label: L("feature_scan"))
+            FeatureItem(icon: "chart.bar.fill", label: L("feature_analyze"))
+            FeatureItem(icon: "heart.fill", label: L("feature_health"))
+            FeatureItem(icon: "bubble.left.fill", label: L("feature_chat"))
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 12)
@@ -194,11 +194,11 @@ struct PaywallView: View {
             // Yearly
             if let yearly = subscriptionManager.yearlyProduct {
                 CompactPricingCard(
-                    title: "Yearly",
+                    title: L("yearly"),
                     price: yearly.displayPrice,
                     period: "year",
                     weeklyPrice: subscriptionManager.weeklyPrice(for: yearly),
-                    badge: "BEST VALUE",
+                    badge: L("best_value"),
                     messageLimit: "\(RateLimitConfig.defaultMessagesPerMonth) AI messages/month",
                     isSelected: selectedProduct?.id == yearly.id
                 ) {
@@ -211,7 +211,7 @@ struct PaywallView: View {
             // Monthly
             if let monthly = subscriptionManager.monthlyProduct {
                 CompactPricingCard(
-                    title: "Monthly",
+                    title: L("monthly"),
                     price: monthly.displayPrice,
                     period: "month",
                     weeklyPrice: subscriptionManager.weeklyPrice(for: monthly),
@@ -256,7 +256,7 @@ struct PaywallView: View {
                         .tint(.white)
                 } else {
                     Image(systemName: "gift.fill")
-                    Text("Start 14-Day Free Trial")
+                    Text(L("start_free_trial"))
                         .fontWeight(.semibold)
                 }
             }
@@ -283,20 +283,20 @@ struct PaywallView: View {
             Button {
                 Task { await subscriptionManager.restorePurchases() }
             } label: {
-                Text("Restore Purchases")
+                Text(L("restore_purchases"))
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.5))
             }
 
             HStack(spacing: 12) {
-                Link("Terms", destination: URL(string: "https://scandalicious.app/terms")!)
+                Link(L("terms"), destination: URL(string: "https://scandalicious.app/terms")!)
                 Text("•")
-                Link("Privacy", destination: URL(string: "https://scandalicious.app/privacy")!)
+                Link(L("privacy"), destination: URL(string: "https://scandalicious.app/privacy")!)
             }
             .font(.caption2)
             .foregroundStyle(.white.opacity(0.4))
 
-            Text("Cancel anytime. Auto-renews until canceled.")
+            Text(L("cancel_anytime"))
                 .font(.caption2)
                 .foregroundStyle(.white.opacity(0.3))
         }
@@ -315,7 +315,7 @@ struct PaywallView: View {
                     .foregroundStyle(.green)
                     .symbolEffect(.bounce, value: showSuccessAnimation)
 
-                Text("Welcome!")
+                Text(L("welcome_success"))
                     .font(.title)
                     .fontWeight(.bold)
             }

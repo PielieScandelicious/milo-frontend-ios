@@ -14,6 +14,7 @@ import StoreKit
 struct ScandaLiciousApp: App {
     @StateObject private var authManager: AuthenticationManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @StateObject private var languageManager = LanguageManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var hasCheckedSubscription = false
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -50,6 +51,7 @@ struct ScandaLiciousApp: App {
             }
             .environmentObject(authManager)
             .environmentObject(subscriptionManager)
+            .environmentObject(languageManager)
             .onOpenURL { url in
                 // Handle Google Sign-In OAuth callback
                 GIDSignIn.sharedInstance.handle(url)

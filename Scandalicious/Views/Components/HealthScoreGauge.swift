@@ -143,7 +143,7 @@ struct HealthScoreCard: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(score.healthScoreColor)
 
-                Text("Health Score")
+                Text(L("health_score"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.7))
                     .textCase(.uppercase)
