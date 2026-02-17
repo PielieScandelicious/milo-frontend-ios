@@ -77,7 +77,7 @@ struct OverviewView: View {
     @State private var cachedChartDataByPeriod: [String: [ChartData]] = [:] // Cache chart data for IconDonutChart
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
-    @State private var receiptsScrollTarget: String? // Declarative scroll position binding
+
     @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
     @State private var isPieChartFlipped = true // Track if pie chart is showing categories (true) or stores (false)
     @State private var pieChartFlipDegrees: Double = 180 // Animation degrees for flip (starts at 180 for categories)
@@ -1171,9 +1171,16 @@ struct OverviewView: View {
                     }
                 }
             }
+            .onChange(of: isReceiptsSectionExpanded) { _, expanded in
+                guard expanded else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        scrollProxy.scrollTo("receiptsSection", anchor: .top)
+                    }
+                }
+            }
             } // ScrollViewReader
         }
-        .scrollPosition(id: $receiptsScrollTarget, anchor: .top)
         .coordinateSpace(name: "scrollView")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
             let newOffset = max(0, value)
@@ -1976,10 +1983,6 @@ struct OverviewView: View {
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     isReceiptsSectionExpanded.toggle()
-                    // Both state changes in the same transaction — SwiftUI
-                    // computes the final layout (expanded + scrolled) and
-                    // animates to it in one pass. The header stays fixed.
-                    receiptsScrollTarget = isReceiptsSectionExpanded ? "receiptsSection" : nil
                 }
             } label: {
                 HStack(spacing: 10) {
