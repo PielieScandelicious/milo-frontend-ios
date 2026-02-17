@@ -87,7 +87,7 @@ struct CategoryAllocationBar: View {
                         .foregroundStyle(categoryProgress.category.categoryColor)
                 }
 
-                Text(CategoryRegistryManager.shared.displayNameForSubCategory(categoryProgress.category))
+                Text(CategoryRegistryManager.shared.displayNameForCategory(categoryProgress.category))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)

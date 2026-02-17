@@ -400,6 +400,16 @@ class AppDataCache: ObservableObject {
         receiptsByPeriod.removeValue(forKey: period)
     }
 
+    /// Removes all cached category line-items for a given period (e.g. "January 2026").
+    func invalidateCategoryItems(for period: String) {
+        let prefix = "\(period)|"
+        let keysToRemove = categoryItemsCache.keys.filter { $0.hasPrefix(prefix) }
+        for key in keysToRemove {
+            categoryItemsCache.removeValue(forKey: key)
+        }
+        scheduleSaveToDisk()
+    }
+
     func invalidateAll() {
         periodMetadata = []
         breakdownsByPeriod = [:]

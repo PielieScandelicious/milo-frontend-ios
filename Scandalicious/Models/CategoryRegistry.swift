@@ -33,6 +33,8 @@ struct CategoryMidResponse: Codable, Identifiable {
     let name: String
     let displayName: String?
     let subCategories: [String]
+    let icon: String?
+    let colorHex: String?
 
     var id: String { name }
 
@@ -43,6 +45,8 @@ struct CategoryMidResponse: Codable, Identifiable {
         case name
         case displayName = "display_name"
         case subCategories = "sub_categories"
+        case icon
+        case colorHex = "color_hex"
     }
 }
 
@@ -92,14 +96,18 @@ class CategoryRegistryManager: ObservableObject {
 
     // Group name -> (icon, colorHex) lookup
     private var groupLookup: [String: (icon: String, colorHex: String)] = [:]
-    // Sub-category -> group name
-    private var subCategoryToGroup: [String: String] = [:]
-    // Sub-category -> mid-level category name (e.g., "Fresh Produce (Fruit & Veg)" -> "Fruits & Vegetables")
-    private var subCategoryToCategory: [String: String] = [:]
-    // Sub-category -> clean display name (e.g., "Alcohol (Beer, Cider, ...)" -> "Alcohol")
-    private var subCategoryToDisplayName: [String: String] = [:]
-    // Mid-level category -> group name (e.g., "Fruits & Vegetables" -> "Fresh Food")
+    // Category internal name -> group name
     private var categoryToGroup: [String: String] = [:]
+    // Category internal name -> clean display name
+    private var categoryToDisplayName: [String: String] = [:]
+    // Category internal name -> Phosphor icon
+    private var categoryToIcon: [String: String] = [:]
+    // Category internal name -> hex color
+    private var categoryToColorHex: [String: String] = [:]
+    // Display name -> Phosphor icon (for normalized name lookups)
+    private var displayNameToIcon: [String: String] = [:]
+    // Display name -> hex color (for normalized name lookups)
+    private var displayNameToColorHex: [String: String] = [:]
 
     private var baseURL: String { AppConfiguration.apiBase }
     private let decoder = JSONDecoder()
@@ -143,28 +151,37 @@ class CategoryRegistryManager: ObservableObject {
 
     private func buildLookups(from response: CategoryHierarchyResponse) {
         groupLookup.removeAll()
-        subCategoryToGroup.removeAll()
-        subCategoryToCategory.removeAll()
-        subCategoryToDisplayName.removeAll()
         categoryToGroup.removeAll()
+        categoryToDisplayName.removeAll()
+        categoryToIcon.removeAll()
+        categoryToColorHex.removeAll()
+        displayNameToIcon.removeAll()
+        displayNameToColorHex.removeAll()
 
         for group in response.groups {
             groupLookup[group.name] = (icon: group.icon, colorHex: group.colorHex)
             for category in group.categories {
-                categoryToGroup[category.name] = group.name
-                for subCategory in category.subCategories {
-                    subCategoryToGroup[subCategory] = group.name
-                    subCategoryToCategory[subCategory] = category.name
-                    subCategoryToDisplayName[subCategory] = category.cleanName
-                }
+                let name = category.name
+                let displayName = category.cleanName
+                let icon = category.icon ?? "tag"
+                let colorHex = category.colorHex ?? group.colorHex
+
+                categoryToGroup[name] = group.name
+                categoryToDisplayName[name] = displayName
+                categoryToIcon[name] = icon
+                categoryToColorHex[name] = colorHex
+
+                // Also index by display name for normalized lookups
+                displayNameToIcon[displayName] = icon
+                displayNameToColorHex[displayName] = colorHex
             }
         }
     }
 
-    // MARK: - All Sub-Categories
+    // MARK: - All Categories
 
-    /// Returns all sub-category names from the loaded hierarchy
-    var allSubCategories: [String] {
+    /// Returns all category names from the loaded hierarchy
+    var allCategories: [String] {
         guard let hierarchy = hierarchy else { return [] }
         return hierarchy.groups.flatMap { group in
             group.categories.flatMap { $0.subCategories }
@@ -220,11 +237,11 @@ class CategoryRegistryManager: ObservableObject {
         "Other": "group_other",
     ]
 
-    // MARK: - Lookup Helpers
+    // MARK: - Category Lookup Helpers
 
-    /// Get localized display name for a sub-category
-    func displayNameForSubCategory(_ subCategory: String) -> String {
-        let englishName = subCategoryToDisplayName[subCategory] ?? subCategory
+    /// Get localized display name for a category
+    func displayNameForCategory(_ category: String) -> String {
+        let englishName = categoryToDisplayName[category] ?? category
         if let key = Self.categoryTranslationKeys[englishName] {
             return L(key)
         }
@@ -239,30 +256,32 @@ class CategoryRegistryManager: ObservableObject {
         return group
     }
 
-    func groupForSubCategory(_ subCategory: String) -> String {
-        subCategoryToGroup[subCategory] ?? "Other"
-    }
-
-    /// Get the mid-level category for a sub-category (e.g., "Phones & Accessories" -> "Electronics")
-    func categoryForSubCategory(_ subCategory: String) -> String {
-        subCategoryToCategory[subCategory] ?? subCategory
-    }
-
-    /// Get the group for a mid-level category (e.g., "Snacks" -> "Snacks & Beverages")
+    /// Get the group for a category
     func groupForCategory(_ category: String) -> String {
         categoryToGroup[category] ?? "Other"
     }
 
-    func iconForSubCategory(_ subCategory: String) -> String {
-        let group = groupForSubCategory(subCategory)
-        return groupLookup[group]?.icon ?? iconForGroup(group)
+    /// Get Phosphor icon name for a category (looks up by internal name, then display name)
+    func iconForCategory(_ category: String) -> String {
+        categoryToIcon[category]
+            ?? displayNameToIcon[category]
+            ?? "tag"
     }
 
-    func colorForSubCategory(_ subCategory: String) -> Color {
-        let group = groupForSubCategory(subCategory)
-        let hex = groupLookup[group]?.colorHex ?? colorHexForGroup(group)
+    /// Get Color for a category
+    func colorForCategory(_ category: String) -> Color {
+        let hex = colorHexForCategory(category)
         return Color(hex: hex) ?? .gray
     }
+
+    /// Get hex color string for a category
+    func colorHexForCategory(_ category: String) -> String {
+        categoryToColorHex[category]
+            ?? displayNameToColorHex[category]
+            ?? "#8E8E93"
+    }
+
+    // MARK: - Group Lookup Helpers
 
     func iconForGroup(_ group: String) -> String {
         if let cached = groupLookup[group]?.icon { return cached }
@@ -301,7 +320,7 @@ class CategoryRegistryManager: ObservableObject {
     // MARK: - Fallback Data
 
     private func setupFallbackData() {
-        // Pre-populate lookups with hardcoded values so the app works before API loads
+        // Pre-populate group lookups with hardcoded values so the app works before API loads
         let fallbackGroups: [(String, String, String)] = [
             ("Fresh Food", "leaf.fill", "#2ECC71"),
             ("Pantry & Staples", "cabinet.fill", "#E67E22"),

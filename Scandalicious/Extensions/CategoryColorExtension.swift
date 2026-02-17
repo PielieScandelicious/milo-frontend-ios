@@ -138,23 +138,24 @@ extension String {
 
 // MARK: - Category Icon Lookup (Phosphor)
 extension String {
-    /// Get Phosphor icon identifier for a grocery category based on its name.
+    /// Get Phosphor icon identifier for a category based on its name.
+    /// Looks up via CategoryRegistryManager (backend single source of truth).
     /// Returns a Phosphor raw value string usable with `Image.categorySymbol()`.
     var categoryIcon: String {
-        ExpenseCategory.from(name: self).phIconName
+        CategoryRegistryManager.shared.iconForCategory(self.normalizedCategoryName)
     }
 }
 
-// MARK: - Grocery Category Colors
+// MARK: - Category Colors
 extension String {
-    /// Assigns vibrant colors to grocery categories via the ExpenseCategory enum.
+    /// Get color for a category via CategoryRegistryManager (backend single source of truth).
     var categoryColor: Color {
-        ExpenseCategory.from(name: self).color
+        CategoryRegistryManager.shared.colorForCategory(self.normalizedCategoryName)
     }
 
     /// Returns hex color string for categories (for CategorySpendItem conversion)
     var categoryColorHex: String {
-        return categoryColor.toHex()
+        CategoryRegistryManager.shared.colorHexForCategory(self.normalizedCategoryName)
     }
 }
 

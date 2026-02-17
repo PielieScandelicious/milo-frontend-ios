@@ -54,7 +54,7 @@ struct CategoryBudgetDetailView: View {
         var groups: [String: [CategoryBudgetProgress]] = [:]
 
         for cat in progress.categoryProgress {
-            let group = registry.groupForSubCategory(cat.category)
+            let group = registry.groupForCategory(cat.category)
             groups[group, default: []].append(cat)
         }
 
@@ -134,7 +134,7 @@ struct CategoryBudgetDetailView: View {
             }
         }
         .confirmationDialog(
-            "Remove \(categoryToRemove.map { CategoryRegistryManager.shared.displayNameForSubCategory($0) } ?? "") target?",
+            "Remove \(categoryToRemove.map { CategoryRegistryManager.shared.displayNameForCategory($0) } ?? "") target?",
             isPresented: Binding(
                 get: { categoryToRemove != nil },
                 set: { if !$0 { categoryToRemove = nil } }
@@ -488,7 +488,7 @@ struct CategoryBudgetCard: View {
 
                 // Category info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(CategoryRegistryManager.shared.displayNameForSubCategory(categoryProgress.category))
+                    Text(CategoryRegistryManager.shared.displayNameForCategory(categoryProgress.category))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
 
@@ -746,7 +746,7 @@ struct CompactCategoryBudgetItem: View {
 
             // Category name and status
             VStack(alignment: .leading, spacing: 3) {
-                Text(CategoryRegistryManager.shared.displayNameForSubCategory(categoryProgress.category))
+                Text(CategoryRegistryManager.shared.displayNameForCategory(categoryProgress.category))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)

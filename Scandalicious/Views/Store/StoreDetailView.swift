@@ -104,7 +104,7 @@ struct StoreDetailView: View {
         var groupDict: [String: (icon: String, colorHex: String, categories: [Category])] = [:]
 
         for category in currentCategories {
-            let midCategory = registry.categoryForSubCategory(category.name)
+            let midCategory = category.name
             let parentGroup = registry.groupForCategory(midCategory)
             let icon = registry.iconForGroup(parentGroup)
             let colorHex = registry.colorHexForGroup(parentGroup)

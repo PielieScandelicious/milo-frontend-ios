@@ -151,7 +151,7 @@ struct BudgetPulseView: View {
                 Text(L("remove_budget_confirm"))
             }
             .confirmationDialog(
-                "Remove \(categoryToRemove.map { CategoryRegistryManager.shared.displayNameForSubCategory($0) } ?? "") target?",
+                "Remove \(categoryToRemove.map { CategoryRegistryManager.shared.displayNameForCategory($0) } ?? "") target?",
                 isPresented: Binding(
                     get: { categoryToRemove != nil },
                     set: { if !$0 { categoryToRemove = nil } }
@@ -955,7 +955,7 @@ struct BudgetPulseView: View {
                     .foregroundStyle(target.category.categoryColor)
             }
 
-            Text(CategoryRegistryManager.shared.displayNameForSubCategory(target.category))
+            Text(CategoryRegistryManager.shared.displayNameForCategory(target.category))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
@@ -1301,7 +1301,7 @@ struct BudgetPulseView: View {
                                             .fill(allocation.category.categoryColor)
                                             .frame(width: 6, height: 6)
 
-                                        Text(CategoryRegistryManager.shared.displayNameForSubCategory(allocation.category))
+                                        Text(CategoryRegistryManager.shared.displayNameForCategory(allocation.category))
                                             .font(.system(size: 12, weight: .medium))
                                             .foregroundColor(.white.opacity(0.8))
 

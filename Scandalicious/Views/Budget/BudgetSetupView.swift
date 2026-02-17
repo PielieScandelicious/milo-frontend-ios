@@ -494,7 +494,7 @@ struct CategoryPickerSheet: View {
     private var registry: CategoryRegistryManager { CategoryRegistryManager.shared }
 
     private var availableCategories: [String] {
-        let all = registry.allSubCategories.filter { !existingCategories.contains($0) }
+        let all = registry.allCategories.filter { !existingCategories.contains($0) }
         if searchText.isEmpty { return all }
         return all.filter { $0.lowercased().contains(searchText.lowercased()) }
     }

@@ -139,7 +139,7 @@ struct BudgetActivityRingsGrid: View {
         var groups: [String: [BudgetProgressItem]] = [:]
 
         for item in items {
-            let group = registry.groupForSubCategory(item.name)
+            let group = registry.groupForCategory(item.name)
             groups[group, default: []].append(item)
         }
 

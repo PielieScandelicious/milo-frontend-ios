@@ -37,7 +37,7 @@ struct CategoryBudgetRow: View {
             // Category info
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(CategoryRegistryManager.shared.displayNameForSubCategory(categoryProgress.category))
+                    Text(CategoryRegistryManager.shared.displayNameForCategory(categoryProgress.category))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
 

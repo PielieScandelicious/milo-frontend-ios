@@ -588,9 +588,11 @@ struct OverviewView: View {
             // Keep in-memory display caches alive to avoid flash - they'll be replaced with fresh data
             AppDataCache.shared.yearSummaryCache.removeValue(forKey: currentYear)
             AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: currentMonthPeriod)
-            let keysToRemove = AppDataCache.shared.categoryItemsCache.keys.filter { $0.hasPrefix("\(currentMonthPeriod)|") }
-            for key in keysToRemove {
-                AppDataCache.shared.categoryItemsCache.removeValue(forKey: key)
+            AppDataCache.shared.invalidateCategoryItems(for: currentMonthPeriod)
+            // Also invalidate the viewed period so expanding a category fetches fresh data
+            if selectedPeriod != currentMonthPeriod {
+                AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: selectedPeriod)
+                AppDataCache.shared.invalidateCategoryItems(for: selectedPeriod)
             }
             AppDataCache.shared.invalidateReceipts(for: currentMonthPeriod)
 
@@ -633,12 +635,17 @@ struct OverviewView: View {
                     }
                 }
             } else {
-                // Not viewing affected period - safe to clear in-memory caches
+                // Viewing a different period — refresh its category data too
                 pieChartSummaryCache.removeValue(forKey: currentMonthPeriod)
-                categoryItems.removeAll()
-                    categoryCurrentPage.removeAll()
-                    categoryHasMore.removeAll()
-                    categoryLoadingMore = nil
+                await fetchCategoryData(for: selectedPeriod, force: true)
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        categoryItems.removeAll()
+                        categoryCurrentPage.removeAll()
+                        categoryHasMore.removeAll()
+                        categoryLoadingMore = nil
+                    }
+                }
             }
 
             await rateLimitManager.syncFromBackend()
@@ -672,10 +679,7 @@ struct OverviewView: View {
                 AppDataCache.shared.yearSummaryCache.removeValue(forKey: deletedYear)
             }
             AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: affectedPeriod)
-            let categoryKeysToRemove = AppDataCache.shared.categoryItemsCache.keys.filter { $0.hasPrefix("\(affectedPeriod)|") }
-            for key in categoryKeysToRemove {
-                AppDataCache.shared.categoryItemsCache.removeValue(forKey: key)
-            }
+            AppDataCache.shared.invalidateCategoryItems(for: affectedPeriod)
 
             // Update available periods with fresh metadata (period may have been emptied)
             await MainActor.run {
@@ -1002,6 +1006,7 @@ struct OverviewView: View {
 
         // Refresh category data for this period
         AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: periodToSync)
+        AppDataCache.shared.invalidateCategoryItems(for: periodToSync)
         await fetchCategoryData(for: periodToSync, force: true)
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.3)) {
@@ -1018,6 +1023,9 @@ struct OverviewView: View {
             AppDataCache.shared.updateReceipts(for: periodToSync, receipts: receiptsViewModel.receipts)
         }
         rebuildSortedReceipts()
+
+        // Refresh budget data
+        await budgetViewModel.refreshProgress()
 
         // Ensure "Syncing" label is visible for at least 1.5s
         let elapsed = Date().timeIntervalSince(syncStart)
