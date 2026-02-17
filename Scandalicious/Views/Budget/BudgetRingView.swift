@@ -228,11 +228,16 @@ struct CategoryBudgetRing: View {
         categoryProgress: []
     )
 
-    return ZStack {
+    ZStack {
         Color(white: 0.05).ignoresSafeArea()
 
         VStack(spacing: 40) {
             BudgetRingView(progress: sampleProgress, size: 120)
+
+            HStack(spacing: 24) {
+                BudgetRingView(progress: sampleProgress, size: 100)
+                BudgetRingView(progress: sampleProgress, size: 140)
+            }
 
             HStack(spacing: 16) {
                 MiniBudgetRing(spendRatio: 0.4, paceStatus: .underBudget)
@@ -248,6 +253,7 @@ struct CategoryBudgetRing: View {
                         currentSpend: 65
                     )
                 )
+
                 CategoryBudgetRing(
                     categoryProgress: CategoryBudgetProgress(
                         category: "Snacks & Sweets",
