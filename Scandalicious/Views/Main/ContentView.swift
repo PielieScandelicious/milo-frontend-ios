@@ -32,7 +32,8 @@ struct ContentView: View {
     enum Tab: Int, Hashable {
         case budget = 0
         case home = 1
-        case dobby = 2
+        case promos = 2
+        case dobby = 3
     }
 
     var body: some View {
@@ -49,6 +50,12 @@ struct ContentView: View {
                         Label("Home", systemImage: "house.fill")
                     }
                     .tag(Tab.home)
+
+                PromosTab()
+                    .tabItem {
+                        Label("Deals", systemImage: "tag.fill")
+                    }
+                    .tag(Tab.promos)
 
                 ScandaLiciousTab()
                     .tabItem {
@@ -198,6 +205,18 @@ struct ScanTab: View {
     var body: some View {
         ReceiptScanView()
             .id("ScanTab") // Prevent recreation
+    }
+}
+
+// MARK: - Promos Tab
+struct PromosTab: View {
+    @StateObject private var viewModel = PromosViewModel()
+
+    var body: some View {
+        NavigationStack {
+            PromosView(viewModel: viewModel)
+        }
+        .id("PromosTab") // Prevent recreation
     }
 }
 

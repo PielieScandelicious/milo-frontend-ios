@@ -34,7 +34,6 @@ struct OverviewView: View {
     @ObservedObject var rateLimitManager = RateLimitManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @StateObject private var budgetViewModel = BudgetViewModel()
-    @StateObject private var promosViewModel = PromosViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
 
@@ -90,8 +89,6 @@ struct OverviewView: View {
     @State private var chartRefreshToken: Int = 0 // Incremented on receipt upload to force pie chart re-animation
     @State private var sortedReceiptsCache: [APIReceipt] = [] // Cached sorted receipts
     @State private var budgetExpanded = false // Track if budget widget is expanded
-    @State private var activeCardPage = 0 // 0=budget, 1=promos
-    @State private var cardDragOffset: CGFloat = 0 // Live drag offset for carousel
     @State private var periodBounceOffset: CGFloat = 0 // Rubber-band effect when at period boundary
     private let maxVisibleRows = 4 // Maximum rows to show before "Show All" button
     @Binding var showSignOutConfirmation: Bool
@@ -499,17 +496,19 @@ struct OverviewView: View {
             }
         }
 
-        // Defer ALL heavy work to next run loop to allow smooth tab transition
+        // Compute available periods synchronously so the toolbar period
+        // navigation buttons are present on the very first frame (avoids jitter
+        // from buttons appearing after a delayed Task).
+        if cachedAvailablePeriods.isEmpty {
+            cachedAvailablePeriods = computeAvailablePeriods()
+        }
+
+        // Defer heavy work to next run loop to allow smooth tab transition
         Task {
             // Small delay to let the tab animation complete
             try? await Task.sleep(for: .milliseconds(100))
 
             await MainActor.run {
-                // Update periods cache (deferred to avoid blocking initial render)
-                if cachedAvailablePeriods.isEmpty {
-                    cachedAvailablePeriods = computeAvailablePeriods()
-                }
-
                 // Build breakdown caches from preloaded data
                 rebuildBreakdownCache()
 
@@ -547,10 +546,6 @@ struct OverviewView: View {
             await budgetViewModel.loadBudget()
         }
 
-        Task {
-            try? await Task.sleep(for: .milliseconds(200))
-            await promosViewModel.loadPromos()
-        }
 
         // Load category data from pre-populated cache
         let initialPeriod = selectedPeriod
@@ -734,11 +729,6 @@ struct OverviewView: View {
         showAllRows = false
         isReceiptsSectionExpanded = false
         receiptsScrollResetToken += 1
-
-        // Reset carousel to budget page when switching periods
-        // (past periods don't show promos, so avoid landing on a hidden page)
-        activeCardPage = 0
-        cardDragOffset = 0
 
         // Clear segment caches for fresh rendering
         cachedSegmentsByPeriod.removeAll()
@@ -1308,85 +1298,16 @@ struct OverviewView: View {
     // MARK: - Overview Content
     private func overviewContentForPeriod(_ period: String) -> some View {
         return VStack(spacing: 16) {
-            // Swipeable carousel: Budget + Promos
-            cardCarousel
+            // Budget widget
+            BudgetPulseView(viewModel: budgetViewModel, isExpanded: $budgetExpanded)
+                .padding(.horizontal, 16)
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: budgetExpanded)
 
             // Spending card with period swipe
             unifiedSpendingCardForPeriod(period)
                 .offset(x: periodBounceOffset)
                 .contentShape(Rectangle())
                 .simultaneousGesture(periodSwipeGesture)
-        }
-    }
-
-    /// Swipeable carousel: Budget + Promos (current period only shows both)
-    /// Uses a single BudgetPulseView instance with offset-based paging (no TabView)
-    /// so expanding/collapsing is smooth with no flash.
-    private var cardCarousel: some View {
-        let screenWidth = UIScreen.main.bounds.width
-        let showPromos = isCurrentPeriod
-
-        return VStack(spacing: 8) {
-            // Carousel area
-            ZStack(alignment: .top) {
-                // Budget widget - single instance, always rendered
-                BudgetPulseView(viewModel: budgetViewModel, isExpanded: $budgetExpanded)
-                    .padding(.horizontal, 16)
-                    .offset(x: (budgetExpanded || !showPromos) ? 0 : CGFloat(-activeCardPage) * screenWidth + cardDragOffset)
-                    .allowsHitTesting(budgetExpanded || !showPromos || activeCardPage == 0)
-
-                // Promo card - only shown for current period
-                if showPromos && !budgetExpanded {
-                    PromoBannerCard(viewModel: promosViewModel)
-                        .padding(.horizontal, 16)
-                        .offset(x: CGFloat(1 - activeCardPage) * screenWidth + cardDragOffset)
-                        .allowsHitTesting(activeCardPage == 1)
-                }
-            }
-            .clipped()
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                (budgetExpanded || !showPromos) ? nil :
-                DragGesture(minimumDistance: 20, coordinateSpace: .local)
-                    .onChanged { value in
-                        if abs(value.translation.width) > abs(value.translation.height) {
-                            cardDragOffset = value.translation.width
-                        }
-                    }
-                    .onEnded { value in
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if value.translation.width < -50 && activeCardPage < 1 {
-                                activeCardPage = 1
-                            } else if value.translation.width > 50 && activeCardPage > 0 {
-                                activeCardPage = 0
-                            }
-                            cardDragOffset = 0
-                        }
-                    }
-            )
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
-
-            // Page dots - only shown for current period with promos
-            if showPromos && !budgetExpanded {
-                HStack(spacing: 6) {
-                    ForEach(0..<2, id: \.self) { index in
-                        Capsule()
-                            .fill(activeCardPage == index ? Color.white.opacity(0.5) : Color.white.opacity(0.15))
-                            .frame(width: activeCardPage == index ? 16 : 6, height: 4)
-                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activeCardPage)
-                    }
-                }
-                .transition(.opacity)
-            }
-        }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: budgetExpanded)
-        .onChange(of: budgetExpanded) { _, expanded in
-            if expanded {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    activeCardPage = 0
-                    cardDragOffset = 0
-                }
-            }
         }
     }
 
