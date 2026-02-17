@@ -444,10 +444,7 @@ struct OverviewView: View {
             }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
-                // Reset entrance animation states for next appearance
-                viewAppeared = false
-                contentOpacity = 0
-                headerOpacity = 0
+                // Keep entrance animation states — no fade-in replay on tab switch back
             }
             .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
                 handleReceiptUploadSuccess()
@@ -541,13 +538,14 @@ struct OverviewView: View {
             }
         }
 
-        // Load budget data
+        // Load budget and promo data — deferred to avoid competing with tab transition animation
         Task {
+            try? await Task.sleep(for: .milliseconds(150))
             await budgetViewModel.loadBudget()
         }
 
-        // Load promo recommendations
         Task {
+            try? await Task.sleep(for: .milliseconds(200))
             await promosViewModel.loadPromos()
         }
 

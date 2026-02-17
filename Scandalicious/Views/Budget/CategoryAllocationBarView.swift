@@ -157,10 +157,9 @@ struct CategoryAllocationBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                animationProgress = 1.0
-            }
+            animationProgress = 1.0
         }
+        .animation(.easeOut(duration: 0.4), value: animationProgress)
     }
 }
 
