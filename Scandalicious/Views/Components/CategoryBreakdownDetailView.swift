@@ -347,16 +347,15 @@ struct CategoryBreakdownDetailView: View {
     private func categoryRowContent(_ category: CategorySpendItem) -> some View {
         let isExpanded = expandedCategoryId == category.id
 
-        return HStack(spacing: 12) {
-            // Color accent bar on the left (matching StoreDetailView)
-            RoundedRectangle(cornerRadius: 2)
+        return HStack(spacing: 10) {
+            // Color dot + icon
+            Circle()
                 .fill(category.color)
-                .frame(width: 4, height: 32)
+                .frame(width: 8, height: 8)
 
-            // Category icon
             Image.categorySymbol(category.icon)
+                .frame(width: 18, height: 18)
                 .foregroundStyle(category.color)
-                .frame(width: 16, height: 16)
 
             // Category name + percentage
             VStack(alignment: .leading, spacing: 2) {

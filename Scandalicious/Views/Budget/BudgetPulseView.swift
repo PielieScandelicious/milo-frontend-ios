@@ -945,15 +945,11 @@ struct BudgetPulseView: View {
         let target = inlineTargets[index]
 
         return HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(target.category.categoryColor.opacity(0.15))
-                    .frame(width: 32, height: 32)
-
-                Image.categorySymbol(target.category.categoryIcon)
-                    .frame(width: 14, height: 14)
-                    .foregroundStyle(target.category.categoryColor)
-            }
+            CategoryIconBadge(
+                icon: target.category.categoryIcon,
+                color: target.category.categoryColor,
+                size: 32
+            )
 
             Text(CategoryRegistryManager.shared.displayNameForCategory(target.category))
                 .font(.system(size: 13, weight: .semibold))

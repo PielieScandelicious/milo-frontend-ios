@@ -113,6 +113,8 @@ class CategoryRegistryManager: ObservableObject {
     private var displayNameToIcon: [String: String] = [:]
     // Display name -> hex color (for normalized name lookups)
     private var displayNameToColorHex: [String: String] = [:]
+    // Display name -> group name (for normalized name lookups)
+    private var displayNameToGroup: [String: String] = [:]
 
     private var baseURL: String { AppConfiguration.apiBase }
     private let decoder = JSONDecoder()
@@ -162,6 +164,7 @@ class CategoryRegistryManager: ObservableObject {
         categoryToColorHex.removeAll()
         displayNameToIcon.removeAll()
         displayNameToColorHex.removeAll()
+        displayNameToGroup.removeAll()
 
         for group in response.groups {
             groupLookup[group.name] = (icon: group.icon, colorHex: group.colorHex)
@@ -179,6 +182,7 @@ class CategoryRegistryManager: ObservableObject {
                 // Also index by display name for normalized lookups
                 displayNameToIcon[displayName] = icon
                 displayNameToColorHex[displayName] = colorHex
+                displayNameToGroup[displayName] = group.name
             }
         }
     }
@@ -271,9 +275,11 @@ class CategoryRegistryManager: ObservableObject {
         return group
     }
 
-    /// Get the group for a category
+    /// Get the group for a category (checks internal name, then display name)
     func groupForCategory(_ category: String) -> String {
-        categoryToGroup[category] ?? "Other"
+        categoryToGroup[category]
+            ?? displayNameToGroup[category]
+            ?? "Other"
     }
 
     /// Get Phosphor icon name for a category (looks up by internal name, then display name)

@@ -170,15 +170,11 @@ struct EditCategoryBudgetsSheet: View {
 
         return HStack(spacing: 12) {
             // Icon
-            ZStack {
-                Circle()
-                    .fill(alloc.category.categoryColor.opacity(0.15))
-                    .frame(width: 40, height: 40)
-
-                Image.categorySymbol(alloc.category.categoryIcon)
-                    .frame(width: 17, height: 17)
-                    .foregroundStyle(alloc.category.categoryColor)
-            }
+            CategoryIconBadge(
+                icon: alloc.category.categoryIcon,
+                color: alloc.category.categoryColor,
+                size: 40
+            )
 
             // Name + edit indicator
             VStack(alignment: .leading, spacing: 1) {

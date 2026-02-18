@@ -337,15 +337,11 @@ struct ReceiptItemRow: View {
         HStack(alignment: .top, spacing: 12) {
             // Category Icon with Quantity Badge
             ZStack(alignment: .topTrailing) {
-                ZStack {
-                    Circle()
-                        .fill(categoryColor.opacity(0.15))
-                        .frame(width: 44, height: 44)
-
-                    Image.categorySymbol(transaction.category.categoryIcon)
-                        .frame(width: 20, height: 20)
-                        .foregroundStyle(categoryColor)
-                }
+                CategoryIconBadge(
+                    icon: transaction.category.categoryIcon,
+                    color: categoryColor,
+                    size: 44
+                )
 
                 // Quantity badge (show if > 1)
                 if transaction.quantity > 1 {
@@ -356,7 +352,7 @@ struct ReceiptItemRow: View {
                         .padding(.vertical, 2)
                         .background(
                             Capsule()
-                                .fill(categoryColor)
+                                .fill(categoryColor.adjustBrightness(by: -0.25))
                         )
                         .offset(x: 6, y: -4)
                 }

@@ -30,7 +30,7 @@ struct ReceiptTransactionsView: View {
     /// Grocery items grouped by sub-category, sorted by total spend
     private var grocerySubGroups: [(String, [APIReceiptItem])] {
         let groceryItems = filteredTransactions.filter {
-            $0.categoryDisplayName.groceryHealthColor != nil
+            $0.categoryDisplayName.isGroceryCategory
         }
         guard !groceryItems.isEmpty else { return [] }
 
@@ -45,7 +45,7 @@ struct ReceiptTransactionsView: View {
     /// Non-grocery items grouped by sub-category (original behavior), sorted by total spend
     private var nonGroceryGroups: [(String, [APIReceiptItem])] {
         let nonGroceryItems = filteredTransactions.filter {
-            $0.categoryDisplayName.groceryHealthColor == nil
+            !$0.categoryDisplayName.isGroceryCategory
         }
         guard !nonGroceryItems.isEmpty else { return [] }
 
@@ -352,8 +352,8 @@ struct ReceiptTransactionsView: View {
                     let subTotal = items.reduce(0) { $0 + $1.totalPrice }
 
                     VStack(alignment: .leading, spacing: 0) {
-                        let subColor = subCategory.groceryHealthColor ?? .white.opacity(0.5)
-                        let subIcon = subCategory.groceryHealthIcon ?? "cart.fill"
+                        let subColor = subCategory.categoryColor
+                        let subIcon = subCategory.categoryIcon
 
                         // Tappable sub-category header
                         Button {
@@ -414,22 +414,12 @@ struct ReceiptTransactionsView: View {
 
     private func transactionRow(_ transaction: APIReceiptItem, colorOverride: Color? = nil) -> some View {
         let itemColor = colorOverride ?? transaction.categoryDisplayName.categoryColor
-        let itemIcon = colorOverride != nil
-            ? (transaction.categoryDisplayName.groceryHealthIcon ?? transaction.categoryDisplayName.categoryIcon)
-            : transaction.categoryDisplayName.categoryIcon
+        let itemIcon = transaction.categoryDisplayName.categoryIcon
 
         return HStack(spacing: 12) {
             // Icon with quantity badge
             ZStack(alignment: .topTrailing) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(itemColor.opacity(0.2))
-                        .frame(width: 50, height: 50)
-
-                    Image.categorySymbol(itemIcon)
-                        .frame(width: 22, height: 22)
-                        .foregroundStyle(itemColor)
-                }
+                CategoryIconBadge(icon: itemIcon, color: itemColor, size: 50)
 
                 if transaction.quantity > 1 {
                     Text("×\(transaction.quantity)")
@@ -439,7 +429,7 @@ struct ReceiptTransactionsView: View {
                         .padding(.vertical, 2)
                         .background(
                             Capsule()
-                                .fill(itemColor)
+                                .fill(itemColor.adjustBrightness(by: -0.25))
                         )
                         .offset(x: 6, y: -4)
                 }

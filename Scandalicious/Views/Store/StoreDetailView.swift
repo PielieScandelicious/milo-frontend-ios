@@ -277,7 +277,7 @@ struct StoreDetailView: View {
 
                             let segment = categoryToSegment(category: category)
                             let normalizedName = category.name.normalizedCategoryName
-                            let icon = normalizedName.groceryHealthIcon ?? normalizedName.categoryIcon
+                            let icon = normalizedName.categoryIcon
                             expandableCategoryRow(segment: segment, isOther: false, icon: icon, originalCategoryName: category.name)
                         }
                         .opacity(categoriesRevealed ? 1 : 0)
@@ -536,12 +536,7 @@ struct StoreDetailView: View {
         let normalizedName = category.name.normalizedCategoryName
         let localizedName = category.name.localizedCategoryName
 
-        let color: Color
-        if let healthColor = normalizedName.groceryHealthColor {
-            color = healthColor
-        } else {
-            color = category.groupColorHex.flatMap { Color(hex: $0) } ?? normalizedName.categoryColor
-        }
+        let color = normalizedName.categoryColor
 
         return ChartSegment(
             startAngle: .degrees(0),
@@ -755,16 +750,13 @@ struct StoreDetailView: View {
                 }
             } label: {
                 HStack(spacing: 12) {
-                    // Color accent bar on the left (matching StoreRowButton)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(isOther ? segment.color.opacity(0.5) : segment.color)
-                        .frame(width: 4, height: 32)
-
-                    // Health-themed icon for grocery sub-categories
+                    // Category icon badge
                     if let icon = icon {
-                        Image.categorySymbol(icon)
-                            .foregroundStyle(segment.color)
-                            .frame(width: 16, height: 16)
+                        CategoryIconBadge(
+                            icon: icon,
+                            color: isOther ? segment.color.opacity(0.5) : segment.color,
+                            size: 34
+                        )
                     }
 
                     // Category name + percentage

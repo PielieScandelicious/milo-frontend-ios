@@ -1313,13 +1313,9 @@ struct CategorySpendItem: Codable, Identifiable {
         name.localizedCategoryName
     }
 
-    /// Color from health-based gradient (green=healthy → red=unhealthy) if available,
-    /// otherwise falls back to hex string or category-based color
+    /// Color from backend hex (CATEGORY_CONFIG), falling back to registry lookup
     var color: Color {
-        if let healthColor = normalizedName.groceryHealthColor {
-            return healthColor
-        }
-        return Color(hex: colorHex) ?? normalizedName.categoryColor
+        Color(hex: colorHex) ?? normalizedName.categoryColor
     }
 
     /// SF Symbol icon for this category

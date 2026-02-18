@@ -259,15 +259,11 @@ struct BudgetSetupView: View {
 
         return HStack(spacing: 12) {
             // Icon
-            ZStack {
-                Circle()
-                    .fill(target.category.categoryColor.opacity(0.12))
-                    .frame(width: 38, height: 38)
-
-                Image.categorySymbol(target.category.categoryIcon)
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(target.category.categoryColor)
-            }
+            CategoryIconBadge(
+                icon: target.category.categoryIcon,
+                color: target.category.categoryColor,
+                size: 38
+            )
 
             // Name
             Text(target.category.localizedCategoryName)
@@ -531,15 +527,11 @@ struct CategoryPickerSheet: View {
                                 dismiss()
                             } label: {
                                 HStack(spacing: 12) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(category.categoryColor.opacity(0.15))
-                                            .frame(width: 38, height: 38)
-
-                                        Image.categorySymbol(category.categoryIcon)
-                                            .frame(width: 16, height: 16)
-                                            .foregroundStyle(category.categoryColor)
-                                    }
+                                    CategoryIconBadge(
+                                        icon: category.categoryIcon,
+                                        color: category.categoryColor,
+                                        size: 38
+                                    )
 
                                     Text(category.localizedCategoryName)
                                         .font(.system(size: 15, weight: .medium))

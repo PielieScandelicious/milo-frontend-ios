@@ -283,15 +283,11 @@ struct BudgetCreatedSheet: View {
 
         return HStack(spacing: 12) {
             // Category icon
-            ZStack {
-                Circle()
-                    .fill(allocation.category.categoryColor.opacity(0.2))
-                    .frame(width: 36, height: 36)
-
-                Image.categorySymbol(allocation.category.categoryIcon)
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(allocation.category.categoryColor)
-            }
+            CategoryIconBadge(
+                icon: allocation.category.categoryIcon,
+                color: allocation.category.categoryColor,
+                size: 36
+            )
 
             // Name
             Text(allocation.category.localizedCategoryName)

@@ -543,15 +543,11 @@ struct APITransactionRowView: View {
         HStack(spacing: 12) {
             // Icon with quantity badge
             ZStack(alignment: .topTrailing) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(transaction.category.categoryColor.opacity(0.2))
-                        .frame(width: 50, height: 50)
-
-                    Image.categorySymbol(transaction.category.categoryIcon)
-                        .frame(width: 22, height: 22)
-                        .foregroundStyle(transaction.category.categoryColor)
-                }
+                CategoryIconBadge(
+                    icon: transaction.category.categoryIcon,
+                    color: transaction.category.categoryColor,
+                    size: 50
+                )
 
                 // Quantity badge (only show if quantity > 1)
                 if transaction.quantity > 1 {
@@ -562,7 +558,7 @@ struct APITransactionRowView: View {
                         .padding(.vertical, 2)
                         .background(
                             Capsule()
-                                .fill(transaction.category.categoryColor)
+                                .fill(transaction.category.categoryColor.adjustBrightness(by: -0.25))
                         )
                         .offset(x: 6, y: -4)
                 }

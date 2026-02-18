@@ -299,15 +299,11 @@ struct SplitItemRow: View {
             // Item info row
             HStack(alignment: .top, spacing: 12) {
                 // Category icon
-                ZStack {
-                    Circle()
-                        .fill(categoryColor.opacity(0.15))
-                        .frame(width: 36, height: 36)
-
-                    Image.categorySymbol(transaction.category.categoryIcon)
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(categoryColor)
-                }
+                CategoryIconBadge(
+                    icon: transaction.category.categoryIcon,
+                    color: categoryColor,
+                    size: 36
+                )
 
                 // Item details
                 VStack(alignment: .leading, spacing: 2) {
