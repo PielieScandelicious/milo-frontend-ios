@@ -296,6 +296,52 @@ struct ProfileView: View {
                 Text(L("insights"))
             }
 
+            // My Progress (Gamification)
+            Section {
+                HStack {
+                    Label("Tier", systemImage: GamificationManager.shared.tierProgress.currentTier.icon)
+                    Spacer()
+                    Text(GamificationManager.shared.tierProgress.currentTier.rawValue)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            LinearGradient(
+                                colors: GamificationManager.shared.tierProgress.currentTier.gradientColors,
+                                startPoint: .leading, endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                }
+
+                HStack {
+                    Label("Streak", systemImage: "flame.fill")
+                    Spacer()
+                    Text("\(GamificationManager.shared.streak.weekCount) weeks")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Label("Wallet", systemImage: "wallet.pass.fill")
+                    Spacer()
+                    Text(GamificationManager.shared.wallet.formatted)
+                        .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0))
+                        .fontWeight(.semibold)
+                }
+
+                HStack {
+                    Label("Badges", systemImage: "star.fill")
+                    Spacer()
+                    let unlocked = GamificationManager.shared.badges.filter(\.isUnlocked).count
+                    let total = GamificationManager.shared.badges.count
+                    Text("\(unlocked)/\(total)")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("My Progress")
+            }
+
             // Sign Out
             Section {
                 Button(role: .destructive) {

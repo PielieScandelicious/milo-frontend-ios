@@ -67,6 +67,7 @@ struct ReceiptScanView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
 
+
                 // Floating scan button (bottom right)
                 VStack {
                     Spacer()
@@ -190,7 +191,7 @@ struct ReceiptScanView: View {
                 await rateLimitManager.syncFromBackend()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { notification in
             // Refresh all stats and receipt list when a receipt is uploaded (from any source)
             loadAllTimeStats()
             Task {

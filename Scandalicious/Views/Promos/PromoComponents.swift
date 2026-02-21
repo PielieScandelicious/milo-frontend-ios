@@ -72,7 +72,7 @@ private struct GlassCard: ViewModifier {
 }
 
 extension View {
-    fileprivate func glassCard(
+    func glassCard(
         cornerRadius: CGFloat = 20,
         borderGradient: LinearGradient? = nil
     ) -> some View {

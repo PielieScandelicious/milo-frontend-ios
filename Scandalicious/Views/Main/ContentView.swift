@@ -29,11 +29,16 @@ struct ContentView: View {
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
 
+    // Gamification reward overlay (global, across all tabs)
+    @State private var showRewardCelebration = false
+    @State private var currentRewardEvent: RewardEvent? = nil
+
     enum Tab: Int, Hashable {
         case budget = 0
         case home = 1
         case promos = 2
         case dobby = 3
+        case rewards = 4
     }
 
     var body: some View {
@@ -41,7 +46,7 @@ struct ContentView: View {
             TabView(selection: $selectedTab) {
                 ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
                     .tabItem {
-                        Label(L("tab_budget"), systemImage: "creditcard.fill")
+                        Label(L("tab_budget"), systemImage: "wallet.bifold.fill")
                     }
                     .tag(Tab.budget)
 
@@ -66,6 +71,12 @@ struct ContentView: View {
                         }
                     }
                     .tag(Tab.dobby)
+
+                RewardsTab()
+                    .tabItem {
+                        Label("Rewards", systemImage: "gift.fill")
+                    }
+                    .tag(Tab.rewards)
             }
             .tint(.blue) // Apple blue
             .toolbarBackground(.ultraThinMaterial, for: .tabBar)
@@ -77,8 +88,34 @@ struct ContentView: View {
                 SyncLoadingView()
                     .transition(.opacity)
             }
+
+            // Reward celebration overlay (visible across all tabs)
+            if showRewardCelebration, let event = currentRewardEvent {
+                RewardCelebrationView(event: event) {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        showRewardCelebration = false
+                    }
+                    currentRewardEvent = nil
+                }
+                .transition(.opacity)
+                .zIndex(100)
+            }
         }
         .animation(.easeInOut(duration: 0.4), value: hasLoadedInitialData)
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { notification in
+            let storeName = notification.userInfo?["storeName"] as? String
+            let receiptAmount = notification.userInfo?["receiptAmount"] as? Double
+            let event = GamificationManager.shared.awardReceiptReward(
+                storeName: storeName,
+                receiptAmount: receiptAmount
+            )
+            currentRewardEvent = event
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    showRewardCelebration = true
+                }
+            }
+        }
         .environmentObject(transactionManager)
         .environmentObject(dataManager)
         .preferredColorScheme(.dark)
@@ -249,6 +286,16 @@ struct ScandaLiciousTab: View {
         }
         .foregroundColor(.green)
         .padding(.top, 12)
+    }
+}
+
+// MARK: - Rewards Tab
+struct RewardsTab: View {
+    var body: some View {
+        NavigationStack {
+            RewardsView()
+        }
+        .id("RewardsTab")
     }
 }
 
