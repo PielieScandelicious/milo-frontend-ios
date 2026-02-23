@@ -1,5 +1,8 @@
 
+# Ignore markdown files except CLAUDE.md and README
 *.md
+!CLAUDE.md
+!README.md
 xcuserdata/
 .idea/
 .DS_Store
