@@ -42,7 +42,10 @@ struct ScandaLiciousApp: App {
                         // Show onboarding for first-time users
                         OnboardingView()
                     } else {
-                        // PAYWALL DISABLED: Always show content view
+                        // PAYWALL DISABLED: Paywall is bypassed during beta/pre-launch.
+                        // SubscriptionManager.subscriptionStatus is hardcoded to .subscribed.
+                        // To re-enable: restore subscription checking logic in SubscriptionManager.updateSubscriptionStatus()
+                        // and gate ContentView behind subscriptionManager.subscriptionStatus.isActive.
                         ContentView()
                     }
                 } else {
