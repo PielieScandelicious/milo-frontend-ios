@@ -487,13 +487,13 @@ struct CategoryDetailView: View {
 
                 if let parsedDate = dateFormatter.date(from: period) {
                     var calendar = Calendar(identifier: .gregorian)
-                    calendar.timeZone = TimeZone(identifier: "UTC")!
+                    calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
-                    let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
-                    let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
-
-                    filters.startDate = startOfMonth
-                    filters.endDate = endOfMonth
+                    if let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate)),
+                       let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) {
+                        filters.startDate = startOfMonth
+                        filters.endDate = endOfMonth
+                    }
                 }
             }
 

@@ -560,7 +560,7 @@ struct OverviewView: View {
     }
 
     private func handleReceiptUploadSuccess() {
-        print("[OverviewView] 📩 handleReceiptUploadSuccess() called")
+        // Receipt upload success notification received
 
         let currentMonthPeriod = PeriodFormatters.periodFormatter.string(from: Date())
         let currentYear = String(Calendar.current.component(.year, from: Date()))
@@ -644,9 +644,7 @@ struct OverviewView: View {
             await rateLimitManager.syncFromBackend()
 
             // Refresh budget widget with latest spend data
-            print("[OverviewView] 🔄 About to call budgetViewModel.refreshProgress()")
             await budgetViewModel.refreshProgress()
-            print("[OverviewView] ✅ budgetViewModel.refreshProgress() completed")
         }
     }
 
@@ -1532,9 +1530,8 @@ struct OverviewView: View {
             withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
                 expandedCategoryId = nil
             }
-        } else if expandedCategoryId != nil {
+        } else if let previousId = expandedCategoryId {
             // Another category is open — collapse it first, then expand the new one
-            let previousId = expandedCategoryId!
 
             let categories = categoryDataForPeriod(period)
             let expandedAbove: Bool = {
@@ -1629,13 +1626,13 @@ struct OverviewView: View {
             // Parse period to get date range (e.g., "January 2026")
             if let parsedDate = PeriodFormatters.periodUTCFormatter.date(from: period) {
                 var calendar = Calendar(identifier: .gregorian)
-                calendar.timeZone = TimeZone(identifier: "UTC")!
+                calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
-                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
-                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
-
-                filters.startDate = startOfMonth
-                filters.endDate = endOfMonth
+                if let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate)),
+                   let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) {
+                    filters.startDate = startOfMonth
+                    filters.endDate = endOfMonth
+                }
             }
 
             let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
@@ -1682,13 +1679,13 @@ struct OverviewView: View {
 
             if let parsedDate = PeriodFormatters.periodUTCFormatter.date(from: period) {
                 var calendar = Calendar(identifier: .gregorian)
-                calendar.timeZone = TimeZone(identifier: "UTC")!
+                calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
-                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
-                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
-
-                filters.startDate = startOfMonth
-                filters.endDate = endOfMonth
+                if let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate)),
+                   let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) {
+                    filters.startDate = startOfMonth
+                    filters.endDate = endOfMonth
+                }
             }
 
             let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)
@@ -2130,16 +2127,12 @@ struct OverviewView: View {
     /// Delete a receipt from the overview
     private func deleteReceiptFromOverview(_ receipt: APIReceipt) {
         isDeletingReceipt = true
-        print("[Overview] deleteReceiptFromOverview called, receiptId=\(receipt.receiptId), selectedPeriod=\(selectedPeriod)")
-        print("[Overview] receiptsVM.receipts.count BEFORE=\(receiptsViewModel.receipts.count)")
 
         Task {
             do {
                 try await receiptsViewModel.deleteReceipt(receipt, period: selectedPeriod, storeName: nil)
                 rebuildSortedReceipts()
-                print("[Overview] deleteReceipt succeeded, receiptsVM.receipts.count AFTER=\(receiptsViewModel.receipts.count)")
             } catch {
-                print("[Overview] deleteReceipt FAILED: \(error.localizedDescription)")
                 receiptDeleteError = error.localizedDescription
             }
 

@@ -347,14 +347,14 @@ struct ShareExtensionView: View {
         var body = Data()
         
         // Add file data
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(contentType)\r\n\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)\r\n")
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n")
+        body.append("Content-Type: \(contentType)\r\n\r\n")
         body.append(data)
-        body.append("\r\n".data(using: .utf8)!)
-        
+        body.append("\r\n")
+
         // Add closing boundary
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n")
         
         request.httpBody = body
         

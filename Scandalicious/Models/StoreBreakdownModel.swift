@@ -866,40 +866,52 @@ class StoreDataManager: ObservableObject {
 
         // Use UTC calendar to avoid timezone issues
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+
+        let fallbackNow = outputFormatter.string(from: Date())
 
         guard let parsedDate = dateFormatter.date(from: period) else {
             // Fallback to current month if parsing fails
             let now = Date()
             let components = calendar.dateComponents([.year, .month], from: now)
-            let startOfMonth = calendar.date(from: components)!
-            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+            guard let startOfMonth = calendar.date(from: components),
+                  let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) else {
+                return (fallbackNow, fallbackNow)
+            }
             return (outputFormatter.string(from: startOfMonth), outputFormatter.string(from: endOfMonth))
         }
 
         switch periodType {
         case .week:
-            let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: parsedDate))!
-            let endOfWeek = calendar.date(byAdding: .day, value: 6, to: startOfWeek)!
+            guard let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: parsedDate)),
+                  let endOfWeek = calendar.date(byAdding: .day, value: 6, to: startOfWeek) else {
+                return (fallbackNow, fallbackNow)
+            }
             return (outputFormatter.string(from: startOfWeek), outputFormatter.string(from: endOfWeek))
 
         case .month:
             let components = calendar.dateComponents([.year, .month], from: parsedDate)
-            let startOfMonth = calendar.date(from: components)!
-            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+            guard let startOfMonth = calendar.date(from: components),
+                  let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) else {
+                return (fallbackNow, fallbackNow)
+            }
             return (outputFormatter.string(from: startOfMonth), outputFormatter.string(from: endOfMonth))
 
         case .year:
             let components = calendar.dateComponents([.year], from: parsedDate)
-            let startOfYear = calendar.date(from: components)!
-            let endOfYear = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: startOfYear)!
+            guard let startOfYear = calendar.date(from: components),
+                  let endOfYear = calendar.date(byAdding: DateComponents(year: 1, day: -1), to: startOfYear) else {
+                return (fallbackNow, fallbackNow)
+            }
             return (outputFormatter.string(from: startOfYear), outputFormatter.string(from: endOfYear))
 
         case .custom:
             // Custom periods use the same format as month (parsed from "MMMM yyyy")
             let components = calendar.dateComponents([.year, .month], from: parsedDate)
-            let startOfMonth = calendar.date(from: components)!
-            let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+            guard let startOfMonth = calendar.date(from: components),
+                  let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) else {
+                return (fallbackNow, fallbackNow)
+            }
             return (outputFormatter.string(from: startOfMonth), outputFormatter.string(from: endOfMonth))
 
         case .all:

@@ -530,8 +530,7 @@ struct SplitTransactionView: View {
     }
 
     private func distributeRemainder() {
-        guard !participants.isEmpty else { return }
-        let firstParticipant = participants.first!
+        guard let firstParticipant = participants.first else { return }
         let currentAmount = customAmounts[firstParticipant.id] ?? 0
         customAmounts[firstParticipant.id] = currentAmount + amountDifference
     }

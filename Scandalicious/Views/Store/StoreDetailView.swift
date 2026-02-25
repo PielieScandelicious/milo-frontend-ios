@@ -431,14 +431,14 @@ struct StoreDetailView: View {
             } else if let year = Int(storeBreakdown.period), year >= 2000 && year <= 2100 {
                 // Handle year period (e.g., "2025")
                 var calendar = Calendar(identifier: .gregorian)
-                calendar.timeZone = TimeZone(identifier: "UTC")!
+                calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
-                let startOfYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
-                let endOfYear = calendar.date(from: DateComponents(year: year, month: 12, day: 31))!
-
-                filters.period = .year
-                filters.startDate = startOfYear
-                filters.endDate = endOfYear
+                if let startOfYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1)),
+                   let endOfYear = calendar.date(from: DateComponents(year: year, month: 12, day: 31)) {
+                    filters.period = .year
+                    filters.startDate = startOfYear
+                    filters.endDate = endOfYear
+                }
             } else {
                 // Parse the period as month (e.g., "January 2026")
                 let dateFormatter = DateFormatter()
@@ -451,14 +451,14 @@ struct StoreDetailView: View {
                 }
 
                 var calendar = Calendar(identifier: .gregorian)
-                calendar.timeZone = TimeZone(identifier: "UTC")!
+                calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
-                let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
-                let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
-
-                filters.period = .month
-                filters.startDate = startOfMonth
-                filters.endDate = endOfMonth
+                if let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate)),
+                   let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) {
+                    filters.period = .month
+                    filters.startDate = startOfMonth
+                    filters.endDate = endOfMonth
+                }
             }
 
             let storeDetails = try await AnalyticsAPIService.shared.getStoreDetails(
@@ -856,13 +856,13 @@ struct StoreDetailView: View {
                 } else if let year = Int(storeBreakdown.period), year >= 2000 && year <= 2100 {
                     // Handle year period (e.g., "2025")
                     var calendar = Calendar(identifier: .gregorian)
-                    calendar.timeZone = TimeZone(identifier: "UTC")!
+                    calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
-                    let startOfYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
-                    let endOfYear = calendar.date(from: DateComponents(year: year, month: 12, day: 31))!
-
-                    filters.startDate = startOfYear
-                    filters.endDate = endOfYear
+                    if let startOfYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1)),
+                       let endOfYear = calendar.date(from: DateComponents(year: year, month: 12, day: 31)) {
+                        filters.startDate = startOfYear
+                        filters.endDate = endOfYear
+                    }
                 } else {
                     // Parse the period as month (e.g., "January 2026")
                     let dateFormatter = DateFormatter()
@@ -876,13 +876,13 @@ struct StoreDetailView: View {
                     }
 
                     var calendar = Calendar(identifier: .gregorian)
-                    calendar.timeZone = TimeZone(identifier: "UTC")!
+                    calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
-                    let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
-                    let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
-
-                    filters.startDate = startOfMonth
-                    filters.endDate = endOfMonth
+                    if let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate)),
+                       let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) {
+                        filters.startDate = startOfMonth
+                        filters.endDate = endOfMonth
+                    }
                 }
 
                 let response = try await AnalyticsAPIService.shared.getTransactions(filters: filters)

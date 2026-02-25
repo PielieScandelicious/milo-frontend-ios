@@ -35,7 +35,7 @@ struct ConfettiView: View {
         particles = (0..<80).map { _ in
             ConfettiParticle(
                 x: CGFloat.random(in: 0.05...0.95),
-                color: colors.randomElement()!,
+                color: colors.randomElement() ?? .white,
                 size: CGFloat.random(in: 6...12),
                 delay: Double.random(in: 0...0.4),
                 duration: Double.random(in: 1.5...2.5),

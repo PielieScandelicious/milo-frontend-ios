@@ -433,7 +433,7 @@ struct CategoryBreakdownDetailView: View {
 
             // Set date range for the specific month/year
             var calendar = Calendar(identifier: .gregorian)
-            calendar.timeZone = TimeZone(identifier: "UTC")!
+            calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
             var components = DateComponents()
             components.year = year
@@ -483,7 +483,7 @@ struct CategoryBreakdownDetailView: View {
             filters.page = nextPage
 
             var calendar = Calendar(identifier: .gregorian)
-            calendar.timeZone = TimeZone(identifier: "UTC")!
+            calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
             var components = DateComponents()
             components.year = year

@@ -194,19 +194,19 @@ class ExpenseSplitViewModel: ObservableObject {
     // MARK: - Assignment Management
 
     func toggleAssignment(transactionId: String, participantId: String) {
-        if assignments[transactionId] == nil {
-            assignments[transactionId] = Set()
-        }
+        var current = assignments[transactionId] ?? Set()
 
         // Normalize to lowercase for consistent comparison with backend UUIDs
         let normalizedId = participantId.lowercased()
 
         // Check if already assigned (case-insensitive)
-        if let existingId = assignments[transactionId]!.first(where: { $0.lowercased() == normalizedId }) {
-            assignments[transactionId]!.remove(existingId)
+        if let existingId = current.first(where: { $0.lowercased() == normalizedId }) {
+            current.remove(existingId)
         } else {
-            assignments[transactionId]!.insert(normalizedId)
+            current.insert(normalizedId)
         }
+
+        assignments[transactionId] = current
     }
 
     func assignAllToEveryone() {

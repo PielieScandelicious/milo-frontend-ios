@@ -105,12 +105,12 @@ actor ReceiptUploadService {
 
         // Add image data with timestamped filename
         let filename = Self.timestampedFilename(extension: "jpg")
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)\r\n")
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n")
+        body.append("Content-Type: image/jpeg\r\n\r\n")
         body.append(imageData)
-        body.append("\r\n".data(using: .utf8)!)
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append("\r\n")
+        body.append("--\(boundary)--\r\n")
 
         // Create request
         guard let url = URL(string: uploadURL) else {
@@ -143,12 +143,12 @@ actor ReceiptUploadService {
 
         // Add PDF data with timestamped filename
         let filename = Self.timestampedFilename(extension: "pdf")
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/pdf\r\n\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)\r\n")
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n")
+        body.append("Content-Type: application/pdf\r\n\r\n")
         body.append(pdfData)
-        body.append("\r\n".data(using: .utf8)!)
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append("\r\n")
+        body.append("--\(boundary)--\r\n")
 
         // Create request
         guard let url = URL(string: uploadURL) else {

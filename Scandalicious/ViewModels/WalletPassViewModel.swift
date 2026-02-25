@@ -242,13 +242,15 @@ struct AddToWalletView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> PKAddPassesViewController {
         do {
             let pass = try PKPass(data: passData)
-            let controller = PKAddPassesViewController(pass: pass)!
-            controller.delegate = context.coordinator
-            return controller
+            if let controller = PKAddPassesViewController(pass: pass) {
+                controller.delegate = context.coordinator
+                return controller
+            }
+            // Pass was valid but controller creation failed
+            return PKAddPassesViewController(passes: [])
         } catch {
             // Return empty controller that will be dismissed
-            let controller = PKAddPassesViewController(passes: [])!
-            return controller
+            return PKAddPassesViewController(passes: [])
         }
     }
 

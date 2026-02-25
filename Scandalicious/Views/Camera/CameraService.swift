@@ -142,8 +142,8 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
         if img.imageOrientation == .up { return img }
         UIGraphicsBeginImageContextWithOptions(img.size, false, img.scale)
         img.draw(in: CGRect(origin: .zero, size: img.size))
-        let normalized = UIGraphicsGetImageFromCurrentImageContext()!
+        let normalized = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
-        return normalized
+        return normalized ?? img
     }
 }

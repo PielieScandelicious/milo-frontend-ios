@@ -26,7 +26,7 @@ struct TierProgressView: View {
                                 )
                             )
                             .frame(width: 38, height: 38)
-                            .shadow(color: tierProgress.currentTier.gradientColors.first!.opacity(0.4), radius: 8)
+                            .shadow(color: (tierProgress.currentTier.gradientColors.first ?? .white).opacity(0.4), radius: 8)
 
                         Image(systemName: tierProgress.currentTier.icon)
                             .font(.system(size: 16, weight: .bold))
@@ -74,7 +74,7 @@ struct TierProgressView: View {
                                 )
                             )
                             .frame(width: totalWidth * overallProgress, height: 5)
-                            .shadow(color: tierProgress.currentTier.gradientColors.first!.opacity(0.5), radius: 4, y: 0)
+                            .shadow(color: (tierProgress.currentTier.gradientColors.first ?? .white).opacity(0.5), radius: 4, y: 0)
                             .animation(.spring(response: 0.6, dampingFraction: 0.8), value: overallProgress)
 
                         // Tier marker dots
@@ -83,7 +83,7 @@ struct TierProgressView: View {
                             Circle()
                                 .fill(
                                     tier.minReceipts <= tierProgress.receiptsThisMonth
-                                        ? tier.gradientColors.first!
+                                        ? (tier.gradientColors.first ?? .white)
                                         : Color(white: 0.2)
                                 )
                                 .frame(width: 9, height: 9)
@@ -139,7 +139,7 @@ struct TierProgressView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(
                                 isActive
-                                    ? tier.gradientColors.first!.opacity(0.35)
+                                    ? (tier.gradientColors.first ?? .white).opacity(0.35)
                                     : Color.clear,
                                 lineWidth: 1
                             )
@@ -155,13 +155,15 @@ struct TierProgressView: View {
 
     private var overallProgress: Double {
         let allTiers = UserTier.allCases
-        let maxReceipts = Double(allTiers.last!.minReceipts)
+        guard let lastTier = allTiers.last else { return 1.0 }
+        let maxReceipts = Double(lastTier.minReceipts)
         guard maxReceipts > 0 else { return 1.0 }
         return min(1.0, Double(tierProgress.receiptsThisMonth) / maxReceipts)
     }
 
     private func markerPosition(for tier: UserTier) -> Double {
-        let maxReceipts = Double(UserTier.allCases.last!.minReceipts)
+        guard let lastTier = UserTier.allCases.last else { return 0 }
+        let maxReceipts = Double(lastTier.minReceipts)
         guard maxReceipts > 0 else { return 0 }
         return Double(tier.minReceipts) / maxReceipts
     }

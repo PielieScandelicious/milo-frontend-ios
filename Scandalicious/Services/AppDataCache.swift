@@ -87,7 +87,9 @@ class AppDataCache: ObservableObject {
     private static let cacheVersion = 4
 
     private let cacheFileURL: URL = {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            return FileManager.default.temporaryDirectory.appendingPathComponent("scandalicious_app_cache.json")
+        }
         return caches.appendingPathComponent("scandalicious_app_cache.json")
     }()
 
@@ -383,7 +385,7 @@ class AppDataCache: ObservableObject {
         guard let date = dateFormatter.date(from: period) else { return (nil, nil) }
 
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
         let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: date))
         var endComponents = DateComponents()

@@ -75,7 +75,7 @@ struct StreakData: Codable {
             // Cash every 4 weeks: €0.50 base, doubles every 3 cash milestones
             let cashIndex = week / 4  // 1, 2, 3, 4, 5 ...
             let amounts: [Double] = [0.50, 1.0, 1.50, 2.0, 3.0, 5.0, 7.50, 10.0, 15.0, 20.0, 30.0, 50.0, 75.0]
-            let amount = cashIndex <= amounts.count ? amounts[cashIndex - 1] : amounts.last!
+            let amount = cashIndex <= amounts.count ? amounts[cashIndex - 1] : (amounts.last ?? 75.0)
             let label = amount >= 1.0 ? String(format: "€%.0f", amount) : String(format: "€%.2f", amount)
             return (label, "banknote.fill", true, amount)
         }
@@ -305,7 +305,7 @@ enum MysteryBonusType {
     // 25% cash, 10% spin, 65% nothing
     static func random() -> MysteryBonusType {
         let roll = Int.random(in: 0..<100)
-        if roll < 25 { return .cashBonus([0.10, 0.20].randomElement()!) }
+        if roll < 25 { return .cashBonus([0.10, 0.20].randomElement() ?? 0.10) }
         if roll < 35 { return .spinToken }
         return .nothing
     }

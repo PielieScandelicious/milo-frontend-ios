@@ -19,7 +19,9 @@ class PromosViewModel: ObservableObject {
     // MARK: - Cache
 
     private static var cacheFileURL: URL {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            return FileManager.default.temporaryDirectory.appendingPathComponent("promos_cache.json")
+        }
         return caches.appendingPathComponent("promos_cache.json")
     }
 

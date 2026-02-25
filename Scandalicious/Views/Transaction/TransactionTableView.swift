@@ -272,7 +272,7 @@ struct TransactionTableView: View {
 
         // Use UTC calendar to avoid timezone issues
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
         // Get start of month
         let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: date))

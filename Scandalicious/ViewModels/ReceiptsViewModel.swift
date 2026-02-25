@@ -207,7 +207,7 @@ class ReceiptsViewModel: ObservableObject {
     private func parsePeriod(_ period: String) -> (Date?, Date?) {
         // Use UTC calendar to avoid timezone issues
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
 
         // Handle year periods (e.g., "2025")
         if isYearPeriod(period), let year = Int(period) {
