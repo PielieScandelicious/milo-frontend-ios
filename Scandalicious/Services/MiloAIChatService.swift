@@ -185,10 +185,50 @@ actor MiloAIChatService {
                         return
                     }
 
-                    // Handle authentication errors
+                    // Handle authentication errors - retry once with a fresh token
                     if httpResponse.statusCode == 401 {
-                        continuation.finish(throwing: ChatServiceError.authenticationRequired)
-                        return
+                        do {
+                            let freshToken = try await MiloAIChatService.shared.getAuthToken()
+                            request.setValue("Bearer \(freshToken)", forHTTPHeaderField: "Authorization")
+                            let (retryBytes, retryResponse) = try await URLSession.shared.bytes(for: request)
+                            guard let retryHttp = retryResponse as? HTTPURLResponse, retryHttp.statusCode == 200 else {
+                                continuation.finish(throwing: ChatServiceError.authenticationRequired)
+                                return
+                            }
+                            // Re-parse the retried stream below by reassigning
+                            // (fall through to the SSE parsing with the retry stream)
+                            await Self.parseAndSyncRateLimitHeaders(from: retryHttp)
+                            var retryBuffer = ""
+                            for try await byte in retryBytes {
+                                let char = Character(UnicodeScalar(byte))
+                                retryBuffer.append(char)
+                                if retryBuffer.hasSuffix("\n\n") {
+                                    for line in retryBuffer.components(separatedBy: "\n") {
+                                        if line.hasPrefix("data: "),
+                                           let data = String(line.dropFirst(6)).data(using: .utf8),
+                                           let event = try? JSONDecoder().decode(ChatStreamEvent.self, from: data) {
+                                            switch event.type {
+                                            case "text":
+                                                if let content = event.content { continuation.yield(content) }
+                                            case "done":
+                                                continuation.finish()
+                                                return
+                                            case "error":
+                                                continuation.finish(throwing: ChatServiceError.streamingError(event.error ?? "Unknown streaming error"))
+                                                return
+                                            default: break
+                                            }
+                                        }
+                                    }
+                                    retryBuffer = ""
+                                }
+                            }
+                            continuation.finish()
+                            return
+                        } catch {
+                            continuation.finish(throwing: ChatServiceError.authenticationRequired)
+                            return
+                        }
                     }
 
                     // Handle rate limit exceeded (429)
@@ -266,7 +306,18 @@ actor MiloAIChatService {
                         }
                     }
 
-                    // Stream ended without "done" event
+                    // Stream ended without "done" event — flush any remaining buffer
+                    if !buffer.isEmpty {
+                        for line in buffer.components(separatedBy: "\n") {
+                            if line.hasPrefix("data: "),
+                               let data = String(line.dropFirst(6)).data(using: .utf8),
+                               let event = try? JSONDecoder().decode(ChatStreamEvent.self, from: data) {
+                                if event.type == "text", let content = event.content {
+                                    continuation.yield(content)
+                                }
+                            }
+                        }
+                    }
                     continuation.finish()
 
                 } catch let error as ChatServiceError {
