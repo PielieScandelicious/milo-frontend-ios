@@ -100,7 +100,6 @@ struct SpinWheelView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
             }
-            .navigationTitle("Prize Wheel")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(white: 0.04), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)

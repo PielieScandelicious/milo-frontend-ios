@@ -66,18 +66,6 @@ struct ReceiptScanView: View {
                     CaptureSuccessOverlay()
                         .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
-
-
-                // Floating scan button (bottom right)
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        floatingScanButton
-                            .padding(.trailing, 24)
-                            .padding(.bottom, 24)
-                    }
-                }
             }
             .toolbar {
                 // Profile button - trailing (right side)
@@ -205,8 +193,6 @@ struct ReceiptScanView: View {
         .animation(.easeInOut, value: uploadState)
     }
 
-    // MARK: - Floating Scan Button
-
     // Premium glass card styling
     private var scanPremiumCardBackground: some View {
         RoundedRectangle(cornerRadius: 20)
@@ -233,46 +219,8 @@ struct ReceiptScanView: View {
             )
     }
 
-    // Deep purple color matching overview tab theme
-    private var deepPurple: Color {
-        Color(red: 0.35, green: 0.10, blue: 0.60)
-    }
-
     // Deep ocean blue header gradient color for scan tab
     private let headerBlueColor = Color(red: 0.04, green: 0.15, blue: 0.30)
-
-    private var floatingScanButton: some View {
-        Button {
-            if rateLimitManager.canUploadReceipt() {
-                showCamera = true
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            } else {
-                showRateLimitAlert = true
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
-            }
-        } label: {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.45, green: 0.15, blue: 0.70),
-                                deepPurple
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 64, height: 64)
-                    .shadow(color: deepPurple.opacity(0.5), radius: 12, y: 6)
-
-                Image(systemName: "doc.text.viewfinder")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-        }
-        .buttonStyle(ScaleScanButtonStyle())
-    }
 
     // MARK: - Profile Menu Button
 

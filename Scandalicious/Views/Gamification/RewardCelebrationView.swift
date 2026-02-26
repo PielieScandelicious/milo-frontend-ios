@@ -74,6 +74,11 @@ struct RewardCelebrationView: View {
                 .opacity(showContent ? 1 : 0)
                 .offset(y: showContent ? 0 : 8)
 
+                // Tier bonus badge
+                tierBonusBadge
+                    .opacity(showContent ? 1 : 0)
+                    .offset(y: showContent ? 0 : 8)
+
                 // Wallet balance
                 HStack(spacing: 6) {
                     Image(systemName: "wallet.bifold.fill")
@@ -150,6 +155,69 @@ struct RewardCelebrationView: View {
             .opacity(cardOpacity)
         }
         .onAppear { playEntrance() }
+    }
+
+    // MARK: - Tier Bonus Badge
+
+    private var tierBonusBadge: some View {
+        let tier = gm.tierProgress.currentTier
+        let tierColors = tier.gradientColors
+
+        return HStack(spacing: 10) {
+            // Tier icon
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: tierColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 28, height: 28)
+
+                Image(systemName: tier.icon)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            Text(tier.rawValue)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white.opacity(0.7))
+
+            Spacer()
+
+            // Multiplier badge
+            Text(tier.bonusLabel)
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: tierColors,
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+
+            Text("bonus")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.35))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(tierColors.first?.opacity(0.08) ?? Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(tierColors.first?.opacity(0.15) ?? Color.clear, lineWidth: 0.5)
+                )
+        )
     }
 
     // MARK: - Reward Row

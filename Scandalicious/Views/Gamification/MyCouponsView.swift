@@ -90,7 +90,7 @@ private struct OwnedCouponRow: View {
                         .foregroundStyle(.white.opacity(0.5))
                 }
                 .padding(.bottom, 16)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
         }
         .background(Color(white: 0.08))
