@@ -1,0 +1,34 @@
+# .swiftlint.yml
+# Sensible defaults for the Milo iOS project
+
+disabled_rules:
+  - trailing_whitespace # Handled by Xcode/IDE automatically
+  - line_length # Often debated, can be enabled later if desired
+
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - fatal_error_message
+  - force_unwrapping
+  - private_outlet
+  - redundant_nil_coalescing
+  - vertical_whitespace_closing_braces
+  - yoda_condition
+
+included:
+  - Scandalicious
+  - ScandaliciousShareExtension
+
+excluded:
+  - Pods
+  - SourcePackages
+
+analyzer_rules:
+  - unused_declaration
+  - unused_import
+
+custom_rules:
+  force_unwrapping:
+    name: "Force Unwrapping"
+    message: "Force unwrapping should be avoided. Use optional binding or guards."
+    severity: error
