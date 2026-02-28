@@ -124,12 +124,6 @@ struct ReceiptsListView: View {
                 Task {
                     await viewModel.loadReceipts(period: period, storeName: storeName, reset: true)
                 }
-            } else if let cached = AppDataCache.shared.receiptsByPeriod[period], !cached.isEmpty, viewModel.receipts.isEmpty, storeName == nil {
-                viewModel.receipts = cached
-                viewModel.state = .success(cached)
-                Task {
-                    await viewModel.loadReceipts(period: period, storeName: storeName, reset: true)
-                }
             } else {
                 await viewModel.loadReceipts(period: period, storeName: storeName)
             }

@@ -164,10 +164,11 @@ class ReceiptProcessingManager: ObservableObject {
     }
 
     private func handleReceiptCompleted(_ receipt: ProcessingReceipt) {
-        print("[ReceiptProcessingMgr] 🎉 Receipt completed: \(receipt.storeName ?? "unknown") — posting .receiptUploadedSuccessfully")
+        print("[ReceiptProcessingMgr] 🎉 Receipt completed: \(receipt.storeName ?? "unknown") date=\(receipt.detectedDate ?? "nil") — posting .receiptUploadedSuccessfully")
         var userInfo: [String: Any] = [:]
-        if let storeName = receipt.storeName    { userInfo["storeName"] = storeName }
-        if let amount    = receipt.totalAmount  { userInfo["receiptAmount"] = amount }
+        if let storeName = receipt.storeName       { userInfo["storeName"] = storeName }
+        if let amount    = receipt.totalAmount     { userInfo["receiptAmount"] = amount }
+        if let detected  = receipt.detectedDate    { userInfo["detectedDate"] = detected }
         NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil, userInfo: userInfo.isEmpty ? nil : userInfo)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
 

@@ -123,24 +123,8 @@ struct ContentView: View {
             // Configure data manager on first appear
             if !hasLoadedInitialData {
                 dataManager.configure(with: transactionManager)
-
-                let cache = AppDataCache.shared
-
-                // INSTANT LAUNCH: If cache has ALL data, show UI immediately
-                if cache.isComplete {
-                    dataManager.populateFromCache(cache)
-                    hasLoadedInitialData = true
-
-                    // Silent background refresh (no UI impact)
-                    Task(priority: .utility) {
-                        try? await Task.sleep(for: .seconds(2))
-                        await loadAllData(cache: cache, showLoading: false)
-                    }
-                } else {
-                    // Loading screen stays until ALL data is fetched
-                    Task {
-                        await loadAllData(cache: cache, showLoading: true)
-                    }
+                Task {
+                    await loadAllData()
                 }
             }
         }
@@ -161,65 +145,22 @@ struct ContentView: View {
 
     // MARK: - Full Data Loading
 
-    /// Loads data needed for smooth browsing (last 12 months).
-    /// When showLoading=true, keeps loading screen visible until done.
-    /// When showLoading=false, runs silently in background.
-    private func loadAllData(cache: AppDataCache, showLoading: Bool) async {
-        // Phase 1: Period metadata + store breakdowns for recent periods
+    /// Fetches period metadata and current month breakdowns from the backend,
+    /// then dismisses the loading screen.
+    private func loadAllData() async {
         await dataManager.fetchPeriodMetadata()
 
         guard !dataManager.periodMetadata.isEmpty else {
-            if showLoading {
-                await MainActor.run { hasLoadedInitialData = true }
-            }
+            await MainActor.run { hasLoadedInitialData = true }
             return
         }
 
-        // Only preload the last 12 months of data for fast startup
-        let recentPeriods = cache.recentMonthPeriods
-
-        // Load store breakdowns for recent periods in parallel
-        await withTaskGroup(of: Void.self) { group in
-            for period in recentPeriods {
-                group.addTask {
-                    await dataManager.fetchPeriodDetails(period)
-                }
-            }
+        // Load the current (most recent) period's store breakdowns
+        if let currentPeriod = dataManager.periodMetadata.first?.period {
+            await dataManager.fetchPeriodDetails(currentPeriod)
         }
 
-        // Phase 2: Receipts + category data for recent month periods in parallel
-        await withTaskGroup(of: Void.self) { group in
-            for period in recentPeriods {
-                group.addTask { await cache.preloadReceipts(for: period) }
-                group.addTask { await cache.preloadCategoryData(for: period) }
-            }
-        }
-
-        // Phase 3: Year summaries for years in recent periods + all-time data in parallel
-        let distinctYears = Set(recentPeriods.compactMap { period -> String? in
-            let parts = period.split(separator: " ")
-            return parts.count == 2 ? String(parts[1]) : nil
-        })
-        await withTaskGroup(of: Void.self) { group in
-            for year in distinctYears {
-                group.addTask { await cache.preloadYearSummary(for: year) }
-            }
-            group.addTask { await cache.preloadAllTimeAggregate() }
-            group.addTask { await cache.preloadBudgetProgress() }
-        }
-
-        // Phase 4: Category items (transactions per category) for recent periods
-        // Must run after Phase 2 since preloadCategoryItems reads pieChartSummaryByPeriod
-        await withTaskGroup(of: Void.self) { group in
-            for period in recentPeriods {
-                group.addTask { await cache.preloadCategoryItems(for: period) }
-            }
-        }
-
-        // All data loaded — dismiss loading screen
-        if showLoading {
-            await MainActor.run { hasLoadedInitialData = true }
-        }
+        await MainActor.run { hasLoadedInitialData = true }
     }
 }
 

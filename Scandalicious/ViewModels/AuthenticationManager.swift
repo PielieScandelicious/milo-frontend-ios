@@ -209,10 +209,9 @@ class AuthenticationManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: profileCompletedKey)
     }
 
-    /// Clear all cached user data (disk cache, split cache) on sign-out or account switch
+    /// Clear all cached user data on sign-out or account switch
     private func clearAllCachedData() {
         Task { @MainActor in
-            AppDataCache.shared.invalidateAll()
             SplitCacheManager.shared.clearCache()
         }
     }

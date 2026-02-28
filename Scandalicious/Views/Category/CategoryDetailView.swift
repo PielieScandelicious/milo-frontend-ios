@@ -457,16 +457,6 @@ struct CategoryDetailView: View {
     // MARK: - Load Transactions
 
     private func loadTransactions() async {
-        // Check AppDataCache first for instant display
-        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
-        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey], !cachedItems.isEmpty {
-            await MainActor.run {
-                self.transactions = cachedItems
-                self.isLoading = false
-            }
-            return
-        }
-
         isLoading = true
         error = nil
 
@@ -502,8 +492,6 @@ struct CategoryDetailView: View {
             await MainActor.run {
                 self.transactions = response.transactions
                 self.isLoading = false
-                // Update cache for future use
-                AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: response.transactions)
             }
         } catch {
             await MainActor.run {

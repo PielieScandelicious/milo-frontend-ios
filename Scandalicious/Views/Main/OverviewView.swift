@@ -440,8 +440,8 @@ struct OverviewView: View {
             .onDisappear {
                 // Keep entrance animation states — no fade-in replay on tab switch back
             }
-            .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
-                handleReceiptUploadSuccess()
+            .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { notification in
+                handleReceiptUploadSuccess(notification: notification)
             }
             .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
                 handleReceiptDeleted()
@@ -512,19 +512,14 @@ struct OverviewView: View {
             }
         }
 
-        // Load receipts from pre-populated cache (all data loaded during startup)
+        // Load receipts from backend on first appear
         let periodToLoad = selectedPeriod
         if !loadedReceiptPeriods.contains(periodToLoad) {
             loadedReceiptPeriods.insert(periodToLoad)
-            let cache = AppDataCache.shared
-            if let cachedReceipts = cache.receiptsByPeriod[periodToLoad], !cachedReceipts.isEmpty {
-                receiptsViewModel.receipts = cachedReceipts
-                receiptsViewModel.state = .success(cachedReceipts)
-            } else {
-                receiptsViewModel.receipts = []
-                receiptsViewModel.state = .success([])
+            Task {
+                await receiptsViewModel.loadReceipts(period: periodToLoad, storeName: nil, reset: true)
+                rebuildSortedReceipts()
             }
-            rebuildSortedReceipts()
         }
 
         // Sync rate limit only once per session
@@ -542,161 +537,87 @@ struct OverviewView: View {
         }
 
 
-        // Load category data from pre-populated cache
+        // Load category data from backend
         let initialPeriod = selectedPeriod
-        let cache = AppDataCache.shared
-        if let cachedPieChart = cache.pieChartSummaryByPeriod[initialPeriod] {
-            pieChartSummaryCache[initialPeriod] = cachedPieChart
-
-            // Pre-populate categoryItems from cache for instant expansion
-            for category in cachedPieChart.categories {
-                let key = cache.categoryItemsKey(period: initialPeriod, category: category.name)
-                if let items = cache.categoryItemsCache[key] {
-                    categoryItems[category.id] = items
-                }
-            }
-        }
+        Task { await fetchCategoryData(for: initialPeriod) }
 
     }
 
-    private func handleReceiptUploadSuccess() {
-        print("[OverviewView] 📩 handleReceiptUploadSuccess() called")
+    // MARK: - Shared Period Refresh
 
-        let currentMonthPeriod = PeriodFormatters.periodFormatter.string(from: Date())
-        let currentYear = String(Calendar.current.component(.year, from: Date()))
+    /// Single source of truth for refreshing all data for a given period.
+    /// Used by both receipt upload notification and pull-to-refresh.
+    private func refreshPeriodData(for period: String) async {
+        // 1. Fetch fresh analytics from backend
+        await dataManager.refreshData(for: .month, periodString: period)
 
-        // Keep period in loadedReceiptPeriods to prevent duplicate loads
-        // The loadReceipts call with reset:true will refresh the data
+        // 2. Refresh category data from backend
+        await fetchCategoryData(for: period, force: true)
+
+        // 3. Reload receipts
+        await receiptsViewModel.loadReceipts(period: period, storeName: nil, reset: true)
+        rebuildSortedReceipts()
+
+        // 5. Rebuild all view-local caches from fresh dataManager state
+        await MainActor.run {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                rebuildBreakdownCache()
+                cacheSegmentsForPeriod(period)
+                categoryItems.removeAll()
+                categoryCurrentPage.removeAll()
+                categoryHasMore.removeAll()
+                categoryLoadingMore = nil
+            }
+            pieChartSummaryCache.removeValue(forKey: period)
+            updateAvailablePeriodsCache()
+            lastRefreshTime = Date()
+        }
+    }
+
+    private func handleReceiptUploadSuccess(notification: NotificationCenter.Publisher.Output) {
+        // Determine which period the receipt belongs to from detectedDate
+        let receiptPeriod: String
+        if let dateString = notification.userInfo?["detectedDate"] as? String {
+            let isoFormatter = DateFormatter()
+            isoFormatter.dateFormat = "yyyy-MM-dd"
+            isoFormatter.locale = Locale(identifier: "en_US")
+            if let receiptDate = isoFormatter.date(from: dateString) {
+                receiptPeriod = PeriodFormatters.periodFormatter.string(from: receiptDate)
+            } else {
+                receiptPeriod = PeriodFormatters.periodFormatter.string(from: Date())
+            }
+        } else {
+            receiptPeriod = PeriodFormatters.periodFormatter.string(from: Date())
+        }
 
         Task {
+            // Brief delay for backend to finalize
             try? await Task.sleep(for: .seconds(1))
 
-            // Refresh current month data — this atomically updates storeBreakdowns,
-            // periodTotalSpends, and periodMetadata in one MainActor.run block.
-            // The onChange(of: storeBreakdowns) observer rebuilds chart caches,
-            // and the spending number animates via .contentTransition(.numericText()).
-            await dataManager.refreshData(for: .month, periodString: currentMonthPeriod)
+            await refreshPeriodData(for: receiptPeriod)
 
-            // Trigger pie chart expansion animation simultaneously with the data-driven
-            // spending number animation. Both fire in the same render cycle since
-            // refreshData already updated the data above.
-            if selectedPeriod == currentMonthPeriod {
+            // Trigger pie chart re-animation if viewing the receipt's period
+            if selectedPeriod == receiptPeriod {
                 chartRefreshToken += 1
             }
 
-            // Invalidate DISK caches (backend source of truth changed)
-            // Keep in-memory display caches alive to avoid flash - they'll be replaced with fresh data
-            AppDataCache.shared.yearSummaryCache.removeValue(forKey: currentYear)
-            AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: currentMonthPeriod)
-            let keysToRemove = AppDataCache.shared.categoryItemsCache.keys.filter { $0.hasPrefix("\(currentMonthPeriod)|") }
-            for key in keysToRemove {
-                AppDataCache.shared.categoryItemsCache.removeValue(forKey: key)
-            }
-            AppDataCache.shared.invalidateReceipts(for: currentMonthPeriod)
-
-            // Refresh period metadata (totals and receipt counts change)
-            await dataManager.fetchPeriodMetadata()
-
-            // Update available periods with fresh metadata (may include new periods)
-            await MainActor.run {
-                updateAvailablePeriodsCache()
-            }
-
-            // Reload receipts for the selected period (what the user is currently viewing)
-            await receiptsViewModel.loadReceipts(period: selectedPeriod, storeName: nil, reset: true)
-            if !receiptsViewModel.receipts.isEmpty {
-                AppDataCache.shared.updateReceipts(for: selectedPeriod, receipts: receiptsViewModel.receipts)
-            }
-            rebuildSortedReceipts()
-
-            // Also update cache for current month if user is viewing a different period
-            if selectedPeriod != currentMonthPeriod {
-                let tempVM = ReceiptsViewModel()
-                await tempVM.loadReceipts(period: currentMonthPeriod, storeName: nil, reset: true)
-                if !tempVM.receipts.isEmpty {
-                    AppDataCache.shared.updateReceipts(for: currentMonthPeriod, receipts: tempVM.receipts)
-                }
-            }
-
-            // Re-fetch data if user is currently viewing an affected period
-            if selectedPeriod == currentMonthPeriod {
-                updateDisplayedBreakdowns()
-                // Force re-fetch pie chart / category data - new data replaces old seamlessly
-                await fetchCategoryData(for: currentMonthPeriod, force: true)
-                // Clear stale expanded category items (fresh data loaded above)
-                await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        categoryItems.removeAll()
-                    categoryCurrentPage.removeAll()
-                    categoryHasMore.removeAll()
-                    categoryLoadingMore = nil
-                    }
-                }
-            } else {
-                // Not viewing affected period - safe to clear in-memory caches
-                pieChartSummaryCache.removeValue(forKey: currentMonthPeriod)
-                categoryItems.removeAll()
-                    categoryCurrentPage.removeAll()
-                    categoryHasMore.removeAll()
-                    categoryLoadingMore = nil
-            }
-
+            // Sync rate limits and budget
             await rateLimitManager.syncFromBackend()
-
-            // Refresh budget widget with latest spend data
-            print("[OverviewView] 🔄 About to call budgetViewModel.refreshProgress()")
             await budgetViewModel.refreshProgress()
-            print("[OverviewView] ✅ budgetViewModel.refreshProgress() completed")
         }
     }
 
     private func handleReceiptDeleted() {
         Task {
-            // Wait briefly for backend to process the deletion
             try? await Task.sleep(for: .milliseconds(500))
 
-            let affectedPeriod = selectedPeriod
+            await refreshPeriodData(for: selectedPeriod)
 
-            // Refresh the period data to update pie chart and total spending
-            await dataManager.refreshData(for: .month, periodString: affectedPeriod)
-
-            // Trigger pie chart expansion animation with the updated data
-            chartRefreshToken += 1
-
-            // Also refresh the period metadata to get updated totals
+            // Refresh period metadata (deletion may have emptied a period)
             await dataManager.fetchPeriodMetadata()
-
-            // Invalidate disk caches (keep in-memory display data to avoid flash)
-            let deletedYear = String(affectedPeriod.suffix(4))
-            if deletedYear.count == 4 && deletedYear.allSatisfy({ $0.isNumber }) {
-                AppDataCache.shared.yearSummaryCache.removeValue(forKey: deletedYear)
-            }
-            AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: affectedPeriod)
-            let categoryKeysToRemove = AppDataCache.shared.categoryItemsCache.keys.filter { $0.hasPrefix("\(affectedPeriod)|") }
-            for key in categoryKeysToRemove {
-                AppDataCache.shared.categoryItemsCache.removeValue(forKey: key)
-            }
-
-            // Update available periods with fresh metadata (period may have been emptied)
             await MainActor.run {
                 updateAvailablePeriodsCache()
-            }
-
-            await MainActor.run {
-                // Update caches with fresh data
-                updateDisplayedBreakdowns()
-                cacheSegmentsForPeriod(affectedPeriod)
-            }
-
-            // Force re-fetch pie chart data, then clear stale expanded category items
-            await fetchCategoryData(for: affectedPeriod, force: true)
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    categoryItems.removeAll()
-                    categoryCurrentPage.removeAll()
-                    categoryHasMore.removeAll()
-                    categoryLoadingMore = nil
-                }
+                chartRefreshToken += 1
             }
         }
     }
@@ -729,57 +650,21 @@ struct OverviewView: View {
         // Cache segments for the new period
         cacheSegmentsForPeriod(newValue)
 
-        // All data pre-loaded at startup — use caches directly
-        let cache = AppDataCache.shared
-
-        // Receipts: use cache if available, otherwise fetch from backend
-        if let cachedReceipts = cache.receiptsByPeriod[newValue], !cachedReceipts.isEmpty {
-            receiptsViewModel.receipts = cachedReceipts
-            receiptsViewModel.state = .success(cachedReceipts)
-        } else {
-            // No cached receipts (cache was invalidated or never loaded) - fetch from backend
-            receiptsViewModel.receipts = []
-            receiptsViewModel.state = .success([])
-            Task {
-                await receiptsViewModel.loadReceipts(period: newValue, storeName: nil, reset: true)
-                // Update cache with freshly loaded receipts
-                if !receiptsViewModel.receipts.isEmpty {
-                    AppDataCache.shared.updateReceipts(for: newValue, receipts: receiptsViewModel.receipts)
-                }
-                rebuildSortedReceipts()
-            }
+        // Fetch receipts from backend
+        Task {
+            await receiptsViewModel.loadReceipts(period: newValue, storeName: nil, reset: true)
+            rebuildSortedReceipts()
         }
-        rebuildSortedReceipts()
 
-        // Month period: budget + breakdowns + categories all from cache
+        // Budget + categories
         Task { await budgetViewModel.selectPeriod(newValue) }
 
-        if let cachedPieChart = cache.pieChartSummaryByPeriod[newValue] {
-            pieChartSummaryCache[newValue] = cachedPieChart
-
-            // Pre-populate categoryItems from cache for instant expansion
-            categoryItems.removeAll()
-                    categoryCurrentPage.removeAll()
-                    categoryHasMore.removeAll()
-                    categoryLoadingMore = nil
-            for category in cachedPieChart.categories {
-                let key = cache.categoryItemsKey(period: newValue, category: category.name)
-                if let items = cache.categoryItemsCache[key] {
-                    categoryItems[category.id] = items
-                }
-            }
-        } else if pieChartSummaryCache[newValue] == nil {
-            // No cached pie chart data - fetch from backend
-            categoryItems.removeAll()
-                    categoryCurrentPage.removeAll()
-                    categoryHasMore.removeAll()
-                    categoryLoadingMore = nil
+        categoryItems.removeAll()
+        categoryCurrentPage.removeAll()
+        categoryHasMore.removeAll()
+        categoryLoadingMore = nil
+        if pieChartSummaryCache[newValue] == nil {
             Task { await fetchCategoryData(for: newValue) }
-        } else {
-            categoryItems.removeAll()
-                    categoryCurrentPage.removeAll()
-                    categoryHasMore.removeAll()
-                    categoryLoadingMore = nil
         }
 
         // Breakdowns should already be loaded; if not, fetch
@@ -830,9 +715,6 @@ struct OverviewView: View {
                     pieChartSummaryCache[period] = response
                     isLoadingCategoryData = false
                 }
-
-                // Sync to disk cache
-                AppDataCache.shared.updatePieChartSummary(for: period, summary: response)
             }
         } catch {
             await MainActor.run {
@@ -960,28 +842,6 @@ struct OverviewView: View {
         }
     }
 
-    /// Prefetch receipts + category data for adjacent periods (background, non-blocking)
-    private func prefetchAdjacentBrowsingData(around period: String) async {
-        guard !availablePeriods.isEmpty else { return }
-        guard let currentIndex = availablePeriods.firstIndex(of: period) else { return }
-
-        let cache = AppDataCache.shared
-        var periodsToPreload: [String] = []
-
-        for offset in [-1, 1, -2, 2] {
-            let index = currentIndex + offset
-            if index >= 0 && index < availablePeriods.count {
-                periodsToPreload.append(availablePeriods[index])
-            }
-        }
-
-        await withTaskGroup(of: Void.self) { group in
-            for p in periodsToPreload {
-                group.addTask { await cache.preloadReceipts(for: p) }
-                group.addTask { await cache.preloadCategoryData(for: p) }
-            }
-        }
-    }
 
     // MARK: - Share Extension Upload Handling
 
@@ -994,30 +854,10 @@ struct OverviewView: View {
         }
 
         let syncStart = Date()
-
         let periodToSync = selectedPeriod
 
-        // Refresh store breakdowns for selected period only
-        await dataManager.refreshData(for: .month, periodString: periodToSync)
-
-        // Refresh category data for this period
-        AppDataCache.shared.pieChartSummaryByPeriod.removeValue(forKey: periodToSync)
-        await fetchCategoryData(for: periodToSync, force: true)
-        await MainActor.run {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                categoryItems.removeAll()
-                    categoryCurrentPage.removeAll()
-                    categoryHasMore.removeAll()
-                    categoryLoadingMore = nil
-            }
-        }
-
-        // Reload receipts for this period
-        await receiptsViewModel.loadReceipts(period: periodToSync, storeName: nil, reset: true)
-        if !receiptsViewModel.receipts.isEmpty {
-            AppDataCache.shared.updateReceipts(for: periodToSync, receipts: receiptsViewModel.receipts)
-        }
-        rebuildSortedReceipts()
+        // Use shared refresh logic
+        await refreshPeriodData(for: periodToSync)
 
         // Ensure "Syncing" label is visible for at least 1.5s
         let elapsed = Date().timeIntervalSince(syncStart)
@@ -1026,14 +866,9 @@ struct OverviewView: View {
             try? await Task.sleep(for: .seconds(minimumSyncingDuration - elapsed))
         }
 
-        // Transition to "Synced" — rebuild caches with fresh data
+        // Transition to "Synced"
         let syncedPeriod = manuallySyncingPeriod
         await MainActor.run {
-            withAnimation(.easeInOut(duration: 0.35)) {
-                rebuildBreakdownCache()
-                cacheSegmentsForPeriod(selectedPeriod)
-            }
-            lastRefreshTime = Date()
             manuallySyncingPeriod = nil
             withAnimation(.easeInOut(duration: 0.3)) {
                 syncedConfirmationPeriod = syncedPeriod
@@ -1579,14 +1414,6 @@ struct OverviewView: View {
         // Force scroll reset by changing the token (recreates the ScrollView)
         categoryScrollResetToken += 1
 
-        // Pre-populate items from cache BEFORE animating expansion
-        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
-        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
-            categoryItems[category.id] = cachedItems
-            // Batch-fetch split data so rows don't fetch one-by-one
-            Task { await batchFetchSplitData(for: cachedItems) }
-        }
-
         // Set loading state BEFORE withAnimation so expandedCategoryItemsSection
         // renders skeleton content immediately (gives ClipReveal something to measure)
         let needsLoad = categoryItems[category.id] == nil && loadingCategoryId != category.id
@@ -1607,13 +1434,6 @@ struct OverviewView: View {
     }
 
     private func loadCategoryItems(_ category: CategorySpendItem, period: String) async {
-        // Check cache first
-        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category.name)
-        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
-            categoryItems[category.id] = cachedItems
-            return
-        }
-
         loadingCategoryId = category.id
         categoryLoadError[category.id] = nil
 
@@ -1645,8 +1465,6 @@ struct OverviewView: View {
                 categoryCurrentPage[category.id] = 1
                 categoryHasMore[category.id] = response.page < response.totalPages
                 loadingCategoryId = nil
-                // Update cache
-                AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: response.transactions)
             }
 
             // Batch-fetch split data so rows don't fetch one-by-one during scroll
@@ -1702,8 +1520,6 @@ struct OverviewView: View {
                 // Stop fetching if we've hit the cap or exhausted pages
                 categoryHasMore[category.id] = combined.count < Self.maxCategoryItems && response.page < response.totalPages
                 categoryLoadingMore = nil
-                // Update cache with accumulated items
-                AppDataCache.shared.updateCategoryItems(period: period, category: category.name, items: categoryItems[category.id] ?? [])
             }
 
             await batchFetchSplitData(for: response.transactions)
@@ -2192,12 +2008,11 @@ struct OverviewView: View {
     }
 
     private func healthScoreForPeriod(_ period: String) -> Double? {
-        // First check period metadata (from lightweight /analytics/periods)
+        // Use period metadata — returns nil when no data exists for this period
         if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
             return metadata.averageHealthScore
         }
-        // Fallback to dataManager's health score for selected period
-        return dataManager.averageHealthScore
+        return nil
     }
 
     private func totalItemsForPeriod(_ period: String) -> Int? {

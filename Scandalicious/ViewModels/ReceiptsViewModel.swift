@@ -123,10 +123,6 @@ class ReceiptsViewModel: ObservableObject {
         receipts = updatedReceipts
         state = .success(updatedReceipts)
 
-        // Sync deletion to AppDataCache so stale cache doesn't restore the receipt
-        AppDataCache.shared.receiptsByPeriod[period]?.removeAll { $0.receiptId == receiptId }
-        AppDataCache.shared.scheduleSaveToDisk()
-
         print("[ReceiptsVM] deleteReceipt done, receipts.count=\(receipts.count)")
 
         // Notify other views to refresh their data
@@ -171,19 +167,6 @@ class ReceiptsViewModel: ObservableObject {
             }
 
             state = .success(receipts)
-
-            // Sync changes to AppDataCache so stale cache doesn't restore old data
-            for (period, var periodReceipts) in AppDataCache.shared.receiptsByPeriod {
-                if let cacheIndex = periodReceipts.firstIndex(where: { $0.receiptId == receiptId }) {
-                    if let updatedReceipt = receipts.first(where: { $0.receiptId == receiptId }) {
-                        periodReceipts[cacheIndex] = updatedReceipt
-                    } else {
-                        periodReceipts.remove(at: cacheIndex)
-                    }
-                    AppDataCache.shared.receiptsByPeriod[period] = periodReceipts
-                }
-            }
-            AppDataCache.shared.scheduleSaveToDisk()
         }
 
         // Notify other views to refresh their data

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct YearInReviewView: View {
+    var periodMetadata: [PeriodMetadata] = []
+
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var yearSummary: YearSummaryResponse?
     @State private var isLoading = false
@@ -198,13 +200,12 @@ struct YearInReviewView: View {
     // MARK: - Data Loading
 
     private func computeAvailableYears() {
-        let cache = AppDataCache.shared
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
         dateFormatter.locale = Locale(identifier: "en_US")
 
         var years: Set<Int> = []
-        for meta in cache.periodMetadata {
+        for meta in periodMetadata {
             if let date = dateFormatter.date(from: meta.period) {
                 years.insert(Calendar.current.component(.year, from: date))
             }
@@ -220,13 +221,6 @@ struct YearInReviewView: View {
     }
 
     private func loadData() {
-        // Check cache first
-        let yearKey = String(selectedYear)
-        if let cached = AppDataCache.shared.yearSummaryCache[yearKey] {
-            yearSummary = cached
-            return
-        }
-
         isLoading = true
         yearSummary = nil
 
@@ -239,7 +233,6 @@ struct YearInReviewView: View {
                 )
                 await MainActor.run {
                     yearSummary = summary
-                    AppDataCache.shared.yearSummaryCache[yearKey] = summary
                     isLoading = false
                 }
             } catch {

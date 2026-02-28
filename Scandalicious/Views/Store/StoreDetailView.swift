@@ -349,17 +349,7 @@ struct StoreDetailView: View {
             if !hasInitialized {
                 hasInitialized = true
 
-                // Pre-populate categoryTransactions from cache for instant expansion
-                let cache = AppDataCache.shared
-                let period = storeBreakdown.period
-                for category in storeBreakdown.categories {
-                    let cacheKey = cache.categoryItemsKey(period: period, category: category.name)
-                    if let cachedItems = cache.categoryItemsCache[cacheKey] {
-                        let storeFiltered = cachedItems.filter { $0.storeName == storeBreakdown.storeName }
-                        let localizedName = category.name.localizedCategoryName
-                        categoryTransactions[localizedName] = storeFiltered
-                    }
-                }
+                // Category transactions loaded on-demand when user expands a category
             }
 
             // Reveal category cards with staggered animation
@@ -736,15 +726,6 @@ struct StoreDetailView: View {
                         expandedCategoryName = nil
                     }
                 } else {
-                    // Pre-populate data BEFORE animation so content appears instantly
-                    if categoryTransactions[segment.label] == nil {
-                        let period = storeBreakdown.period
-                        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: categoryForAPI)
-                        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
-                            let storeFiltered = cachedItems.filter { $0.storeName == storeBreakdown.storeName }
-                            categoryTransactions[segment.label] = storeFiltered
-                        }
-                    }
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                         expandedCategoryName = segment.label
                     }
@@ -831,15 +812,6 @@ struct StoreDetailView: View {
     private func loadCategoryTransactions(category: String, displayKey: String) {
         // Use displayKey for storage/retrieval (matches segment.label used in UI)
         guard categoryTransactions[displayKey] == nil else { return }
-
-        // Try to serve from AppDataCache first (filter cached category items by store name)
-        let period = storeBreakdown.period
-        let cacheKey = AppDataCache.shared.categoryItemsKey(period: period, category: category)
-        if let cachedItems = AppDataCache.shared.categoryItemsCache[cacheKey] {
-            let storeFiltered = cachedItems.filter { $0.storeName == storeBreakdown.storeName }
-            categoryTransactions[displayKey] = storeFiltered
-            return
-        }
 
         loadingCategories.insert(displayKey)
 
