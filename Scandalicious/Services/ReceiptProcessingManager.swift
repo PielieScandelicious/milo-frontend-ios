@@ -27,7 +27,7 @@ class ReceiptProcessingManager: ObservableObject {
 
     // Polling configuration
     private let initialPollInterval: TimeInterval = 2.0
-    private let maxPollInterval: TimeInterval = 10.0
+    private let maxPollInterval: TimeInterval = 4.0
     private let maxPollDuration: TimeInterval = 300 // 5 minutes
     private let completedDisplayDuration: TimeInterval = 5.0
 
