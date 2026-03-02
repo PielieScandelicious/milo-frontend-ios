@@ -16,23 +16,6 @@ struct AllStoresBreakdownView: View {
     @State private var selectedStoreName: String?
     @State private var showingStoreTransactions = false
 
-    // Calculate weighted average health score across all stores
-    private var overallHealthScore: Double? {
-        let storesWithScores = breakdowns.filter { $0.averageHealthScore != nil }
-        guard !storesWithScores.isEmpty else { return nil }
-
-        // Weight by spend amount for more accurate representation
-        let totalSpendWithScores = storesWithScores.reduce(0.0) { $0 + $1.totalStoreSpend }
-        guard totalSpendWithScores > 0 else { return nil }
-
-        let weightedSum = storesWithScores.reduce(0.0) { sum, breakdown in
-            guard let score = breakdown.averageHealthScore else { return sum }
-            return sum + (score * breakdown.totalStoreSpend)
-        }
-
-        return weightedSum / totalSpendWithScores
-    }
-
     private var storeSegments: [StoreChartSegment] {
         var currentAngle: Double = 0
         let colors: [Color] = [
@@ -56,7 +39,6 @@ struct AllStoresBreakdownView: View {
                 storeName: breakdown.storeName,
                 amount: breakdown.totalStoreSpend,
                 percentage: Int(percentage * 100),
-                healthScore: breakdown.averageHealthScore,
                 group: breakdown.primaryGroup,
                 groupColorHex: breakdown.primaryGroupColorHex,
                 groupIcon: breakdown.primaryGroupIcon
@@ -72,14 +54,6 @@ struct AllStoresBreakdownView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
-                    // Nutri Score Header
-                    NutriScoreHeader(
-                        healthScore: overallHealthScore,
-                        period: period,
-                        totalSpend: totalSpend
-                    )
-                    .padding(.horizontal)
-                    
                     // Large combined donut chart - tap to flip to line chart
                     VStack(spacing: 32) {
                         FlippableAllStoresChartView(
@@ -160,11 +134,6 @@ struct AllStoresBreakdownView: View {
             Text(segment.storeName.localizedCapitalized)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white)
-
-            // Health Score Badge (if available)
-            if let healthScore = segment.healthScore {
-                HealthScoreBadge(score: Int(healthScore.rounded()), size: .small, style: .subtle)
-            }
 
             Spacer()
 
@@ -252,7 +221,6 @@ struct StoreChartSegment: Identifiable {
     let storeName: String
     let amount: Double
     let percentage: Int
-    let healthScore: Double?  // Average health score for this store
     let group: String?  // Primary category group (e.g., "Food & Dining")
     let groupColorHex: String?  // Hex color for the group
     let groupIcon: String?  // SF Symbol icon for the group
@@ -269,91 +237,6 @@ struct StoreRowButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Nutri Score Header
-
-struct NutriScoreHeader: View {
-    let healthScore: Double?
-    let period: String
-    let totalSpend: Double
-
-    private var nutriScoreLetter: String {
-        guard let score = healthScore else { return "-" }
-        let rounded = Int(score.rounded())
-        return rounded.nutriScoreLetter
-    }
-
-    private var scoreColor: Color {
-        guard let score = healthScore else { return Color(white: 0.4) }
-        return score.healthScoreColor
-    }
-
-    private var scoreLabel: String {
-        guard let score = healthScore else { return L("no_data") }
-        return score.healthScoreLabel
-    }
-
-    var body: some View {
-        HStack(spacing: 16) {
-            // Nutri Score Circle
-            ZStack {
-                Circle()
-                    .fill(scoreColor.opacity(0.15))
-                    .frame(width: 72, height: 72)
-
-                Circle()
-                    .stroke(scoreColor, lineWidth: 3)
-                    .frame(width: 72, height: 72)
-
-                Text(nutriScoreLetter)
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundColor(scoreColor)
-            }
-
-            // Score Details
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L("nutri_score"))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .textCase(.uppercase)
-                    .tracking(1)
-
-                Text(scoreLabel)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
-
-                if let score = healthScore {
-                    Text(String(format: "%.1f / 5", score))
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundColor(.white.opacity(0.6))
-                }
-            }
-
-            Spacer()
-
-            // Spend Summary
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(period)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.4))
-
-                Text(String(format: "€%.0f", totalSpend))
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(scoreColor.opacity(0.3), lineWidth: 1)
-        )
-    }
-}
-
 // MARK: - Preview
 #Preview {
     NavigationStack {
@@ -367,8 +250,7 @@ struct NutriScoreHeader: View {
                     categories: [
                         Category(name: "Meat & Fish", spent: 65.40, percentage: 34)
                     ],
-                    visitCount: 15,
-                    averageHealthScore: 3.8
+                    visitCount: 15
                 ),
                 StoreBreakdown(
                     storeName: "ALDI",
@@ -377,8 +259,7 @@ struct NutriScoreHeader: View {
                     categories: [
                         Category(name: "Fresh Produce", spent: 32.10, percentage: 34)
                     ],
-                    visitCount: 10,
-                    averageHealthScore: 4.2
+                    visitCount: 10
                 )
             ],
             totalSpend: 284.40,

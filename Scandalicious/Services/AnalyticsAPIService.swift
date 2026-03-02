@@ -315,7 +315,7 @@ actor AnalyticsAPIService {
                 return decodedResponse
             } catch {
                 // If response can't be decoded, return a default success response
-                return DeleteReceiptItemResponse(success: true, message: "Item deleted successfully", updatedTotalAmount: nil, updatedItemsCount: nil, updatedAverageHealthScore: nil, receiptDeleted: nil)
+                return DeleteReceiptItemResponse(success: true, message: "Item deleted successfully", updatedTotalAmount: nil, updatedItemsCount: nil, receiptDeleted: nil)
             }
 
         case 401:
@@ -679,7 +679,6 @@ struct DeleteReceiptItemResponse: Decodable {
     let message: String
     let updatedTotalAmount: Double?
     let updatedItemsCount: Int?
-    let updatedAverageHealthScore: Double?
     let receiptDeleted: Bool?
 
     enum CodingKeys: String, CodingKey {
@@ -687,7 +686,6 @@ struct DeleteReceiptItemResponse: Decodable {
         case message
         case updatedTotalAmount = "updated_total_amount"
         case updatedItemsCount = "updated_items_count"
-        case updatedAverageHealthScore = "updated_average_health_score"
         case receiptDeleted = "receipt_deleted"
     }
 }

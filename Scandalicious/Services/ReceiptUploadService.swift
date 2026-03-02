@@ -41,6 +41,7 @@ enum ReceiptUploadError: LocalizedError {
     case networkError(Error)
     case rateLimitExceeded(ReceiptRateLimitExceededError)
     case deleteFailed(String)
+    case duplicateReceipt
 
     var errorDescription: String? {
         switch self {
@@ -58,6 +59,8 @@ enum ReceiptUploadError: LocalizedError {
             return error.message
         case .deleteFailed(let message):
             return "Failed to delete receipt: \(message)"
+        case .duplicateReceipt:
+            return "This receipt has already been uploaded"
         }
     }
 
@@ -293,7 +296,10 @@ actor ReceiptUploadService {
                     throw ReceiptUploadError.serverError("Upload limit exceeded. Please try again later.")
                 }
 
-            case 400...428, 430...499:
+            case 409:
+                throw ReceiptUploadError.duplicateReceipt
+
+            case 400...408, 410...428, 430...499:
                 if let errorMessage = try? JSONDecoder().decode([String: String].self, from: data),
                    let message = errorMessage["error"] ?? errorMessage["message"] {
                     throw ReceiptUploadError.serverError(message)

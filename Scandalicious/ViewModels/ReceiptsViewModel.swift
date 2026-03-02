@@ -154,7 +154,6 @@ class ReceiptsViewModel: ObservableObject {
                     receiptDate: receipt.receiptDate,
                     totalAmount: response.updatedTotalAmount ?? receipt.totalAmount,
                     itemsCount: response.updatedItemsCount ?? updatedTransactions.count,
-                    averageHealthScore: response.updatedAverageHealthScore ?? calculateAverageHealthScore(for: updatedTransactions),
                     transactions: updatedTransactions
                 )
 
@@ -171,13 +170,6 @@ class ReceiptsViewModel: ObservableObject {
 
         // Notify other views to refresh their data
         NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
-    }
-
-    /// Calculate average health score for a list of items
-    private func calculateAverageHealthScore(for items: [APIReceiptItem]) -> Double? {
-        let scores = items.compactMap { $0.healthScore }
-        guard !scores.isEmpty else { return nil }
-        return Double(scores.reduce(0, +)) / Double(scores.count)
     }
 
     // MARK: - Private Helpers

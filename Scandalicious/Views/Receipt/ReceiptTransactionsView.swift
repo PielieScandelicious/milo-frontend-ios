@@ -172,29 +172,6 @@ struct ReceiptTransactionsView: View {
                     .foregroundColor(.white)
                     .padding(.top, 4)
 
-                // Health score if available
-                if let healthScore = receipt.averageHealthScore {
-                    Divider()
-                        .background(Color.white.opacity(0.2))
-                        .padding(.horizontal, 40)
-                        .padding(.top, 8)
-
-                    HStack(spacing: 8) {
-                        HealthScoreBadge(score: Int(healthScore.rounded()), size: .medium, style: .subtle)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(L("health_score"))
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
-
-                            Text(healthScore.healthScoreLabel)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(healthScore.healthScoreColor)
-                        }
-                    }
-                    .padding(.top, 4)
-                }
-
                 // Item count
                 Text("\(receipt.itemsCount) item\(receipt.itemsCount == 1 ? "" : "s")")
                     .font(.system(size: 14, weight: .medium))
@@ -464,10 +441,6 @@ struct ReceiptTransactionsView: View {
                     }
 
                     Spacer(minLength: 0)
-
-                    if let healthScore = transaction.healthScore {
-                        HealthScoreBadge(score: healthScore, size: .small, style: .subtle)
-                    }
                 }
 
                 HStack(spacing: 8) {
@@ -500,11 +473,6 @@ struct ReceiptTransactionsView: View {
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
-                if let score = transaction.healthScore {
-                    Text(score.healthScoreShortLabel)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(score.healthScoreColor)
-                }
             }
         }
         .padding(16)
@@ -532,23 +500,20 @@ struct ReceiptTransactionsView: View {
                 receiptDate: "2026-01-24",
                 totalAmount: 4.48,
                 itemsCount: 2,
-                averageHealthScore: 3.5,
                 transactions: [
                     APIReceiptItem(
                         itemName: "Organic Milk",
                         itemPrice: 2.49,
                         quantity: 2,
                         unitPrice: 1.245,
-                        category: "Dairy & Eggs",
-                        healthScore: 4
+                        category: "Dairy & Eggs"
                     ),
                     APIReceiptItem(
                         itemName: "Fresh Bread",
                         itemPrice: 1.99,
                         quantity: 1,
                         unitPrice: nil,
-                        category: "Bakery",
-                        healthScore: 3
+                        category: "Bakery"
                     )
                 ]
             )

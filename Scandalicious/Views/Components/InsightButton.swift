@@ -145,9 +145,7 @@ struct InsightSheetView: View {
         switch insightType {
         case .totalSpending:
             return L("daily_spending_insight")
-        case .healthScore:
-            return L("daily_health_insight")
-        case .storeBreakdown(let storeName, _, _, _):
+        case .storeBreakdown(let storeName, _, _):
             return "\(storeName) \(L("daily_insight"))"
         }
     }
@@ -156,8 +154,6 @@ struct InsightSheetView: View {
         switch insightType {
         case .totalSpending:
             return "creditcard.fill"
-        case .healthScore:
-            return "heart.fill"
         case .storeBreakdown:
             return "storefront.fill"
         }
@@ -167,8 +163,6 @@ struct InsightSheetView: View {
         switch insightType {
         case .totalSpending:
             return .blue
-        case .healthScore:
-            return .green
         case .storeBreakdown:
             return .purple
         }
@@ -370,11 +364,6 @@ struct InsightSheetView: View {
                 topStore: "Albert Heijn"
             ))
 
-            InsightButton(insightType: .healthScore(
-                score: 3.8,
-                period: "January 2026",
-                totalItems: 47
-            ))
-        }
+}
     }
 }

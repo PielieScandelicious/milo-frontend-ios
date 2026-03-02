@@ -738,8 +738,7 @@ struct OverviewView: View {
                 totalSpent: category.totalSpent,
                 colorHex: normalizedName.categoryColorHex,
                 percentage: category.percentage,
-                transactionCount: category.transactionCount,
-                averageHealthScore: category.averageHealthScore
+                transactionCount: category.transactionCount
             )
         }
     }
@@ -776,15 +775,6 @@ struct OverviewView: View {
             topStore: currentBreakdowns.first?.storeName
         ))
 
-        // Prefetch health score insight if available
-        if let score = dataManager.averageHealthScore {
-            let totalVisits = currentBreakdowns.reduce(0) { $0 + $1.visitCount }
-            InsightService.shared.prefetchInsight(for: .healthScore(
-                score: score,
-                period: selectedPeriod,
-                totalItems: totalVisits
-            ))
-        }
     }
 
     // MARK: - Period Prefetching
@@ -1230,7 +1220,6 @@ struct OverviewView: View {
                 storeName: breakdown.storeName,
                 amount: breakdown.totalStoreSpend,
                 percentage: Int(percentage * 100),
-                healthScore: breakdown.averageHealthScore,
                 group: group,
                 groupColorHex: groupColorHex,
                 groupIcon: groupIcon
@@ -1623,22 +1612,6 @@ struct OverviewView: View {
         let friendsOnly = splitParticipants.filter { !$0.isMe }
 
         return HStack(spacing: 10) {
-            // Health score letter (only shown when score exists)
-            if item.healthScore != nil {
-                Text(item.healthScore.nutriScoreLetter)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(item.healthScore.healthScoreColor)
-                    .frame(width: 22, height: 22)
-                    .background(
-                        Circle()
-                            .fill(item.healthScore.healthScoreColor.opacity(0.15))
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(item.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
-                    )
-            }
-
             // Item details
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -2005,14 +1978,6 @@ struct OverviewView: View {
         }
         // Fallback to cached values or calculated sum
         return dataManager.periodReceiptCounts[period] ?? breakdownsForPeriod(period).reduce(0) { $0 + $1.visitCount }
-    }
-
-    private func healthScoreForPeriod(_ period: String) -> Double? {
-        // Use period metadata — returns nil when no data exists for this period
-        if let metadata = dataManager.periodMetadata.first(where: { $0.period == period }) {
-            return metadata.averageHealthScore
-        }
-        return nil
     }
 
     private func totalItemsForPeriod(_ period: String) -> Int? {
@@ -2424,7 +2389,6 @@ struct OverviewView: View {
         let segments = storeSegmentsForPeriod(period)
         let categories = categoryDataForPeriod(period)
         let spending = totalSpendForPeriod(period)
-        let healthScore = healthScoreForPeriod(period)
 
         return VStack(spacing: 0) {
             spendingHeaderSection(spending: spending, period: period)
@@ -2438,17 +2402,6 @@ struct OverviewView: View {
                     .clipped()
                     .animation(nil, value: isPieChartFlipped)
             }
-
-            Group {
-                if isPieChartFlipped {
-                    CompactNutriBadge(score: healthScore ?? 0)
-                        .padding(.top, 12)
-                        .padding(.bottom, 8)
-                        .opacity(healthScore != nil ? 1 : 0)
-                        .transition(.identity)
-                }
-            }
-            .animation(nil, value: isPieChartFlipped)
 
             rowsSection(
                 period: period,
@@ -3062,220 +3015,6 @@ struct SyncingArrowsView: View {
 
 // Note: ModernReceiptCard has been replaced with the shared ExpandableReceiptCard component
 // located in Scandalicious/Views/Components/ExpandableReceiptCard.swift
-
-// MARK: - Compact Nutri Badge (inline pill for unified card)
-struct CompactNutriBadge: View {
-    let score: Double
-
-    @State private var animatedProgress: CGFloat = 0
-
-    private var scoreColor: Color {
-        switch score {
-        case 0..<1.5:
-            return Color(red: 0.95, green: 0.3, blue: 0.3)
-        case 1.5..<2.5:
-            return Color(red: 1.0, green: 0.55, blue: 0.2)
-        case 2.5..<3.25:
-            return Color(red: 1.0, green: 0.8, blue: 0.2)
-        case 3.25..<4:
-            return Color(red: 0.5, green: 0.85, blue: 0.4)
-        default:
-            return Color(red: 0.2, green: 0.8, blue: 0.4)
-        }
-    }
-
-    private var gradeLabel: String {
-        switch score {
-        case 4...: return "A"
-        case 3.25..<4: return "B"
-        case 2.5..<3.25: return "C"
-        case 1.5..<2.5: return "D"
-        default: return "E"
-        }
-    }
-
-    private var scoreProgress: Double {
-        switch gradeLabel {
-        case "A": return 1.0
-        case "B": return 0.75
-        case "C": return 0.5
-        case "D": return 0.25
-        default: return 0.0
-        }
-    }
-
-    private func replayAnimation() {
-        animatedProgress = 0
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) {
-                animatedProgress = 1.0
-            }
-        }
-    }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            // Grade letter with circular ring
-            ZStack {
-                Circle()
-                    .stroke(scoreColor.opacity(0.2), lineWidth: 2)
-                    .frame(width: 26, height: 26)
-                    .transaction { $0.animation = nil }
-                Circle()
-                    .trim(from: 0, to: scoreProgress * animatedProgress)
-                    .stroke(scoreColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .frame(width: 26, height: 26)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 0.5, dampingFraction: 1.0), value: animatedProgress)
-                Text(gradeLabel)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(scoreColor)
-                    .transaction { $0.animation = nil }
-            }
-
-            Text(L("nutri_score"))
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(.white.opacity(0.4))
-                .tracking(0.8)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(
-            Capsule()
-                .fill(scoreColor.opacity(0.08))
-                .overlay(
-                    Capsule()
-                        .stroke(scoreColor.opacity(0.2), lineWidth: 0.5)
-                )
-        )
-        .transaction { $0.animation = nil }
-        .onAppear {
-            replayAnimation()
-        }
-        .onChange(of: score) { _, _ in
-            replayAnimation()
-        }
-    }
-}
-
-// MARK: - Modern Health Score Badge
-struct ModernHealthScoreBadge: View {
-    let score: Double
-
-    // Color based on score (0-5): red (poor) → orange → yellow → green (excellent)
-    private var scoreColor: Color {
-        switch score {
-        case 0..<1.5:
-            return Color(red: 0.95, green: 0.3, blue: 0.3) // Red - E
-        case 1.5..<2.5:
-            return Color(red: 1.0, green: 0.55, blue: 0.2) // Orange - D
-        case 2.5..<3.25:
-            return Color(red: 1.0, green: 0.8, blue: 0.2) // Yellow - C
-        case 3.25..<4:
-            return Color(red: 0.5, green: 0.85, blue: 0.4) // Light green - B
-        default:
-            return Color(red: 0.2, green: 0.8, blue: 0.4) // Green - A
-        }
-    }
-
-    // Grade letter based on score (A, B, C, D, E) on 0-5 scale
-    private var gradeLabel: String {
-        switch score {
-        case 4...:
-            return "A"
-        case 3.25..<4:
-            return "B"
-        case 2.5..<3.25:
-            return "C"
-        case 1.5..<2.5:
-            return "D"
-        default:
-            return "E"
-        }
-    }
-
-    private var scoreProgress: Double {
-        score / 5.0
-    }
-
-    var body: some View {
-        HStack(spacing: 14) {
-            // Circular progress ring with letter grade inside
-            ZStack {
-                // Background ring
-                Circle()
-                    .stroke(scoreColor.opacity(0.2), lineWidth: 3.5)
-                    .frame(width: 44, height: 44)
-
-                // Progress ring
-                Circle()
-                    .trim(from: 0, to: scoreProgress)
-                    .stroke(
-                        scoreColor,
-                        style: StrokeStyle(lineWidth: 3.5, lineCap: .round)
-                    )
-                    .frame(width: 44, height: 44)
-                    .rotationEffect(.degrees(-90))
-
-                // Letter grade in the middle of the circle
-                Text(gradeLabel)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(scoreColor)
-            }
-
-            // Score number and label in the center
-            VStack(alignment: .leading, spacing: 2) {
-                Text(String(format: "%.1f", score))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.5, dampingFraction: 1.0), value: score)
-
-                Text(L("nutri_score"))
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .textCase(.uppercase)
-                    .tracking(0.5)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            ZStack {
-                // Glass base
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(Color.white.opacity(0.04))
-
-                // Gradient overlay
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                scoreColor.opacity(0.12),
-                                scoreColor.opacity(0.03)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            scoreColor.opacity(0.3),
-                            scoreColor.opacity(0.1)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-    }
-}
 
 #Preview {
     NavigationStack {

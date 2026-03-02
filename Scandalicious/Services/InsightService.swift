@@ -12,8 +12,7 @@ import FirebaseAuth
 
 enum InsightType {
     case totalSpending(amount: Double, period: String, storeCount: Int, topStore: String?)
-    case healthScore(score: Double?, period: String, totalItems: Int)
-    case storeBreakdown(storeName: String, amount: Double, period: String, healthScore: Double?)
+    case storeBreakdown(storeName: String, amount: Double, period: String)
 
     /// Unique cache key for storing daily insights
     /// The key is based on the insight type and period, so the same insight type + period combination
@@ -22,9 +21,7 @@ enum InsightType {
         switch self {
         case .totalSpending(_, let period, _, _):
             return "daily_insight_totalSpending_\(period)"
-        case .healthScore(_, let period, _):
-            return "daily_insight_healthScore_\(period)"
-        case .storeBreakdown(let storeName, _, let period, _):
+        case .storeBreakdown(let storeName, _, let period):
             return "daily_insight_store_\(storeName)_\(period)"
         }
     }
@@ -46,34 +43,17 @@ enum InsightType {
             prompt += "\n\nProvide a short, helpful insight about their spending habits. Don't repeat the numbers - give perspective or a tip."
             return prompt
 
-        case .healthScore(let score, let period, let totalItems):
-            let scoreText = score.map { String(format: "%.1f", $0) } ?? "N/A"
-            return """
-            Generate a brief, encouraging observation about this health score. Be concise (2-3 sentences max), supportive, and provide helpful perspective.
-
-            Data:
-            - Average health score: \(scoreText) out of 5.0
-            - Period: \(period)
-            - Total items tracked: \(totalItems)
-
-            Health score scale: 5=Very Healthy (fresh produce), 4=Healthy, 3=Moderate, 2=Less Healthy, 1=Unhealthy, 0=Very Unhealthy.
-
-            Provide a short, supportive insight. Focus on encouragement and one small actionable tip if relevant.
-            """
-
-        case .storeBreakdown(let storeName, let amount, let period, let healthScore):
-            var prompt = """
+        case .storeBreakdown(let storeName, let amount, let period):
+            let prompt = """
             Generate a brief insight about shopping at this store. Be concise (2-3 sentences max) and helpful.
 
             Data:
             - Store: \(storeName)
             - Amount spent: €\(String(format: "%.2f", amount))
             - Period: \(period)
+
+            Provide a brief, helpful observation about their shopping at this store.
             """
-            if let score = healthScore {
-                prompt += "\n- Average health score at this store: \(String(format: "%.1f", score))/5.0"
-            }
-            prompt += "\n\nProvide a brief, helpful observation about their shopping at this store."
             return prompt
         }
     }

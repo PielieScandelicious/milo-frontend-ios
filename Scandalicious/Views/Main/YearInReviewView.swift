@@ -65,11 +65,7 @@ struct YearInReviewView: View {
             statCard(title: L("total_spent"), value: String(format: "€%.2f", summary.totalSpend), icon: "creditcard.fill", color: .purple)
             statCard(title: L("receipts"), value: "\(summary.receiptCount)", icon: "receipt.fill", color: .blue)
             statCard(title: L("items"), value: "\(summary.totalItems)", icon: "bag.fill", color: .green)
-            if let healthScore = summary.averageHealthScore, healthScore > 0 {
-                statCard(title: L("health_score"), value: String(format: "%.1f", healthScore), icon: "heart.fill", color: .red)
-            } else {
-                statCard(title: L("transactions"), value: "\(summary.transactionCount)", icon: "list.bullet.rectangle.fill", color: .orange)
-            }
+            statCard(title: L("transactions"), value: "\(summary.transactionCount)", icon: "list.bullet.rectangle.fill", color: .orange)
         }
         .padding(.horizontal, 16)
     }

@@ -31,6 +31,22 @@ class AppSyncManager {
             }
         }
 
+        // Darwin notification: fires immediately when the share extension signals a new upload,
+        // even if the main app is already in the foreground (didBecomeActiveNotification won't
+        // fire in that case). Uses the singleton directly to avoid C-callback memory issues.
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            nil,
+            { _, _, _, _, _ in
+                Task { @MainActor in
+                    AppSyncManager.shared.checkForShareExtensionUploads()
+                }
+            },
+            "com.deepmaind.scandalicious.shareExtensionDidUpload" as CFString,
+            nil,
+            .deliverImmediately
+        )
+
         // Initialize share extension timestamp
         initializeLastCheckedTimestamp()
     }

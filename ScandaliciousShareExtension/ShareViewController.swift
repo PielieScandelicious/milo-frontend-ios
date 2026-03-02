@@ -568,9 +568,6 @@ class ShareViewController: UIViewController {
         // Show success immediately for instant feedback
         updateStatus(.success(message: ""))
 
-        // Signal main app that it needs to refresh data
-        signalMainAppToRefresh()
-
         // Decrement rate limit locally to prevent stale data allowing duplicate uploads
         decrementRateLimitLocally()
 
@@ -584,10 +581,17 @@ class ShareViewController: UIViewController {
                 do {
                     let result = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
                     if case .accepted(let accepted) = result {
+                        // Persist receipt ID first, then signal — main app must see the
+                        // receipt ID in UserDefaults before it calls reloadPersistedReceipts()
                         self.persistProcessingReceipt(receiptId: accepted.receiptId, filename: accepted.filename)
+                        self.signalMainAppToRefresh()
+                    }
+                } catch ReceiptUploadError.duplicateReceipt {
+                    await MainActor.run {
+                        self.updateStatus(.failed(message: "This receipt has already been uploaded.", canRetry: false))
                     }
                 } catch {
-                    // Error is logged but not shown - user already saw success
+                    // Other errors are not shown — user already saw the success animation
                 }
             }
         }
@@ -612,9 +616,6 @@ class ShareViewController: UIViewController {
         // Show success immediately for instant feedback
         updateStatus(.success(message: ""))
 
-        // Signal main app that it needs to refresh data
-        signalMainAppToRefresh()
-
         // Decrement rate limit locally to prevent stale data allowing duplicate uploads
         decrementRateLimitLocally()
 
@@ -628,10 +629,17 @@ class ShareViewController: UIViewController {
                 do {
                     let result = try await ReceiptUploadService.shared.uploadReceipt(image: image)
                     if case .accepted(let accepted) = result {
+                        // Persist receipt ID first, then signal — main app must see the
+                        // receipt ID in UserDefaults before it calls reloadPersistedReceipts()
                         self.persistProcessingReceipt(receiptId: accepted.receiptId, filename: accepted.filename)
+                        self.signalMainAppToRefresh()
+                    }
+                } catch ReceiptUploadError.duplicateReceipt {
+                    await MainActor.run {
+                        self.updateStatus(.failed(message: "This receipt has already been uploaded.", canRetry: false))
                     }
                 } catch {
-                    // Error is logged but not shown - user already saw success
+                    // Other errors are not shown — user already saw the success animation
                 }
             }
         }
@@ -734,7 +742,8 @@ class ShareViewController: UIViewController {
 
     // MARK: - Signal Main App to Refresh
 
-    /// Saves a timestamp to shared UserDefaults to signal the main app that new data is available
+    /// Saves a timestamp to shared UserDefaults and posts a Darwin notification so the
+    /// main app picks up the new receipt immediately — even if it's already in the foreground.
     private func signalMainAppToRefresh() {
         let appGroupIdentifier = "group.com.deepmaind.scandalicious"
         guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
@@ -745,6 +754,15 @@ class ShareViewController: UIViewController {
         let timestamp = Date().timeIntervalSince1970
         sharedDefaults.set(timestamp, forKey: "receipt_upload_timestamp")
         sharedDefaults.synchronize()
+
+        // Darwin notification: wakes the main app immediately when it's in the foreground.
+        // didBecomeActiveNotification only fires on background→foreground transition, so
+        // this is needed when the user stays in the main app while sharing.
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName("com.deepmaind.scandalicious.shareExtensionDidUpload" as CFString),
+            nil, nil, true
+        )
     }
 
     // MARK: - User-Friendly Error Messages
@@ -780,6 +798,8 @@ class ShareViewController: UIViewController {
                 }
             case .deleteFailed:
                 return "Unable to delete receipt. Please try again."
+            case .duplicateReceipt:
+                return "This receipt has already been uploaded."
             }
         }
 

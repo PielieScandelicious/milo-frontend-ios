@@ -387,8 +387,7 @@ struct SplitItemRow: View {
                     itemPrice: 12.00,
                     quantity: 1,
                     unitPrice: 12.00,
-                    category: "Ready Meals",
-                    healthScore: 3
+                    category: "Ready Meals"
                 ),
                 ReceiptTransaction(
                     itemId: "t2",
@@ -396,8 +395,7 @@ struct SplitItemRow: View {
                     itemPrice: 15.00,
                     quantity: 3,
                     unitPrice: 5.00,
-                    category: "Alcohol",
-                    healthScore: 1
+                    category: "Alcohol"
                 ),
                 ReceiptTransaction(
                     itemId: "t3",
@@ -405,8 +403,7 @@ struct SplitItemRow: View {
                     itemPrice: 8.50,
                     quantity: 1,
                     unitPrice: 8.50,
-                    category: "Snacks & Sweets",
-                    healthScore: 2
+                    category: "Snacks & Sweets"
                 ),
                 ReceiptTransaction(
                     itemId: "t4",
@@ -414,12 +411,10 @@ struct SplitItemRow: View {
                     itemPrice: 4.00,
                     quantity: 2,
                     unitPrice: 2.00,
-                    category: "Drinks (Water)",
-                    healthScore: 5
+                    category: "Drinks (Water)"
                 ),
             ],
-            warnings: [],
-            averageHealthScore: 2.5
+            warnings: []
         )
     )
 }

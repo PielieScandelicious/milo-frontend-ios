@@ -641,8 +641,7 @@ struct SplitTransactionView: View {
             itemPrice: 12.00,
             quantity: 1,
             category: "PREPARED_MEALS",
-            date: "2026-02-03",
-            healthScore: 3
+            date: "2026-02-03"
         ),
         storeName: "COLRUYT"
     )

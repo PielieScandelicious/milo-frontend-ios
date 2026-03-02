@@ -273,8 +273,7 @@ struct ShareSheet: UIViewControllerRepresentable {
             totalAmount: 47.50,
             itemsCount: 4,
             transactions: [],
-            warnings: [],
-            averageHealthScore: 2.5
+            warnings: []
         ),
         results: [
             SplitResult(

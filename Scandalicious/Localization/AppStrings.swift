@@ -62,7 +62,6 @@ enum AppStrings {
         "your_ai_assistant": ["en": "Your AI shopping assistant", "nl": "Je AI-winkelassistent", "fr": "Votre assistant shopping IA"],
         "feature_scan": ["en": "Scan", "nl": "Scan", "fr": "Scanner"],
         "feature_analyze": ["en": "Analyze", "nl": "Analyseer", "fr": "Analyser"],
-        "feature_health": ["en": "Health", "nl": "Gezondheid", "fr": "Santé"],
         "feature_chat": ["en": "Chat", "nl": "Chat", "fr": "Chat"],
         "yearly": ["en": "Yearly", "nl": "Jaarlijks", "fr": "Annuel"],
         "monthly": ["en": "Monthly", "nl": "Maandelijks", "fr": "Mensuel"],
@@ -129,7 +128,6 @@ enum AppStrings {
         "tap_to_flip": ["en": "Tap to flip", "nl": "Tik om te draaien", "fr": "Appuyez pour retourner"],
         "sort_by": ["en": "Sort By", "nl": "Sorteer op", "fr": "Trier par"],
         "filters": ["en": "Filters", "nl": "Filters", "fr": "Filtres"],
-        "nutri_score": ["en": "NUTRI SCORE", "nl": "NUTRI SCORE", "fr": "NUTRI SCORE"],
         "all_stores": ["en": "All Stores", "nl": "Alle winkels", "fr": "Tous les magasins"],
         "highest_spend": ["en": "Highest Spend", "nl": "Hoogste uitgave", "fr": "Dépense la plus élevée"],
         "lowest_spend": ["en": "Lowest Spend", "nl": "Laagste uitgave", "fr": "Dépense la plus basse"],
@@ -155,9 +153,6 @@ enum AppStrings {
         "prompt_price_title": ["en": "Spot the price creep", "nl": "Ontdek prijsstijgingen", "fr": "Détecter les hausses de prix"],
         "prompt_price_subtitle": ["en": "Are my groceries getting pricier?", "nl": "Worden mijn boodschappen duurder?", "fr": "Mes courses deviennent-elles plus chères ?"],
         "prompt_price_message": ["en": "Are any of my regularly purchased grocery items getting more expensive over time?", "nl": "Worden sommige van mijn vaste boodschappen geleidelijk duurder?", "fr": "Certains de mes articles habituels deviennent-ils plus chers avec le temps ?"],
-        "prompt_health_title": ["en": "Rate my basket", "nl": "Beoordeel mijn winkelmandje", "fr": "Évaluer mon panier"],
-        "prompt_health_subtitle": ["en": "Nutrition score breakdown", "nl": "Analyse van je voedingsscore", "fr": "Analyse du score nutritionnel"],
-        "prompt_health_message": ["en": "Analyze the nutritional balance of my recent grocery purchases and give me a health score", "nl": "Analyseer het voedingsevenwicht van mijn recente boodschappen en geef me een gezondheidsscore", "fr": "Analysez l'équilibre nutritionnel de mes achats récents et donnez-moi un score santé"],
         "message_limit_reached": ["en": "Message Limit Reached", "nl": "Berichtlimiet bereikt", "fr": "Limite de messages atteinte"],
         "error_encountered": ["en": "I'm sorry, I encountered an error", "nl": "Sorry, er is een fout opgetreden", "fr": "Désolé, une erreur s'est produite"],
         "please_try_again": ["en": "Please try again.", "nl": "Probeer het opnieuw.", "fr": "Veuillez réessayer."],
@@ -239,7 +234,6 @@ enum AppStrings {
         "duplicate_receipt": ["en": "Duplicate Receipt", "nl": "Dubbel kassaticket", "fr": "Ticket en double"],
         "duplicate_receipt_msg": ["en": "This receipt was already uploaded before. The items have not been added again.", "nl": "Dit kassaticket was al eerder geüpload. De items zijn niet opnieuw toegevoegd.", "fr": "Ce ticket a déjà été téléchargé. Les articles n'ont pas été ajoutés à nouveau."],
         "total": ["en": "Total", "nl": "Totaal", "fr": "Total"],
-        "health_score": ["en": "Health Score", "nl": "Gezondheidsscore", "fr": "Score santé"],
         "split_with_friends": ["en": "Split with Friends", "nl": "Delen met vrienden", "fr": "Partager avec des amis"],
         "divide_receipt": ["en": "Divide this receipt among friends", "nl": "Verdeel dit kassaticket onder vrienden", "fr": "Répartir ce ticket entre amis"],
         "items": ["en": "Items", "nl": "Items", "fr": "Articles"],
@@ -344,9 +338,8 @@ enum AppStrings {
         "unlock": ["en": "Unlock", "nl": "Ontgrendelen", "fr": "Débloquer"],
         "upgrade_unlimited": ["en": "Upgrade for unlimited uploads", "nl": "Upgrade voor onbeperkt uploaden", "fr": "Passez à Premium pour des téléchargements illimités"],
 
-        // MARK: - Health Score
+        // MARK: - General
         "no_data": ["en": "No Data", "nl": "Geen gegevens", "fr": "Aucune donnée"],
-        "upload_receipts_health": ["en": "Upload receipts to see your health score", "nl": "Upload kassatickets om je gezondheidsscore te zien", "fr": "Téléchargez des tickets pour voir votre score santé"],
         "na": ["en": "N/A", "nl": "N/B", "fr": "N/D"],
         "vs_last_period": ["en": "vs last period", "nl": "vs vorige periode", "fr": "vs période précédente"],
         "this_month": ["en": "This Month", "nl": "Deze maand", "fr": "Ce mois"],
@@ -424,7 +417,6 @@ enum AppStrings {
 
         // MARK: - Insight Button (extra)
         "daily_spending_insight": ["en": "Daily Spending Insight", "nl": "Dagelijks uitgave-inzicht", "fr": "Analyse quotidienne des dépenses"],
-        "daily_health_insight": ["en": "Daily Health Insight", "nl": "Dagelijks gezondheidsinzicht", "fr": "Analyse quotidienne santé"],
 
         // MARK: - Donut Chart / Category Detail
         "avg_price": ["en": "AVG PRICE", "nl": "GEM. PRIJS", "fr": "PRIX MOYEN"],

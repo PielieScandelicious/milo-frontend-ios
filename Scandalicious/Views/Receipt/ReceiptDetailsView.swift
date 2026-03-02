@@ -150,27 +150,6 @@ struct ReceiptDetailsView: View {
                 }
             }
 
-            // Health Score (if available)
-            if let healthScore = receipt.calculatedAverageHealthScore {
-                Divider()
-                    .padding(.vertical, 4)
-
-                HStack(spacing: 12) {
-                    HealthScoreGauge(score: healthScore, size: 60, showLabel: false)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("health_score"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        Text(healthScore.healthScoreLabel)
-                            .font(.headline)
-                            .foregroundStyle(healthScore.healthScoreColor)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-            }
-
             // Items Count
             HStack(spacing: 4) {
                 Image(systemName: "list.bullet")
@@ -389,10 +368,6 @@ struct ReceiptItemRow: View {
                     }
 
                     Spacer(minLength: 0)
-
-                    // Health Score Badge
-                    HealthScoreBadge(score: transaction.healthScore, size: .small, style: .subtle)
-                        .layoutPriority(1)
                 }
 
                 HStack(spacing: 8) {
@@ -426,13 +401,6 @@ struct ReceiptItemRow: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(.primary)
 
-                // Health score label
-                if let score = transaction.healthScore {
-                    Text(score.healthScoreShortLabel)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(score.healthScoreColor)
-                }
             }
             .layoutPriority(1)  // Ensure price doesn't get compressed
         }
@@ -513,51 +481,44 @@ struct ReceiptItemSplitAvatars: View {
                     quantity: 2,
                     unitPrice: 1.50,
                     category: "Dairy & Eggs",
-                    healthScore: 4
                 ),
                 ReceiptTransaction(
                     itemName: "Bread",
                     itemPrice: 3.49,
                     quantity: 1,
                     unitPrice: 3.49,
-                    category: "Bakery",
-                    healthScore: 3
+                    category: "Bakery"
                 ),
                 ReceiptTransaction(
                     itemName: "Apples",
                     itemPrice: 4.99,
                     quantity: 1,
                     unitPrice: 4.99,
-                    category: "Fresh Produce",
-                    healthScore: 5
+                    category: "Fresh Produce"
                 ),
                 ReceiptTransaction(
                     itemName: "Chicken Breast",
                     itemPrice: 8.99,
                     quantity: 1,
                     unitPrice: 8.99,
-                    category: "Meat & Fish",
-                    healthScore: 4
+                    category: "Meat & Fish"
                 ),
                 ReceiptTransaction(
                     itemName: "Cola",
                     itemPrice: 3.99,
                     quantity: 1,
                     unitPrice: 3.99,
-                    category: "Drinks (Soft/Soda)",
-                    healthScore: 1
+                    category: "Drinks (Soft/Soda)"
                 ),
                 ReceiptTransaction(
                     itemName: "Paper Towels",
                     itemPrice: 5.99,
                     quantity: 1,
                     unitPrice: 5.99,
-                    category: "Household",
-                    healthScore: nil  // Non-food item
+                    category: "Household"
                 )
             ],
-            warnings: [],
-            averageHealthScore: 3.4
+            warnings: []
         )
     )
 }
@@ -577,20 +538,17 @@ struct ReceiptItemSplitAvatars: View {
                     itemPrice: 1.99,
                     quantity: 1,
                     unitPrice: 1.99,
-                    category: "Fresh Produce",
-                    healthScore: 5
+                    category: "Fresh Produce"
                 ),
                 ReceiptTransaction(
                     itemName: "Yogurt",
                     itemPrice: 3.49,
                     quantity: 1,
                     unitPrice: 3.49,
-                    category: "Dairy & Eggs",
-                    healthScore: 4
+                    category: "Dairy & Eggs"
                 )
             ],
             warnings: [],
-            averageHealthScore: 4.5,
             isDuplicate: true
         )
     )

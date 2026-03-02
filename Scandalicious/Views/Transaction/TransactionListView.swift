@@ -9,7 +9,6 @@ import SwiftUI
 
 enum TransactionSortOrder {
     case date
-    case healthScoreDescending // Healthiest first (5 -> 0 -> nil)
 }
 
 struct TransactionListView: View {
@@ -38,19 +37,6 @@ struct TransactionListView: View {
     private var transactions: [APITransaction] {
         var baseTransactions = viewModel.transactions
 
-        // Apply sorting based on sortOrder
-        if sortOrder == .healthScoreDescending {
-            baseTransactions.sort { first, second in
-                // Health score sorting: highest first (5 -> 0), nil values last
-                switch (first.healthScore, second.healthScore) {
-                case (nil, nil): return false
-                case (nil, _): return false  // nil goes last
-                case (_, nil): return true   // non-nil comes before nil
-                case (let a?, let b?): return a > b  // Higher score first
-                }
-            }
-        }
-
         // Filter by search text
         if searchText.isEmpty {
             return baseTransactions
@@ -67,30 +53,7 @@ struct TransactionListView: View {
     }
 
     private var groupedTransactions: [(String, [APITransaction])] {
-        // When sorting by health score, group by score ranges instead of dates
-        if sortOrder == .healthScoreDescending {
-            let grouped = Dictionary(grouping: transactions) { transaction -> String in
-                guard let score = transaction.healthScore else { return "Non-Food Items" }
-                switch score {
-                case 5: return "Very Healthy"
-                case 4: return "Healthy"
-                case 3: return "Moderate"
-                case 2: return "Less Healthy"
-                case 1: return "Unhealthy"
-                case 0: return "Very Unhealthy"
-                default: return "Other"
-                }
-            }
-            // Sort groups by health score order (highest first)
-            let order = ["Very Healthy", "Healthy", "Moderate", "Less Healthy", "Unhealthy", "Very Unhealthy", "Non-Food Items"]
-            return grouped.sorted { first, second in
-                let firstIndex = order.firstIndex(of: first.0) ?? order.count
-                let secondIndex = order.firstIndex(of: second.0) ?? order.count
-                return firstIndex < secondIndex
-            }
-        }
-
-        // Default: group by date
+        // Group by date
         let grouped = Dictionary(grouping: transactions) { transaction -> String in
             guard let date = transaction.dateParsed else { return "Unknown" }
             let formatter = DateFormatter()
@@ -123,9 +86,7 @@ struct TransactionListView: View {
             if viewModel.state.isLoading && transactions.isEmpty {
                 // Skeleton loading state
                 VStack(spacing: 0) {
-                    if sortOrder != .healthScoreDescending {
-                        headerSection
-                    }
+                    headerSection
 
                     SkeletonTransactionList(count: 5)
                         .padding(.horizontal, 20)
@@ -135,9 +96,7 @@ struct TransactionListView: View {
             } else if transactions.isEmpty {
                 VStack(spacing: 0) {
                     // Header (hidden for health score view)
-                    if sortOrder != .healthScoreDescending {
-                        headerSection
-                    }
+                    headerSection
 
                     // Search bar
                     searchBar
@@ -148,10 +107,7 @@ struct TransactionListView: View {
                 // Full screen scrollable
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Header (hidden for health score view)
-                        if sortOrder != .healthScoreDescending {
-                            headerSection
-                        }
+                        headerSection
 
                         // Search bar
                         searchBar
@@ -195,7 +151,7 @@ struct TransactionListView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text(sortOrder == .healthScoreDescending ? "Health Score" : (category ?? storeName))
+                    Text(category ?? storeName)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.white)
 
@@ -594,9 +550,6 @@ struct APITransactionRowView: View {
                     }
 
                     Spacer(minLength: 0)
-
-                    // Health Score Badge
-                    HealthScoreBadge(score: transaction.healthScore, size: .small, style: .subtle)
                 }
 
                 HStack(spacing: 8) {
@@ -624,18 +577,10 @@ struct APITransactionRowView: View {
 
             Spacer()
 
-            // Amount and Health Score
             VStack(alignment: .trailing, spacing: 4) {
                 Text(String(format: "€%.2f", transaction.totalPrice))
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-
-                // Health score label
-                if let score = transaction.healthScore {
-                    Text(score.healthScoreShortLabel)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(score.healthScoreColor)
-                }
             }
         }
         .padding(16)

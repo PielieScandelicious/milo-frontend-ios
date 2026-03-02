@@ -19,7 +19,6 @@ protocol ReceiptDisplayable: Identifiable {
     var displayTotalAmount: Double { get }
     var displayItemsCount: Int { get }
     var displayTransactions: [ReceiptItemDisplayable] { get }
-    var displayHealthScore: Double? { get }
 }
 
 /// Protocol for displaying receipt items uniformly
@@ -27,7 +26,6 @@ protocol ReceiptItemDisplayable: Identifiable {
     var displayItemName: String { get }
     var displayItemPrice: Double { get }
     var displayQuantity: Int { get }
-    var displayHealthScore: Int? { get }
     /// Unique identifier for deletion - returns item_id from backend if available
     var deletableItemId: String? { get }
 }
@@ -44,14 +42,12 @@ extension APIReceipt: ReceiptDisplayable {
         transactions.reduce(0) { $0 + $1.quantity }
     }
     var displayTransactions: [ReceiptItemDisplayable] { transactions }
-    var displayHealthScore: Double? { averageHealthScore }
 }
 
 extension APIReceiptItem: ReceiptItemDisplayable {
     var displayItemName: String { displayName }
     var displayItemPrice: Double { itemPrice }
     var displayQuantity: Int { quantity }
-    var displayHealthScore: Int? { healthScore }
     var deletableItemId: String? { itemId }
 }
 
@@ -72,14 +68,12 @@ extension ReceiptUploadResponse: ReceiptDisplayable {
         transactions.reduce(0) { $0 + $1.quantity }
     }
     var displayTransactions: [ReceiptItemDisplayable] { transactions }
-    var displayHealthScore: Double? { averageHealthScore }
 }
 
 extension ReceiptTransaction: ReceiptItemDisplayable {
     var displayItemName: String { displayName }
     var displayItemPrice: Double { itemPrice }
     var displayQuantity: Int { quantity }
-    var displayHealthScore: Int? { healthScore }
     var deletableItemId: String? { itemId } // Uses backend item_id if available
 }
 
@@ -183,27 +177,9 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
         onDeleteItem != nil && receipt.displayTransactions.contains { $0.deletableItemId != nil }
     }
 
-    /// Transactions sorted by nutri score (healthy first), then alphabetically for items without scores
     private var sortedTransactions: [ReceiptItemDisplayable] {
         receipt.displayTransactions.sorted { item1, item2 in
-            let score1 = item1.displayHealthScore
-            let score2 = item2.displayHealthScore
-
-            // Both have scores - sort by score descending (higher = healthier first)
-            if let s1 = score1, let s2 = score2 {
-                return s1 > s2
-            }
-
-            // Item with score comes before item without score
-            if score1 != nil && score2 == nil {
-                return true
-            }
-            if score1 == nil && score2 != nil {
-                return false
-            }
-
-            // Neither has score - sort alphabetically
-            return item1.displayItemName.localizedCaseInsensitiveCompare(item2.displayItemName) == .orderedAscending
+            item1.displayItemName.localizedCaseInsensitiveCompare(item2.displayItemName) == .orderedAscending
         }
     }
 
@@ -297,7 +273,7 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                         .frame(height: 1)
                         .padding(.horizontal, 14)
 
-                    // All items sorted by health score (healthy first)
+                    // All items sorted alphabetically
                     if !sortedTransactions.isEmpty {
                         VStack(spacing: 6) {
                             ForEach(Array(sortedTransactions.enumerated()), id: \.offset) { index, item in
@@ -517,22 +493,6 @@ struct EditableLineItemRow: View {
                     insertion: .scale.combined(with: .opacity),
                     removal: .scale.combined(with: .opacity)
                 ))
-            }
-
-            // Nutri-Score letter (only shown when score exists)
-            if item.displayHealthScore != nil {
-                Text(item.displayHealthScore.nutriScoreLetter)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundColor(item.displayHealthScore.healthScoreColor)
-                    .frame(width: 16, height: 16)
-                    .background(
-                        Circle()
-                            .fill(item.displayHealthScore.healthScoreColor.opacity(0.15))
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(item.displayHealthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
-                    )
             }
 
             VStack(alignment: .leading, spacing: 2) {

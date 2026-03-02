@@ -150,25 +150,6 @@ struct ShareExtensionView: View {
                     .font(.subheadline)
             }
 
-            // Health Score Section
-            if let healthScore = response.calculatedAverageHealthScore {
-                Divider()
-
-                HStack(spacing: 12) {
-                    HealthScoreBadge(score: Int(healthScore.rounded()), size: .medium, style: .subtle)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L("health_score"))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Text(healthScore.healthScoreLabel)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(healthScore.healthScoreColor)
-                    }
-                }
-            }
         }
     }
     

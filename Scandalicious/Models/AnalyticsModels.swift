@@ -44,7 +44,6 @@ struct TrendPeriod: Codable, Identifiable {
     let periodEnd: String        // e.g., "2026-01-31"
     let totalSpend: Double
     let transactionCount: Int
-    let averageHealthScore: Double?  // Average health score for this period
 
     var id: String { periodStart }
 
@@ -54,16 +53,14 @@ struct TrendPeriod: Codable, Identifiable {
         case periodEnd = "end_date"
         case totalSpend = "total_spend"
         case transactionCount = "transaction_count"
-        case averageHealthScore = "average_health_score"
     }
 
-    init(period: String = "", periodStart: String, periodEnd: String, totalSpend: Double, transactionCount: Int, averageHealthScore: Double? = nil) {
+    init(period: String = "", periodStart: String, periodEnd: String, totalSpend: Double, transactionCount: Int) {
         self.period = period
         self.periodStart = periodStart
         self.periodEnd = periodEnd
         self.totalSpend = totalSpend
         self.transactionCount = transactionCount
-        self.averageHealthScore = averageHealthScore
     }
 
     var startDate: Date? {
@@ -85,7 +82,6 @@ struct CategoriesResponse: Codable {
     let endDate: String
     let totalSpend: Double
     let categories: [CategoryBreakdown]
-    let averageHealthScore: Double?  // Overall average health score
 
     enum CodingKeys: String, CodingKey {
         case period
@@ -93,16 +89,14 @@ struct CategoriesResponse: Codable {
         case endDate = "end_date"
         case totalSpend = "total_spend"
         case categories
-        case averageHealthScore = "average_health_score"
     }
 
-    init(period: String, startDate: String, endDate: String, totalSpend: Double, categories: [CategoryBreakdown], averageHealthScore: Double? = nil) {
+    init(period: String, startDate: String, endDate: String, totalSpend: Double, categories: [CategoryBreakdown]) {
         self.period = period
         self.startDate = startDate
         self.endDate = endDate
         self.totalSpend = totalSpend
         self.categories = categories
-        self.averageHealthScore = averageHealthScore
     }
 
     var startDateParsed: Date? {
@@ -121,7 +115,6 @@ struct CategoryBreakdown: Codable, Identifiable {
     let spent: Double
     let percentage: Double
     let transactionCount: Int
-    let averageHealthScore: Double?  // Average health score for this category
     let group: String?  // Top-level group name (e.g., "Food & Dining")
     let groupColorHex: String?  // Hex color for the group
     let groupIcon: String?  // SF Symbol icon for the group
@@ -133,18 +126,16 @@ struct CategoryBreakdown: Codable, Identifiable {
         case spent
         case percentage
         case transactionCount = "transaction_count"
-        case averageHealthScore = "average_health_score"
         case group
         case groupColorHex = "group_color_hex"
         case groupIcon = "group_icon"
     }
 
-    init(name: String, spent: Double, percentage: Double, transactionCount: Int, averageHealthScore: Double? = nil, group: String? = nil, groupColorHex: String? = nil, groupIcon: String? = nil) {
+    init(name: String, spent: Double, percentage: Double, transactionCount: Int, group: String? = nil, groupColorHex: String? = nil, groupIcon: String? = nil) {
         self.name = name
         self.spent = spent
         self.percentage = percentage
         self.transactionCount = transactionCount
-        self.averageHealthScore = averageHealthScore
         self.group = group
         self.groupColorHex = groupColorHex
         self.groupIcon = groupIcon
@@ -170,7 +161,6 @@ struct SummaryResponse: Codable {
 
     // Common fields
     let totalSpend: Double
-    let averageHealthScore: Double?
 
     // Store breakdown (legacy format)
     let stores: [APIStoreBreakdown]?
@@ -188,7 +178,6 @@ struct SummaryResponse: Codable {
         case transactionCount = "transaction_count"
         case stores
         case categories
-        case averageHealthScore = "average_health_score"
     }
 
     // Custom decoder to handle both "total_spend" and "total_spent" keys
@@ -203,7 +192,6 @@ struct SummaryResponse: Codable {
         transactionCount = try container.decodeIfPresent(Int.self, forKey: .transactionCount)
         stores = try container.decodeIfPresent([APIStoreBreakdown].self, forKey: .stores)
         categories = try container.decodeIfPresent([CategorySpendItem].self, forKey: .categories)
-        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
 
         // Handle both "total_spend" and "total_spent"
         if let spend = try? container.decode(Double.self, forKey: .totalSpend) {
@@ -219,7 +207,7 @@ struct SummaryResponse: Codable {
         case totalSpend = "total_spend"
     }
 
-    init(period: String?, startDate: String?, endDate: String?, totalSpend: Double, transactionCount: Int?, stores: [APIStoreBreakdown]?, categories: [CategorySpendItem]? = nil, averageHealthScore: Double? = nil, month: Int? = nil, year: Int? = nil) {
+    init(period: String?, startDate: String?, endDate: String?, totalSpend: Double, transactionCount: Int?, stores: [APIStoreBreakdown]?, categories: [CategorySpendItem]? = nil, month: Int? = nil, year: Int? = nil) {
         self.month = month
         self.year = year
         self.period = period
@@ -229,7 +217,6 @@ struct SummaryResponse: Codable {
         self.transactionCount = transactionCount
         self.stores = stores
         self.categories = categories
-        self.averageHealthScore = averageHealthScore
     }
 
     var startDateParsed: Date? {
@@ -273,7 +260,6 @@ struct APIStoreBreakdown: Codable, Identifiable {
     let amountSpent: Double
     let storeVisits: Int
     let percentage: Double
-    let averageHealthScore: Double?  // Average health score for this store
 
     var id: String { storeName }
 
@@ -285,22 +271,19 @@ struct APIStoreBreakdown: Codable, Identifiable {
         case storeVisits = "store_visits"
         case visitCount = "visit_count"
         case percentage
-        case averageHealthScore = "average_health_score"
     }
 
-    init(storeName: String, amountSpent: Double, storeVisits: Int, percentage: Double, averageHealthScore: Double? = nil) {
+    init(storeName: String, amountSpent: Double, storeVisits: Int, percentage: Double) {
         self.storeName = storeName
         self.amountSpent = amountSpent
         self.storeVisits = storeVisits
         self.percentage = percentage
-        self.averageHealthScore = averageHealthScore
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         storeName = try container.decode(String.self, forKey: .storeName)
         percentage = try container.decode(Double.self, forKey: .percentage)
-        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
 
         // Try new field names first, fall back to old field names
         if let totalSpent = try container.decodeIfPresent(Double.self, forKey: .totalSpent) {
@@ -322,7 +305,6 @@ struct APIStoreBreakdown: Codable, Identifiable {
         try container.encode(amountSpent, forKey: .totalSpent)
         try container.encode(storeVisits, forKey: .visitCount)
         try container.encode(percentage, forKey: .percentage)
-        try container.encodeIfPresent(averageHealthScore, forKey: .averageHealthScore)
     }
 }
 
@@ -336,7 +318,6 @@ struct StoreDetailsResponse: Codable {
     let totalSpend: Double
     let visitCount: Int
     let categories: [CategoryBreakdown]
-    let averageHealthScore: Double?  // Average health score for this store
     let totalItems: Int?             // NEW: Sum of all item quantities (for average item price)
     let averageItemPrice: Double?    // NEW: Backend-computed average item price
 
@@ -348,12 +329,11 @@ struct StoreDetailsResponse: Codable {
         case totalSpend = "total_store_spend"
         case visitCount = "store_visits"
         case categories
-        case averageHealthScore = "average_health_score"
         case totalItems = "total_items"
         case averageItemPrice = "average_item_price"
     }
 
-    init(storeName: String, period: String, startDate: String, endDate: String, totalSpend: Double, visitCount: Int, categories: [CategoryBreakdown], averageHealthScore: Double? = nil, totalItems: Int? = nil, averageItemPrice: Double? = nil) {
+    init(storeName: String, period: String, startDate: String, endDate: String, totalSpend: Double, visitCount: Int, categories: [CategoryBreakdown], totalItems: Int? = nil, averageItemPrice: Double? = nil) {
         self.storeName = storeName
         self.period = period
         self.startDate = startDate
@@ -361,7 +341,6 @@ struct StoreDetailsResponse: Codable {
         self.totalSpend = totalSpend
         self.visitCount = visitCount
         self.categories = categories
-        self.averageHealthScore = averageHealthScore
         self.totalItems = totalItems
         self.averageItemPrice = averageItemPrice
     }
@@ -419,7 +398,6 @@ struct APITransaction: Codable, Identifiable {
     let unitPrice: Double?  // Price per unit when quantity > 1
     let category: String
     let date: String
-    let healthScore: Int?  // 0-5 for food items, nil for non-food
     let receiptId: String?  // Receipt ID for split lookup
     let originalDescription: String?  // Raw OCR text
     let normalizedBrand: String?  // Brand name
@@ -444,14 +422,13 @@ struct APITransaction: Codable, Identifiable {
         case unitPrice = "unit_price"
         case category
         case date
-        case healthScore = "health_score"
         case receiptId = "receipt_id"
         case originalDescription = "original_description"
         case normalizedBrand = "normalized_brand"
         case normalizedName = "normalized_name"
     }
 
-    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, healthScore: Int? = nil, receiptId: String? = nil, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
+    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, receiptId: String? = nil, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
         self.id = id
         self.storeName = storeName
         self.itemName = itemName
@@ -460,7 +437,6 @@ struct APITransaction: Codable, Identifiable {
         self.unitPrice = unitPrice
         self.category = category
         self.date = date
-        self.healthScore = healthScore
         self.receiptId = receiptId
         self.originalDescription = originalDescription
         self.normalizedBrand = normalizedBrand
@@ -590,7 +566,6 @@ struct APIReceipt: Codable, Identifiable {
     let receiptDate: String?
     let totalAmount: Double?
     let itemsCount: Int
-    let averageHealthScore: Double?
     let source: APIReceiptSource
     let transactions: [APIReceiptItem]
 
@@ -602,19 +577,17 @@ struct APIReceipt: Codable, Identifiable {
         case receiptDate = "receipt_date"
         case totalAmount = "total_amount"
         case itemsCount = "items_count"
-        case averageHealthScore = "average_health_score"
         case source
         case transactions
     }
 
     /// Manual initializer for creating updated copies
-    init(receiptId: String, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, averageHealthScore: Double?, source: APIReceiptSource = .receiptUpload, transactions: [APIReceiptItem]) {
+    init(receiptId: String, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, source: APIReceiptSource = .receiptUpload, transactions: [APIReceiptItem]) {
         self.receiptId = receiptId
         self.storeName = storeName
         self.receiptDate = receiptDate
         self.totalAmount = totalAmount
         self.itemsCount = itemsCount
-        self.averageHealthScore = averageHealthScore
         self.source = source
         self.transactions = transactions
     }
@@ -627,7 +600,6 @@ struct APIReceipt: Codable, Identifiable {
         receiptDate = try container.decodeIfPresent(String.self, forKey: .receiptDate)
         totalAmount = try container.decodeIfPresent(Double.self, forKey: .totalAmount)
         itemsCount = try container.decode(Int.self, forKey: .itemsCount)
-        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
         // Default to receiptUpload for backwards compatibility
         source = try container.decodeIfPresent(APIReceiptSource.self, forKey: .source) ?? .receiptUpload
         transactions = try container.decode([APIReceiptItem].self, forKey: .transactions)
@@ -661,7 +633,6 @@ struct APIReceiptItem: Codable, Identifiable {
     let quantity: Int
     let unitPrice: Double?
     let category: String
-    let healthScore: Int?
     let originalDescription: String?  // Raw OCR text
     let normalizedBrand: String?  // Brand name
     let normalizedName: String?  // Cleaned product name
@@ -685,7 +656,6 @@ struct APIReceiptItem: Codable, Identifiable {
         case quantity
         case unitPrice = "unit_price"
         case category
-        case healthScore = "health_score"
         case originalDescription = "original_description"
         case normalizedBrand = "normalized_brand"
         case normalizedName = "normalized_name"
@@ -701,14 +671,13 @@ struct APIReceiptItem: Codable, Identifiable {
     }
 
     /// Manual initializer for creating instances (e.g., previews)
-    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, healthScore: Int?, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
+    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
         self.itemId = itemId
         self.itemName = itemName
         self.itemPrice = itemPrice
         self.quantity = quantity
         self.unitPrice = unitPrice
         self.category = category
-        self.healthScore = healthScore
         self.originalDescription = originalDescription
         self.normalizedBrand = normalizedBrand
         self.normalizedName = normalizedName
@@ -728,7 +697,6 @@ extension APIReceipt {
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
                 category: item.category,
-                healthScore: item.healthScore,
                 originalDescription: item.originalDescription,
                 normalizedBrand: item.normalizedBrand,
                 normalizedName: item.normalizedName
@@ -743,8 +711,7 @@ extension APIReceipt {
             totalAmount: totalAmount,
             itemsCount: itemsCount,
             transactions: convertedTransactions,
-            warnings: [],
-            averageHealthScore: averageHealthScore
+            warnings: []
         )
     }
 }
@@ -790,7 +757,6 @@ struct AggregateResponse: Codable {
     let extremes: AggregateExtremes
     let topCategories: [AggregateCategory]
     let topStores: [AggregateStore]
-    let healthScoreDistribution: HealthScoreDistribution?
 
     enum CodingKeys: String, CodingKey {
         case periodType = "period_type"
@@ -802,7 +768,6 @@ struct AggregateResponse: Codable {
         case extremes
         case topCategories = "top_categories"
         case topStores = "top_stores"
-        case healthScoreDistribution = "health_score_distribution"
     }
 }
 
@@ -824,7 +789,6 @@ struct AggregateAverages: Codable {
     let averageSpendPerPeriod: Double
     let averageTransactionValue: Double
     let averageItemPrice: Double          // NEW: total_spend / total_items
-    let averageHealthScore: Double?
     let averageReceiptsPerPeriod: Double
     let averageTransactionsPerPeriod: Double
     let averageItemsPerReceipt: Double    // NEW: total_items / total_receipts
@@ -833,7 +797,6 @@ struct AggregateAverages: Codable {
         case averageSpendPerPeriod = "average_spend_per_period"
         case averageTransactionValue = "average_transaction_value"
         case averageItemPrice = "average_item_price"
-        case averageHealthScore = "average_health_score"
         case averageReceiptsPerPeriod = "average_receipts_per_period"
         case averageTransactionsPerPeriod = "average_transactions_per_period"
         case averageItemsPerReceipt = "average_items_per_receipt"
@@ -843,14 +806,10 @@ struct AggregateAverages: Codable {
 struct AggregateExtremes: Codable {
     let maxSpendingPeriod: AggregatePeriodSpend?
     let minSpendingPeriod: AggregatePeriodSpend?
-    let highestHealthScorePeriod: AggregatePeriodHealth?
-    let lowestHealthScorePeriod: AggregatePeriodHealth?
 
     enum CodingKeys: String, CodingKey {
         case maxSpendingPeriod = "max_spending_period"
         case minSpendingPeriod = "min_spending_period"
-        case highestHealthScorePeriod = "highest_health_score_period"
-        case lowestHealthScorePeriod = "lowest_health_score_period"
     }
 }
 
@@ -868,22 +827,11 @@ struct AggregatePeriodSpend: Codable {
     }
 }
 
-struct AggregatePeriodHealth: Codable {
-    let period: String
-    let averageHealthScore: Double
-
-    enum CodingKeys: String, CodingKey {
-        case period
-        case averageHealthScore = "average_health_score"
-    }
-}
-
 struct AggregateCategory: Codable, Identifiable {
     let name: String
     let totalSpent: Double
     let percentage: Double
     let transactionCount: Int
-    let averageHealthScore: Double?
 
     var id: String { name }
 
@@ -892,7 +840,6 @@ struct AggregateCategory: Codable, Identifiable {
         case totalSpent = "total_spent"
         case percentage
         case transactionCount = "transaction_count"
-        case averageHealthScore = "average_health_score"
     }
 }
 
@@ -901,7 +848,6 @@ struct AggregateStore: Codable, Identifiable {
     let totalSpent: Double
     let percentage: Double
     let visitCount: Int
-    let averageHealthScore: Double?
 
     var id: String { storeName }
 
@@ -910,37 +856,6 @@ struct AggregateStore: Codable, Identifiable {
         case totalSpent = "total_spent"
         case percentage
         case visitCount = "visit_count"
-        case averageHealthScore = "average_health_score"
-    }
-}
-
-struct HealthScoreDistribution: Codable {
-    let veryHealthy5: Double
-    let healthy4: Double
-    let moderate3: Double
-    let lessHealthy2: Double
-    let unhealthy1: Double
-    let veryUnhealthy0: Double
-
-    enum CodingKeys: String, CodingKey {
-        case veryHealthy5 = "very_healthy_5"
-        case healthy4 = "healthy_4"
-        case moderate3 = "moderate_3"
-        case lessHealthy2 = "less_healthy_2"
-        case unhealthy1 = "unhealthy_1"
-        case veryUnhealthy0 = "very_unhealthy_0"
-    }
-
-    /// Returns the distribution as an array of (score, percentage) tuples for easy iteration
-    var asArray: [(score: Int, percentage: Double)] {
-        [
-            (5, veryHealthy5),
-            (4, healthy4),
-            (3, moderate3),
-            (2, lessHealthy2),
-            (1, unhealthy1),
-            (0, veryUnhealthy0)
-        ]
     }
 }
 
@@ -990,7 +905,6 @@ struct AllTimeStatsResponse: Codable {
     let totalSpend: Double
     let totalTransactions: Int
     let averageItemPrice: Double
-    let averageHealthScore: Double?
     let topStoresByVisits: [TopStoreVisit]
     let topStoresBySpend: [TopStoreSpend]
     let topCategories: [TopCategory]?
@@ -1003,7 +917,6 @@ struct AllTimeStatsResponse: Codable {
         case totalSpend = "total_spend"
         case totalTransactions = "total_transactions"
         case averageItemPrice = "average_item_price"
-        case averageHealthScore = "average_health_score"
         case topStoresByVisits = "top_stores_by_visits"
         case topStoresBySpend = "top_stores_by_spend"
         case topCategories = "top_categories"
@@ -1045,7 +958,6 @@ struct TopCategory: Codable, Identifiable {
     let totalSpent: Double
     let percentage: Double
     let transactionCount: Int
-    let averageHealthScore: Double?
     let rank: Int
 
     var id: String { name }
@@ -1055,7 +967,6 @@ struct TopCategory: Codable, Identifiable {
         case totalSpent = "total_spent"
         case percentage
         case transactionCount = "transaction_count"
-        case averageHealthScore = "average_health_score"
         case rank
     }
 
@@ -1075,7 +986,6 @@ struct YearSummaryResponse: Codable {
     let transactionCount: Int
     let receiptCount: Int
     let totalItems: Int
-    let averageHealthScore: Double?
     let stores: [APIStoreBreakdown]
     let monthlyBreakdown: [MonthlySpend]?
     let topCategories: [CategoryBreakdown]?
@@ -1088,13 +998,12 @@ struct YearSummaryResponse: Codable {
         case transactionCount = "transaction_count"
         case receiptCount = "receipt_count"
         case totalItems = "total_items"
-        case averageHealthScore = "average_health_score"
         case stores
         case monthlyBreakdown = "monthly_breakdown"
         case topCategories = "top_categories"
     }
 
-    init(year: Int, startDate: String, endDate: String, totalSpend: Double, transactionCount: Int, receiptCount: Int, totalItems: Int, averageHealthScore: Double?, stores: [APIStoreBreakdown], monthlyBreakdown: [MonthlySpend]? = nil, topCategories: [CategoryBreakdown]? = nil) {
+    init(year: Int, startDate: String, endDate: String, totalSpend: Double, transactionCount: Int, receiptCount: Int, totalItems: Int, stores: [APIStoreBreakdown], monthlyBreakdown: [MonthlySpend]? = nil, topCategories: [CategoryBreakdown]? = nil) {
         self.year = year
         self.startDate = startDate
         self.endDate = endDate
@@ -1102,7 +1011,6 @@ struct YearSummaryResponse: Codable {
         self.transactionCount = transactionCount
         self.receiptCount = receiptCount
         self.totalItems = totalItems
-        self.averageHealthScore = averageHealthScore
         self.stores = stores
         self.monthlyBreakdown = monthlyBreakdown
         self.topCategories = topCategories
@@ -1114,7 +1022,6 @@ struct MonthlySpend: Codable, Identifiable {
     let monthNumber: Int        // 1-12
     let totalSpend: Double
     let receiptCount: Int
-    let averageHealthScore: Double?
 
     var id: Int { monthNumber }
 
@@ -1123,7 +1030,6 @@ struct MonthlySpend: Codable, Identifiable {
         case monthNumber = "month_number"
         case totalSpend = "total_spend"
         case receiptCount = "receipt_count"
-        case averageHealthScore = "average_health_score"
     }
 }
 
@@ -1148,7 +1054,6 @@ struct PeriodMetadata: Codable, Identifiable {
     let storeCount: Int
     let transactionCount: Int       // Number of line items (rows)
     let totalItems: Int?            // Sum of all quantities (actual items purchased)
-    let averageHealthScore: Double?
 
     var id: String { period }
 
@@ -1161,7 +1066,6 @@ struct PeriodMetadata: Codable, Identifiable {
         case storeCount = "store_count"
         case transactionCount = "transaction_count"
         case totalItems = "total_items"
-        case averageHealthScore = "average_health_score"
     }
 
     var startDate: Date? {
@@ -1186,7 +1090,6 @@ struct PieChartSummaryResponse: Codable {
     let stores: [PieChartStore]
     let totalItems: Int?
     let averageItemPrice: Double?
-    let averageHealthScore: Double?
 
     enum CodingKeys: String, CodingKey {
         case month
@@ -1196,7 +1099,6 @@ struct PieChartSummaryResponse: Codable {
         case stores
         case totalItems = "total_items"
         case averageItemPrice = "average_item_price"
-        case averageHealthScore = "average_health_score"
     }
 
     init(from decoder: Decoder) throws {
@@ -1208,7 +1110,6 @@ struct PieChartSummaryResponse: Codable {
         stores = try container.decodeIfPresent([PieChartStore].self, forKey: .stores) ?? []
         totalItems = try container.decodeIfPresent(Int.self, forKey: .totalItems)
         averageItemPrice = try container.decodeIfPresent(Double.self, forKey: .averageItemPrice)
-        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
     }
 
     /// Computed average item price (fallback if not provided by backend)
@@ -1230,7 +1131,6 @@ struct PieChartStore: Codable, Identifiable {
     let totalSpent: Double        // Amount spent at this store
     let percentage: Double        // Percentage of total spend
     let visitCount: Int           // Number of visits
-    let averageHealthScore: Double? // Average health score (optional)
 
     var id: String { storeName }
 
@@ -1239,7 +1139,6 @@ struct PieChartStore: Codable, Identifiable {
         case totalSpent = "total_spent"
         case percentage
         case visitCount = "visit_count"
-        case averageHealthScore = "average_health_score"
     }
 
     // MARK: - Computed Properties
@@ -1287,7 +1186,6 @@ struct CategorySpendItem: Codable, Identifiable {
     let colorHex: String          // Hex color e.g., "#FF6B6B"
     let percentage: Double        // Percentage of total spend
     let transactionCount: Int     // Number of transactions
-    let averageHealthScore: Double? // Average health score (optional)
 
     var id: String { categoryId }
 
@@ -1298,7 +1196,6 @@ struct CategorySpendItem: Codable, Identifiable {
         case colorHex = "color_hex"
         case percentage
         case transactionCount = "transaction_count"
-        case averageHealthScore = "average_health_score"
     }
 
     // MARK: - Computed Properties

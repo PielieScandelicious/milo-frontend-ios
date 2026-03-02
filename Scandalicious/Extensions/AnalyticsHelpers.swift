@@ -367,9 +367,6 @@ extension AggregateResponse {
     /// Convenience: Average items per receipt
     var averageItemsPerReceipt: Double { averages.averageItemsPerReceipt }
 
-    /// Convenience: Overall average health score
-    var averageHealthScore: Double? { averages.averageHealthScore }
-
     /// Convenience: Period with maximum spending
     var maxSpendingPeriod: AggregatePeriodSpend? { extremes.maxSpendingPeriod }
 
@@ -418,8 +415,7 @@ extension AggregateCategory {
             name: name,
             spent: totalSpent,
             percentage: percentage,
-            transactionCount: transactionCount,
-            averageHealthScore: averageHealthScore
+            transactionCount: transactionCount
         )
     }
 }
@@ -438,8 +434,7 @@ extension AggregateStore {
             storeName: storeName,
             amountSpent: totalSpent,
             storeVisits: visitCount,
-            percentage: percentage,
-            averageHealthScore: averageHealthScore
+            percentage: percentage
         )
     }
 }

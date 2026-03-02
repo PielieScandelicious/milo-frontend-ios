@@ -18,7 +18,6 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
     let itemsCount: Int  // Required field from backend (not optional)
     let transactions: [ReceiptTransaction]
     let warnings: [String]  // Required field - always returned as array (may be empty)
-    let averageHealthScore: Double?  // Average health score for food items in the receipt
     let isDuplicate: Bool  // Whether this receipt was already uploaded before
     let duplicateScore: Double?  // Confidence score for duplicate detection (0.0 - 1.0)
 
@@ -31,13 +30,12 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
         case itemsCount = "items_count"
         case transactions  // Backend returns "transactions"
         case warnings
-        case averageHealthScore = "average_health_score"
         case isDuplicate = "is_duplicate"
         case duplicateScore = "duplicate_score"
     }
 
     // Custom init for manual construction (e.g., previews)
-    init(receiptId: String, status: ReceiptStatus, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, transactions: [ReceiptTransaction], warnings: [String], averageHealthScore: Double?, isDuplicate: Bool = false, duplicateScore: Double? = nil) {
+    init(receiptId: String, status: ReceiptStatus, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, transactions: [ReceiptTransaction], warnings: [String], isDuplicate: Bool = false, duplicateScore: Double? = nil) {
         self.receiptId = receiptId
         self.status = status
         self.storeName = storeName
@@ -46,7 +44,6 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
         self.itemsCount = itemsCount
         self.transactions = transactions
         self.warnings = warnings
-        self.averageHealthScore = averageHealthScore
         self.isDuplicate = isDuplicate
         self.duplicateScore = duplicateScore
     }
@@ -62,7 +59,6 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
         itemsCount = try container.decode(Int.self, forKey: .itemsCount)
         transactions = try container.decode([ReceiptTransaction].self, forKey: .transactions)
         warnings = try container.decode([String].self, forKey: .warnings)
-        averageHealthScore = try container.decodeIfPresent(Double.self, forKey: .averageHealthScore)
         isDuplicate = try container.decodeIfPresent(Bool.self, forKey: .isDuplicate) ?? false
         duplicateScore = try container.decodeIfPresent(Double.self, forKey: .duplicateScore)
     }
@@ -79,17 +75,6 @@ struct ReceiptUploadResponse: Equatable, Sendable, Codable {
         return formatter.date(from: dateString)
     }
 
-    /// Calculate average health score from transactions (if not provided by backend)
-    var calculatedAverageHealthScore: Double? {
-        // If backend provides it, use that
-        if let avg = averageHealthScore {
-            return avg
-        }
-        // Otherwise calculate from transactions
-        let scores = transactions.compactMap { $0.healthScore }
-        guard !scores.isEmpty else { return nil }
-        return Double(scores.reduce(0, +)) / Double(scores.count)
-    }
 }
 
 // MARK: - Receipt Status
@@ -111,7 +96,6 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
     let quantity: Int
     let unitPrice: Double?
     let category: String
-    let healthScore: Int?  // 0-5 for food items, nil for non-food
     let originalDescription: String?  // Raw OCR text
     let normalizedBrand: String?  // Brand name
     let normalizedName: String?  // Cleaned product name
@@ -136,21 +120,19 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         case quantity
         case unitPrice = "unit_price"
         case category
-        case healthScore = "health_score"
         case originalDescription = "original_description"
         case normalizedBrand = "normalized_brand"
         case normalizedName = "normalized_name"
     }
 
     // Custom initializer to generate UUID
-    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, healthScore: Int? = nil, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
+    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double?, category: String, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
         self.itemId = itemId
         self.itemName = itemName
         self.itemPrice = itemPrice
         self.quantity = quantity
         self.unitPrice = unitPrice
         self.category = category
-        self.healthScore = healthScore
         self.originalDescription = originalDescription
         self.normalizedBrand = normalizedBrand
         self.normalizedName = normalizedName
@@ -166,7 +148,6 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         quantity = try container.decode(Int.self, forKey: .quantity)
         unitPrice = try container.decodeIfPresent(Double.self, forKey: .unitPrice)
         category = try container.decode(String.self, forKey: .category)
-        healthScore = try container.decodeIfPresent(Int.self, forKey: .healthScore)
         originalDescription = try container.decodeIfPresent(String.self, forKey: .originalDescription)
         normalizedBrand = try container.decodeIfPresent(String.self, forKey: .normalizedBrand)
         normalizedName = try container.decodeIfPresent(String.self, forKey: .normalizedName)
@@ -183,7 +164,6 @@ struct ReceiptTransaction: Identifiable, Equatable, Sendable, Codable {
         try container.encode(quantity, forKey: .quantity)
         try container.encodeIfPresent(unitPrice, forKey: .unitPrice)
         try container.encode(category, forKey: .category)
-        try container.encodeIfPresent(healthScore, forKey: .healthScore)
         try container.encodeIfPresent(originalDescription, forKey: .originalDescription)
         try container.encodeIfPresent(normalizedBrand, forKey: .normalizedBrand)
         try container.encodeIfPresent(normalizedName, forKey: .normalizedName)

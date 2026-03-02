@@ -21,7 +21,6 @@ struct StoreDetailView: View {
     @State private var currentTotalSpend: Double
     @State private var currentVisitCount: Int
     @State private var currentCategories: [Category]
-    @State private var currentHealthScore: Double?
     @State private var currentTotalItems: Int = 0
     @State private var isRefreshing = false
     @State private var hasInitialized = false
@@ -37,7 +36,6 @@ struct StoreDetailView: View {
         _currentTotalSpend = State(initialValue: storeBreakdown.totalStoreSpend)
         _currentVisitCount = State(initialValue: storeBreakdown.visitCount)
         _currentCategories = State(initialValue: storeBreakdown.categories)
-        _currentHealthScore = State(initialValue: storeBreakdown.averageHealthScore)
     }
 
     // Expandable receipts section
@@ -249,12 +247,6 @@ struct StoreDetailView: View {
                 showAllSegments: showAllCategories
             )
             .padding(.vertical, 12)
-
-            if let score = currentHealthScore {
-                CompactNutriBadge(score: score)
-                    .padding(.top, 4)
-                    .padding(.bottom, 8)
-            }
 
             if !currentCategories.isEmpty {
                 VStack(spacing: 0) {
@@ -476,7 +468,6 @@ struct StoreDetailView: View {
                 currentTotalSpend = storeDetails.totalSpend
                 currentVisitCount = storeDetails.visitCount
                 currentCategories = categories
-                currentHealthScore = storeDetails.averageHealthScore
                 currentTotalItems = totalItems
                 backendAverageItemPrice = storeDetails.averageItemPrice  // Use backend value if available
             }
@@ -883,12 +874,7 @@ private struct CategoryTransactionsContent: View {
 
     var body: some View {
         let sorted = transactions.sorted { t1, t2 in
-            let s1 = t1.healthScore
-            let s2 = t2.healthScore
-            if let a = s1, let b = s2 { return a > b }
-            if s1 != nil && s2 == nil { return true }
-            if s1 == nil && s2 != nil { return false }
-            return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
+            t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
         }
 
         ForEach(sorted) { transaction in
@@ -927,22 +913,6 @@ private struct CategoryTransactionItemRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Nutri-Score letter (only shown when score exists)
-            if transaction.healthScore != nil {
-                Text(transaction.healthScore.nutriScoreLetter)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundColor(transaction.healthScore.healthScoreColor)
-                    .frame(width: 16, height: 16)
-                    .background(
-                        Circle()
-                            .fill(transaction.healthScore.healthScoreColor.opacity(0.15))
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(transaction.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
-                    )
-            }
-
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(transaction.displayName)

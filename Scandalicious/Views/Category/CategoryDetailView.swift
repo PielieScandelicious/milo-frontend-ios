@@ -27,13 +27,6 @@ struct CategoryDetailView: View {
             .sorted { $0.totalSpent > $1.totalSpent }
     }
 
-    // Average health score for this category
-    private var averageHealthScore: Double? {
-        let scores = transactions.compactMap { $0.healthScore }
-        guard !scores.isEmpty else { return nil }
-        return Double(scores.reduce(0, +)) / Double(scores.count)
-    }
-
     // Total spent
     private var totalSpent: Double {
         transactions.reduce(0) { $0 + $1.totalPrice }
@@ -188,13 +181,7 @@ struct CategoryDetailView: View {
     // MARK: - Category Header
 
     private var categoryHeader: some View {
-        let scoreColor = averageHealthScore?.healthScoreColor ?? Color(white: 0.4)
-        let nutriLetter: String = {
-            guard let score = averageHealthScore else { return "-" }
-            return Int(score.rounded()).nutriScoreLetter
-        }()
-
-        return HStack(spacing: 0) {
+        HStack(spacing: 0) {
             // Left side: Category info
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
@@ -222,44 +209,6 @@ struct CategoryDetailView: View {
             }
 
             Spacer()
-
-            // Right side: Nutri Score
-            VStack(spacing: 8) {
-                if averageHealthScore != nil {
-                    ZStack {
-                        Circle()
-                            .fill(scoreColor.opacity(0.15))
-                            .frame(width: 64, height: 64)
-
-                        Circle()
-                            .stroke(scoreColor, lineWidth: 3)
-                            .frame(width: 64, height: 64)
-
-                        Text(nutriLetter)
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(scoreColor)
-                    }
-                } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.white.opacity(0.06))
-                            .frame(width: 64, height: 64)
-
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                            .frame(width: 64, height: 64)
-
-                        Text("N/A")
-                            .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.35))
-                    }
-                }
-
-                Text("NUTRI SCORE")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundColor(averageHealthScore != nil ? scoreColor : .white.opacity(0.35))
-            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 20)
@@ -335,12 +284,7 @@ struct CategoryDetailView: View {
             // Transaction items
             VStack(spacing: 0) {
                 let sortedTransactions = storeData.transactions.sorted { t1, t2 in
-                    let score1 = t1.healthScore
-                    let score2 = t2.healthScore
-                    if let s1 = score1, let s2 = score2 { return s1 > s2 }
-                    if score1 != nil && score2 == nil { return true }
-                    if score1 == nil && score2 != nil { return false }
-                    return t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
+                    t1.itemName.localizedCaseInsensitiveCompare(t2.itemName) == .orderedAscending
                 }
 
                 ForEach(Array(sortedTransactions.enumerated()), id: \.element.id) { index, transaction in
@@ -369,22 +313,6 @@ struct CategoryDetailView: View {
         let friendsOnly = splitParticipants.filter { !$0.isMe }
 
         return HStack(spacing: 12) {
-            // Nutri-Score badge (only shown when score exists)
-            if transaction.healthScore != nil {
-                Text(transaction.healthScore.nutriScoreLetter)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(transaction.healthScore.healthScoreColor)
-                    .frame(width: 24, height: 24)
-                    .background(
-                        Circle()
-                            .fill(transaction.healthScore.healthScoreColor.opacity(0.15))
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(transaction.healthScore.healthScoreColor.opacity(0.3), lineWidth: 0.5)
-                    )
-            }
-
             // Item info
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -525,8 +453,7 @@ extension CategorySpendItem: Hashable {
                 totalSpent: 125.50,
                 colorHex: "#FF6B6B",
                 percentage: 25.0,
-                transactionCount: 12,
-                averageHealthScore: 3.5
+                transactionCount: 12
             ),
             period: "January 2026"
         )

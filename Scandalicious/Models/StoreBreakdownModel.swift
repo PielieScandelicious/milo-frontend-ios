@@ -14,7 +14,6 @@ struct StoreBreakdown: Codable, Identifiable, Equatable, Hashable {
     let totalStoreSpend: Double
     let categories: [Category]
     let visitCount: Int
-    let averageHealthScore: Double?  // Average health score for this store
 
     var id: String { "\(storeName)-\(period)" }
 
@@ -24,17 +23,14 @@ struct StoreBreakdown: Codable, Identifiable, Equatable, Hashable {
         case totalStoreSpend = "total_store_spend"
         case categories
         case visitCount = "visit_count"
-        case averageHealthScore = "average_health_score"
     }
 
-    // Initializer with default nil for averageHealthScore
-    init(storeName: String, period: String, totalStoreSpend: Double, categories: [Category], visitCount: Int, averageHealthScore: Double? = nil) {
+    init(storeName: String, period: String, totalStoreSpend: Double, categories: [Category], visitCount: Int) {
         self.storeName = storeName
         self.period = period
         self.totalStoreSpend = totalStoreSpend
         self.categories = categories
         self.visitCount = visitCount
-        self.averageHealthScore = averageHealthScore
     }
 
     // MARK: - Primary Group (derived from highest-spend category group)
@@ -109,7 +105,6 @@ class StoreDataManager: ObservableObject {
     @Published var isRefreshing = false
     @Published var error: String?
     @Published var lastFetchDate: Date?
-    @Published var averageHealthScore: Double?  // Overall average health score for the current period
     @Published var isDeleting = false
     @Published var deleteError: String?
     @Published var deleteSuccessMessage: String?
@@ -236,15 +231,10 @@ class StoreDataManager: ObservableObject {
                         receiptCount: receiptCount,
                         storeCount: (summary.stores ?? []).count,
                         transactionCount: summary.transactionCount ?? 0,
-                        totalItems: existingMetadata.totalItems,
-                        averageHealthScore: summary.averageHealthScore ?? existingMetadata.averageHealthScore
+                        totalItems: existingMetadata.totalItems
                     )
                 }
 
-                // Only update health score if the summary includes one (preserve existing)
-                if let newScore = summary.averageHealthScore {
-                    self.averageHealthScore = newScore
-                }
                 self.isLoading = false
                 self.isRefreshing = false
                 self.lastFetchDate = Date()
@@ -328,11 +318,6 @@ class StoreDataManager: ObservableObject {
                     self.periodReceiptCounts[period.period] = period.receiptCount
                 }
 
-                // Set health score from the most recent period
-                if let latestPeriod = response.periods.first {
-                    self.averageHealthScore = latestPeriod.averageHealthScore
-                }
-
                 self.isLoadingPeriods = false
                 self.hasInitiallyFetched = true
                 self.lastFetchDate = Date()
@@ -401,12 +386,6 @@ class StoreDataManager: ObservableObject {
                 // Mark this period as loaded
                 self.loadedPeriods.insert(periodString)
 
-                // Update health score if this is the current period (only if new value exists)
-                if let metadata = self.periodMetadata.first, metadata.period == periodString,
-                   let newScore = summary.averageHealthScore {
-                    self.averageHealthScore = newScore
-                }
-
                 self.isRefreshing = false
 
                 // Breakdowns updated in-memory
@@ -459,7 +438,6 @@ class StoreDataManager: ObservableObject {
             var allBreakdowns: [StoreBreakdown] = []
             var allPeriodTotalSpends: [String: Double] = [:]
             var allPeriodReceiptCounts: [String: Int] = [:]
-            var latestHealthScore: Double?
 
             for trendPeriod in periodsWithData {
                 // Parse start and end dates from the trend period
@@ -496,11 +474,6 @@ class StoreDataManager: ObservableObject {
                     let receiptsResponse = try await AnalyticsAPIService.shared.getReceipts(filters: receiptFilters)
                     allPeriodReceiptCounts[periodKey] = receiptsResponse.total
 
-                    // Store the health score from the most recent period (first one with data)
-                    if latestHealthScore == nil {
-                        latestHealthScore = summary.averageHealthScore
-                    }
-
                 } catch {
                     // Failed to fetch summary for period - continue with others
                 }
@@ -521,7 +494,6 @@ class StoreDataManager: ObservableObject {
                 self.storeBreakdowns = allBreakdowns
                 self.periodTotalSpends = allPeriodTotalSpends
                 self.periodReceiptCounts = allPeriodReceiptCounts
-                self.averageHealthScore = latestHealthScore
                 self.isLoading = false
                 self.hasInitiallyFetched = true
                 self.lastFetchDate = Date()
@@ -644,8 +616,7 @@ class StoreDataManager: ObservableObject {
                 period: periodString,
                 totalStoreSpend: apiStore.amountSpent,
                 categories: categories,
-                visitCount: apiStore.storeVisits,
-                averageHealthScore: storeDetails.averageHealthScore ?? apiStore.averageHealthScore
+                visitCount: apiStore.storeVisits
             )
 
         } catch {
@@ -655,8 +626,7 @@ class StoreDataManager: ObservableObject {
                 period: periodString,
                 totalStoreSpend: apiStore.amountSpent,
                 categories: [],
-                visitCount: apiStore.storeVisits,
-                averageHealthScore: apiStore.averageHealthScore
+                visitCount: apiStore.storeVisits
             )
         }
     }
