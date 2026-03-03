@@ -130,18 +130,12 @@ struct ReceiptScanView: View {
             showReceiptDetails = false
         } content: {
             if let receipt = uploadedReceipt {
-                ReceiptDetailsView(receipt: receipt) {
-                    // Receipt was deleted - notify to refresh data
-                    NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                }
+                ReceiptDetailsView(receipt: receipt)
             }
         }
         .sheet(isPresented: $showRecentReceiptDetails) {
             if let receipt = selectedReceipt {
-                ReceiptDetailsView(receipt: receipt) {
-                    NotificationCenter.default.post(name: .receiptDeleted, object: nil)
-                    selectedReceipt = nil
-                }
+                ReceiptDetailsView(receipt: receipt)
             }
         }
         .sheet(isPresented: $showProfile) {

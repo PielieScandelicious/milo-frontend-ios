@@ -120,8 +120,6 @@ enum AppStrings {
         "receipts": ["en": "Receipts", "nl": "Kassatickets", "fr": "Tickets de caisse"],
         "scan_first_receipt": ["en": "Scan your first receipt to get started", "nl": "Scan je eerste kassaticket om te beginnen", "fr": "Scannez votre premier ticket de caisse pour commencer"],
         "no_receipts_period": ["en": "No receipts for this period", "nl": "Geen kassatickets voor deze periode", "fr": "Aucun ticket de caisse pour cette période"],
-        "deleting": ["en": "Deleting...", "nl": "Verwijderen...", "fr": "Suppression..."],
-        "delete_failed": ["en": "Delete Failed", "nl": "Verwijderen mislukt", "fr": "Échec de la suppression"],
         "spent_this_month": ["en": "SPENT THIS MONTH", "nl": "UITGEGEVEN DEZE MAAND", "fr": "DÉPENSÉ CE MOIS"],
         "no_category_data": ["en": "No category data", "nl": "Geen categoriegegevens", "fr": "Aucune donnée de catégorie"],
         "tap_to_flip_back": ["en": "Tap to flip back", "nl": "Tik om terug te draaien", "fr": "Appuyez pour retourner"],
@@ -237,8 +235,6 @@ enum AppStrings {
         "items": ["en": "Items", "nl": "Items", "fr": "Articles"],
         "no_items_found_receipt": ["en": "No items found", "nl": "Geen items gevonden", "fr": "Aucun article trouvé"],
         "no_items_detected": ["en": "The receipt was uploaded successfully, but no items were detected.", "nl": "Het kassaticket is succesvol geüpload, maar er zijn geen items gedetecteerd.", "fr": "Le ticket a été téléchargé avec succès, mais aucun article n'a été détecté."],
-        "delete_receipt": ["en": "Delete Receipt", "nl": "Kassaticket verwijderen", "fr": "Supprimer le ticket"],
-        "delete_receipt_confirm": ["en": "Are you sure you want to delete this receipt? This action cannot be undone.", "nl": "Ben je zeker dat je dit kassaticket wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.", "fr": "Êtes-vous sûr de vouloir supprimer ce ticket ? Cette action est irréversible."],
         "no_receipts": ["en": "No Receipts", "nl": "Geen kassatickets", "fr": "Aucun ticket"],
         "no_receipts_found": ["en": "No receipts found for this period", "nl": "Geen kassatickets gevonden voor deze periode", "fr": "Aucun ticket trouvé pour cette période"],
         "qty": ["en": "Qty", "nl": "Aantal", "fr": "Qté"],
@@ -397,8 +393,6 @@ enum AppStrings {
         "items_purchased": ["en": "items purchased", "nl": "items gekocht", "fr": "articles achetés"],
         "others": ["en": "Others", "nl": "Andere", "fr": "Autres"],
         "of_total": ["en": "of total", "nl": "van totaal", "fr": "du total"],
-        "edit_items": ["en": "Edit Items", "nl": "Items bewerken", "fr": "Modifier les articles"],
-
         // MARK: - Year In Review (extra)
         "total_receipts": ["en": "Total Receipts", "nl": "Totaal kassatickets", "fr": "Total des tickets"],
         "total_spent_year": ["en": "Total Spent", "nl": "Totaal uitgegeven", "fr": "Total dépensé"],

@@ -42,8 +42,6 @@ struct StoreDetailView: View {
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @State private var isReceiptsSectionExpanded = false
     @State private var expandedReceiptId: String?
-    @State private var isDeletingReceipt = false
-    @State private var receiptDeleteError: String?
 
     // Expandable category transactions
     @StateObject private var transactionsViewModel = TransactionsViewModel()
@@ -380,13 +378,6 @@ struct StoreDetailView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
-            Task {
-                // Wait for backend to process the change
-                try? await Task.sleep(for: .seconds(0.5))
-                await refreshStoreData()
-            }
-        }
     }
 
     // MARK: - Refresh Store Data from Backend
@@ -616,14 +607,6 @@ struct StoreDetailView: View {
                                                     expandedReceiptId = receipt.id
                                                 }
                                             }
-                                        },
-                                        onDelete: {
-                                            withAnimation(.easeInOut(duration: 0.3)) {
-                                                deleteReceipt(receipt)
-                                            }
-                                        },
-                                        onDeleteItem: { receiptId, itemId in
-                                            deleteReceiptItem(receiptId: receiptId, itemId: itemId)
                                         }
                                     )
                                 }
@@ -665,32 +648,6 @@ struct StoreDetailView: View {
     private func loadReceipts() {
         Task {
             await receiptsViewModel.loadReceipts(period: storeBreakdown.period, storeName: storeBreakdown.storeName)
-        }
-    }
-
-    private func deleteReceipt(_ receipt: APIReceipt) {
-        isDeletingReceipt = true
-        Task {
-            do {
-                try await receiptsViewModel.deleteReceipt(receipt, period: storeBreakdown.period, storeName: storeBreakdown.storeName)
-                NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            } catch {
-                receiptDeleteError = error.localizedDescription
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-            }
-            isDeletingReceipt = false
-        }
-    }
-
-    private func deleteReceiptItem(receiptId: String, itemId: String) {
-        Task {
-            do {
-                try await receiptsViewModel.deleteReceiptItem(receiptId: receiptId, itemId: itemId)
-            } catch {
-                receiptDeleteError = error.localizedDescription
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-            }
         }
     }
 

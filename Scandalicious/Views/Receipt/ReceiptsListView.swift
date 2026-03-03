@@ -16,9 +16,6 @@ struct ReceiptsListView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedReceipt: APIReceipt?
     @State private var showingReceiptDetail = false
-    @State private var isDeleting = false
-    @State private var isDeletingItem = false
-    @State private var deleteError: String?
     @State private var expandedReceiptId: String?
 
     var body: some View {
@@ -50,14 +47,6 @@ struct ReceiptsListView: View {
                                                 expandedReceiptId = receipt.receiptId
                                             }
                                         }
-                                    },
-                                    onDelete: {
-                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                            deleteReceipt(receipt)
-                                        }
-                                    },
-                                    onDeleteItem: { receiptId, itemId in
-                                        deleteReceiptItem(receiptId: receiptId, itemId: itemId)
                                     }
                                 )
                                 .transition(.asymmetric(
@@ -126,80 +115,6 @@ struct ReceiptsListView: View {
         } message: {
             if let error = viewModel.state.error {
                 Text(error)
-            }
-        }
-        .alert(L("delete_failed"), isPresented: .constant(deleteError != nil)) {
-            Button(L("ok")) {
-                deleteError = nil
-            }
-        } message: {
-            if let error = deleteError {
-                Text(error)
-            }
-        }
-        .overlay {
-            if isDeleting {
-                ZStack {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.2)
-
-                        Text(L("deleting"))
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white)
-                    }
-                    .padding(24)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(white: 0.15))
-                    )
-                }
-            }
-        }
-    }
-
-    // MARK: - Delete Receipt
-
-    private func deleteReceipt(_ receipt: APIReceipt) {
-        isDeleting = true
-
-        Task {
-            do {
-                try await viewModel.deleteReceipt(receipt, period: period, storeName: storeName)
-
-                // Haptic feedback for successful deletion
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
-            } catch {
-                deleteError = error.localizedDescription
-
-                // Haptic feedback for failure
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.error)
-            }
-
-            isDeleting = false
-        }
-    }
-
-    // MARK: - Delete Receipt Item
-
-    private func deleteReceiptItem(receiptId: String, itemId: String) {
-        Task {
-            do {
-                try await viewModel.deleteReceiptItem(receiptId: receiptId, itemId: itemId)
-
-                // Haptic feedback already handled in the component
-            } catch {
-                deleteError = error.localizedDescription
-
-                // Haptic feedback for failure
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.error)
             }
         }
     }

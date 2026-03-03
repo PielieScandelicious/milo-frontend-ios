@@ -14,7 +14,6 @@ import Combine
 // MARK: - Notification for Receipt Upload
 extension Notification.Name {
     static let receiptUploadedSuccessfully = Notification.Name("receiptUploadedSuccessfully")
-    static let receiptDeleted = Notification.Name("receiptDeleted")
 }
 
 enum SortOption: String, CaseIterable {
@@ -101,8 +100,6 @@ struct OverviewView: View {
     @State private var hasSyncedRateLimit = false  // Prevent duplicate rate limit syncs
     @State private var loadedReceiptPeriods: Set<String> = []  // Track which periods have loaded receipts
     @State private var expandedReceiptId: String? // For inline receipt expansion
-    @State private var isDeletingReceipt = false
-    @State private var receiptDeleteError: String?
     // scrollOffset removed — gradient header now manages its own scroll state via ScrollFadingGradientView
     @State private var cachedAvailablePeriods: [String] = [] // Cached for performance
     @State private var cachedSegmentsByPeriod: [String: [StoreChartSegment]] = [:] // Cache segments
@@ -437,9 +434,6 @@ struct OverviewView: View {
             .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { notification in
                 handleReceiptUploadSuccess(notification: notification)
             }
-            .onReceive(NotificationCenter.default.publisher(for: .receiptsDataDidChange)) { _ in
-                handleReceiptDeleted()
-            }
             .onChange(of: transactionManager.transactions) { oldValue, newValue in
                 handleTransactionsChanged(oldValue: oldValue, newValue: newValue)
             }
@@ -598,21 +592,6 @@ struct OverviewView: View {
             // Sync rate limits and budget
             await rateLimitManager.syncFromBackend()
             await budgetViewModel.refreshProgress()
-        }
-    }
-
-    private func handleReceiptDeleted() {
-        Task {
-            try? await Task.sleep(for: .milliseconds(500))
-
-            await refreshPeriodData(for: selectedPeriod)
-
-            // Refresh period metadata (deletion may have emptied a period)
-            await dataManager.fetchPeriodMetadata()
-            await MainActor.run {
-                updateAvailablePeriodsCache()
-                chartRefreshToken += 1
-            }
         }
     }
 
@@ -1799,14 +1778,6 @@ struct OverviewView: View {
                                                     expandedReceiptId = receipt.id
                                                 }
                                             }
-                                        },
-                                        onDelete: {
-                                            withAnimation(.easeInOut(duration: 0.3)) {
-                                                deleteReceiptFromOverview(receipt)
-                                            }
-                                        },
-                                        onDeleteItem: { receiptId, itemId in
-                                            deleteReceiptItemFromOverview(receiptId: receiptId, itemId: itemId)
                                         }
                                     )
                                 }
@@ -1832,37 +1803,6 @@ struct OverviewView: View {
         .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 8)
         .padding(.horizontal, 16)
         .padding(.top, 8)
-        .overlay {
-            if isDeletingReceipt {
-                ZStack {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        Text(L("deleting"))
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                    .padding(20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(white: 0.12))
-                    )
-                }
-            }
-        }
-        .alert(L("delete_failed"), isPresented: Binding<Bool>(
-            get: { receiptDeleteError != nil },
-            set: { if !$0 { receiptDeleteError = nil } }
-        )) {
-            Button(L("ok")) {
-                receiptDeleteError = nil
-            }
-        } message: {
-            Text(receiptDeleteError ?? "An error occurred")
-        }
     }
 
     // MARK: - Transactions Section (Collapsible with glass design - Bank Imports)
@@ -1874,38 +1814,6 @@ struct OverviewView: View {
             let d1 = r1.dateParsed ?? Date.distantPast
             let d2 = r2.dateParsed ?? Date.distantPast
             return d1 > d2
-        }
-    }
-
-    /// Delete a receipt from the overview
-    private func deleteReceiptFromOverview(_ receipt: APIReceipt) {
-        isDeletingReceipt = true
-        print("[Overview] deleteReceiptFromOverview called, receiptId=\(receipt.receiptId), selectedPeriod=\(selectedPeriod)")
-        print("[Overview] receiptsVM.receipts.count BEFORE=\(receiptsViewModel.receipts.count)")
-
-        Task {
-            do {
-                try await receiptsViewModel.deleteReceipt(receipt, period: selectedPeriod, storeName: nil)
-                rebuildSortedReceipts()
-                print("[Overview] deleteReceipt succeeded, receiptsVM.receipts.count AFTER=\(receiptsViewModel.receipts.count)")
-            } catch {
-                print("[Overview] deleteReceipt FAILED: \(error.localizedDescription)")
-                receiptDeleteError = error.localizedDescription
-            }
-
-            isDeletingReceipt = false
-        }
-    }
-
-    /// Delete a line item from a receipt in the overview
-    private func deleteReceiptItemFromOverview(receiptId: String, itemId: String) {
-        Task {
-            do {
-                try await receiptsViewModel.deleteReceiptItem(receiptId: receiptId, itemId: itemId)
-            } catch {
-                receiptDeleteError = error.localizedDescription
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-            }
         }
     }
 

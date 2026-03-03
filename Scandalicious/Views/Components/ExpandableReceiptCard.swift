@@ -26,8 +26,6 @@ protocol ReceiptItemDisplayable: Identifiable {
     var displayItemName: String { get }
     var displayItemPrice: Double { get }
     var displayQuantity: Int { get }
-    /// Unique identifier for deletion - returns item_id from backend if available
-    var deletableItemId: String? { get }
 }
 
 // MARK: - APIReceipt Conformance
@@ -48,7 +46,6 @@ extension APIReceiptItem: ReceiptItemDisplayable {
     var displayItemName: String { displayName }
     var displayItemPrice: Double { itemPrice }
     var displayQuantity: Int { quantity }
-    var deletableItemId: String? { itemId }
 }
 
 // MARK: - ReceiptUploadResponse Conformance
@@ -74,7 +71,6 @@ extension ReceiptTransaction: ReceiptItemDisplayable {
     var displayItemName: String { displayName }
     var displayItemPrice: Double { itemPrice }
     var displayQuantity: Int { quantity }
-    var deletableItemId: String? { itemId } // Uses backend item_id if available
 }
 
 // MARK: - Expandable Receipt Card
@@ -85,9 +81,6 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
     let receipt: Receipt
     let isExpanded: Bool
     let onTap: () -> Void
-    let onDelete: (() -> Void)?
-    /// Callback when a line item is deleted - receives (receiptId, itemId)
-    let onDeleteItem: ((String, String) -> Void)?
     /// Optional accent color for the card (e.g., green for "Recent Scan")
     var accentColor: Color = .white
 
@@ -100,17 +93,10 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
     /// Whether to show the item count badge in the card header
     var showItemCount: Bool = true
 
-    @State private var showDeleteConfirmation = false
-    @State private var deletingItemIds: Set<String> = []
-    @State private var isEditMode = false
-    @State private var itemToDelete: (id: String, name: String)?
-
     init(
         receipt: Receipt,
         isExpanded: Bool,
         onTap: @escaping () -> Void,
-        onDelete: (() -> Void)? = nil,
-        onDeleteItem: ((String, String) -> Void)? = nil,
         accentColor: Color = .white,
         badgeText: String? = nil,
         showDate: Bool = true,
@@ -119,8 +105,6 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
         self.receipt = receipt
         self.isExpanded = isExpanded
         self.onTap = onTap
-        self.onDelete = onDelete
-        self.onDeleteItem = onDeleteItem
         self.accentColor = accentColor
         self.badgeText = badgeText
         self.showDate = showDate
@@ -149,11 +133,6 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
 
     private var hasAccent: Bool {
         accentColor != .white
-    }
-
-    /// Check if any transaction items are deletable (have item IDs)
-    private var hasDeletableItems: Bool {
-        onDeleteItem != nil && receipt.displayTransactions.contains { $0.deletableItemId != nil }
     }
 
     private var sortedTransactions: [ReceiptItemDisplayable] {
@@ -243,26 +222,7 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                     if !sortedTransactions.isEmpty {
                         VStack(spacing: 6) {
                             ForEach(Array(sortedTransactions.enumerated()), id: \.offset) { index, item in
-                                let itemId = item.deletableItemId
-                                let canDelete = itemId != nil && onDeleteItem != nil
-                                let isDeleting = itemId.map { deletingItemIds.contains($0) } ?? false
-
-                                EditableLineItemRow(
-                                    item: item,
-                                    isEditMode: isEditMode,
-                                    canDelete: canDelete && !isDeleting,
-                                    onDelete: {
-                                        if let itemId = itemId {
-                                            // Show confirmation dialog
-                                            itemToDelete = (id: itemId, name: item.displayItemName)
-                                        }
-                                    }
-                                )
-                                .opacity(isDeleting ? 0.5 : 1.0)
-                                .transition(.asymmetric(
-                                    insertion: .opacity,
-                                    removal: .move(edge: .leading).combined(with: .opacity)
-                                ))
+                                LineItemRow(item: item)
                             }
                         }
                         .padding(.horizontal, 14)
@@ -270,144 +230,22 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                         .padding(.bottom, 10)
                         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: sortedTransactions.count)
                     }
-
-                    // Action buttons row
-                    if onDelete != nil || hasDeletableItems {
-                        VStack(spacing: 8) {
-                            HStack(spacing: 10) {
-                                // Edit Items button (only if there are deletable items)
-                                if hasDeletableItems {
-                                    Button {
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                            isEditMode.toggle()
-                                        }
-                                        let generator = UIImpactFeedbackGenerator(style: .light)
-                                        generator.impactOccurred()
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: isEditMode ? "checkmark" : "pencil")
-                                                .font(.system(size: 13, weight: .medium))
-                                            Text(isEditMode ? L("done") : L("edit_items"))
-                                                .font(.system(size: 13, weight: .semibold))
-                                        }
-                                        .foregroundColor(isEditMode ? .green.opacity(0.9) : .white.opacity(0.7))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(isEditMode ? Color.green.opacity(0.12) : Color.white.opacity(0.06))
-                                        )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
-
-                                // Delete Receipt button
-                                if let deleteAction = onDelete {
-                                    Button {
-                                        showDeleteConfirmation = true
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "trash")
-                                                .font(.system(size: 13, weight: .medium))
-                                            Text(L("delete_receipt"))
-                                                .font(.system(size: 13, weight: .semibold))
-                                        }
-                                        .foregroundColor(.red.opacity(0.8))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(Color.red.opacity(0.08))
-                                        )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .confirmationDialog("Delete Receipt", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
-                                        Button("Delete", role: .destructive) {
-                                            deleteAction()
-                                        }
-                                        Button("Cancel", role: .cancel) {}
-                                    } message: {
-                                        Text(L("delete_receipt_confirm"))
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                    }
                 }
                 .transition(.opacity)
             }
         }
         .background(Color.clear)
-        .confirmationDialog("Delete Item", isPresented: Binding(
-            get: { itemToDelete != nil },
-            set: { if !$0 { itemToDelete = nil } }
-        ), titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
-                if let item = itemToDelete {
-                    // Mark as deleting for visual feedback
-                    deletingItemIds.insert(item.id)
-
-                    // Trigger haptic
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
-
-                    // Call delete handler
-                    onDeleteItem?(receipt.displayId, item.id)
-                }
-                itemToDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                itemToDelete = nil
-            }
-        } message: {
-            if let item = itemToDelete {
-                Text("Remove \"\(item.name)\" from this receipt?")
-            }
-        }
-        .onChange(of: isExpanded) { _, expanded in
-            // Reset edit mode when card collapses
-            if !expanded && isEditMode {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    isEditMode = false
-                }
-            }
-
-        }
     }
 }
 
-// MARK: - Editable Line Item Row
+// MARK: - Line Item Row
 
-/// A clean row component for line items with optional delete button in edit mode
-struct EditableLineItemRow: View {
+/// A clean row component for displaying line items
+struct LineItemRow: View {
     let item: ReceiptItemDisplayable
-    let isEditMode: Bool
-    let canDelete: Bool
-    let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            // Delete button (shown in edit mode)
-            if isEditMode && canDelete {
-                Button {
-                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                    generator.impactOccurred()
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash.circle.fill")
-                        .font(.system(size: 22, weight: .medium))
-                        .foregroundColor(.red.opacity(0.85))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .transition(.asymmetric(
-                    insertion: .scale.combined(with: .opacity),
-                    removal: .scale.combined(with: .opacity)
-                ))
-            }
-
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(item.displayItemName)
@@ -438,11 +276,6 @@ struct EditableLineItemRow: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isEditMode && canDelete ? Color.red.opacity(0.03) : Color.clear)
-        )
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isEditMode)
     }
 }
 

@@ -105,9 +105,6 @@ class StoreDataManager: ObservableObject {
     @Published var isRefreshing = false
     @Published var error: String?
     @Published var lastFetchDate: Date?
-    @Published var isDeleting = false
-    @Published var deleteError: String?
-    @Published var deleteSuccessMessage: String?
     @Published var periodTotalSpends: [String: Double] = [:]  // Total spend per period from backend (sum of item_price)
     @Published var periodReceiptCounts: [String: Int] = [:]  // Total receipt count per period
 
@@ -723,73 +720,21 @@ class StoreDataManager: ObservableObject {
             .reduce(0) { $0 + $1.totalStoreSpend }
     }
 
-    // Delete a store breakdown - removes from local state only (for immediate UI feedback)
-    func deleteBreakdownLocally(_ breakdown: StoreBreakdown) {
-        storeBreakdowns.removeAll { $0.id == breakdown.id }
-    }
-
-    // Delete a store breakdown from backend and local state
-    func deleteBreakdown(_ breakdown: StoreBreakdown, periodType: PeriodType = .month) async -> Bool {
-        await MainActor.run {
-            isDeleting = true
-            deleteError = nil
-            deleteSuccessMessage = nil
-        }
-
-        do {
-            // Parse the period string (e.g., "January 2026") to get date range
-            let (startDate, endDate) = parsePeriodToDates(breakdown.period, periodType: periodType)
-
-            // Call backend API
-            let response = try await AnalyticsAPIService.shared.removeTransactions(
-                storeName: breakdown.storeName,
-                period: periodType.rawValue,
-                startDate: startDate,
-                endDate: endDate
-            )
-
-            await MainActor.run {
-                // Remove from local state after successful API call
-                self.storeBreakdowns.removeAll { $0.id == breakdown.id }
-                self.isDeleting = false
-                self.deleteSuccessMessage = response.message
-            }
-
-            return true
-
-        } catch let apiError as AnalyticsAPIError {
-            await MainActor.run {
-                self.isDeleting = false
-                self.deleteError = apiError.localizedDescription
-            }
-            return false
-
-        } catch {
-            await MainActor.run {
-                self.isDeleting = false
-                self.deleteError = error.localizedDescription
-            }
-            return false
-        }
-    }
-
     // Parse period string to date range
     private func parsePeriodToDates(_ period: String, periodType: PeriodType) -> (startDate: String, endDate: String) {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US") // Ensure consistent English month names
-        dateFormatter.timeZone = TimeZone(identifier: "UTC") // Use UTC to avoid timezone shifts
+        dateFormatter.locale = Locale(identifier: "en_US")
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
 
         let outputFormatter = DateFormatter()
         outputFormatter.dateFormat = "yyyy-MM-dd"
         outputFormatter.timeZone = TimeZone(identifier: "UTC")
 
-        // Use UTC calendar to avoid timezone issues
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
 
         guard let parsedDate = dateFormatter.date(from: period) else {
-            // Fallback to current month if parsing fails
             let now = Date()
             let components = calendar.dateComponents([.year, .month], from: now)
             let startOfMonth = calendar.date(from: components)!
@@ -816,25 +761,16 @@ class StoreDataManager: ObservableObject {
             return (outputFormatter.string(from: startOfYear), outputFormatter.string(from: endOfYear))
 
         case .custom:
-            // Custom periods use the same format as month (parsed from "MMMM yyyy")
             let components = calendar.dateComponents([.year, .month], from: parsedDate)
             let startOfMonth = calendar.date(from: components)!
             let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
             return (outputFormatter.string(from: startOfMonth), outputFormatter.string(from: endOfMonth))
 
         case .all:
-            // All time - return a very wide date range
             return ("1900-01-01", outputFormatter.string(from: Date()))
         }
     }
 
-    // Delete a store breakdown at specific indices
-    func deleteBreakdowns(at offsets: IndexSet, from breakdowns: [StoreBreakdown]) {
-        let breakdownsToDelete = offsets.map { breakdowns[$0] }
-        for breakdown in breakdownsToDelete {
-            deleteBreakdownLocally(breakdown)
-        }
-    }
 }
 // MARK: - DateFormatter Extension
 

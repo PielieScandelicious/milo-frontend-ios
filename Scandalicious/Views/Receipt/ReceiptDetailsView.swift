@@ -9,12 +9,6 @@ import SwiftUI
 
 struct ReceiptDetailsView: View {
     let receipt: ReceiptUploadResponse
-    var onDelete: (() -> Void)?
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var isDeleting = false
-    @State private var deleteError: String?
-    @State private var showDeleteError = false
 
     var body: some View {
         NavigationStack {
@@ -31,9 +25,6 @@ struct ReceiptDetailsView: View {
                     // Items List (hide for duplicates since they weren't saved)
                     if !receipt.isDuplicate {
                         itemsSection
-
-                        // Delete Button
-                        deleteButton
                     }
                 }
                 .padding()
@@ -41,11 +32,6 @@ struct ReceiptDetailsView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle(L("receipt_details"))
             .navigationBarTitleDisplayMode(.inline)
-            .alert(L("delete_failed"), isPresented: $showDeleteError) {
-                Button(L("ok"), role: .cancel) {}
-            } message: {
-                Text(deleteError ?? "An unknown error occurred")
-            }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -188,53 +174,6 @@ struct ReceiptDetailsView: View {
         }
     }
 
-    // MARK: - Delete Button
-
-    private var deleteButton: some View {
-        Button(role: .destructive) {
-            Task {
-                await deleteReceipt()
-            }
-        } label: {
-            HStack {
-                if isDeleting {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Image(systemName: "trash")
-                }
-                Text(isDeleting ? L("deleting") : L("delete_receipt"))
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.red.opacity(isDeleting ? 0.5 : 1.0))
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .disabled(isDeleting)
-        .padding(.top, 16)
-    }
-
-    // MARK: - Delete Receipt
-
-    private func deleteReceipt() async {
-        isDeleting = true
-
-        do {
-            try await AnalyticsAPIService.shared.removeReceipt(receiptId: receipt.receiptId)
-
-            await MainActor.run {
-                onDelete?()
-                dismiss()
-            }
-        } catch {
-            await MainActor.run {
-                deleteError = error.localizedDescription
-                showDeleteError = true
-                isDeleting = false
-            }
-        }
-    }
 }
 
 // MARK: - Receipt Item Row

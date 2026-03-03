@@ -43,26 +43,6 @@ class TransactionsViewModel: ObservableObject {
     @Published var hasMorePages = false
 
     private let apiService = AnalyticsAPIService.shared
-    private var notificationObserver: NSObjectProtocol?
-
-    init() {
-        // Listen for data change notifications
-        notificationObserver = NotificationCenter.default.addObserver(
-            forName: .receiptsDataDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                await self?.refresh()
-            }
-        }
-    }
-
-    deinit {
-        if let observer = notificationObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-    }
 
     func loadTransactions(reset: Bool = false) async {
         if reset {
@@ -128,21 +108,4 @@ class TransactionsViewModel: ObservableObject {
         await loadTransactions(reset: true)
     }
 
-    /// Delete a single transaction
-    func deleteTransaction(_ transaction: APITransaction) async throws {
-        try await apiService.removeTransaction(transactionId: transaction.id)
-
-        // Remove from local state
-        objectWillChange.send()
-        transactions.removeAll { $0.id == transaction.id }
-
-        // Notify other views
-        NotificationCenter.default.post(name: .receiptsDataDidChange, object: nil)
-    }
-}
-
-// MARK: - Data Refresh Notification
-
-extension Notification.Name {
-    static let receiptsDataDidChange = Notification.Name("receiptsDataDidChange")
 }

@@ -17,13 +17,6 @@ struct TransactionTableView: View {
     @State private var searchText: String = ""
     @FocusState private var isSearchFocused: Bool
 
-    // Delete states
-    @State private var transactionToDelete: APITransaction?
-    @State private var showDeleteConfirmation = false
-    @State private var isDeleting = false
-    @State private var deleteError: String?
-    @State private var showDeleteError = false
-
     enum SortOrder: String, CaseIterable {
         case dateDescending = "Date (Newest)"
         case dateAscending = "Date (Oldest)"
@@ -74,16 +67,6 @@ struct TransactionTableView: View {
                 Button("OK") { }
             } message: {
                 Text(viewModel.state.error ?? "Unknown error")
-            }
-            .confirmationDialog("Delete Transaction", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
-                deleteDialogButtons
-            } message: {
-                Text(transactionToDelete.map { "Are you sure you want to delete \"\($0.itemName)\"? This action cannot be undone." } ?? "")
-            }
-            .alert("Delete Failed", isPresented: $showDeleteError) {
-                Button("OK") { deleteError = nil }
-            } message: {
-                Text(deleteError ?? "An error occurred while deleting the transaction.")
             }
     }
 
@@ -153,11 +136,8 @@ struct TransactionTableView: View {
     private var transactionsList: some View {
         LazyVStack(spacing: 0) {
             ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
-                TransactionRowWithMenu(
-                    transaction: transaction,
-                    onDelete: { transactionToDelete = transaction; showDeleteConfirmation = true },
-                    onAppear: { loadMoreIfNeeded(at: index) }
-                )
+                APITransactionTableRow(transaction: transaction)
+                    .onAppear { loadMoreIfNeeded(at: index) }
                 Divider().background(Color.white.opacity(0.1))
             }
         }
@@ -192,34 +172,10 @@ struct TransactionTableView: View {
         }
     }
 
-    @ViewBuilder
-    private var deleteDialogButtons: some View {
-        Button("Delete", role: .destructive) {
-            if let transaction = transactionToDelete {
-                Task { await deleteTransaction(transaction) }
-            }
-        }
-        Button("Cancel", role: .cancel) { transactionToDelete = nil }
-    }
-
     private func loadMoreIfNeeded(at index: Int) {
         if index == transactions.count - 1 && viewModel.hasMorePages {
             Task { await viewModel.loadNextPage() }
         }
-    }
-
-    // MARK: - Delete Transaction
-
-    private func deleteTransaction(_ transaction: APITransaction) async {
-        isDeleting = true
-        do {
-            try await viewModel.deleteTransaction(transaction)
-            transactionToDelete = nil
-        } catch {
-            deleteError = error.localizedDescription
-            showDeleteError = true
-        }
-        isDeleting = false
     }
 
     private func loadTransactions() async {
@@ -383,13 +339,9 @@ struct TransactionTableView: View {
                 .textCase(.uppercase)
                 .tracking(0.8)
                 .frame(width: 70, alignment: .trailing)
-
-            // Spacer for menu column
-            Spacer()
-                .frame(width: 40)
         }
         .padding(.leading, 16)
-        .padding(.trailing, 8)
+        .padding(.trailing, 16)
         .padding(.vertical, 14)
         .background(Color.white.opacity(0.08))
     }
@@ -460,40 +412,6 @@ struct TransactionTableView: View {
     }
 }
 
-// MARK: - Transaction Row With Dropdown Menu
-
-struct TransactionRowWithMenu: View {
-    let transaction: APITransaction
-    let onDelete: () -> Void
-    let onAppear: () -> Void
-
-    var body: some View {
-        HStack(spacing: 0) {
-            // Transaction content
-            APITransactionTableRow(transaction: transaction)
-
-            // Dropdown menu button
-            Menu {
-                Button(role: .destructive) {
-                    onDelete()
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .frame(width: 32, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .padding(.trailing, 8)
-        }
-        .onAppear {
-            onAppear()
-        }
-    }
-}
-
 // MARK: - Transaction Table Row
 
 struct APITransactionTableRow: View {
@@ -526,7 +444,7 @@ struct APITransactionTableRow: View {
                 .frame(width: 70, alignment: .trailing)
         }
         .padding(.leading, 16)
-        .padding(.trailing, 4)
+        .padding(.trailing, 16)
         .padding(.vertical, 14)
         .background(Color.clear)
     }

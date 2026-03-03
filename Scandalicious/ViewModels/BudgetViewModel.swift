@@ -62,7 +62,6 @@ class BudgetViewModel: ObservableObject {
     // MARK: - Private Properties
 
     private let apiService = BudgetAPIService.shared
-    private var notificationObserver: NSObjectProtocol?
     private var receiptUploadObserver: NSObjectProtocol?
     private var categoryAllocationsObserver: NSObjectProtocol?
 
@@ -82,17 +81,6 @@ class BudgetViewModel: ObservableObject {
 
     init() {
         initializePeriodsSync()
-
-        notificationObserver = NotificationCenter.default.addObserver(
-            forName: .receiptsDataDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("[BudgetVM] 📩 Received .receiptsDataDidChange notification")
-            Task { @MainActor in
-                await self?.refreshProgress()
-            }
-        }
 
         receiptUploadObserver = NotificationCenter.default.addObserver(
             forName: .receiptUploadedSuccessfully,
@@ -136,9 +124,6 @@ class BudgetViewModel: ObservableObject {
     }
 
     deinit {
-        if let observer = notificationObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
         if let observer = receiptUploadObserver {
             NotificationCenter.default.removeObserver(observer)
         }
