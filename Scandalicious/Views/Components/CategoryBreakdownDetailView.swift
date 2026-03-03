@@ -34,9 +34,6 @@ struct CategoryBreakdownDetailView: View {
     @State private var categoryIsLoadingMore: [String: Bool] = [:]
     @State private var categoryTotalCount: [String: Int] = [:]
 
-    /// Observe split cache for updates
-    @ObservedObject private var splitCache = SplitCacheManager.shared
-
     private let apiService = AnalyticsAPIService.shared
 
     private var monthName: String {
@@ -456,8 +453,6 @@ struct CategoryBreakdownDetailView: View {
                 loadingCategoryId = nil
             }
 
-            // Load split data in background for the loaded page
-            loadSplitData(for: response.transactions)
         } catch {
             await MainActor.run {
                 categoryLoadError[category.id] = error.localizedDescription
@@ -505,45 +500,9 @@ struct CategoryBreakdownDetailView: View {
                 categoryIsLoadingMore[id] = false
             }
 
-            // Load split data in background for the new page
-            loadSplitData(for: response.transactions)
         } catch {
             await MainActor.run {
                 categoryIsLoadingMore[id] = false
-            }
-        }
-    }
-
-    // MARK: - Load Split Data (Background)
-
-    private func loadSplitData(for transactions: [APITransaction]) {
-        Task.detached { [weak splitCache] in
-            let uniqueReceiptIds = Set(transactions.compactMap { $0.receiptId })
-
-            await withTaskGroup(of: Void.self) { group in
-                var activeTasksCount = 0
-                let maxConcurrentTasks = 5
-                var remainingIds = Array(uniqueReceiptIds)
-
-                while !remainingIds.isEmpty || activeTasksCount > 0 {
-                    while activeTasksCount < maxConcurrentTasks && !remainingIds.isEmpty {
-                        let receiptId = remainingIds.removeFirst()
-
-                        guard let cache = splitCache, await !cache.hasSplit(for: receiptId) else {
-                            continue
-                        }
-
-                        group.addTask {
-                            await cache.fetchSplit(for: receiptId)
-                        }
-                        activeTasksCount += 1
-                    }
-
-                    if activeTasksCount > 0 {
-                        await group.next()
-                        activeTasksCount -= 1
-                    }
-                }
             }
         }
     }
@@ -582,14 +541,6 @@ struct CategoryBreakdownDetailView: View {
             }
         } else if let items = categoryItems[category.id], !items.isEmpty {
             ForEach(items) { item in
-                // Get split participants for this item
-                let splitParticipants: [SplitParticipantInfo] = {
-                    guard let receiptId = item.receiptId else { return [] }
-                    guard let splitData = splitCache.getSplit(for: receiptId) else { return [] }
-                    return splitData.participantsForTransaction(item.id)
-                }()
-                let friendsOnly = splitParticipants.filter { !$0.isMe }
-
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
@@ -608,12 +559,6 @@ struct CategoryBreakdownDetailView: View {
                                         Capsule()
                                             .fill(Color.white.opacity(0.08))
                                     )
-                                    .transition(.identity)
-                            }
-
-                            // Split participant avatars
-                            if !friendsOnly.isEmpty {
-                                MiniSplitAvatars(participants: friendsOnly)
                                     .transition(.identity)
                             }
                         }

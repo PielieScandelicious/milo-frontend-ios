@@ -94,7 +94,6 @@ struct OverviewView: View {
     @State private var categoryCurrentPage: [String: Int] = [:]  // Current loaded page per category
     @State private var categoryHasMore: [String: Bool] = [:]  // Whether more pages exist per category
     @State private var categoryLoadingMore: String?  // Category currently loading more items
-    private let splitCache = SplitCacheManager.shared  // Access only — not observed to avoid re-rendering entire OverviewView on every split fetch
     @State private var showingAllTransactions = false
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
@@ -104,7 +103,6 @@ struct OverviewView: View {
     @State private var expandedReceiptId: String? // For inline receipt expansion
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
-    @State private var receiptToSplit: APIReceipt? // For expense split
     // scrollOffset removed — gradient header now manages its own scroll state via ScrollFadingGradientView
     @State private var cachedAvailablePeriods: [String] = [] // Cached for performance
     @State private var cachedSegmentsByPeriod: [String: [StoreChartSegment]] = [:] // Cache segments
@@ -431,10 +429,6 @@ struct OverviewView: View {
                 // Parse month and year from selectedPeriod (e.g., "January 2026")
                 let components = parsePeriodComponents(selectedPeriod)
                 CategoryBreakdownDetailView(month: components.month, year: components.year)
-            }
-            .sheet(item: $receiptToSplit) { receipt in
-                // Scanned receipts use line item splitting
-                SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
             }
             .onAppear(perform: handleOnAppear)
             .onDisappear {
@@ -1336,20 +1330,6 @@ struct OverviewView: View {
 
     // MARK: - Expandable Category Functions
 
-    /// Batch-fetch split data for a list of items so rows don't fetch one-by-one during scroll
-    private func batchFetchSplitData(for items: [APITransaction]) async {
-        let receiptIds = Set(items.compactMap { $0.receiptId })
-        let uncachedIds = receiptIds.filter { !splitCache.hasSplit(for: $0) }
-        guard !uncachedIds.isEmpty else { return }
-        await withTaskGroup(of: Void.self) { group in
-            for receiptId in uncachedIds {
-                group.addTask {
-                    await self.splitCache.fetchSplit(for: receiptId)
-                }
-            }
-        }
-    }
-
     private func toggleCategoryExpansion(_ category: CategorySpendItem, period: String) {
         if expandedCategoryId == category.id {
             // Collapse
@@ -1456,8 +1436,6 @@ struct OverviewView: View {
                 loadingCategoryId = nil
             }
 
-            // Batch-fetch split data so rows don't fetch one-by-one during scroll
-            await batchFetchSplitData(for: response.transactions)
         } catch {
             await MainActor.run {
                 categoryLoadError[category.id] = error.localizedDescription
@@ -1511,7 +1489,6 @@ struct OverviewView: View {
                 categoryLoadingMore = nil
             }
 
-            await batchFetchSplitData(for: response.transactions)
         } catch {
             await MainActor.run {
                 categoryLoadingMore = nil
@@ -1603,15 +1580,7 @@ struct OverviewView: View {
     }
 
     private func expandedCategoryItemRow(_ item: APITransaction, category: CategorySpendItem, isLast: Bool) -> some View {
-        // Get split participants for this item
-        let splitParticipants: [SplitParticipantInfo] = {
-            guard let receiptId = item.receiptId else { return [] }
-            guard let splitData = splitCache.getSplit(for: receiptId) else { return [] }
-            return splitData.participantsForTransaction(item.id)
-        }()
-        let friendsOnly = splitParticipants.filter { !$0.isMe }
-
-        return HStack(spacing: 10) {
+        HStack(spacing: 10) {
             // Item details
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -1630,11 +1599,6 @@ struct OverviewView: View {
                                 Capsule()
                                     .fill(Color.white.opacity(0.08))
                             )
-                    }
-
-                    // Split participant avatars
-                    if !friendsOnly.isEmpty {
-                        MiniSplitAvatars(participants: friendsOnly)
                     }
                 }
 
@@ -1843,9 +1807,6 @@ struct OverviewView: View {
                                         },
                                         onDeleteItem: { receiptId, itemId in
                                             deleteReceiptItemFromOverview(receiptId: receiptId, itemId: itemId)
-                                        },
-                                        onSplit: {
-                                            receiptToSplit = receipt
                                         }
                                     )
                                 }

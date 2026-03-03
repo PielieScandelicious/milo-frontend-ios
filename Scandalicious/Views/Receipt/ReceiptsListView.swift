@@ -20,7 +20,6 @@ struct ReceiptsListView: View {
     @State private var isDeletingItem = false
     @State private var deleteError: String?
     @State private var expandedReceiptId: String?
-    @State private var receiptToSplit: APIReceipt?
 
     var body: some View {
         ZStack {
@@ -59,9 +58,6 @@ struct ReceiptsListView: View {
                                     },
                                     onDeleteItem: { receiptId, itemId in
                                         deleteReceiptItem(receiptId: receiptId, itemId: itemId)
-                                    },
-                                    onSplit: {
-                                        receiptToSplit = receipt
                                     }
                                 )
                                 .transition(.asymmetric(
@@ -111,9 +107,6 @@ struct ReceiptsListView: View {
             if let receipt = selectedReceipt {
                 ReceiptTransactionsView(receipt: receipt)
             }
-        }
-        .sheet(item: $receiptToSplit) { receipt in
-            SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
         }
         .task {
             // Use initial/cached receipts for instant display

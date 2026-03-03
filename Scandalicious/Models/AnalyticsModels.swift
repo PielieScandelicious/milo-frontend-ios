@@ -687,7 +687,7 @@ struct APIReceiptItem: Codable, Identifiable {
 // MARK: - APIReceipt to ReceiptUploadResponse Conversion
 
 extension APIReceipt {
-    /// Convert APIReceipt to ReceiptUploadResponse for use with SplitExpenseView
+    /// Convert APIReceipt to ReceiptUploadResponse
     func toReceiptUploadResponse() -> ReceiptUploadResponse {
         let convertedTransactions = transactions.map { item -> ReceiptTransaction in
             return ReceiptTransaction(

@@ -45,9 +45,6 @@ struct StoreDetailView: View {
     @State private var isDeletingReceipt = false
     @State private var receiptDeleteError: String?
 
-    // Split expense
-    @State private var receiptToSplit: APIReceipt?
-
     // Expandable category transactions
     @StateObject private var transactionsViewModel = TransactionsViewModel()
     @State private var expandedCategoryName: String?
@@ -333,9 +330,6 @@ struct StoreDetailView: View {
                 period: storeBreakdown.period,
                 storeName: storeBreakdown.storeName
             )
-        }
-        .sheet(item: $receiptToSplit) { receipt in
-            SplitExpenseView(receipt: receipt.toReceiptUploadResponse())
         }
         .onAppear {
             if !hasInitialized {
@@ -630,9 +624,6 @@ struct StoreDetailView: View {
                                         },
                                         onDeleteItem: { receiptId, itemId in
                                             deleteReceiptItem(receiptId: receiptId, itemId: itemId)
-                                        },
-                                        onSplit: {
-                                            receiptToSplit = receipt
                                         }
                                     )
                                 }
@@ -866,11 +857,8 @@ struct StoreDetailView: View {
 
 // MARK: - Category Transaction Subviews (Performance-Isolated)
 
-/// Observes SplitCacheManager independently so split-data loads only re-render
-/// this small list — not the entire StoreDetailView (header, chart, receipts, etc.).
 private struct CategoryTransactionsContent: View {
     let transactions: [APITransaction]
-    @ObservedObject private var splitCache = SplitCacheManager.shared
 
     var body: some View {
         let sorted = transactions.sorted { t1, t2 in
@@ -878,38 +866,14 @@ private struct CategoryTransactionsContent: View {
         }
 
         ForEach(sorted) { transaction in
-            CategoryTransactionItemRow(
-                transaction: transaction,
-                friends: friendsFor(transaction)
-            )
+            CategoryTransactionItemRow(transaction: transaction)
         }
-        .task {
-            // Batch-fetch all unique receipt splits at once instead of N individual fetches
-            let ids = Set(transactions.compactMap { $0.receiptId })
-                .filter { !splitCache.hasSplit(for: $0) }
-            guard !ids.isEmpty else { return }
-            await withTaskGroup(of: Void.self) { group in
-                for id in ids {
-                    group.addTask {
-                        await SplitCacheManager.shared.fetchSplit(for: id)
-                    }
-                }
-            }
-        }
-    }
-
-    private func friendsFor(_ transaction: APITransaction) -> [SplitParticipantInfo] {
-        guard let receiptId = transaction.receiptId,
-              let splitData = splitCache.getSplit(for: receiptId) else { return [] }
-        return splitData.participantsForTransaction(transaction.id).filter { !$0.isMe }
     }
 }
 
 /// Pure rendering view — no observation, no async work.
-/// Receives pre-computed friends so SwiftUI can diff efficiently via Equatable arrays.
 private struct CategoryTransactionItemRow: View {
     let transaction: APITransaction
-    let friends: [SplitParticipantInfo]
 
     var body: some View {
         HStack(spacing: 10) {
@@ -930,10 +894,6 @@ private struct CategoryTransactionItemRow: View {
                                 Capsule()
                                     .fill(Color.white.opacity(0.08))
                             )
-                    }
-
-                    if !friends.isEmpty {
-                        MiniSplitAvatars(participants: friends)
                     }
                 }
 

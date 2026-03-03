@@ -30,10 +30,6 @@ struct TransactionListView: View {
     @State private var deleteError: String?
     @State private var showDeleteError = false
 
-    // Split states
-    @State private var transactionToSplit: APITransaction?
-    @State private var showSplitView = false
-
     private var transactions: [APITransaction] {
         var baseTransactions = viewModel.transactions
 
@@ -187,12 +183,6 @@ struct TransactionListView: View {
             Button("OK") { deleteError = nil }
         } message: {
             Text(deleteError ?? "An error occurred while deleting the transaction.")
-        }
-        // Split expense sheet
-        .sheet(isPresented: $showSplitView) {
-            if let transaction = transactionToSplit {
-                SplitTransactionView(transaction: transaction, storeName: storeName)
-            }
         }
     }
 
@@ -409,10 +399,6 @@ struct TransactionListView: View {
                 ForEach(transactions) { transaction in
                     TransactionCardWithMenu(
                         transaction: transaction,
-                        onSplit: {
-                            transactionToSplit = transaction
-                            showSplitView = true
-                        },
                         onDelete: {
                             transactionToDelete = transaction
                             showDeleteConfirmation = true
@@ -429,35 +415,15 @@ struct TransactionListView: View {
 
 struct TransactionCardWithMenu: View {
     let transaction: APITransaction
-    let onSplit: () -> Void
     let onDelete: () -> Void
-
-    @ObservedObject private var splitCache = SplitCacheManager.shared
-
-    /// Get split participants for this transaction
-    private var splitParticipants: [SplitParticipantInfo] {
-        guard let receiptId = transaction.receiptId,
-              let splitData = splitCache.getSplit(for: receiptId) else {
-            return []
-        }
-        return splitData.participantsForTransaction(transaction.id)
-    }
 
     var body: some View {
         HStack(spacing: 0) {
             // Transaction card content
-            APITransactionRowView(transaction: transaction, splitParticipants: splitParticipants)
+            APITransactionRowView(transaction: transaction)
 
             // Dropdown menu button
             Menu {
-                Button {
-                    onSplit()
-                } label: {
-                    Label("Split with Friends", systemImage: "person.2.fill")
-                }
-
-                Divider()
-
                 Button(role: .destructive) {
                     onDelete()
                 } label: {
@@ -477,23 +443,11 @@ struct TransactionCardWithMenu: View {
             }
             .padding(.leading, 8)
         }
-        .task {
-            // Fetch split data if we have a receipt ID and it's not cached
-            if let receiptId = transaction.receiptId, !splitCache.hasSplit(for: receiptId) {
-                await splitCache.fetchSplit(for: receiptId)
-            }
-        }
     }
 }
 
 struct APITransactionRowView: View {
     let transaction: APITransaction
-    var splitParticipants: [SplitParticipantInfo] = []
-
-    /// Filter out "Me" - only show friends
-    private var friendsOnly: [SplitParticipantInfo] {
-        splitParticipants.filter { !$0.isMe }
-    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -529,17 +483,10 @@ struct APITransactionRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(transaction.displayName)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                                .lineLimit(2)
-
-                            // Split participant avatars (inline with item name)
-                            if !friendsOnly.isEmpty {
-                                TransactionSplitAvatars(participants: friendsOnly)
-                            }
-                        }
+                        Text(transaction.displayName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
 
                         if let description = transaction.displayDescription {
                             Text(description)
@@ -594,55 +541,6 @@ struct APITransactionRowView: View {
         )
     }
 
-}
-
-// MARK: - Transaction Split Avatars
-
-/// Compact display of friend avatars for split transactions (excludes "Me")
-struct TransactionSplitAvatars: View {
-    let participants: [SplitParticipantInfo]
-
-    /// Maximum avatars to show before "+N"
-    private let maxVisible = 3
-
-    var body: some View {
-        if !participants.isEmpty {
-            HStack(spacing: -4) {
-                // Show up to maxVisible avatars
-                ForEach(Array(participants.prefix(maxVisible).enumerated()), id: \.element.id) { index, participant in
-                    Circle()
-                        .fill(participant.swiftUIColor)
-                        .frame(width: 16, height: 16)
-                        .overlay(
-                            Text(String(participant.name.prefix(1)).uppercased())
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.white)
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(Color(white: 0.1), lineWidth: 1)
-                        )
-                        .zIndex(Double(maxVisible - index))
-                }
-
-                // Show "+N" if more participants
-                if participants.count > maxVisible {
-                    Circle()
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 16, height: 16)
-                        .overlay(
-                            Text("+\(participants.count - maxVisible)")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.white.opacity(0.8))
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(Color(white: 0.1), lineWidth: 1)
-                        )
-                }
-            }
-        }
-    }
 }
 
 #Preview {

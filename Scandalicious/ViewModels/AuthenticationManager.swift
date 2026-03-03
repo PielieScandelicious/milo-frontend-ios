@@ -211,8 +211,5 @@ class AuthenticationManager: ObservableObject {
 
     /// Clear all cached user data on sign-out or account switch
     private func clearAllCachedData() {
-        Task { @MainActor in
-            SplitCacheManager.shared.clearCache()
-        }
     }
 }

@@ -17,9 +17,6 @@ struct CategoryDetailView: View {
     @State private var error: String?
     @State private var hasInitialized = false
 
-    /// Observe split cache for updates
-    @ObservedObject private var splitCache = SplitCacheManager.shared
-
     // Group transactions by store
     private var transactionsByStore: [(storeName: String, transactions: [APITransaction], totalSpent: Double)] {
         let grouped = Dictionary(grouping: transactions) { $0.storeName }
@@ -299,20 +296,7 @@ struct CategoryDetailView: View {
     // MARK: - Transaction Row
 
     private func transactionRow(_ transaction: APITransaction, isLast: Bool) -> some View {
-        // Get split participants for this transaction
-        let splitParticipants: [SplitParticipantInfo] = {
-            guard let receiptId = transaction.receiptId else {
-                return []
-            }
-            guard let splitData = splitCache.getSplit(for: receiptId) else {
-                return []
-            }
-            let participants = splitData.participantsForTransaction(transaction.id)
-            return participants
-        }()
-        let friendsOnly = splitParticipants.filter { !$0.isMe }
-
-        return HStack(spacing: 12) {
+        HStack(spacing: 12) {
             // Item info
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -331,11 +315,6 @@ struct CategoryDetailView: View {
                                 Capsule()
                                     .fill(Color.white.opacity(0.08))
                             )
-                    }
-
-                    // Split participant avatars
-                    if !friendsOnly.isEmpty {
-                        MiniSplitAvatars(participants: friendsOnly)
                     }
                 }
 
@@ -365,12 +344,6 @@ struct CategoryDetailView: View {
                 .fill(Color.white.opacity(0.02))
         )
         .padding(.bottom, isLast ? 0 : 6)
-        .task {
-            // Fetch split data if we have a receipt ID and it's not cached
-            if let receiptId = transaction.receiptId, !splitCache.hasSplit(for: receiptId) {
-                await splitCache.fetchSplit(for: receiptId)
-            }
-        }
     }
 
     // MARK: - Date Formatting

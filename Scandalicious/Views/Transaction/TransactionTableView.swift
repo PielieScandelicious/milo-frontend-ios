@@ -24,10 +24,6 @@ struct TransactionTableView: View {
     @State private var deleteError: String?
     @State private var showDeleteError = false
 
-    // Split states
-    @State private var transactionToSplit: APITransaction?
-    @State private var showSplitView = false
-
     enum SortOrder: String, CaseIterable {
         case dateDescending = "Date (Newest)"
         case dateAscending = "Date (Oldest)"
@@ -88,9 +84,6 @@ struct TransactionTableView: View {
                 Button("OK") { deleteError = nil }
             } message: {
                 Text(deleteError ?? "An error occurred while deleting the transaction.")
-            }
-            .sheet(isPresented: $showSplitView) {
-                splitSheetContent
             }
     }
 
@@ -162,7 +155,6 @@ struct TransactionTableView: View {
             ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
                 TransactionRowWithMenu(
                     transaction: transaction,
-                    onSplit: { transactionToSplit = transaction; showSplitView = true },
                     onDelete: { transactionToDelete = transaction; showDeleteConfirmation = true },
                     onAppear: { loadMoreIfNeeded(at: index) }
                 )
@@ -208,13 +200,6 @@ struct TransactionTableView: View {
             }
         }
         Button("Cancel", role: .cancel) { transactionToDelete = nil }
-    }
-
-    @ViewBuilder
-    private var splitSheetContent: some View {
-        if let transaction = transactionToSplit {
-            SplitTransactionView(transaction: transaction, storeName: storeName)
-        }
     }
 
     private func loadMoreIfNeeded(at index: Int) {
@@ -479,7 +464,6 @@ struct TransactionTableView: View {
 
 struct TransactionRowWithMenu: View {
     let transaction: APITransaction
-    let onSplit: () -> Void
     let onDelete: () -> Void
     let onAppear: () -> Void
 
@@ -490,14 +474,6 @@ struct TransactionRowWithMenu: View {
 
             // Dropdown menu button
             Menu {
-                Button {
-                    onSplit()
-                } label: {
-                    Label("Split with Friends", systemImage: "person.2.fill")
-                }
-
-                Divider()
-
                 Button(role: .destructive) {
                     onDelete()
                 } label: {
