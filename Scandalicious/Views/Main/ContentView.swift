@@ -181,7 +181,7 @@ struct ViewTab: View {
 // MARK: - Scan Tab
 struct ScanTab: View {
     var body: some View {
-        ReceiptScanView()
+        HomeTabView()
             .id("ScanTab") // Prevent recreation
     }
 }
