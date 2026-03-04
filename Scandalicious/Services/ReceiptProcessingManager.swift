@@ -166,6 +166,7 @@ class ReceiptProcessingManager: ObservableObject {
     private func handleReceiptCompleted(_ receipt: ProcessingReceipt) {
         print("[ReceiptProcessingMgr] 🎉 Receipt completed: \(receipt.storeName ?? "unknown") date=\(receipt.detectedDate ?? "nil") — posting .receiptUploadedSuccessfully")
         var userInfo: [String: Any] = [:]
+        userInfo["receiptId"] = receipt.id
         if let storeName = receipt.storeName       { userInfo["storeName"] = storeName }
         if let amount    = receipt.totalAmount     { userInfo["receiptAmount"] = amount }
         if let detected  = receipt.detectedDate    { userInfo["detectedDate"] = detected }

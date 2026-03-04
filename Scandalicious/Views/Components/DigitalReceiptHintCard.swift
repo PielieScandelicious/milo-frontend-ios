@@ -26,10 +26,15 @@ struct DigitalReceiptHintCard: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
 
-                Text("Use the share button and earn up to 1% cashback")
+                Text("Earn 0.5%\u{2013}1% cashback \u{2014} the more you spend, the higher your reward")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
                     .lineLimit(2)
+
+                Text("Cashback increases progressively in \u{20AC}50 segments, up to 1%")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.3))
+                    .lineLimit(1)
             }
 
             Spacer()

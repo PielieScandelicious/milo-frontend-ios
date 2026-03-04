@@ -11,15 +11,18 @@ import SwiftUI
 struct HomeTabView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject private var rateLimitManager = RateLimitManager.shared
+    @ObservedObject private var processingManager = ReceiptProcessingManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     @State private var viewModel = HomeViewModel()
     @State private var showCamera = false
+    @State private var capturedImage: UIImage?
     @State private var showProfile = false
     @State private var showRateLimitAlert = false
     @State private var contentOpacity: Double = 0
     @State private var showMiloGame = false
     @State private var showWalletPassCreator = false
+    @Environment(\.scenePhase) private var scenePhase
 
     private let headerBlueColor = Color(red: 0.04, green: 0.15, blue: 0.30)
     private let deepPurple = Color(red: 0.35, green: 0.10, blue: 0.60)
@@ -60,7 +63,17 @@ struct HomeTabView: View {
             }
         }
         .fullScreenCover(isPresented: $showCamera) {
-            CustomCameraView(capturedImage: .constant(nil))
+            CustomCameraView(capturedImage: $capturedImage)
+        }
+        .onChange(of: capturedImage) { _, newImage in
+            guard let image = newImage else { return }
+            capturedImage = nil
+            viewModel.uploadAndProcess(image: image)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                checkForShareExtensionUploads()
+            }
         }
         .sheet(isPresented: $showProfile) {
             NavigationStack {
@@ -125,7 +138,7 @@ struct HomeTabView: View {
                 if viewModel.processingPhase != .idle && viewModel.processingPhase != .claiming {
                     HomeProcessingCard(viewModel: viewModel)
                         .padding(.horizontal, 20)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .transition(.opacity)
                 }
 
                 // Digital receipt hint
@@ -146,33 +159,10 @@ struct HomeTabView: View {
                 RecentReceiptsSection(receipts: viewModel.recentReceipts)
                     .padding(.horizontal, 20)
 
-                // Demo button (for testing processing flow)
-                if viewModel.processingPhase == .idle {
-                    Button {
-                        viewModel.startProcessing()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 12, weight: .semibold))
-                            Text("Demo Processing")
-                                .font(.system(size: 13, weight: .semibold))
-                        }
-                        .foregroundStyle(.white.opacity(0.4))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.06))
-                                .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.5))
-                        )
-                    }
-                    .padding(.top, 8)
-                }
-
                 Spacer()
                     .frame(height: 120)
             }
-            .padding(.top, 16)
+            .padding(.top, 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(backgroundGradient)
@@ -285,6 +275,15 @@ struct HomeTabView: View {
                     )
                     .offset(x: -2, y: -2)
             }
+        }
+    }
+
+    // MARK: - Share Extension Detection
+
+    private func checkForShareExtensionUploads() {
+        processingManager.reloadPersistedReceipts()
+        if processingManager.hasActiveProcessing && viewModel.processingPhase == .idle {
+            viewModel.startProcessingForShareExtension()
         }
     }
 

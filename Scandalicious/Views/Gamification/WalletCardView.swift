@@ -58,7 +58,7 @@ struct WalletCardView: View {
                 .padding(.bottom, 8)
 
             // Earnings info
-            Text("€0.50 per receipt \u{00B7} \(String(format: "%.0f%%", (gm.tierProgress.currentTier.multiplier - 1.0) * 100)) tier bonus")
+            Text("0.5%\u{2013}1% progressive cashback per receipt")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.4))
                 .padding(.bottom, 18)

@@ -66,25 +66,9 @@ struct HomeProcessingCard: View {
                     .foregroundStyle(.blue)
                     .symbolEffect(.rotate, isActive: true)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Processing your receipt...")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(viewModel.processingStoreColor)
-                            .frame(width: 6, height: 6)
-                        Text(viewModel.processingStoreName)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
-                        Text("\u{2022}")
-                            .foregroundStyle(.white.opacity(0.3))
-                        Text(String(format: "\u{20AC}%.2f", viewModel.processingAmount))
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
-                }
+                Text("Processing your receipt...")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
 
                 Spacer()
             }
@@ -92,11 +76,10 @@ struct HomeProcessingCard: View {
             .padding(.top, 14)
 
             // Progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.06))
-
+            Capsule()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 3)
+                .overlay(alignment: .leading) {
                     Capsule()
                         .fill(
                             LinearGradient(
@@ -108,21 +91,28 @@ struct HomeProcessingCard: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(4, geo.size.width * viewModel.processingProgress))
+                        .frame(
+                            width: nil,
+                            alignment: .leading
+                        )
+                        .scaleEffect(
+                            x: max(0.01, viewModel.processingProgress),
+                            y: 1,
+                            anchor: .leading
+                        )
                 }
-            }
-            .frame(height: 3)
-            .padding(.horizontal, 16)
+                .clipShape(Capsule())
+                .padding(.horizontal, 16)
 
             // Play while you wait hint pointing to easter egg above
             HStack(spacing: 5) {
+                Text("Tap Milo to play while you wait")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.35))
+
                 Image(systemName: "arrow.up")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.white.opacity(0.25))
-
-                Text("Play while you wait")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.35))
             }
             .padding(.bottom, 10)
         }

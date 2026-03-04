@@ -29,10 +29,6 @@ struct ContentView: View {
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
 
-    // Gamification reward overlay (global, across all tabs)
-    @State private var showRewardCelebration = false
-    @State private var currentRewardEvent: RewardEvent? = nil
-
     enum Tab: Int, Hashable {
         case budget = 0
         case home = 1
@@ -89,33 +85,8 @@ struct ContentView: View {
                     .transition(.opacity)
             }
 
-            // Reward celebration overlay (visible across all tabs)
-            if showRewardCelebration, let event = currentRewardEvent {
-                RewardCelebrationView(event: event) {
-                    withAnimation(.easeOut(duration: 0.25)) {
-                        showRewardCelebration = false
-                    }
-                    currentRewardEvent = nil
-                }
-                .transition(.opacity)
-                .zIndex(100)
-            }
         }
         .animation(.easeInOut(duration: 0.4), value: hasLoadedInitialData)
-        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { notification in
-            let storeName = notification.userInfo?["storeName"] as? String
-            let receiptAmount = notification.userInfo?["receiptAmount"] as? Double
-            let event = GamificationManager.shared.awardReceiptReward(
-                storeName: storeName,
-                receiptAmount: receiptAmount
-            )
-            currentRewardEvent = event
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    showRewardCelebration = true
-                }
-            }
-        }
         .environmentObject(transactionManager)
         .environmentObject(dataManager)
         .preferredColorScheme(.dark)

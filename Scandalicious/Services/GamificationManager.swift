@@ -132,6 +132,13 @@ class GamificationManager: ObservableObject {
         userDefaults.set(spinsAvailable, forKey: "\(prefix)_spins")
     }
 
+    // MARK: - Wallet Sync
+
+    func syncWalletWithBackend(balance: Double) {
+        wallet = WalletBalance(euros: balance)
+        saveState()
+    }
+
     // MARK: - Public API
 
     func awardReceiptReward(storeName: String?, receiptAmount: Double?) -> RewardEvent {

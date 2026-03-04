@@ -2,22 +2,22 @@
 //  RecentReceiptsSection.swift
 //  Scandalicious
 //
-//  Expandable list of recent mock receipts (Recent Rewards).
-//  Shows 4 rows by default, expands to show all.
+//  Expandable list of recent cashback receipts (Recent Rewards).
+//  Shows 3 rows by default, expands to show all.
 //
 
 import SwiftUI
 
 struct RecentReceiptsSection: View {
-    let receipts: [MockReceipt]
+    let receipts: [RecentReceipt]
 
     @State private var isExpanded = false
 
-    private var visibleReceipts: [MockReceipt] {
+    private var visibleReceipts: [RecentReceipt] {
         if isExpanded {
             return receipts
         } else {
-            return Array(receipts.prefix(4))
+            return Array(receipts.prefix(3))
         }
     }
 
@@ -58,7 +58,7 @@ struct RecentReceiptsSection: View {
 
             // Receipt rows
             ForEach(Array(visibleReceipts.enumerated()), id: \.element.id) { index, receipt in
-                MockReceiptRow(receipt: receipt)
+                RecentReceiptRow(receipt: receipt)
 
                 if index < visibleReceipts.count - 1 {
                     Divider()
@@ -102,8 +102,8 @@ struct RecentReceiptsSection: View {
 
 // MARK: - Mock Receipt Row
 
-private struct MockReceiptRow: View {
-    let receipt: MockReceipt
+private struct RecentReceiptRow: View {
+    let receipt: RecentReceipt
 
     private let cashbackGreen = Color(red: 0.2, green: 0.85, blue: 0.4)
 
@@ -127,15 +127,9 @@ private struct MockReceiptRow: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
 
-                HStack(spacing: 4) {
-                    Text(formatDate(receipt.date))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
-
-                    Text("\u{2022} \(receipt.itemCount) items")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.35))
-                }
+                Text(formatDate(receipt.date))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
             }
 
             Spacer()
