@@ -12,8 +12,13 @@ struct CouponStoreView: View {
     @State private var selectedCoupon: Coupon? = nil
     @State private var showPurchaseConfirm = false
     @State private var purchaseError = false
+    @State private var isExpanded = false
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+
+    private var displayedCoupons: [Coupon] {
+        isExpanded ? Coupon.mockCoupons : Array(Coupon.mockCoupons.prefix(4))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -25,13 +30,10 @@ struct CouponStoreView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                 Spacer()
-                Text(gm.wallet.formatted)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0))
             }
 
             LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(Coupon.mockCoupons) { coupon in
+                ForEach(displayedCoupons) { coupon in
                     CouponTileView(
                         coupon: coupon,
                         canAfford: gm.wallet.cents >= coupon.priceCents,
@@ -40,6 +42,24 @@ struct CouponStoreView: View {
                         selectedCoupon = coupon
                         showPurchaseConfirm = true
                     }
+                }
+            }
+
+            if Coupon.mockCoupons.count > 4 {
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(isExpanded ? "Show Less" : "Show All")
+                            .font(.system(size: 13, weight: .semibold))
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(.white.opacity(0.5))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                 }
             }
         }

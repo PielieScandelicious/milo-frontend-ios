@@ -13,6 +13,7 @@ struct RewardsView: View {
     @State private var showBadgeUnlock = false
     @State private var badgeToShow: Badge? = nil
     @State private var appeared = false
+    @State private var contentOpacity: Double = 0
 
     private let brandPurple = Color(red: 0.45, green: 0.15, blue: 0.85)
     private let headerGoldColor = Color(red: 0.18, green: 0.14, blue: 0.05)
@@ -52,18 +53,6 @@ struct RewardsView: View {
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 12)
 
-                    // Streak card
-                    StreakCardView(streak: gm.streak)
-                        .padding(.horizontal, 20)
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 12)
-
-                    // Tier card
-                    TierProgressView(tierProgress: gm.tierProgress)
-                        .padding(.horizontal, 20)
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 12)
-
                     // Coupon store
                     CouponStoreView()
                         .padding(.horizontal, 20)
@@ -77,6 +66,12 @@ struct RewardsView: View {
                             .opacity(appeared ? 1 : 0)
                             .offset(y: appeared ? 0 : 12)
                     }
+
+                    // Streak card
+                    StreakCardView(streak: gm.streak)
+                        .padding(.horizontal, 20)
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
 
                     // Badges
                     BadgeGridView(badges: gm.badges)
@@ -101,10 +96,14 @@ struct RewardsView: View {
             }
         }
         .navigationBarHidden(true)
+        .opacity(contentOpacity)
         .sheet(isPresented: $showSpinWheel) {
             SpinWheelView()
         }
         .onAppear {
+            withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
+                contentOpacity = 1.0
+            }
             withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
                 appeared = true
             }
@@ -164,8 +163,10 @@ struct RewardsView: View {
                                 gm.spinsAvailable > 0 ? 0.5 : 0), radius: 12, y: 6)
                     )
             }
+            #if PRODUCTION
             .disabled(gm.spinsAvailable == 0)
             .opacity(gm.spinsAvailable == 0 ? 0.5 : 1.0)
+            #endif
         }
         .padding(20)
         .glassCard()

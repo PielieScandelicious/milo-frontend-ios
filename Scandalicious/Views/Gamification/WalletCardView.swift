@@ -55,12 +55,6 @@ struct WalletCardView: View {
                 .shadow(color: Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.3), radius: 12)
                 .contentTransition(.numericText())
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: gm.wallet.cents)
-                .padding(.bottom, 8)
-
-            // Earnings info
-            Text("0.5%\u{2013}1% progressive cashback per receipt")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.4))
                 .padding(.bottom, 18)
         }
         .background(

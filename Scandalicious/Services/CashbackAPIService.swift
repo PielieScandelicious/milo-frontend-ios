@@ -165,6 +165,16 @@ actor CashbackAPIService {
         )
     }
 
+    // MARK: - Spin Endpoints
+
+    func spinWheel(hasDoubleNext: Bool = false, isRespin: Bool = false, forceSegment: Int? = nil) async throws -> SpinResult {
+        var body: [String: Any] = ["has_double_next": hasDoubleNext, "is_respin": isRespin]
+        if let forceSegment { body["force_segment"] = forceSegment }
+        // Encode manually since [String: Any] isn't Encodable
+        let jsonData = try JSONSerialization.data(withJSONObject: body)
+        return try await performPostRequestWithData(endpoint: "/spin/spin", bodyData: jsonData)
+    }
+
     // MARK: - Nonisolated Wrappers
 
     nonisolated func getBalance() async throws -> CashbackBalanceResponse {
@@ -177,6 +187,10 @@ actor CashbackAPIService {
 
     nonisolated func getHistory(page: Int = 1, pageSize: Int = 20) async throws -> CashbackHistoryResponse {
         return try await fetchHistory(page: page, pageSize: pageSize)
+    }
+
+    nonisolated func performSpin(hasDoubleNext: Bool = false, isRespin: Bool = false, forceSegment: Int? = nil) async throws -> SpinResult {
+        return try await spinWheel(hasDoubleNext: hasDoubleNext, isRespin: isRespin, forceSegment: forceSegment)
     }
 
     // MARK: - Private
@@ -202,6 +216,100 @@ actor CashbackAPIService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = 15
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw CashbackAPIError.invalidResponse
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                do {
+                    return try decoder.decode(T.self, from: data)
+                } catch {
+                    throw CashbackAPIError.decodingError(error.localizedDescription)
+                }
+            case 401:
+                throw CashbackAPIError.unauthorized
+            case 400...499:
+                let msg = parseErrorMessage(from: data) ?? "Client error: \(httpResponse.statusCode)"
+                throw CashbackAPIError.serverError(msg)
+            default:
+                throw CashbackAPIError.serverError("Server error: \(httpResponse.statusCode)")
+            }
+        } catch let error as CashbackAPIError {
+            throw error
+        } catch {
+            throw CashbackAPIError.networkError(error)
+        }
+    }
+
+    private func performPostRequest<T: Decodable, B: Encodable>(
+        endpoint: String,
+        body: B
+    ) async throws -> T {
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            throw CashbackAPIError.invalidURL
+        }
+
+        let token = try await getAuthToken()
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 15
+        request.httpBody = try JSONEncoder().encode(body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw CashbackAPIError.invalidResponse
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                do {
+                    return try decoder.decode(T.self, from: data)
+                } catch {
+                    throw CashbackAPIError.decodingError(error.localizedDescription)
+                }
+            case 401:
+                throw CashbackAPIError.unauthorized
+            case 400...499:
+                let msg = parseErrorMessage(from: data) ?? "Client error: \(httpResponse.statusCode)"
+                throw CashbackAPIError.serverError(msg)
+            default:
+                throw CashbackAPIError.serverError("Server error: \(httpResponse.statusCode)")
+            }
+        } catch let error as CashbackAPIError {
+            throw error
+        } catch {
+            throw CashbackAPIError.networkError(error)
+        }
+    }
+
+    private func performPostRequestWithData<T: Decodable>(
+        endpoint: String,
+        bodyData: Data
+    ) async throws -> T {
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            throw CashbackAPIError.invalidURL
+        }
+
+        let token = try await getAuthToken()
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 15
+        request.httpBody = bodyData
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

@@ -256,43 +256,61 @@ struct Badge: Identifiable, Codable {
 
 // MARK: - Spin Wheel
 
+enum SpinSegmentType: String, Codable {
+    case cash
+    case mystery
+    case tryAgain = "try_again"
+    case doubleNext = "double_next"
+    case jackpot
+}
+
 struct SpinSegment: Identifiable {
     let id: Int
     let label: String
     let value: Double
+    let segmentType: SpinSegmentType
     let isJackpot: Bool
     let color: Color
+    let icon: String?
 
     static let segments: [SpinSegment] = [
-        SpinSegment(id: 0, label: "€0.20",    value: 0.20,    isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0)),
-        SpinSegment(id: 1, label: "€0.50",    value: 0.50,    isJackpot: false, color: Color(red: 0.45, green: 0.15, blue: 0.85)),
-        SpinSegment(id: 2, label: "€1",       value: 1.00,    isJackpot: false, color: Color(red: 0.2, green: 0.8, blue: 0.4)),
-        SpinSegment(id: 3, label: "€2",       value: 2.00,    isJackpot: false, color: Color(red: 1.0, green: 0.65, blue: 0.0)),
-        SpinSegment(id: 4, label: "€5",       value: 5.00,    isJackpot: false, color: Color(red: 0.9, green: 0.2, blue: 0.4)),
-        SpinSegment(id: 5, label: "€10",      value: 10.00,   isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0)),
-        SpinSegment(id: 6, label: "€50",      value: 50.00,   isJackpot: false, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
-        SpinSegment(id: 7, label: "€1000",    value: 1000.00, isJackpot: true,  color: Color(red: 1.0, green: 0.3, blue: 0.5)),
+        SpinSegment(id: 0, label: "€0.10",        value: 0.10, segmentType: .cash,       isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),   icon: nil),
+        SpinSegment(id: 1, label: "Mystery",       value: 0.0,  segmentType: .mystery,    isJackpot: false, color: Color(red: 0.6, green: 0.2, blue: 1.0),   icon: "gift.fill"),
+        SpinSegment(id: 2, label: "€1",            value: 1.00, segmentType: .cash,       isJackpot: false, color: Color(red: 1.0, green: 0.65, blue: 0.0),  icon: nil),
+        SpinSegment(id: 3, label: "2x",            value: 0.0,  segmentType: .doubleNext, isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),   icon: "bolt.fill"),
+        SpinSegment(id: 4, label: "€0.50",         value: 0.50, segmentType: .cash,       isJackpot: false, color: Color(red: 0.2, green: 0.8, blue: 0.4),   icon: nil),
+        SpinSegment(id: 5, label: "Retry",         value: 0.0,  segmentType: .tryAgain,   isJackpot: false, color: Color(red: 0.0, green: 0.8, blue: 0.7),   icon: "arrow.counterclockwise"),
+        SpinSegment(id: 6, label: "€2",            value: 2.00, segmentType: .cash,       isJackpot: false, color: Color(red: 0.9, green: 0.2, blue: 0.4),   icon: nil),
+        SpinSegment(id: 7, label: "Jackpot",        value: 5.00, segmentType: .jackpot,    isJackpot: true,  color: Color(red: 1.0, green: 0.84, blue: 0.0),  icon: "star.fill"),
     ]
-
-    // Weights: [35, 25, 18, 10, 6, 3, 2, 1] — jackpot is 1%
-    static let weights: [Int] = [35, 25, 18, 10, 6, 3, 2, 1]
-
-    static func randomResult() -> SpinSegment {
-        let total = weights.reduce(0, +)
-        var roll = Int.random(in: 0..<total)
-        for (index, weight) in weights.enumerated() {
-            roll -= weight
-            if roll < 0 { return segments[index] }
-        }
-        return segments[0]
-    }
 }
 
 struct SpinResult: Codable {
     let segmentIndex: Int
-    let valueEuros: Double
+    let segmentLabel: String
+    let segmentType: String
+    let cashValue: Double
     let isJackpot: Bool
-    let timestamp: Date
+    let isDoubled: Bool
+    let mysteryRevealValue: Double?
+    let grantsFreeSpin: Bool
+    let grantsDoubleNext: Bool
+    let newBalance: Double
+    let spinsRemaining: Int
+
+    enum CodingKeys: String, CodingKey {
+        case segmentIndex = "segment_index"
+        case segmentLabel = "segment_label"
+        case segmentType = "segment_type"
+        case cashValue = "cash_value"
+        case isJackpot = "is_jackpot"
+        case isDoubled = "is_doubled"
+        case mysteryRevealValue = "mystery_reveal_value"
+        case grantsFreeSpin = "grants_free_spin"
+        case grantsDoubleNext = "grants_double_next"
+        case newBalance = "new_balance"
+        case spinsRemaining = "spins_remaining"
+    }
 }
 
 // MARK: - Mystery Bonus

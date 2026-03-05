@@ -73,9 +73,6 @@ struct StreakCardView: View {
 
             // Progress bar showing current 4-week cycle
             streakProgressBar
-
-            // Next cash reward preview
-            nextCashRewardRow
         }
         .padding(16)
         .glassCard()
@@ -201,48 +198,4 @@ struct StreakCardView: View {
         .frame(height: 52)
     }
 
-    // MARK: - Next Cash Reward Row
-
-    private var nextCashRewardRow: some View {
-        let cashReward = StreakData.weeklyReward(for: streak.nextCashWeek)
-
-        return HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(cashGreen.opacity(0.1))
-                    .frame(width: 32, height: 32)
-                Image(systemName: "banknote.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(cashGreen)
-            }
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Cash reward at week \(streak.nextCashWeek)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.45))
-                Text(cashReward.label)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(cashGreen)
-            }
-
-            Spacer()
-
-            Text("\(streak.weeksUntilCash)w left")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color(white: 0.1)))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(white: 0.06))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(cashGreen.opacity(0.1), lineWidth: 0.5)
-                )
-        )
-    }
 }

@@ -10,6 +10,7 @@ import SwiftUI
 struct PromosView: View {
     @ObservedObject var viewModel: PromosViewModel
     @State private var scrollOffset: CGFloat = 0
+    @State private var contentOpacity: Double = 0
 
     // Premium emerald header
     private let headerGreen = Color(red: 0.04, green: 0.22, blue: 0.13)
@@ -66,6 +67,12 @@ struct PromosView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .opacity(contentOpacity)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
+                contentOpacity = 1.0
+            }
+        }
         .task {
             await viewModel.loadPromos()
         }

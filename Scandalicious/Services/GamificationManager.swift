@@ -114,6 +114,7 @@ class GamificationManager: ObservableObject {
         }
 
         spinsAvailable = userDefaults.integer(forKey: "\(prefix)_spins")
+        hasDoubleNext = userDefaults.bool(forKey: "\(prefix)_doubleNext")
         if !userDefaults.bool(forKey: "\(prefix)_initialized") {
             spinsAvailable = 2
         }
@@ -146,6 +147,7 @@ class GamificationManager: ObservableObject {
         if let data = try? encoder.encode(badges)       { userDefaults.set(data, forKey: "\(prefix)_badges") }
         if let data = try? encoder.encode(ownedCoupons) { userDefaults.set(data, forKey: "\(prefix)_ownedCoupons") }
         userDefaults.set(spinsAvailable, forKey: "\(prefix)_spins")
+        userDefaults.set(hasDoubleNext, forKey: "\(prefix)_doubleNext")
     }
 
     // MARK: - Wallet Sync
@@ -202,31 +204,62 @@ class GamificationManager: ObservableObject {
         )
     }
 
-    func spinWheel() -> SpinResult? {
-        guard spinsAvailable > 0 else { return nil }
+    @Published private(set) var hasDoubleNext: Bool = false
+    @Published var spinTestMode: Bool = false
+    @Published var forcedSegmentIndex: Int? = nil
+
+    func spinWheel(isRespin: Bool = false) async -> SpinResult? {
+        if !spinTestMode {
+            guard spinsAvailable > 0 else { return nil }
+        }
         spinsAvailable -= 1
 
-        let segment = SpinSegment.randomResult()
-        wallet.add(euros: segment.value)
+        do {
+            let result = try await CashbackAPIService.shared.performSpin(
+                hasDoubleNext: hasDoubleNext,
+                isRespin: isRespin,
+                forceSegment: spinTestMode ? forcedSegmentIndex : nil
+            )
 
-        let result = SpinResult(
-            segmentIndex: segment.id,
-            valueEuros: segment.value,
-            isJackpot: segment.isJackpot,
-            timestamp: Date()
-        )
-        lastSpinResult = result
+            // Update wallet with server-authoritative balance
+            wallet = WalletBalance(euros: result.newBalance)
 
-        if segment.isJackpot {
-            unlockBadgeIfNeeded(id: "jackpot")
+            // Handle free spin (Try Again)
+            if result.grantsFreeSpin {
+                spinsAvailable += 1
+            }
+
+            // NOTE: hasDoubleNext is updated by the view after wheel animation completes,
+            // not here, to avoid showing the banner before the wheel stops.
+
+            lastSpinResult = result
+
+            if result.isJackpot {
+                unlockBadgeIfNeeded(id: "jackpot")
+            }
+
+            saveState()
+            NotificationCenter.default.post(name: .spinCompleted, object: nil)
+            return result
+        } catch {
+            // Refund the spin on network error
+            spinsAvailable += 1
+            print("[GamificationManager] Spin failed: \(error)")
+            return nil
         }
-        if segment.value >= 10.0 {
-            unlockBadgeIfNeeded(id: "lucky_spin")
-        }
+    }
 
+    /// Called by the view after wheel animation completes to update the double-next banner.
+    /// Only consume 2x when a cash prize was actually doubled, and activate it when granted.
+    func applyDoubleNextState(from result: SpinResult) {
+        if result.grantsDoubleNext {
+            hasDoubleNext = true
+        } else if result.isDoubled {
+            // 2x was consumed by a cash/mystery/jackpot win
+            hasDoubleNext = false
+        }
+        // Otherwise (retry, non-doubled cash with no 2x active): leave hasDoubleNext unchanged
         saveState()
-        NotificationCenter.default.post(name: .spinCompleted, object: nil)
-        return result
     }
 
     func redeemCoupon(_ coupon: Coupon) -> Bool {
