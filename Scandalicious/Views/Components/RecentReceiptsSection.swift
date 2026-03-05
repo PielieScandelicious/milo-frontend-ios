@@ -61,10 +61,14 @@ struct RecentReceiptsSection: View {
                 RecentReceiptRow(receipt: receipt)
 
                 if index < visibleReceipts.count - 1 {
-                    Divider()
-                        .background(Color.white.opacity(0.06))
-                        .padding(.leading, 52)
-                        .padding(.trailing, 16)
+                    LinearGradient(
+                        colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(height: 0.5)
+                    .padding(.leading, 52)
+                    .padding(.trailing, 16)
                 }
             }
         }
@@ -92,7 +96,7 @@ struct RecentReceiptsSection: View {
         RoundedRectangle(cornerRadius: 20)
             .stroke(
                 LinearGradient(
-                    colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),

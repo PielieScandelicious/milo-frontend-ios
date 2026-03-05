@@ -64,10 +64,13 @@ struct CashbackRevealOverlay: View {
                 .offset(y: showContent ? 0 : 8)
 
                 // Divider
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 1)
-                    .opacity(showContent ? 1 : 0)
+                LinearGradient(
+                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 0.5)
+                .opacity(showContent ? 1 : 0)
 
                 // Cashback amount
                 VStack(spacing: 4) {
@@ -105,7 +108,7 @@ struct CashbackRevealOverlay: View {
                                     .fill(gold)
                             )
                     }
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
             }
             .padding(28)
@@ -169,7 +172,7 @@ struct CashbackRevealOverlay: View {
         }
 
         // Enable dismiss
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
             withAnimation(.easeOut(duration: 0.3)) {
                 canDismiss = true
             }
