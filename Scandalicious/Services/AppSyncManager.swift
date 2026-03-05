@@ -81,9 +81,6 @@ class AppSyncManager {
 
             // Tell processing manager to pick up any persisted receipts from the share extension
             ReceiptProcessingManager.shared.reloadPersistedReceipts()
-
-            // Optimistically decrement the local rate limit counter
-            RateLimitManager.shared.decrementReceiptLocal()
         }
     }
 }

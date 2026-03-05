@@ -9,28 +9,6 @@ import Foundation
 import UIKit
 import FirebaseAuth
 
-// MARK: - Receipt Rate Limit Error
-
-struct ReceiptRateLimitExceededError: Codable, Error {
-    let error: String
-    let message: String
-    let details: ReceiptRateLimitDetails
-
-    struct ReceiptRateLimitDetails: Codable {
-        let receiptsUsed: Int
-        let receiptsLimit: Int
-        let periodEndDate: Date
-        let retryAfterSeconds: Int
-
-        enum CodingKeys: String, CodingKey {
-            case receiptsUsed = "receipts_used"
-            case receiptsLimit = "receipts_limit"
-            case periodEndDate = "period_end_date"
-            case retryAfterSeconds = "retry_after_seconds"
-        }
-    }
-}
-
 // MARK: - Receipt Upload Error
 
 enum ReceiptUploadError: LocalizedError {
@@ -39,7 +17,6 @@ enum ReceiptUploadError: LocalizedError {
     case noAuthToken
     case serverError(String)
     case networkError(Error)
-    case rateLimitExceeded(ReceiptRateLimitExceededError)
     case deleteFailed(String)
     case duplicateReceipt
 
@@ -55,23 +32,10 @@ enum ReceiptUploadError: LocalizedError {
             return "Server error: \(message)"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
-        case .rateLimitExceeded(let error):
-            return error.message
         case .deleteFailed(let message):
             return "Failed to delete receipt: \(message)"
         case .duplicateReceipt:
             return "This receipt has already been uploaded"
-        }
-    }
-
-    /// User-friendly message for rate limit exceeded
-    var rateLimitUserMessage: String? {
-        guard case .rateLimitExceeded(let error) = self else { return nil }
-        let daysUntilReset = Calendar.current.dateComponents([.day], from: Date(), to: error.details.periodEndDate).day ?? 0
-        if daysUntilReset > 0 {
-            return "You've used all \(error.details.receiptsLimit) receipt uploads this month. Your limit resets in \(daysUntilReset) day\(daysUntilReset == 1 ? "" : "s")."
-        } else {
-            return "You've used all \(error.details.receiptsLimit) receipt uploads this month. Your limit resets soon."
         }
     }
 }
@@ -284,17 +248,7 @@ actor ReceiptUploadService {
                 }
 
             case 429:
-                // Rate limit exceeded
-                do {
-                    let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
-                    let rateLimitError = try decoder.decode(ReceiptRateLimitExceededError.self, from: data)
-                    throw ReceiptUploadError.rateLimitExceeded(rateLimitError)
-                } catch let error as ReceiptUploadError {
-                    throw error
-                } catch {
-                    throw ReceiptUploadError.serverError("Upload limit exceeded. Please try again later.")
-                }
+                throw ReceiptUploadError.serverError("Too many requests. Please try again later.")
 
             case 409:
                 throw ReceiptUploadError.duplicateReceipt

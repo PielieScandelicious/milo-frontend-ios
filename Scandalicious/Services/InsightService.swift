@@ -144,7 +144,7 @@ actor InsightService {
                     }
 
                     if httpResponse.statusCode == 429 {
-                        continuation.finish(throwing: ChatServiceError.rateLimitExceeded("Insight limit reached. Try again later."))
+                        continuation.finish(throwing: ChatServiceError.serverError(statusCode: 429, message: "Too many requests. Please try again later."))
                         return
                     }
 

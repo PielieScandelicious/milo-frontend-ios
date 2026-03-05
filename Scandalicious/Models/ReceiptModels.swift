@@ -213,7 +213,7 @@ struct ReceiptStatusResponse: Codable, Sendable {
 struct ProcessingReceipt: Identifiable, Codable, Equatable {
     let id: String          // receipt_id from backend
     let filename: String
-    let startedAt: Date
+    let startedAt: Date     // when upload was initiated
     var status: ReceiptStatus
     var storeName: String?
     var totalAmount: Double?
@@ -221,6 +221,19 @@ struct ProcessingReceipt: Identifiable, Codable, Equatable {
     var errorMessage: String?
     var detectedDate: String?
     var completedAt: Date?
+    var processingStartedAt: Date?  // when backend actually started processing (nil = queued)
+
+    /// Whether this receipt has an active processing slot (progress bar should animate).
+    /// Uses processingStartedAt as source of truth — the backend marks ALL receipts
+    /// as .processing almost immediately, so we can't rely on status for queue position.
+    var isActivelyProcessing: Bool {
+        processingStartedAt != nil && !isTerminal
+    }
+
+    /// Whether this receipt is waiting in the frontend queue (no processing slot yet).
+    var isQueued: Bool {
+        processingStartedAt == nil && !isTerminal
+    }
 
     var isTerminal: Bool {
         status == .completed || status == .success || status == .failed
@@ -234,6 +247,20 @@ struct ProcessingReceipt: Identifiable, Codable, Equatable {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         return "Receipt \u{2022} \(formatter.string(from: startedAt))"
+    }
+
+    /// Receipt date formatted as "5 Mar" — uses detected date from backend, falls back to upload date.
+    var formattedDate: String? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        if let detected = detectedDate {
+            let iso = DateFormatter()
+            iso.dateFormat = "yyyy-MM-dd"
+            if let date = iso.date(from: detected) {
+                return formatter.string(from: date)
+            }
+        }
+        return formatter.string(from: startedAt)
     }
 }
 

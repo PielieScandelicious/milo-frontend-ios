@@ -9,39 +9,110 @@
 import SwiftUI
 
 struct DigitalReceiptHintCard: View {
+    @State private var showInfo = false
+
+    private let accent = Color(red: 0.85, green: 0.2, blue: 0.6)
+
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color(red: 0.85, green: 0.2, blue: 0.6).opacity(0.12))
-                    .frame(width: 40, height: 40)
+        VStack(spacing: 0) {
+            // Main content
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(accent.opacity(0.12))
+                        .frame(width: 40, height: 40)
 
-                Image(systemName: "square.and.arrow.up.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(red: 0.85, green: 0.2, blue: 0.6))
-            }
+                    Image(systemName: "square.and.arrow.up.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(accent)
+                }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Got a digital receipt?")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 2) {
+                        Text("Got a digital receipt?")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
 
-                Text("Earn 0.5%\u{2013}1% cashback \u{2014} the more you spend, the higher your reward")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .lineLimit(2)
+                        Text("*")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(accent.opacity(0.6))
+                    }
 
-                Text("Cashback increases progressively in \u{20AC}50 segments, up to 1%")
-                    .font(.system(size: 11, weight: .regular))
+                    Text("Earn up to 1% cashback on groceries")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.3))
-                    .lineLimit(1)
+                    .rotationEffect(.degrees(showInfo ? 180 : 0))
             }
+            .padding(16)
 
-            Spacer()
+            // Expandable info
+            if showInfo {
+                Rectangle()
+                    .fill(Color.white.opacity(0.06))
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 16)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("The more you spend, the higher your cashback rate. Your rate increases progressively:")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Cashback table
+                    VStack(spacing: 0) {
+                        cashbackTableRow(spend: "Spend", rate: "Cashback", isHeader: true)
+                        cashbackTableRow(spend: "\u{20AC}0 \u{2013} \u{20AC}80", rate: "0.50%")
+                        cashbackTableRow(spend: "\u{20AC}80 \u{2013} \u{20AC}160", rate: "0.60%")
+                        cashbackTableRow(spend: "\u{20AC}160 \u{2013} \u{20AC}240", rate: "0.70%")
+                        cashbackTableRow(spend: "\u{20AC}240 \u{2013} \u{20AC}320", rate: "0.80%")
+                        cashbackTableRow(spend: "\u{20AC}320 \u{2013} \u{20AC}400", rate: "0.90%")
+                        cashbackTableRow(spend: "\u{20AC}400 \u{2013} \u{20AC}500", rate: "1.00%")
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Text("Each segment earns its own rate \u{2014} e.g. on a \u{20AC}200 receipt, the first \u{20AC}80 earns 0.50%, the next \u{20AC}80 earns 0.60%, and the last \u{20AC}40 earns 0.70%.")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 14)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
-        .padding(16)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                showInfo.toggle()
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .background(cardBackground)
         .overlay(cardBorder)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showInfo)
+    }
+
+    private func cashbackTableRow(spend: String, rate: String, isHeader: Bool = false) -> some View {
+        HStack {
+            Text(spend)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(rate)
+                .frame(width: 70, alignment: .trailing)
+        }
+        .font(.system(size: 11, weight: isHeader ? .semibold : .regular))
+        .foregroundStyle(.white.opacity(isHeader ? 0.5 : 0.35))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(isHeader ? 0.06 : 0.03))
     }
 
     private var cardBackground: some View {

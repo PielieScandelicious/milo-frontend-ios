@@ -10,7 +10,6 @@ import SwiftUI
 
 struct HomeTabView: View {
     @EnvironmentObject var authManager: AuthenticationManager
-    @ObservedObject private var rateLimitManager = RateLimitManager.shared
     @ObservedObject private var processingManager = ReceiptProcessingManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
@@ -18,7 +17,7 @@ struct HomeTabView: View {
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
     @State private var showProfile = false
-    @State private var showRateLimitAlert = false
+
     @State private var contentOpacity: Double = 0
     @State private var showMiloGame = false
     @State private var showWalletPassCreator = false
@@ -85,11 +84,6 @@ struct HomeTabView: View {
         .sheet(isPresented: $showWalletPassCreator) {
             WalletPassCreatorView()
         }
-        .alert("Upload Limit Reached", isPresented: $showRateLimitAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(rateLimitManager.receiptLimitMessage ?? "You've reached your monthly upload limit.")
-        }
     }
 
     // MARK: - Main Content
@@ -104,6 +98,7 @@ struct HomeTabView: View {
                             showMiloGame = true
                         }
                     }
+                    .zIndex(1)
                 }
 
                 // Inline Milo Game (when active) - on top of processing card
@@ -134,15 +129,24 @@ struct HomeTabView: View {
                     }
                 }
 
-                // Processing card below the game (when processing or done)
-                if viewModel.processingPhase != .idle && viewModel.processingPhase != .claiming {
-                    HomeProcessingCard(viewModel: viewModel)
-                        .padding(.horizontal, 20)
-                        .transition(.opacity)
+                // Multi-receipt processing cards
+                if !processingManager.processingReceipts.isEmpty {
+                    ProcessingReceiptsCard(
+                        manager: processingManager,
+                        onClaimReceipt: { receipt in
+                            viewModel.claimReward(for: receipt)
+                        }
+                    )
+                    .padding(.horizontal, 20)
+                    .transition(.opacity)
                 }
 
                 // Digital receipt hint
                 DigitalReceiptHintCard()
+                    .padding(.horizontal, 20)
+
+                // Monthly lottery
+                MonthlyLotteryCard()
                     .padding(.horizontal, 20)
 
                 // Wallet Pass creator
@@ -150,10 +154,6 @@ struct HomeTabView: View {
                     showWalletPassCreator = true
                 }
                 .padding(.horizontal, 20)
-
-                // Monthly lottery
-                MonthlyLotteryCard()
-                    .padding(.horizontal, 20)
 
                 // Recent rewards
                 RecentReceiptsSection(receipts: viewModel.recentReceipts)
@@ -167,7 +167,7 @@ struct HomeTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(backgroundGradient)
         .opacity(contentOpacity)
-        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.processingPhase)
+        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: processingManager.processingReceipts.count)
         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: showMiloGame)
     }
 
@@ -201,13 +201,8 @@ struct HomeTabView: View {
 
     private var floatingScanButton: some View {
         Button {
-            if rateLimitManager.canUploadReceipt() {
-                showCamera = true
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            } else {
-                showRateLimitAlert = true
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
-            }
+            showCamera = true
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         } label: {
             ZStack {
                 Circle()
@@ -235,46 +230,17 @@ struct HomeTabView: View {
     // MARK: - Profile Menu Button
 
     private var profileMenuButton: some View {
-        Menu {
-            Section {
-                Button(action: {}) {
-                    Label(rateLimitManager.usageDisplayString, systemImage: usageIconName)
-                }
-                .tint(usageColor)
-
-                Button(action: {}) {
-                    Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts", systemImage: receiptLimitIcon)
-                }
-                .tint(receiptLimitColor)
-            }
-
-            Section {
-                Button {
-                    showProfile = true
-                } label: {
-                    Label("Profile", systemImage: "person.fill")
-                }
-            }
+        Button {
+            showProfile = true
         } label: {
-            ZStack(alignment: .bottomTrailing) {
-                Circle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 36, height: 36)
-
-                Image(systemName: "gearshape")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .frame(width: 36, height: 36)
-
-                Circle()
-                    .fill(profileBadgeColor)
-                    .frame(width: 10, height: 10)
-                    .overlay(
-                        Circle()
-                            .stroke(Color(.systemBackground), lineWidth: 1.5)
-                    )
-                    .offset(x: -2, y: -2)
-            }
+            Circle()
+                .fill(Color.white.opacity(0.15))
+                .frame(width: 36, height: 36)
+                .overlay(
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                )
         }
     }
 
@@ -282,52 +248,6 @@ struct HomeTabView: View {
 
     private func checkForShareExtensionUploads() {
         processingManager.reloadPersistedReceipts()
-        if processingManager.hasActiveProcessing && viewModel.processingPhase == .idle {
-            viewModel.startProcessingForShareExtension()
-        }
-    }
-
-    // MARK: - Usage Helpers
-
-    private var usageIconName: String {
-        let used = rateLimitManager.usagePercentage
-        if used >= 0.95 { return "exclamationmark.bubble.fill" }
-        else if used >= 0.8 { return "bubble.left.and.exclamationmark.bubble.right.fill" }
-        else { return "bubble.left.fill" }
-    }
-
-    private var usageColor: Color {
-        let used = rateLimitManager.usagePercentage
-        return Color(red: 0.2 + (used * 0.7), green: 0.8 - (used * 0.6), blue: 0.2)
-    }
-
-    private var receiptLimitIcon: String {
-        switch rateLimitManager.receiptLimitState {
-        case .normal: return "checkmark.circle.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .exhausted: return "xmark.circle.fill"
-        }
-    }
-
-    private var receiptLimitColor: Color {
-        switch rateLimitManager.receiptLimitState {
-        case .normal: return .green
-        case .warning: return .orange
-        case .exhausted: return .red
-        }
-    }
-
-    private var profileBadgeColor: Color {
-        let receiptState = rateLimitManager.receiptLimitState
-        let messageUsage = rateLimitManager.usagePercentage
-
-        if receiptState == .exhausted || messageUsage >= 0.95 { return .red }
-        if receiptState == .warning {
-            if messageUsage >= 0.8 { return messageUsage >= 0.9 ? usageColor : .orange }
-            return .orange
-        }
-        if messageUsage >= 0.8 { return usageColor }
-        return .green
     }
 }
 

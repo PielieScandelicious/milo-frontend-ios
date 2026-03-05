@@ -14,7 +14,6 @@ struct WalletPassCreatorView: View {
     @StateObject private var viewModel = WalletPassViewModel()
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedLogoItem: PhotosPickerItem?
-    @State private var showingPassPreview = false
 
     var body: some View {
         NavigationStack {
@@ -24,17 +23,14 @@ struct WalletPassCreatorView: View {
 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Store Details Section
-                        storeDetailsSection
+                        // Logo Section
+                        logoSection
 
                         // Barcode Section
                         barcodeSection
 
                         // Color Selection
                         colorSelectionSection
-
-                        // Logo Section
-                        logoSection
 
                         // Create Button
                         createPassButton
@@ -56,15 +52,6 @@ struct WalletPassCreatorView: View {
                     }
                 }
 
-                ToolbarItem(placement: .topBarTrailing) {
-                    if viewModel.canCreatePass {
-                        Button(L("preview")) {
-                            showingPassPreview = true
-                        }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                    }
-                }
             }
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
@@ -110,9 +97,6 @@ struct WalletPassCreatorView: View {
         } message: {
             Text(viewModel.errorMessage ?? L("an_error_occurred"))
         }
-        .sheet(isPresented: $showingPassPreview) {
-            PassPreviewSheet(passData: viewModel.passData)
-        }
         .sheet(isPresented: $viewModel.showingAddToWallet) {
             if let passData = viewModel.passDataForWallet {
                 AddToWalletView(passData: passData) {
@@ -149,8 +133,8 @@ struct WalletPassCreatorView: View {
                     .frame(height: 180)
 
                 VStack(spacing: 12) {
-                    // Header with logo and title
-                    HStack(spacing: 12) {
+                    // Header with logo
+                    HStack {
                         if let logo = viewModel.passData.logoImage {
                             Image(uiImage: logo)
                                 .resizable()
@@ -167,10 +151,6 @@ struct WalletPassCreatorView: View {
                                         .foregroundStyle(.white.opacity(0.4))
                                 }
                         }
-
-                        Text(viewModel.passData.storeName.isEmpty ? L("store_name") : viewModel.passData.storeName)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(viewModel.passData.colorPreset.foregroundColor)
 
                         Spacer()
                     }
@@ -213,23 +193,6 @@ struct WalletPassCreatorView: View {
                 .padding(.vertical, 16)
             }
             .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-        }
-    }
-
-    // MARK: - Store Details Section
-
-    private var storeDetailsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader(L("store_details"), icon: "building.2.fill")
-
-            VStack(spacing: 12) {
-                // Store name field
-                PremiumTextField(
-                    icon: "storefront",
-                    placeholder: L("store_name"),
-                    text: $viewModel.passData.storeName
-                )
-            }
         }
     }
 
@@ -389,6 +352,7 @@ struct WalletPassCreatorView: View {
                     Button {
                         if let image = UIImage(named: store.logoImageName) {
                             viewModel.setLogoImage(image)
+                            viewModel.passData.storeName = store.displayName
                         }
                     } label: {
                         RoundedRectangle(cornerRadius: 10)
@@ -408,37 +372,6 @@ struct WalletPassCreatorView: View {
                 }
             }
 
-            // Gallery picker button
-            Button {
-                viewModel.selectLogo()
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "photo.on.rectangle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-
-                    Text(L("or_choose_from_gallery"))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.2))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.white.opacity(0.03))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                )
-            }
-
             // Current logo preview
             if let logo = viewModel.passData.logoImage {
                 HStack(spacing: 12) {
@@ -456,6 +389,7 @@ struct WalletPassCreatorView: View {
 
                     Button {
                         viewModel.passData.logoImage = nil
+                        viewModel.passData.storeName = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 18))
@@ -756,10 +690,6 @@ struct PassCardView: View {
                             .frame(width: 44, height: 44)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-
-                    Text(passData.storeName)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(passData.colorPreset.foregroundColor)
 
                     Spacer()
                 }

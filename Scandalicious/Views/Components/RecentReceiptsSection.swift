@@ -70,6 +70,7 @@ struct RecentReceiptsSection: View {
         }
         .padding(.bottom, 10)
         .background(cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(cardBorder)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
     }

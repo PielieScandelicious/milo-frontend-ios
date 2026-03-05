@@ -69,7 +69,6 @@ struct OverviewView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject var dataManager: StoreDataManager
-    @ObservedObject var rateLimitManager = RateLimitManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
     @StateObject private var budgetViewModel = BudgetViewModel()
     @Environment(\.scenePhase) private var scenePhase
@@ -97,7 +96,6 @@ struct OverviewView: View {
     @State private var lastRefreshTime: Date?
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
     @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
-    @State private var hasSyncedRateLimit = false  // Prevent duplicate rate limit syncs
     @State private var loadedReceiptPeriods: Set<String> = []  // Track which periods have loaded receipts
     @State private var expandedReceiptId: String? // For inline receipt expansion
     // scrollOffset removed — gradient header now manages its own scroll state via ScrollFadingGradientView
@@ -510,14 +508,6 @@ struct OverviewView: View {
             }
         }
 
-        // Sync rate limit only once per session
-        if !hasSyncedRateLimit {
-            Task {
-                await rateLimitManager.syncFromBackend()
-                await MainActor.run { hasSyncedRateLimit = true }
-            }
-        }
-
         // Load budget and promo data — deferred to avoid competing with tab transition animation
         Task {
             try? await Task.sleep(for: .milliseconds(150))
@@ -589,8 +579,6 @@ struct OverviewView: View {
                 chartRefreshToken += 1
             }
 
-            // Sync rate limits and budget
-            await rateLimitManager.syncFromBackend()
             await budgetViewModel.refreshProgress()
         }
     }

@@ -11,7 +11,7 @@ import FirebaseAuth
 // MARK: - Environment key for active tab (used by MiniBudgetRing to replay animation)
 
 private struct SelectedTabIndexKey: EnvironmentKey {
-    static let defaultValue: Int = 1 // scan tab by default
+    static let defaultValue: Int = 2 // home tab by default
 }
 
 extension EnvironmentValues {
@@ -31,8 +31,8 @@ struct ContentView: View {
 
     enum Tab: Int, Hashable {
         case budget = 0
-        case home = 1
-        case promos = 2
+        case promos = 1
+        case home = 2
         case dobby = 3
         case rewards = 4
     }
@@ -46,17 +46,17 @@ struct ContentView: View {
                     }
                     .tag(Tab.budget)
 
-                ScanTab()
-                    .tabItem {
-                        Label(L("tab_home"), systemImage: "house.fill")
-                    }
-                    .tag(Tab.home)
-
                 PromosTab()
                     .tabItem {
                         Label("Deals", systemImage: "tag.fill")
                     }
                     .tag(Tab.promos)
+
+                ScanTab()
+                    .tabItem {
+                        Label(L("tab_home"), systemImage: "house.fill")
+                    }
+                    .tag(Tab.home)
 
                 ScandaLiciousTab()
                     .tabItem {

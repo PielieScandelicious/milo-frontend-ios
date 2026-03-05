@@ -282,13 +282,11 @@ struct ScandaLiciousAIChatView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @StateObject private var viewModel = ChatViewModel()
     @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @StateObject private var rateLimitManager = RateLimitManager.shared
     @State private var messageText = ""
     @FocusState private var isInputFocused: Bool
     @State private var scrollOffset: CGFloat = 0
     @State private var showWelcome = true
     @State private var showManageSubscription = false
-    @State private var showRateLimitAlert = false
     @State private var showClearButton = false
 
     // Entrance animation states
@@ -315,16 +313,8 @@ struct ScandaLiciousAIChatView: View {
             }
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
-        .alert(L("message_limit_reached"), isPresented: $showRateLimitAlert) {
-            Button(L("ok"), role: .cancel) {}
-        } message: {
-            Text(rateLimitManager.rateLimitMessage ?? L("message_limit_period"))
-        }
         .onAppear {
             viewModel.setTransactions(transactionManager.transactions)
-            Task {
-                await rateLimitManager.syncFromBackend()
-            }
 
             // Trigger entrance animations
             if !viewAppeared {
@@ -337,11 +327,6 @@ struct ScandaLiciousAIChatView: View {
                     inputAreaOffset = 0
                     inputAreaOpacity = 1.0
                 }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            Task {
-                await rateLimitManager.syncFromBackend()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
@@ -589,13 +574,7 @@ struct ScandaLiciousAIChatView: View {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        guard rateLimitManager.canSendMessage(for: subscriptionManager.subscriptionStatus) else {
-            showRateLimitAlert = true
-            return
-        }
-
         messageText = ""
-        rateLimitManager.decrementLocal()
 
         if viewModel.messages.isEmpty {
             withAnimation(.easeInOut(duration: 0.25)) {

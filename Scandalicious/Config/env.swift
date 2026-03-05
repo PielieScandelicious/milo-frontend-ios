@@ -26,7 +26,7 @@ enum AppConfiguration {
     static var chatEndpoint: String { "\(apiBase)/chat/" }
     static var chatStreamEndpoint: String { "\(apiBase)/chat/stream" }
     static var receiptUploadEndpoint: String { "\(apiBase)/receipts/upload" }
-    static var rateLimitEndpoint: String { "\(apiBase)/rate-limit" }
+
     static var analyticsEndpoint: String { apiBase }
     static var profileEndpoint: String { "\(apiBase)/profile" }
     static var transactionsEndpoint: String { "\(apiBase)/transactions" }

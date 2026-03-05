@@ -41,8 +41,15 @@ class ReceiptProcessingManager: ObservableObject {
 
     // MARK: - Add Receipt
 
+    /// Maximum number of receipts the backend processes concurrently.
+    private let maxConcurrent = 2
+
     func addReceipt(_ accepted: ReceiptUploadAcceptedResponse) {
         guard !processingReceipts.contains(where: { $0.id == accepted.receiptId }) else { return }
+
+        // If fewer than maxConcurrent are actively processing, this one starts immediately
+        let activeCount = processingReceipts.filter { !$0.isTerminal }.count
+        let startsImmediately = activeCount < maxConcurrent
 
         let receipt = ProcessingReceipt(
             id: accepted.receiptId,
@@ -54,7 +61,8 @@ class ReceiptProcessingManager: ObservableObject {
             itemsCount: 0,
             errorMessage: nil,
             detectedDate: nil,
-            completedAt: nil
+            completedAt: nil,
+            processingStartedAt: startsImmediately ? Date() : nil
         )
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -146,6 +154,9 @@ class ReceiptProcessingManager: ObservableObject {
                     processingReceipts[index].errorMessage = response.errorMessage
                     processingReceipts[index].detectedDate = response.detectedDate
 
+                    // NOTE: processingStartedAt is managed exclusively by
+                    // addReceipt / promoteQueuedReceipts to respect maxConcurrent.
+
                     if processingReceipts[index].isTerminal && processingReceipts[index].completedAt == nil {
                         processingReceipts[index].completedAt = Date()
                     }
@@ -160,7 +171,30 @@ class ReceiptProcessingManager: ObservableObject {
             }
         }
 
+        // Promote queued receipts: when a slot opens up, start progress for the next in line
+        promoteQueuedReceipts()
+
         persistReceipts()
+    }
+
+    /// When fewer than `maxConcurrent` receipts are actively processing,
+    /// promote the oldest queued receipt so its progress bar starts.
+    private func promoteQueuedReceipts() {
+        let activeCount = processingReceipts.filter {
+            $0.processingStartedAt != nil && !$0.isTerminal
+        }.count
+
+        guard activeCount < maxConcurrent else { return }
+
+        let slotsAvailable = maxConcurrent - activeCount
+        let queued = processingReceipts.enumerated().filter { $0.element.isQueued }
+            .prefix(slotsAvailable)
+
+        for (index, _) in queued {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                processingReceipts[index].processingStartedAt = Date()
+            }
+        }
     }
 
     private func handleReceiptCompleted(_ receipt: ProcessingReceipt) {
@@ -172,14 +206,7 @@ class ReceiptProcessingManager: ObservableObject {
         if let detected  = receipt.detectedDate    { userInfo["detectedDate"] = detected }
         NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil, userInfo: userInfo.isEmpty ? nil : userInfo)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-
-        // Auto-dismiss after delay
-        Task {
-            try? await Task.sleep(for: .seconds(completedDisplayDuration))
-            await MainActor.run {
-                dismiss(receipt.id)
-            }
-        }
+        // Completed receipts stay visible until user taps to claim
     }
 
     private func pruneStaleReceipts() {
@@ -214,10 +241,17 @@ class ReceiptProcessingManager: ObservableObject {
         else { return }
 
         // Merge: add any persisted receipts we don't already have
-        for receipt in receipts {
-            if !processingReceipts.contains(where: { $0.id == receipt.id }) {
-                processingReceipts.append(receipt)
+        for var receipt in receipts {
+            guard !processingReceipts.contains(where: { $0.id == receipt.id }) else { continue }
+            // Ensure the first N non-terminal receipts have processingStartedAt set
+            // (handles receipts persisted before this field existed)
+            if !receipt.isTerminal && receipt.processingStartedAt == nil {
+                let activeCount = processingReceipts.filter { $0.processingStartedAt != nil && !$0.isTerminal }.count
+                if activeCount < maxConcurrent {
+                    receipt.processingStartedAt = receipt.startedAt
+                }
             }
+            processingReceipts.append(receipt)
         }
     }
 }

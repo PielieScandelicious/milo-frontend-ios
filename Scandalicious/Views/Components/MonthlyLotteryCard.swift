@@ -33,16 +33,9 @@ struct MonthlyLotteryCard: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
 
-                        Button {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                showEligibility.toggle()
-                            }
-                        } label: {
-                            Text("*")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(gold.opacity(0.6))
-                                .frame(width: 20, height: 20)
-                        }
+                        Text("*")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(gold.opacity(0.6))
                     }
 
                     Text("Win up to \u{20AC}100 every month")
@@ -56,7 +49,6 @@ struct MonthlyLotteryCard: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.3))
                     .rotationEffect(.degrees(showEligibility ? 180 : 0))
-                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showEligibility)
             }
             .padding(16)
 
@@ -81,9 +73,16 @@ struct MonthlyLotteryCard: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
                 .padding(.bottom, 14)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                showEligibility.toggle()
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .background(cardBackground)
         .overlay(cardBorder)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showEligibility)

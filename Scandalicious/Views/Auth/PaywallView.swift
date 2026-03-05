@@ -199,7 +199,7 @@ struct PaywallView: View {
                     period: "year",
                     weeklyPrice: subscriptionManager.weeklyPrice(for: yearly),
                     badge: L("best_value"),
-                    messageLimit: "\(RateLimitConfig.defaultMessagesPerMonth) AI messages/month",
+                    messageLimit: "Unlimited AI messages",
                     isSelected: selectedProduct?.id == yearly.id
                 ) {
                     withAnimation(.spring(response: 0.3)) {
@@ -216,7 +216,7 @@ struct PaywallView: View {
                     period: "month",
                     weeklyPrice: subscriptionManager.weeklyPrice(for: monthly),
                     badge: nil,
-                    messageLimit: "\(RateLimitConfig.defaultMessagesPerMonth) AI messages/month",
+                    messageLimit: "Unlimited AI messages",
                     isSelected: selectedProduct?.id == monthly.id
                 ) {
                     withAnimation(.spring(response: 0.3)) {

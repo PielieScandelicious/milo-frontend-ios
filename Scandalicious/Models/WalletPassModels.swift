@@ -118,7 +118,7 @@ struct LoyaltyPassData {
     var stripImage: UIImage? = nil
 
     var isValid: Bool {
-        !storeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        logoImage != nil &&
         !barcodeValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
