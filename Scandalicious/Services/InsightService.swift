@@ -143,11 +143,6 @@ actor InsightService {
                         return
                     }
 
-                    if httpResponse.statusCode == 429 {
-                        continuation.finish(throwing: ChatServiceError.serverError(statusCode: 429, message: "Too many requests. Please try again later."))
-                        return
-                    }
-
                     guard httpResponse.statusCode == 200 else {
                         continuation.finish(throwing: ChatServiceError.serverError(statusCode: httpResponse.statusCode, message: "Failed to generate insight"))
                         return

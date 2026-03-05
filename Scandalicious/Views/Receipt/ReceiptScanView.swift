@@ -927,6 +927,7 @@ struct ReceiptScanView: View {
                     case .success, .completed:
                         uploadState = .success(response)
                         uploadedReceipt = response
+
                         totalReceiptsScanned += 1
 
                         NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)

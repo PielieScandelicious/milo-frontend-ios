@@ -75,6 +75,7 @@ enum ChatServiceError: LocalizedError {
     case tokenRefreshFailed
     case serverError(statusCode: Int, message: String)
     case streamingError(String)
+
     var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -161,12 +162,6 @@ actor MiloAIChatService {
                     // Handle authentication errors
                     if httpResponse.statusCode == 401 {
                         continuation.finish(throwing: ChatServiceError.authenticationRequired)
-                        return
-                    }
-
-                    // Handle rate limit exceeded (429)
-                    if httpResponse.statusCode == 429 {
-                        continuation.finish(throwing: ChatServiceError.serverError(statusCode: 429, message: "Too many requests. Please try again later."))
                         return
                     }
 

@@ -579,6 +579,7 @@ struct OverviewView: View {
                 chartRefreshToken += 1
             }
 
+            // Sync budget
             await budgetViewModel.refreshProgress()
         }
     }

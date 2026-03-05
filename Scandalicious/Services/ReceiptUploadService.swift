@@ -247,9 +247,6 @@ actor ReceiptUploadService {
                     throw ReceiptUploadError.invalidResponse
                 }
 
-            case 429:
-                throw ReceiptUploadError.serverError("Too many requests. Please try again later.")
-
             case 409:
                 throw ReceiptUploadError.duplicateReceipt
 

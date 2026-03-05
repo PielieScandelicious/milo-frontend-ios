@@ -588,7 +588,6 @@ class ShareViewController: UIViewController {
         vc.modalTransitionStyle = .crossDissolve
 
         // Ensure view is in window hierarchy before presenting
-        // This fixes the issue where the dialogue doesn't show when rate limit is 0
         guard self.view.window != nil else {
             // View not ready yet, retry after a short delay (max 5 retries = 0.5 seconds)
             if retryCount < 5 {
