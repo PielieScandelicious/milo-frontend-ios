@@ -11,7 +11,6 @@ import StoreKit
 struct ReceiptScanView: View {
     @EnvironmentObject var transactionManager: TransactionManager
     @EnvironmentObject var authManager: AuthenticationManager
-    @ObservedObject private var rateLimitManager = RateLimitManager.shared
     @ObservedObject private var processingManager = ReceiptProcessingManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var receiptsViewModel = ReceiptsViewModel()
@@ -24,7 +23,6 @@ struct ReceiptScanView: View {
     @State private var uploadedReceipt: ReceiptUploadResponse?
     @State private var showReceiptDetails = false
     @State private var canRetryAfterError = false
-    @State private var showRateLimitAlert = false
     @State private var showCaptureSuccess = false
     @State private var showProfile = false
 
@@ -150,39 +148,21 @@ struct ReceiptScanView: View {
         }
         .onChange(of: capturedImage) { _, newImage in
             if let image = newImage {
-                // Double-check rate limit before processing (could have changed while camera was open)
-                if rateLimitManager.canUploadReceipt() {
-                    // Show success overlay first
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        showCaptureSuccess = true
-                    }
-
-                    // Hide after delay and start processing
-                    Task {
-                        try? await Task.sleep(for: .seconds(2.2))
-                        await MainActor.run {
-                            withAnimation(.easeOut(duration: 0.4)) {
-                                showCaptureSuccess = false
-                            }
-                        }
-                        await processReceipt(image: image)
-                    }
-                } else {
-                    capturedImage = nil
-                    showRateLimitAlert = true
-                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                // Show success overlay first
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    showCaptureSuccess = true
                 }
-            }
-        }
-        .alert(L("upload_limit_reached"), isPresented: $showRateLimitAlert) {
-            Button(L("ok"), role: .cancel) {}
-        } message: {
-            Text(rateLimitManager.receiptLimitMessage ?? L("upload_limit_month"))
-        }
-        .onAppear {
-            // Sync rate limit when view appears to ensure we have latest count
-            Task {
-                await rateLimitManager.syncFromBackend()
+
+                // Hide after delay and start processing
+                Task {
+                    try? await Task.sleep(for: .seconds(2.2))
+                    await MainActor.run {
+                        withAnimation(.easeOut(duration: 0.4)) {
+                            showCaptureSuccess = false
+                        }
+                    }
+                    await processReceipt(image: image)
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { notification in
@@ -237,13 +217,8 @@ struct ReceiptScanView: View {
 
     private var floatingScanButton: some View {
         Button {
-            if rateLimitManager.canUploadReceipt() {
-                showCamera = true
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            } else {
-                showRateLimitAlert = true
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
-            }
+            showCamera = true
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         } label: {
             ZStack {
                 Circle()
@@ -272,21 +247,6 @@ struct ReceiptScanView: View {
 
     private var profileMenuButton: some View {
         Menu {
-            // Usage & Subscription
-            Section {
-                // Message rate limit usage display with smart color
-                Button(action: {}) {
-                    Label(rateLimitManager.usageDisplayString, systemImage: usageIconName)
-                }
-                .tint(usageColor)
-
-                // Receipt upload limit
-                Button(action: {}) {
-                    Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) \(L("receipt_plural"))", systemImage: receiptLimitIcon)
-                }
-                .tint(receiptLimitColor)
-            }
-
             // Profile
             Section {
                 Button {
@@ -307,7 +267,7 @@ struct ReceiptScanView: View {
                     .frame(width: 36, height: 36)
 
                 Circle()
-                    .fill(profileBadgeColor)
+                    .fill(Color.green)
                     .frame(width: 10, height: 10)
                     .overlay(
                         Circle()
@@ -316,62 +276,6 @@ struct ReceiptScanView: View {
                     .offset(x: -2, y: -2)
             }
         }
-    }
-
-    // MARK: - Usage Display Helpers
-
-    private var usageIconName: String {
-        let used = rateLimitManager.usagePercentage
-        if used >= 0.95 {
-            return "exclamationmark.bubble.fill"
-        } else if used >= 0.8 {
-            return "bubble.left.and.exclamationmark.bubble.right.fill"
-        } else {
-            return "bubble.left.fill"
-        }
-    }
-
-    private var usageColor: Color {
-        let used = rateLimitManager.usagePercentage
-        let red = 0.2 + (used * 0.7)
-        let green = 0.8 - (used * 0.6)
-        let blue = 0.2
-        return Color(red: red, green: green, blue: blue)
-    }
-
-    private var receiptLimitIcon: String {
-        switch rateLimitManager.receiptLimitState {
-        case .normal: return "checkmark.circle.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .exhausted: return "xmark.circle.fill"
-        }
-    }
-
-    private var receiptLimitColor: Color {
-        switch rateLimitManager.receiptLimitState {
-        case .normal: return .green
-        case .warning: return .orange
-        case .exhausted: return .red
-        }
-    }
-
-    private var profileBadgeColor: Color {
-        let receiptState = rateLimitManager.receiptLimitState
-        let messageUsage = rateLimitManager.usagePercentage
-
-        if receiptState == .exhausted || messageUsage >= 0.95 {
-            return .red
-        }
-        if receiptState == .warning {
-            if messageUsage >= 0.8 {
-                return messageUsage >= 0.9 ? usageColor : .orange
-            }
-            return .orange
-        }
-        if messageUsage >= 0.8 {
-            return usageColor
-        }
-        return usageColor
     }
 
     // MARK: - Main Content View
@@ -1032,7 +936,6 @@ struct ReceiptScanView: View {
                 case .accepted(let accepted):
                     // Async processing — hand off to processing manager
                     processingManager.addReceipt(accepted)
-                    rateLimitManager.decrementReceiptLocal()
                     uploadState = .idle
 
                 case .completed(let response):
@@ -1042,7 +945,6 @@ struct ReceiptScanView: View {
                         uploadState = .success(response)
                         uploadedReceipt = response
 
-                        rateLimitManager.decrementReceiptLocal()
                         totalReceiptsScanned += 1
 
                         NotificationCenter.default.post(name: .receiptUploadedSuccessfully, object: nil)
@@ -1071,16 +973,8 @@ struct ReceiptScanView: View {
             await MainActor.run {
                 uploadState = .failed(error.localizedDescription)
 
-                if case .rateLimitExceeded = error {
-                    canRetryAfterError = false
-                    errorMessage = error.rateLimitUserMessage ?? "Upload limit reached for this month."
-                    Task {
-                        await RateLimitManager.shared.syncFromBackend()
-                    }
-                } else {
-                    canRetryAfterError = true
-                    errorMessage = error.localizedDescription
-                }
+                canRetryAfterError = true
+                errorMessage = error.localizedDescription
 
                 showError = true
                 UINotificationFeedbackGenerator().notificationOccurred(.error)

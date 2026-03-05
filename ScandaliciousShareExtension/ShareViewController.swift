@@ -41,95 +41,8 @@ class ShareViewController: UIViewController {
         processSharedContent()
     }
 
-    // MARK: - Rate Limit Check
-
-    /// Decrements the rate limit locally after showing success to prevent stale data issues
-    private func decrementRateLimitLocally() {
-        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            return
-        }
-
-        // Get the current user ID - try Firebase Auth first, then fall back to shared storage
-        let userId: String
-        if let firebaseUserId = Auth.auth().currentUser?.uid {
-            userId = firebaseUserId
-        } else if let storedUserId = sharedDefaults.string(forKey: "rateLimit_currentUserId") {
-            userId = storedUserId
-        } else {
-            return
-        }
-
-        // Build the specific key for this user (matching RateLimitManager's key format)
-        let receiptsRemainingKey = "rateLimit_\(userId)_receiptsRemaining"
-
-        // Check if the key exists
-        guard sharedDefaults.object(forKey: receiptsRemainingKey) != nil else {
-            return
-        }
-
-        let currentValue = sharedDefaults.integer(forKey: receiptsRemainingKey)
-        let newValue = max(0, currentValue - 1)
-        sharedDefaults.set(newValue, forKey: receiptsRemainingKey)
-        sharedDefaults.synchronize()
-    }
-
-    /// Checks if the user has remaining receipt uploads by reading from shared UserDefaults
-    private func checkRateLimitFromSharedStorage() -> (canUpload: Bool, message: String?) {
-        let appGroupIdentifier = "group.com.deepmaind.scandalicious"
-
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            // If we can't check, allow the upload (backend will reject if needed)
-            return (true, nil)
-        }
-
-        // Get the current user ID - try Firebase Auth first, then fall back to shared storage
-        let userId: String
-        if let firebaseUserId = Auth.auth().currentUser?.uid {
-            userId = firebaseUserId
-        } else if let storedUserId = sharedDefaults.string(forKey: "rateLimit_currentUserId") {
-            userId = storedUserId
-        } else {
-            // If we can't identify the user, allow the upload (backend will reject if needed)
-            return (true, nil)
-        }
-
-        // Build the specific key for this user (matching RateLimitManager's key format)
-        let receiptsRemainingKey = "rateLimit_\(userId)_receiptsRemaining"
-        let daysUntilResetKey = "rateLimit_\(userId)_daysUntilReset"
-
-        // Check if the key exists - UserDefaults.integer(forKey:) returns 0 for non-existent keys
-        guard sharedDefaults.object(forKey: receiptsRemainingKey) != nil else {
-            // If no rate limit data is saved, allow the upload (backend will reject if needed)
-            return (true, nil)
-        }
-
-        let receiptsRemaining = sharedDefaults.integer(forKey: receiptsRemainingKey)
-        let daysUntilReset = sharedDefaults.integer(forKey: daysUntilResetKey)
-
-        // If receiptsRemaining is 0, block the upload
-        if receiptsRemaining <= 0 {
-            let message: String
-            if daysUntilReset > 0 {
-                message = "You've reached your monthly upload limit.\n\nYour limit resets in \(daysUntilReset) day\(daysUntilReset == 1 ? "" : "s")."
-            } else {
-                message = "You've reached your monthly upload limit.\n\nYour limit resets soon."
-            }
-            return (false, message)
-        }
-
-        return (true, nil)
-    }
-
     // MARK: - Process Shared Content
     private func processSharedContent() {
-        // Check rate limit before processing
-        let rateLimitCheck = checkRateLimitFromSharedStorage()
-        if !rateLimitCheck.canUpload {
-            updateStatus(.failed(message: rateLimitCheck.message ?? "Upload limit reached for this month.", canRetry: false))
-            return
-        }
-
         guard let extensionItem = extensionContext?.inputItems.first as? NSExtensionItem else {
             updateStatus(error: "No content found")
             return
@@ -568,9 +481,6 @@ class ShareViewController: UIViewController {
         // Show success immediately for instant feedback
         updateStatus(.success(message: ""))
 
-        // Decrement rate limit locally to prevent stale data allowing duplicate uploads
-        decrementRateLimitLocally()
-
         // Start upload with expiring activity to ensure it completes
         ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading PDF receipt") { expired in
             if expired {
@@ -615,9 +525,6 @@ class ShareViewController: UIViewController {
 
         // Show success immediately for instant feedback
         updateStatus(.success(message: ""))
-
-        // Decrement rate limit locally to prevent stale data allowing duplicate uploads
-        decrementRateLimitLocally()
 
         // Start upload with expiring activity to ensure it completes
         ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading receipt") { expired in
@@ -681,7 +588,6 @@ class ShareViewController: UIViewController {
         vc.modalTransitionStyle = .crossDissolve
 
         // Ensure view is in window hierarchy before presenting
-        // This fixes the issue where the dialogue doesn't show when rate limit is 0
         guard self.view.window != nil else {
             // View not ready yet, retry after a short delay (max 5 retries = 0.5 seconds)
             if retryCount < 5 {
@@ -789,13 +695,6 @@ class ShareViewController: UIViewController {
                 return "Unable to upload receipt. Please try again later."
             case .networkError:
                 return "Please check your internet connection and try again."
-            case .rateLimitExceeded(let error):
-                let daysUntilReset = Calendar.current.dateComponents([.day], from: Date(), to: error.details.periodEndDate).day ?? 0
-                if daysUntilReset > 0 {
-                    return "Upload limit reached. Resets in \(daysUntilReset) day\(daysUntilReset == 1 ? "" : "s")."
-                } else {
-                    return "Upload limit reached for this month."
-                }
             case .deleteFailed:
                 return "Unable to delete receipt. Please try again."
             case .duplicateReceipt:

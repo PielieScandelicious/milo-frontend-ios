@@ -10,7 +10,6 @@ import SwiftUI
 
 struct HomeTabView: View {
     @EnvironmentObject var authManager: AuthenticationManager
-    @ObservedObject private var rateLimitManager = RateLimitManager.shared
     @ObservedObject private var processingManager = ReceiptProcessingManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
@@ -18,7 +17,6 @@ struct HomeTabView: View {
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
     @State private var showProfile = false
-    @State private var showRateLimitAlert = false
     @State private var contentOpacity: Double = 0
     @State private var showMiloGame = false
     @State private var showWalletPassCreator = false
@@ -84,11 +82,6 @@ struct HomeTabView: View {
         }
         .sheet(isPresented: $showWalletPassCreator) {
             WalletPassCreatorView()
-        }
-        .alert("Upload Limit Reached", isPresented: $showRateLimitAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(rateLimitManager.receiptLimitMessage ?? "You've reached your monthly upload limit.")
         }
     }
 
@@ -201,13 +194,8 @@ struct HomeTabView: View {
 
     private var floatingScanButton: some View {
         Button {
-            if rateLimitManager.canUploadReceipt() {
-                showCamera = true
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            } else {
-                showRateLimitAlert = true
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
-            }
+            showCamera = true
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         } label: {
             ZStack {
                 Circle()
@@ -237,18 +225,6 @@ struct HomeTabView: View {
     private var profileMenuButton: some View {
         Menu {
             Section {
-                Button(action: {}) {
-                    Label(rateLimitManager.usageDisplayString, systemImage: usageIconName)
-                }
-                .tint(usageColor)
-
-                Button(action: {}) {
-                    Label("\(rateLimitManager.receiptsRemaining)/\(rateLimitManager.receiptsLimit) receipts", systemImage: receiptLimitIcon)
-                }
-                .tint(receiptLimitColor)
-            }
-
-            Section {
                 Button {
                     showProfile = true
                 } label: {
@@ -267,7 +243,7 @@ struct HomeTabView: View {
                     .frame(width: 36, height: 36)
 
                 Circle()
-                    .fill(profileBadgeColor)
+                    .fill(Color.green)
                     .frame(width: 10, height: 10)
                     .overlay(
                         Circle()
@@ -287,48 +263,6 @@ struct HomeTabView: View {
         }
     }
 
-    // MARK: - Usage Helpers
-
-    private var usageIconName: String {
-        let used = rateLimitManager.usagePercentage
-        if used >= 0.95 { return "exclamationmark.bubble.fill" }
-        else if used >= 0.8 { return "bubble.left.and.exclamationmark.bubble.right.fill" }
-        else { return "bubble.left.fill" }
-    }
-
-    private var usageColor: Color {
-        let used = rateLimitManager.usagePercentage
-        return Color(red: 0.2 + (used * 0.7), green: 0.8 - (used * 0.6), blue: 0.2)
-    }
-
-    private var receiptLimitIcon: String {
-        switch rateLimitManager.receiptLimitState {
-        case .normal: return "checkmark.circle.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .exhausted: return "xmark.circle.fill"
-        }
-    }
-
-    private var receiptLimitColor: Color {
-        switch rateLimitManager.receiptLimitState {
-        case .normal: return .green
-        case .warning: return .orange
-        case .exhausted: return .red
-        }
-    }
-
-    private var profileBadgeColor: Color {
-        let receiptState = rateLimitManager.receiptLimitState
-        let messageUsage = rateLimitManager.usagePercentage
-
-        if receiptState == .exhausted || messageUsage >= 0.95 { return .red }
-        if receiptState == .warning {
-            if messageUsage >= 0.8 { return messageUsage >= 0.9 ? usageColor : .orange }
-            return .orange
-        }
-        if messageUsage >= 0.8 { return usageColor }
-        return .green
-    }
 }
 
 // MARK: - Milo Dachshund Easter Egg

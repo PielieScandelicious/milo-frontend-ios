@@ -399,13 +399,11 @@ struct APITransaction: Codable, Identifiable {
     let category: String
     let date: String
     let receiptId: String?  // Receipt ID for split lookup
-    let originalDescription: String?  // Raw OCR text
     let normalizedBrand: String?  // Brand name
     let normalizedName: String?  // Cleaned product name
 
-    /// Display name: prefer original_description if available, else item_name
     var displayName: String {
-        (originalDescription ?? itemName).capitalized
+        itemName.capitalized
     }
 
     /// Subtitle: normalized_brand shown beneath the description
@@ -423,12 +421,11 @@ struct APITransaction: Codable, Identifiable {
         case category
         case date
         case receiptId = "receipt_id"
-        case originalDescription = "original_description"
         case normalizedBrand = "normalized_brand"
         case normalizedName = "normalized_name"
     }
 
-    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, receiptId: String? = nil, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
+    init(id: String, storeName: String, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, date: String, receiptId: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
         self.id = id
         self.storeName = storeName
         self.itemName = itemName
@@ -438,7 +435,6 @@ struct APITransaction: Codable, Identifiable {
         self.category = category
         self.date = date
         self.receiptId = receiptId
-        self.originalDescription = originalDescription
         self.normalizedBrand = normalizedBrand
         self.normalizedName = normalizedName
     }
@@ -633,15 +629,13 @@ struct APIReceiptItem: Codable, Identifiable {
     let quantity: Int
     let unitPrice: Double?
     let category: String
-    let originalDescription: String?  // Raw OCR text
     let normalizedBrand: String?  // Brand name
     let normalizedName: String?  // Cleaned product name
 
     var id: String { itemId ?? "\(itemName)-\(itemPrice)-\(quantity)" }
 
-    /// Display name: prefer original_description if available, else item_name
     var displayName: String {
-        (originalDescription ?? itemName).capitalized
+        itemName.capitalized
     }
 
     /// Subtitle: normalized_brand shown beneath the description
@@ -656,7 +650,6 @@ struct APIReceiptItem: Codable, Identifiable {
         case quantity
         case unitPrice = "unit_price"
         case category
-        case originalDescription = "original_description"
         case normalizedBrand = "normalized_brand"
         case normalizedName = "normalized_name"
     }
@@ -671,14 +664,13 @@ struct APIReceiptItem: Codable, Identifiable {
     }
 
     /// Manual initializer for creating instances (e.g., previews)
-    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, originalDescription: String? = nil, normalizedBrand: String? = nil, normalizedName: String? = nil) {
+    init(itemId: String? = nil, itemName: String, itemPrice: Double, quantity: Int, unitPrice: Double? = nil, category: String, normalizedBrand: String? = nil, normalizedName: String? = nil) {
         self.itemId = itemId
         self.itemName = itemName
         self.itemPrice = itemPrice
         self.quantity = quantity
         self.unitPrice = unitPrice
         self.category = category
-        self.originalDescription = originalDescription
         self.normalizedBrand = normalizedBrand
         self.normalizedName = normalizedName
     }
@@ -697,7 +689,6 @@ extension APIReceipt {
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
                 category: item.category,
-                originalDescription: item.originalDescription,
                 normalizedBrand: item.normalizedBrand,
                 normalizedName: item.normalizedName
             )

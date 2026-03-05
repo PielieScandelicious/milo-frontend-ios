@@ -151,7 +151,6 @@ enum AppStrings {
         "prompt_price_title": ["en": "Spot the price creep", "nl": "Ontdek prijsstijgingen", "fr": "Détecter les hausses de prix"],
         "prompt_price_subtitle": ["en": "Are my groceries getting pricier?", "nl": "Worden mijn boodschappen duurder?", "fr": "Mes courses deviennent-elles plus chères ?"],
         "prompt_price_message": ["en": "Are any of my regularly purchased grocery items getting more expensive over time?", "nl": "Worden sommige van mijn vaste boodschappen geleidelijk duurder?", "fr": "Certains de mes articles habituels deviennent-ils plus chers avec le temps ?"],
-        "message_limit_reached": ["en": "Message Limit Reached", "nl": "Berichtlimiet bereikt", "fr": "Limite de messages atteinte"],
         "error_encountered": ["en": "I'm sorry, I encountered an error", "nl": "Sorry, er is een fout opgetreden", "fr": "Désolé, une erreur s'est produite"],
         "please_try_again": ["en": "Please try again.", "nl": "Probeer het opnieuw.", "fr": "Veuillez réessayer."],
 
@@ -246,8 +245,6 @@ enum AppStrings {
         "wallet_pass_desc": ["en": "Create Apple Wallet loyalty cards to receive digital receipts", "nl": "Maak Apple Wallet klantenkaarten aan om digitale kassatickets te ontvangen", "fr": "Créez des cartes de fidélité Apple Wallet pour recevoir des tickets digitaux"],
         "top_stores": ["en": "Top Stores", "nl": "Topwinkels", "fr": "Magasins principaux"],
         "top_categories": ["en": "Top Categories", "nl": "Topcategorieën", "fr": "Catégories principales"],
-        "upload_limit_reached": ["en": "Upload Limit Reached", "nl": "Uploadlimiet bereikt", "fr": "Limite de téléchargement atteinte"],
-        "upload_limit_month": ["en": "You've used all your receipt uploads for this month. Your limit will reset soon.", "nl": "Je hebt al je kassaticket-uploads voor deze maand opgebruikt. Je limiet wordt binnenkort hersteld.", "fr": "Vous avez utilisé tous vos téléchargements de tickets pour ce mois. Votre limite sera bientôt réinitialisée."],
 
         // MARK: - Receipt Upload / Camera
         "upload_receipt": ["en": "Upload Receipt", "nl": "Kassaticket uploaden", "fr": "Télécharger un ticket"],
@@ -305,7 +302,6 @@ enum AppStrings {
         "unlock_all_features": ["en": "Unlock all features with a free trial", "nl": "Ontgrendel alle functies met een gratis proefperiode", "fr": "Débloquez toutes les fonctionnalités avec un essai gratuit"],
         "premium_feature": ["en": "Premium Feature", "nl": "Premiumfunctie", "fr": "Fonctionnalité Premium"],
         "unlock": ["en": "Unlock", "nl": "Ontgrendelen", "fr": "Débloquer"],
-        "upgrade_unlimited": ["en": "Upgrade for unlimited uploads", "nl": "Upgrade voor onbeperkt uploaden", "fr": "Passez à Premium pour des téléchargements illimités"],
 
         // MARK: - General
         "no_data": ["en": "No Data", "nl": "Geen gegevens", "fr": "Aucune donnée"],
@@ -359,17 +355,6 @@ enum AppStrings {
         "automatic_backup": ["en": "Automatic cloud backup", "nl": "Automatische cloudback-up", "fr": "Sauvegarde cloud automatique"],
         "access_any_device": ["en": "Access from any device", "nl": "Toegang vanaf elk apparaat", "fr": "Accès depuis n'importe quel appareil"],
         "automatic_processing": ["en": "Automatic processing", "nl": "Automatische verwerking", "fr": "Traitement automatique"],
-
-        // MARK: - Rate Limit Messages
-        "messages": ["en": "messages", "nl": "berichten", "fr": "messages"],
-        "message_limit_period": ["en": "Message limit reached for this period.", "nl": "Berichtlimiet bereikt voor deze periode.", "fr": "Limite de messages atteinte pour cette période."],
-        "message_limit_resets": ["en": "Message limit reached. Resets", "nl": "Berichtlimiet bereikt. Herstelt", "fr": "Limite de messages atteinte. Réinitialisation"],
-        "no_receipts_remaining": ["en": "No receipts remaining", "nl": "Geen kassatickets meer over", "fr": "Aucun ticket restant"],
-        "one_receipt_remaining": ["en": "1 receipt remaining", "nl": "1 kassaticket over", "fr": "1 ticket restant"],
-        "receipts_remaining": ["en": "receipts remaining", "nl": "kassatickets over", "fr": "tickets restants"],
-        "upload_limit_period": ["en": "Upload limit reached for this period.", "nl": "Uploadlimiet bereikt voor deze periode.", "fr": "Limite de téléchargement atteinte pour cette période."],
-        "resets_today": ["en": "Resets today", "nl": "Herstelt vandaag", "fr": "Réinitialisation aujourd'hui"],
-        "resets_in_1_day": ["en": "Resets in 1 day", "nl": "Herstelt in 1 dag", "fr": "Réinitialisation dans 1 jour"],
 
         // MARK: - Expandable Receipt Card
         "store_receipt": ["en": "store", "nl": "winkel", "fr": "magasin"],
@@ -469,7 +454,6 @@ enum AppStrings {
         // MARK: - Subscription Banner (variant keys)
         "start_14day_trial": ["en": "Start your 14-day free trial", "nl": "Start je 14 dagen gratis proefperiode", "fr": "Commencez votre essai gratuit de 14 jours"],
         "unlock_features_trial": ["en": "Unlock all features with a free trial", "nl": "Ontgrendel alle functies met een gratis proefperiode", "fr": "Débloquez toutes les fonctionnalités avec un essai gratuit"],
-        "upgrade_unlimited_uploads": ["en": "Upgrade for unlimited uploads", "nl": "Upgrade voor onbeperkt uploaden", "fr": "Passez à Premium pour des téléchargements illimités"],
 
         // MARK: - Camera
         "normal": ["en": "Normal", "nl": "Normaal", "fr": "Normal"],
