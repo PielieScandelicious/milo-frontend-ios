@@ -42,6 +42,19 @@ class GamificationManager: ObservableObject {
         if let user = Auth.auth().currentUser {
             handleUserChange(user)
         }
+
+        // Auto-sync wallet when any receipt completes
+        NotificationCenter.default.addObserver(
+            forName: .receiptUploadedSuccessfully,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // Small delay to let the backend finalize cashback
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                self?.fetchAndSyncWallet()
+            }
+        }
     }
 
     // MARK: - User Management
@@ -82,7 +95,7 @@ class GamificationManager: ObservableObject {
            let decoded = try? decoder.decode(WalletBalance.self, from: data) {
             wallet = decoded
         } else {
-            wallet = WalletBalance(euros: 4.50)
+            wallet = WalletBalance(euros: 0)
         }
 
         if let data = userDefaults.data(forKey: "\(prefix)_streak"),
@@ -119,6 +132,9 @@ class GamificationManager: ObservableObject {
 
         userDefaults.set(true, forKey: "\(prefix)_initialized")
         saveState()
+
+        // Sync wallet with backend cashback balance
+        fetchAndSyncWallet()
     }
 
     private func saveState() {
@@ -137,6 +153,19 @@ class GamificationManager: ObservableObject {
     func syncWalletWithBackend(balance: Double) {
         wallet = WalletBalance(euros: balance)
         saveState()
+    }
+
+    /// Fetch the latest cashback balance from the backend and update the wallet.
+    func fetchAndSyncWallet() {
+        Task {
+            do {
+                let balance = try await CashbackAPIService.shared.getBalance()
+                self.wallet = WalletBalance(euros: balance.currentBalance)
+                self.saveState()
+            } catch {
+                print("[GamificationManager] Wallet sync failed: \(error)")
+            }
+        }
     }
 
     // MARK: - Public API

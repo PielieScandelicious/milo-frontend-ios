@@ -108,6 +108,7 @@ struct RewardsView: View {
             withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
                 appeared = true
             }
+            gm.fetchAndSyncWallet()
         }
         .onReceive(NotificationCenter.default.publisher(for: .badgeUnlocked)) { _ in
             if let badge = gm.lastUnlockedBadge {
