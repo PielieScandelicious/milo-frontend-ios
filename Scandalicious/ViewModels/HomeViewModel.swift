@@ -16,6 +16,7 @@ struct RecentReceipt: Identifiable {
     let storeColor: Color
     let totalAmount: Double
     let cashbackAmount: Double
+    let spinsAwarded: Int
     let date: Date
 
     /// Map a backend cashback transaction to a displayable receipt.
@@ -38,6 +39,7 @@ struct RecentReceipt: Identifiable {
             storeColor: color,
             totalAmount: tx.receiptTotal,
             cashbackAmount: tx.cashbackAmount,
+            spinsAwarded: tx.spinsAwarded,
             date: date
         )
     }

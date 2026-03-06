@@ -110,7 +110,16 @@ struct RecentReceiptsSection: View {
 private struct RecentReceiptRow: View {
     let receipt: RecentReceipt
 
-    private let cashbackGreen = Color(red: 0.2, green: 0.85, blue: 0.4)
+    private let cashbackGradient = LinearGradient(
+        colors: [Color(red: 0.2, green: 0.85, blue: 0.7), Color(red: 0.15, green: 0.55, blue: 0.75)],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+    private let goldGradient = LinearGradient(
+        colors: [Color(red: 1.0, green: 0.88, blue: 0.35), Color(red: 0.80, green: 0.60, blue: 0.0)],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
 
     var body: some View {
         HStack(spacing: 12) {
@@ -145,9 +154,17 @@ private struct RecentReceiptRow: View {
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
 
-                Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(cashbackGreen)
+                HStack(spacing: 6) {
+                    Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(cashbackGradient)
+
+                    if receipt.spinsAwarded > 0 {
+                        Text("+\(receipt.spinsAwarded) \(receipt.spinsAwarded == 1 ? "spin" : "spins")")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(goldGradient)
+                    }
+                }
             }
         }
         .padding(.horizontal, 16)
