@@ -15,11 +15,15 @@ struct CashbackBalanceResponse: Codable {
     let totalEarned: Double
     let totalPaidOut: Double
     let currentBalance: Double
+    let isGoldTier: Bool
+    let spinsAvailable: Int
 
     enum CodingKeys: String, CodingKey {
         case totalEarned = "total_earned"
         case totalPaidOut = "total_paid_out"
         case currentBalance = "current_balance"
+        case isGoldTier = "is_gold_tier"
+        case spinsAvailable = "spins_available"
     }
 }
 
@@ -33,6 +37,7 @@ struct CashbackTransactionResponse: Codable, Identifiable {
     let createdAt: String
     let storeName: String?
     let receiptDate: String?
+    let spinsAwarded: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -44,6 +49,7 @@ struct CashbackTransactionResponse: Codable, Identifiable {
         case createdAt = "created_at"
         case storeName = "store_name"
         case receiptDate = "receipt_date"
+        case spinsAwarded = "spins_awarded"
     }
 }
 
@@ -52,12 +58,14 @@ struct CashbackSummaryResponse: Codable {
     let recentTransactions: [CashbackTransactionResponse]
     let avgCashbackPerReceipt: Double
     let totalReceiptsWithCashback: Int
+    let isGoldTier: Bool
 
     enum CodingKeys: String, CodingKey {
         case balance
         case recentTransactions = "recent_transactions"
         case avgCashbackPerReceipt = "avg_cashback_per_receipt"
         case totalReceiptsWithCashback = "total_receipts_with_cashback"
+        case isGoldTier = "is_gold_tier"
     }
 }
 

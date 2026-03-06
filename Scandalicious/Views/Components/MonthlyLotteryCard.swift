@@ -54,10 +54,13 @@ struct MonthlyLotteryCard: View {
 
             // Expandable eligibility info
             if showEligibility {
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 0.5)
-                    .padding(.horizontal, 16)
+                LinearGradient(
+                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 0.5)
+                .padding(.horizontal, 16)
 
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "info.circle.fill")

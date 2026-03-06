@@ -14,7 +14,6 @@ extension Notification.Name {
     static let rewardEarned  = Notification.Name("gamification.rewardEarned")
     static let spinCompleted = Notification.Name("gamification.spinCompleted")
     static let badgeUnlocked = Notification.Name("gamification.badgeUnlocked")
-    static let tierChanged   = Notification.Name("gamification.tierChanged")
 }
 
 // MARK: - Codable Color Wrapper
@@ -120,110 +119,18 @@ struct StreakData: Codable {
     }
 }
 
-// MARK: - Tier
+// MARK: - Gold Tier
 
-enum UserTier: String, Codable, CaseIterable {
-    case bronze  = "Bronze"
-    case silver  = "Silver"
-    case gold    = "Gold"
-    case diamond = "Diamond"
+struct GoldTierStatus: Codable {
+    var isGoldTier: Bool = true
 
-    var minReceipts: Int {
-        switch self {
-        case .bronze:  return 0
-        case .silver:  return 5
-        case .gold:    return 8
-        case .diamond: return 12
-        }
-    }
-
-    var next: UserTier? {
-        switch self {
-        case .bronze:  return .silver
-        case .silver:  return .gold
-        case .gold:    return .diamond
-        case .diamond: return nil
-        }
-    }
-
-    var multiplier: Double {
-        switch self {
-        case .bronze:  return 1.0
-        case .silver:  return 1.1
-        case .gold:    return 1.25
-        case .diamond: return 1.5
-        }
-    }
-
-    var spinsPerReceipt: Int {
-        switch self {
-        case .bronze:  return 1
-        case .silver:  return 2
-        case .gold:    return 3
-        case .diamond: return 5
-        }
-    }
+    var displayName: String { isGoldTier ? "Gold" : "No Tier" }
 
     var gradientColors: [Color] {
-        switch self {
-        case .bronze:
-            return [Color(red: 0.90, green: 0.60, blue: 0.35),
-                    Color(red: 0.60, green: 0.35, blue: 0.15)]
-        case .silver:
-            return [Color(red: 0.85, green: 0.85, blue: 0.90),
-                    Color(red: 0.55, green: 0.55, blue: 0.60)]
-        case .gold:
-            return [Color(red: 1.0, green: 0.88, blue: 0.35),
-                    Color(red: 0.80, green: 0.60, blue: 0.0)]
-        case .diamond:
-            return [Color(red: 0.6, green: 0.9, blue: 1.0),
-                    Color(red: 0.3, green: 0.6, blue: 0.95)]
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .bronze:  return "medal.fill"
-        case .silver:  return "medal.fill"
-        case .gold:    return "medal.fill"
-        case .diamond: return "diamond.fill"
-        }
-    }
-
-    var bonusLabel: String {
-        switch self {
-        case .bronze:  return "1x"
-        case .silver:  return "1.1x"
-        case .gold:    return "1.25x"
-        case .diamond: return "1.5x"
-        }
-    }
-
-    var perks: [String] {
-        switch self {
-        case .bronze:  return ["1 spin/receipt", "Base earnings"]
-        case .silver:  return ["2 spins/receipt", "+10% bonus"]
-        case .gold:    return ["3 spins/receipt", "+25% bonus"]
-        case .diamond: return ["5 spins/receipt", "+50% bonus"]
-        }
-    }
-}
-
-struct TierProgress: Codable {
-    var currentTier: UserTier
-    var receiptsThisMonth: Int
-
-    var progressToNext: Double {
-        guard let next = currentTier.next else { return 1.0 }
-        let range = next.minReceipts - currentTier.minReceipts
-        let current = receiptsThisMonth - currentTier.minReceipts
-        guard range > 0 else { return 1.0 }
-        return max(0, min(1.0, Double(current) / Double(range)))
-    }
-
-    var receiptsNeededForNextTier: Int {
-        guard let next = currentTier.next else { return 0 }
-        return max(0, next.minReceipts - receiptsThisMonth)
+        isGoldTier
+            ? [Color(red: 1.0, green: 0.88, blue: 0.35),
+               Color(red: 0.80, green: 0.60, blue: 0.0)]
+            : [Color(white: 0.25), Color(white: 0.15)]
     }
 }
 
@@ -242,11 +149,9 @@ struct Badge: Identifiable, Codable {
         Badge(id: "first_scan",    name: "First Scan",      description: "Upload your first receipt",               icon: "doc.text.viewfinder", iconColor: CodableColor(Color(red: 0.2, green: 0.8, blue: 0.4)),  isUnlocked: true,  unlockedAt: Date().addingTimeInterval(-86400 * 30)),
         Badge(id: "streak_2",      name: "Getting Started", description: "Reach a 2-week streak",                   icon: "flame.fill",          iconColor: CodableColor(.orange),                                  isUnlocked: true,  unlockedAt: Date().addingTimeInterval(-86400 * 14)),
         Badge(id: "streak_4",      name: "Consistent",      description: "Reach a 4-week streak",                   icon: "flame.fill",          iconColor: CodableColor(Color(red: 1.0, green: 0.5, blue: 0.0)),  isUnlocked: true,  unlockedAt: Date().addingTimeInterval(-86400 * 7)),
-        Badge(id: "silver_tier",   name: "Silver Member",   description: "Reach Silver tier",                       icon: "medal.fill",          iconColor: CodableColor(Color(red: 0.7, green: 0.7, blue: 0.75)), isUnlocked: true,  unlockedAt: Date().addingTimeInterval(-86400 * 10)),
         Badge(id: "big_spender",   name: "Big Spender",     description: "Scan a receipt over €100",                icon: "banknote.fill",       iconColor: CodableColor(Color(red: 0.2, green: 0.8, blue: 0.4)),  isUnlocked: true,  unlockedAt: Date().addingTimeInterval(-86400 * 5)),
         Badge(id: "lucky_spin",    name: "Lucky Spin",      description: "Win €10 or more on the wheel",            icon: "sparkles",            iconColor: CodableColor(.yellow),                                  isUnlocked: false, unlockedAt: nil),
         Badge(id: "streak_8",      name: "Dedicated",       description: "Reach an 8-week streak",                  icon: "flame.fill",          iconColor: CodableColor(.red),                                     isUnlocked: false, unlockedAt: nil),
-        Badge(id: "gold_tier",     name: "Gold Member",     description: "Reach Gold tier",                         icon: "medal.fill",          iconColor: CodableColor(Color(red: 1.0, green: 0.84, blue: 0.0)), isUnlocked: false, unlockedAt: nil),
         Badge(id: "coupon_buyer",  name: "Deal Hunter",     description: "Redeem your first coupon",                icon: "tag.fill",            iconColor: CodableColor(.purple),                                  isUnlocked: false, unlockedAt: nil),
         Badge(id: "jackpot",       name: "Jackpot!",        description: "Hit the €1000 jackpot",                   icon: "crown.fill",          iconColor: CodableColor(.yellow),                                  isUnlocked: false, unlockedAt: nil),
         Badge(id: "night_scanner", name: "Night Owl",       description: "Upload a receipt after 10 PM",            icon: "moon.fill",           iconColor: CodableColor(.indigo),                                  isUnlocked: false, unlockedAt: nil),

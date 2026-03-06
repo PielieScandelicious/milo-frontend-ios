@@ -56,6 +56,8 @@ class HomeViewModel {
     var processingStoreColor: Color = .white
     var processingAmount: Double = 0
     var cashbackAmount: Double = 0
+    var spinsAwarded: Int = 0
+    var isGoldTier: Bool = true
 
     // Mini game
     var showMiniGame: Bool = false
@@ -164,23 +166,32 @@ class HomeViewModel {
                 if let receiptId,
                    let tx = summary.recentTransactions.first(where: { $0.receiptId == receiptId }) {
                     self.cashbackAmount = tx.cashbackAmount
+                    self.spinsAwarded = tx.spinsAwarded
                 } else if let latest = summary.recentTransactions.first {
                     self.cashbackAmount = latest.cashbackAmount
+                    self.spinsAwarded = latest.spinsAwarded
                 } else {
                     self.cashbackAmount = self.processingAmount * 0.005
+                    self.spinsAwarded = 0
                 }
+                self.isGoldTier = summary.isGoldTier
             }
 
             // Refresh recent receipts list
             updateRecentReceipts(from: summary.recentTransactions)
 
-            // Sync wallet with backend balance
-            GamificationManager.shared.syncWalletWithBackend(balance: summary.balance.currentBalance)
+            // Sync wallet, gold tier, and spins with backend
+            GamificationManager.shared.syncWalletWithBackend(
+                balance: summary.balance.currentBalance,
+                isGoldTier: summary.isGoldTier,
+                spins: summary.balance.spinsAvailable
+            )
 
         } catch {
             print("[HomeViewModel] Failed to fetch cashback: \(error)")
             if updateUI {
                 self.cashbackAmount = self.processingAmount * 0.005
+                self.spinsAwarded = 0
             }
         }
     }
@@ -190,7 +201,11 @@ class HomeViewModel {
             do {
                 let summary = try await CashbackAPIService.shared.getSummary()
                 updateRecentReceipts(from: summary.recentTransactions)
-                GamificationManager.shared.syncWalletWithBackend(balance: summary.balance.currentBalance)
+                GamificationManager.shared.syncWalletWithBackend(
+                    balance: summary.balance.currentBalance,
+                    isGoldTier: summary.isGoldTier,
+                    spins: summary.balance.spinsAvailable
+                )
             } catch {
                 print("[HomeViewModel] Failed to load recent receipts: \(error)")
             }

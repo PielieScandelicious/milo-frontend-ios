@@ -124,7 +124,6 @@ struct SpinWheelView: View {
                     mysteryRevealOverlay(result)
                 }
             }
-            .navigationTitle("Prize Wheel")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(white: 0.04), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -616,9 +615,9 @@ struct SpinWheelView: View {
             spinResult = result
             isSpinning = false
 
-            // Update double-next state now that wheel has stopped (animated)
+            // Sync wallet, spins, and double-next now that wheel has stopped
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                gm.applyDoubleNextState(from: result)
+                gm.applySpinResult(result)
             }
 
             UINotificationFeedbackGenerator().notificationOccurred(.success)

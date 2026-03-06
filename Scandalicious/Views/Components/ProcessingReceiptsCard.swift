@@ -313,7 +313,7 @@ struct ProcessingReceiptRow: View {
 private struct ReceiptProgressBar: View {
     let processingStartedAt: Date?
 
-    private let processingDuration: Double = 60.0
+    private let processingDuration: Double = 23.0
 
     @State private var progress: Double = 0
 

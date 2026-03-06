@@ -55,10 +55,13 @@ struct DigitalReceiptHintCard: View {
 
             // Expandable info
             if showInfo {
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 0.5)
-                    .padding(.horizontal, 16)
+                LinearGradient(
+                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 0.5)
+                .padding(.horizontal, 16)
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("The more you spend, the higher your cashback rate. Your rate increases progressively:")
@@ -66,19 +69,48 @@ struct DigitalReceiptHintCard: View {
                         .foregroundStyle(.white.opacity(0.4))
                         .fixedSize(horizontal: false, vertical: true)
 
-                    // Cashback table
+                    // Cashback table with Gold Tier spins column
                     VStack(spacing: 0) {
-                        cashbackTableRow(spend: "Spend", rate: "Cashback", isHeader: true)
-                        cashbackTableRow(spend: "\u{20AC}0 \u{2013} \u{20AC}80", rate: "0.50%")
-                        cashbackTableRow(spend: "\u{20AC}80 \u{2013} \u{20AC}160", rate: "0.60%")
-                        cashbackTableRow(spend: "\u{20AC}160 \u{2013} \u{20AC}240", rate: "0.70%")
-                        cashbackTableRow(spend: "\u{20AC}240 \u{2013} \u{20AC}320", rate: "0.80%")
-                        cashbackTableRow(spend: "\u{20AC}320 \u{2013} \u{20AC}400", rate: "0.90%")
-                        cashbackTableRow(spend: "\u{20AC}400 \u{2013} \u{20AC}500", rate: "1.00%")
+                        cashbackTableRow(spend: "Spend", rate: "Cashback", spins: "Gold Tier", isHeader: true)
+                        cashbackTableRow(spend: "\u{20AC}0 \u{2013} \u{20AC}80", rate: "0.50%", spins: "\u{2014}")
+                        cashbackTableRow(spend: "\u{20AC}80 \u{2013} \u{20AC}160", rate: "0.60%", spins: "+1 spin")
+                        cashbackTableRow(spend: "\u{20AC}160 \u{2013} \u{20AC}240", rate: "0.70%", spins: "+2 spins")
+                        cashbackTableRow(spend: "\u{20AC}240 \u{2013} \u{20AC}320", rate: "0.80%", spins: "+3 spins")
+                        cashbackTableRow(spend: "\u{20AC}320 \u{2013} \u{20AC}400", rate: "0.90%", spins: "\u{2014}")
+                        cashbackTableRow(spend: "\u{20AC}400 \u{2013} \u{20AC}500", rate: "1.00%", spins: "\u{2014}")
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
                     Text("Each segment earns its own rate \u{2014} e.g. on a \u{20AC}200 receipt, the first \u{20AC}80 earns 0.50%, the next \u{20AC}80 earns 0.60%, and the last \u{20AC}40 earns 0.70%.")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Gold Tier section
+                    LinearGradient(
+                        colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(height: 0.5)
+                    .padding(.vertical, 4)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "medal.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color(red: 1.0, green: 0.88, blue: 0.35), Color(red: 0.80, green: 0.60, blue: 0.0)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        Text("Gold Tier")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+
+                    Text("Upload at least one receipt over \u{20AC}50 every 7 days to keep Gold Tier. Gold Tier earns you free spins starting from the second cashback segment: 1 spin at \u{20AC}80+, 2 spins at \u{20AC}160+, and 3 spins (max) at \u{20AC}240+.")
                         .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(.white.opacity(0.3))
                         .fixedSize(horizontal: false, vertical: true)
@@ -101,12 +133,36 @@ struct DigitalReceiptHintCard: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showInfo)
     }
 
-    private func cashbackTableRow(spend: String, rate: String, isHeader: Bool = false) -> some View {
+    private let goldGradient = LinearGradient(
+        colors: [Color(red: 1.0, green: 0.88, blue: 0.35), Color(red: 0.80, green: 0.60, blue: 0.0)],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+
+    private let cashbackGradient = LinearGradient(
+        colors: [Color(red: 0.2, green: 0.85, blue: 0.7), Color(red: 0.15, green: 0.55, blue: 0.75)],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+
+    private func cashbackTableRow(spend: String, rate: String, spins: String = "", isHeader: Bool = false) -> some View {
         HStack {
             Text(spend)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(rate)
-                .frame(width: 70, alignment: .trailing)
+                .frame(width: 55, alignment: .trailing)
+                .foregroundStyle(
+                    isHeader
+                        ? AnyShapeStyle(.white.opacity(0.5))
+                        : AnyShapeStyle(cashbackGradient)
+                )
+            Text(spins)
+                .frame(width: 60, alignment: .trailing)
+                .foregroundStyle(
+                    isHeader
+                        ? AnyShapeStyle(.white.opacity(0.5))
+                        : (spins.hasPrefix("+") ? AnyShapeStyle(goldGradient) : AnyShapeStyle(.white.opacity(0.2)))
+                )
         }
         .font(.system(size: 11, weight: isHeader ? .semibold : .regular))
         .foregroundStyle(.white.opacity(isHeader ? 0.5 : 0.35))

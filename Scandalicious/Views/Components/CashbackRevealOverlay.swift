@@ -4,6 +4,7 @@
 //
 //  Fullscreen overlay that reveals the cashback earned from a processed receipt
 //  with counting animation, confetti celebration, and smooth transitions.
+//  Shows Gold Tier spins when awarded.
 //
 
 import SwiftUI
@@ -16,11 +17,15 @@ struct CashbackRevealOverlay: View {
     @State private var cardOpacity: Double = 0
     @State private var showContent = false
     @State private var showAmount = false
+    @State private var showSpins = false
     @State private var canDismiss = false
     @State private var dismissed = false
 
     private let gold = Color(red: 1.0, green: 0.84, blue: 0.0)
-    private let successGreen = Color(red: 0.2, green: 0.8, blue: 0.4)
+    private let goldGradient = [
+        Color(red: 1.0, green: 0.88, blue: 0.35),
+        Color(red: 0.80, green: 0.60, blue: 0.0)
+    ]
 
     var body: some View {
         ZStack {
@@ -93,23 +98,83 @@ struct CashbackRevealOverlay: View {
                         .opacity(showAmount ? 1 : 0)
                 }
 
-                // Continue button
-                if canDismiss {
-                    Button {
-                        dismissWithAnimation()
-                    } label: {
-                        Text("Continue")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 13)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(gold)
-                            )
+                // Gold Tier spins section
+                if viewModel.spinsAwarded > 0 {
+                    VStack(spacing: 14) {
+                        // Thin divider
+                        LinearGradient(
+                            colors: [gold.opacity(0), gold.opacity(0.3), gold.opacity(0)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(height: 0.5)
+
+                        VStack(spacing: 8) {
+                            // Spin icon
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: goldGradient.map { $0.opacity(0.15) },
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 44, height: 44)
+
+                                Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: goldGradient,
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+
+                            Text("+\(viewModel.spinsAwarded) spin\(viewModel.spinsAwarded > 1 ? "s" : "")")
+                                .font(.system(size: 22, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+
+                            // Gold Tier tag
+                            Text("Gold Tier")
+                                .font(.system(size: 10, weight: .heavy))
+                                .tracking(0.5)
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule().fill(
+                                        LinearGradient(
+                                            colors: goldGradient,
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                )
+                        }
                     }
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .opacity(showSpins ? 1 : 0)
+                    .offset(y: showSpins ? 0 : 10)
                 }
+
+                // Continue button
+                Button {
+                    dismissWithAnimation()
+                } label: {
+                    Text("Continue")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(gold)
+                        )
+                }
+                .opacity(canDismiss ? 1 : 0)
+                .allowsHitTesting(canDismiss)
             }
             .padding(28)
             .frame(width: UIScreen.main.bounds.width - 56)
@@ -165,14 +230,20 @@ struct CashbackRevealOverlay: View {
             startCountingAnimation()
         }
 
-        // Confetti
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.3) {
-            viewModel.showConfetti = true
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        // Show spins (after cashback counting finishes)
+        if viewModel.spinsAwarded > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.1) {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                    showSpins = true
+                }
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
         }
 
-        // Enable dismiss
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+        // Confetti + enable dismiss
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            viewModel.showConfetti = true
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             withAnimation(.easeOut(duration: 0.3)) {
                 canDismiss = true
             }

@@ -299,16 +299,16 @@ struct ProfileView: View {
             // My Progress (Gamification)
             Section {
                 HStack {
-                    Label("Tier", systemImage: GamificationManager.shared.tierProgress.currentTier.icon)
+                    Label("Tier", systemImage: "medal.fill")
                     Spacer()
-                    Text(GamificationManager.shared.tierProgress.currentTier.rawValue)
+                    Text(GamificationManager.shared.goldTierStatus.displayName)
                         .font(.subheadline.bold())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(GamificationManager.shared.goldTierStatus.isGoldTier ? .white : .white.opacity(0.5))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(
                             LinearGradient(
-                                colors: GamificationManager.shared.tierProgress.currentTier.gradientColors,
+                                colors: GamificationManager.shared.goldTierStatus.gradientColors,
                                 startPoint: .leading, endPoint: .trailing
                             )
                         )

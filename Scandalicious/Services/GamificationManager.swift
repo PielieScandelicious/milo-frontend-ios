@@ -18,7 +18,7 @@ class GamificationManager: ObservableObject {
 
     @Published private(set) var wallet: WalletBalance = WalletBalance(euros: 0)
     @Published private(set) var streak: StreakData = StreakData(weekCount: 0, lastReceiptDate: nil, hasShield: false, isAtRisk: false)
-    @Published private(set) var tierProgress: TierProgress = TierProgress(currentTier: .bronze, receiptsThisMonth: 0)
+    @Published private(set) var goldTierStatus: GoldTierStatus = GoldTierStatus(isGoldTier: true)
     @Published private(set) var badges: [Badge] = Badge.allBadges
     @Published private(set) var spinsAvailable: Int = 0
     @Published private(set) var ownedCoupons: [Coupon] = []
@@ -81,7 +81,7 @@ class GamificationManager: ObservableObject {
     private func resetToDefaults() {
         wallet = WalletBalance(euros: 0)
         streak = StreakData(weekCount: 0, lastReceiptDate: nil, hasShield: false, isAtRisk: false)
-        tierProgress = TierProgress(currentTier: .bronze, receiptsThisMonth: 0)
+        goldTierStatus = GoldTierStatus(isGoldTier: true)
         badges = Badge.allBadges.map { var b = $0; b.isUnlocked = false; b.unlockedAt = nil; return b }
         spinsAvailable = 0
         ownedCoupons = []
@@ -106,11 +106,11 @@ class GamificationManager: ObservableObject {
             streak = StreakData(weekCount: 3, lastReceiptDate: Date().addingTimeInterval(-86400 * 5), hasShield: false, isAtRisk: false)
         }
 
-        if let data = userDefaults.data(forKey: "\(prefix)_tier"),
-           let decoded = try? decoder.decode(TierProgress.self, from: data) {
-            tierProgress = decoded
+        if let data = userDefaults.data(forKey: "\(prefix)_goldTier"),
+           let decoded = try? decoder.decode(GoldTierStatus.self, from: data) {
+            goldTierStatus = decoded
         } else {
-            tierProgress = TierProgress(currentTier: .silver, receiptsThisMonth: 6)
+            goldTierStatus = GoldTierStatus(isGoldTier: true)
         }
 
         spinsAvailable = userDefaults.integer(forKey: "\(prefix)_spins")
@@ -141,19 +141,23 @@ class GamificationManager: ObservableObject {
     private func saveState() {
         let prefix = keyPrefix
         let encoder = JSONEncoder()
-        if let data = try? encoder.encode(wallet)       { userDefaults.set(data, forKey: "\(prefix)_wallet") }
-        if let data = try? encoder.encode(streak)       { userDefaults.set(data, forKey: "\(prefix)_streak") }
-        if let data = try? encoder.encode(tierProgress) { userDefaults.set(data, forKey: "\(prefix)_tier") }
-        if let data = try? encoder.encode(badges)       { userDefaults.set(data, forKey: "\(prefix)_badges") }
+        if let data = try? encoder.encode(wallet)         { userDefaults.set(data, forKey: "\(prefix)_wallet") }
+        if let data = try? encoder.encode(streak)         { userDefaults.set(data, forKey: "\(prefix)_streak") }
+        if let data = try? encoder.encode(goldTierStatus) { userDefaults.set(data, forKey: "\(prefix)_goldTier") }
+        if let data = try? encoder.encode(badges)         { userDefaults.set(data, forKey: "\(prefix)_badges") }
         if let data = try? encoder.encode(ownedCoupons) { userDefaults.set(data, forKey: "\(prefix)_ownedCoupons") }
         userDefaults.set(spinsAvailable, forKey: "\(prefix)_spins")
         userDefaults.set(hasDoubleNext, forKey: "\(prefix)_doubleNext")
     }
 
-    // MARK: - Wallet Sync
+    // MARK: - Wallet & Gold Tier Sync
 
-    func syncWalletWithBackend(balance: Double) {
+    func syncWalletWithBackend(balance: Double, isGoldTier: Bool, spins: Int? = nil) {
         wallet = WalletBalance(euros: balance)
+        goldTierStatus = GoldTierStatus(isGoldTier: isGoldTier)
+        if let spins {
+            spinsAvailable = spins
+        }
         saveState()
     }
 
@@ -163,6 +167,8 @@ class GamificationManager: ObservableObject {
             do {
                 let balance = try await CashbackAPIService.shared.getBalance()
                 self.wallet = WalletBalance(euros: balance.currentBalance)
+                self.goldTierStatus = GoldTierStatus(isGoldTier: balance.isGoldTier)
+                self.spinsAvailable = balance.spinsAvailable
                 self.saveState()
             } catch {
                 print("[GamificationManager] Wallet sync failed: \(error)")
@@ -176,8 +182,7 @@ class GamificationManager: ObservableObject {
         let baseAmount = 0.50
         let bonus = MysteryBonusType.random()
 
-        let multiplied = baseAmount * tierProgress.currentTier.multiplier
-        wallet.add(euros: multiplied)
+        wallet.add(euros: baseAmount)
 
         switch bonus {
         case .cashBonus(let amount):
@@ -188,18 +193,15 @@ class GamificationManager: ObservableObject {
             break
         }
 
-        // Award spins based on tier
-        spinsAvailable += tierProgress.currentTier.spinsPerReceipt
-
+        // Spins are now awarded server-side via cashback transaction
         updateStreakForReceipt()
-        incrementReceiptCount()
         saveState()
 
         return RewardEvent(
             storeName: storeName,
             receiptAmount: receiptAmount,
-            coinsAwarded: multiplied,
-            spinsAwarded: tierProgress.currentTier.spinsPerReceipt,
+            coinsAwarded: baseAmount,
+            spinsAwarded: 0,
             mysteryBonus: bonus
         )
     }
@@ -212,6 +214,7 @@ class GamificationManager: ObservableObject {
         if !spinTestMode {
             guard spinsAvailable > 0 else { return nil }
         }
+        // Optimistic local decrement for immediate UI feedback
         spinsAvailable -= 1
 
         do {
@@ -221,16 +224,9 @@ class GamificationManager: ObservableObject {
                 forceSegment: spinTestMode ? forcedSegmentIndex : nil
             )
 
-            // Update wallet with server-authoritative balance
-            wallet = WalletBalance(euros: result.newBalance)
-
-            // Handle free spin (Try Again)
-            if result.grantsFreeSpin {
-                spinsAvailable += 1
-            }
-
-            // NOTE: hasDoubleNext is updated by the view after wheel animation completes,
-            // not here, to avoid showing the banner before the wheel stops.
+            // NOTE: wallet, spinsAvailable, and hasDoubleNext are updated by the view
+            // after wheel animation completes via applySpinResult(), not here,
+            // to avoid updating counters before the wheel stops.
 
             lastSpinResult = result
 
@@ -249,16 +245,19 @@ class GamificationManager: ObservableObject {
         }
     }
 
-    /// Called by the view after wheel animation completes to update the double-next banner.
-    /// Only consume 2x when a cash prize was actually doubled, and activate it when granted.
-    func applyDoubleNextState(from result: SpinResult) {
+    /// Called by the view after wheel animation completes to sync all state.
+    /// Deferred so counters don't update while the wheel is still spinning.
+    func applySpinResult(_ result: SpinResult) {
+        // Sync wallet and spins with server-authoritative values
+        wallet = WalletBalance(euros: result.newBalance)
+        spinsAvailable = result.spinsRemaining
+
+        // Update double-next state
         if result.grantsDoubleNext {
             hasDoubleNext = true
         } else if result.isDoubled {
-            // 2x was consumed by a cash/mystery/jackpot win
             hasDoubleNext = false
         }
-        // Otherwise (retry, non-doubled cash with no 2x active): leave hasDoubleNext unchanged
         saveState()
     }
 
@@ -303,30 +302,6 @@ class GamificationManager: ObservableObject {
             let spinStr = reward.label.components(separatedBy: " ").first ?? "1"
             spinsAvailable += Int(spinStr) ?? 1
         }
-    }
-
-    private func incrementReceiptCount() {
-        tierProgress.receiptsThisMonth += 1
-
-        let newTier = tierForReceipts(tierProgress.receiptsThisMonth)
-        if newTier != tierProgress.currentTier {
-            tierProgress.currentTier = newTier
-            if newTier == .gold    { unlockBadgeIfNeeded(id: "gold_tier") }
-            if newTier == .silver  { unlockBadgeIfNeeded(id: "silver_tier") }
-
-            NotificationCenter.default.post(
-                name: .tierChanged,
-                object: nil,
-                userInfo: ["to": newTier.rawValue]
-            )
-        }
-    }
-
-    private func tierForReceipts(_ count: Int) -> UserTier {
-        if count >= 12 { return .diamond }
-        if count >= 8  { return .gold }
-        if count >= 5  { return .silver }
-        return .bronze
     }
 
     private func unlockBadgeIfNeeded(id: String) {

@@ -21,18 +21,25 @@ struct WalletCardView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
                 Spacer()
-                Text(gm.tierProgress.currentTier.rawValue)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(
-                        LinearGradient(
-                            colors: gm.tierProgress.currentTier.gradientColors,
-                            startPoint: .leading, endPoint: .trailing
-                        )
+                HStack(spacing: 4) {
+                    if gm.goldTierStatus.isGoldTier {
+                        Image(systemName: "medal.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.black.opacity(0.7))
+                    }
+                    Text(gm.goldTierStatus.displayName)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(gm.goldTierStatus.isGoldTier ? .black : .white.opacity(0.35))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    LinearGradient(
+                        colors: gm.goldTierStatus.gradientColors,
+                        startPoint: .leading, endPoint: .trailing
                     )
-                    .clipShape(Capsule())
+                )
+                .clipShape(Capsule())
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
