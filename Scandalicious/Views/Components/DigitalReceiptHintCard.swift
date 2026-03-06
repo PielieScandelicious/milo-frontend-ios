@@ -74,10 +74,10 @@ struct DigitalReceiptHintCard: View {
                         cashbackTableRow(spend: "Spend", rate: "Cashback", spins: "Gold Tier", isHeader: true)
                         cashbackTableRow(spend: "\u{20AC}0 \u{2013} \u{20AC}80", rate: "0.50%", spins: "\u{2014}")
                         cashbackTableRow(spend: "\u{20AC}80 \u{2013} \u{20AC}160", rate: "0.60%", spins: "+1 spin")
-                        cashbackTableRow(spend: "\u{20AC}160 \u{2013} \u{20AC}240", rate: "0.70%", spins: "+2 spins")
-                        cashbackTableRow(spend: "\u{20AC}240 \u{2013} \u{20AC}320", rate: "0.80%", spins: "+3 spins")
-                        cashbackTableRow(spend: "\u{20AC}320 \u{2013} \u{20AC}400", rate: "0.90%", spins: "\u{2014}")
-                        cashbackTableRow(spend: "\u{20AC}400 \u{2013} \u{20AC}500", rate: "1.00%", spins: "\u{2014}")
+                        cashbackTableRow(spend: "\u{20AC}160 \u{2013} \u{20AC}240", rate: "0.70%", spins: "+1 spin")
+                        cashbackTableRow(spend: "\u{20AC}240 \u{2013} \u{20AC}320", rate: "0.80%", spins: "+1 spin")
+                        cashbackTableRow(spend: "\u{20AC}320 \u{2013} \u{20AC}400", rate: "0.90%", spins: "+1 spin")
+                        cashbackTableRow(spend: "\u{20AC}400 \u{2013} \u{20AC}500", rate: "1.00%", spins: "+1 spin")
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
@@ -110,7 +110,7 @@ struct DigitalReceiptHintCard: View {
                             .foregroundStyle(.white.opacity(0.7))
                     }
 
-                    Text("Upload at least one receipt over \u{20AC}50 every 7 days to keep Gold Tier. Gold Tier earns you free spins starting from the second cashback segment: 1 spin at \u{20AC}80+, 2 spins at \u{20AC}160+, and 3 spins (max) at \u{20AC}240+.")
+                    Text("Upload at least one receipt over \u{20AC}50 every 7 days to keep Gold Tier. Gold Tier earns you +1 free spin for each cashback segment from \u{20AC}80+, up to 5 spins (max) at \u{20AC}500.")
                         .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(.white.opacity(0.3))
                         .fixedSize(horizontal: false, vertical: true)

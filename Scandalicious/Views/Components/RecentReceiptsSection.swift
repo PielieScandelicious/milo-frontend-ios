@@ -13,11 +13,15 @@ struct RecentReceiptsSection: View {
 
     @State private var isExpanded = false
 
+    private var cappedReceipts: [RecentReceipt] {
+        Array(receipts.prefix(10))
+    }
+
     private var visibleReceipts: [RecentReceipt] {
         if isExpanded {
-            return receipts
+            return cappedReceipts
         } else {
-            return Array(receipts.prefix(3))
+            return Array(cappedReceipts.prefix(3))
         }
     }
 
@@ -40,7 +44,7 @@ struct RecentReceiptsSection: View {
 
                     Spacer()
 
-                    Text("\(receipts.count)")
+                    Text("\(cappedReceipts.count)")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.3))
 
