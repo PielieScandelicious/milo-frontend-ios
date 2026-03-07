@@ -97,7 +97,7 @@ struct HomeTabView: View {
     // MARK: - Main Content
 
     private var mainContent: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
                 // Milo dachshund easter egg (always visible when game not open)
                 if !showMiloGame {
@@ -184,6 +184,7 @@ struct HomeTabView: View {
             }
             .padding(.top, 0)
         }
+        .scrollBounceBehavior(.basedOnSize)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(backgroundGradient)
         .opacity(contentOpacity)
