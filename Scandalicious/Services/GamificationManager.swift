@@ -21,7 +21,6 @@ class GamificationManager: ObservableObject {
     @Published private(set) var goldTierStatus: GoldTierStatus = GoldTierStatus(isGoldTier: true)
     @Published private(set) var badges: [Badge] = Badge.allBadges
     @Published private(set) var spinsAvailable: Int = 0
-    @Published private(set) var ownedCoupons: [Coupon] = []
     @Published private(set) var lastUnlockedBadge: Badge? = nil
     @Published private(set) var lastSpinResult: SpinResult? = nil
 
@@ -102,7 +101,6 @@ class GamificationManager: ObservableObject {
         goldTierStatus = GoldTierStatus(isGoldTier: true)
         badges = Badge.allBadges.map { var b = $0; b.isUnlocked = false; b.unlockedAt = nil; return b }
         spinsAvailable = 0
-        ownedCoupons = []
         referralCode = nil
         referralCount = 0
         referralEarned = 0
@@ -155,11 +153,6 @@ class GamificationManager: ObservableObject {
             badges = Badge.allBadges
         }
 
-        if let data = userDefaults.data(forKey: "\(prefix)_ownedCoupons"),
-           let decoded = try? decoder.decode([Coupon].self, from: data) {
-            ownedCoupons = decoded
-        }
-
         // Referral state
         referralCode = userDefaults.string(forKey: "\(prefix)_referralCode")
         referralCount = userDefaults.integer(forKey: "\(prefix)_referralCount")
@@ -181,7 +174,6 @@ class GamificationManager: ObservableObject {
         if let data = try? encoder.encode(streak)         { userDefaults.set(data, forKey: "\(prefix)_streak") }
         if let data = try? encoder.encode(goldTierStatus) { userDefaults.set(data, forKey: "\(prefix)_goldTier") }
         if let data = try? encoder.encode(badges)         { userDefaults.set(data, forKey: "\(prefix)_badges") }
-        if let data = try? encoder.encode(ownedCoupons) { userDefaults.set(data, forKey: "\(prefix)_ownedCoupons") }
         userDefaults.set(spinsAvailable, forKey: "\(prefix)_spins")
         userDefaults.set(hasDoubleNext, forKey: "\(prefix)_doubleNext")
         if let code = referralCode { userDefaults.set(code, forKey: "\(prefix)_referralCode") }
@@ -300,20 +292,6 @@ class GamificationManager: ObservableObject {
             hasDoubleNext = false
         }
         saveState()
-    }
-
-    func redeemCoupon(_ coupon: Coupon) -> Bool {
-        guard wallet.cents >= coupon.priceCents else { return false }
-
-        wallet.cents -= coupon.priceCents
-        var purchased = coupon
-        purchased.isRedeemed = false
-        purchased.redeemedAt = Date()
-        ownedCoupons.append(purchased)
-
-        unlockBadgeIfNeeded(id: "coupon_buyer")
-        saveState()
-        return true
     }
 
     func checkStreakStatus() {

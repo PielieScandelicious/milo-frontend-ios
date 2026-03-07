@@ -53,38 +53,24 @@ struct RewardsView: View {
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 12)
 
-                    // Referral card
-                    ReferralCardView()
-                        .padding(.horizontal, 20)
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 12)
-
-                    // Coupon store
-                    CouponStoreView()
-                        .padding(.horizontal, 20)
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 12)
-
-                    // Withdraw cash
-                    WithdrawCardView()
-                        .padding(.horizontal, 20)
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 12)
-
-                    // My coupons
-                    if !gm.ownedCoupons.isEmpty {
-                        MyCouponsView()
-                            .padding(.horizontal, 20)
-                            .opacity(appeared ? 1 : 0)
-                            .offset(y: appeared ? 0 : 12)
-                    }
-
                     // Streak card
                     StreakCardView(streak: gm.streak) {
                         Task {
                             _ = try? await gm.claimStreakReward()
                         }
                     }
+                        .padding(.horizontal, 20)
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+
+                    // Referral card
+                    ReferralCardView()
+                        .padding(.horizontal, 20)
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+
+                    // Withdraw cash
+                    WithdrawCardView()
                         .padding(.horizontal, 20)
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 12)

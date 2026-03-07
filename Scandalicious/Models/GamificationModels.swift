@@ -163,7 +163,6 @@ struct Badge: Identifiable, Codable {
         Badge(id: "big_spender",   name: "Big Spender",     description: "Scan a receipt over €100",                icon: "banknote.fill",       iconColor: CodableColor(Color(red: 0.2, green: 0.8, blue: 0.4)),  isUnlocked: true,  unlockedAt: Date().addingTimeInterval(-86400 * 5)),
         Badge(id: "lucky_spin",    name: "Lucky Spin",      description: "Win €10 or more on the wheel",            icon: "sparkles",            iconColor: CodableColor(.yellow),                                  isUnlocked: false, unlockedAt: nil),
         Badge(id: "streak_8",      name: "Dedicated",       description: "Reach an 8-week streak",                  icon: "flame.fill",          iconColor: CodableColor(.red),                                     isUnlocked: false, unlockedAt: nil),
-        Badge(id: "coupon_buyer",  name: "Deal Hunter",     description: "Redeem your first coupon",                icon: "tag.fill",            iconColor: CodableColor(.purple),                                  isUnlocked: false, unlockedAt: nil),
         Badge(id: "jackpot",       name: "Jackpot!",        description: "Hit the €1000 jackpot",                   icon: "crown.fill",          iconColor: CodableColor(.yellow),                                  isUnlocked: false, unlockedAt: nil),
         Badge(id: "night_scanner", name: "Night Owl",       description: "Upload a receipt after 10 PM",            icon: "moon.fill",           iconColor: CodableColor(.indigo),                                  isUnlocked: false, unlockedAt: nil),
         Badge(id: "collector",     name: "Collector",       description: "Scan receipts from 5 different stores",   icon: "storefront.fill",     iconColor: CodableColor(.cyan),                                    isUnlocked: false, unlockedAt: nil),
@@ -257,31 +256,3 @@ struct RewardEvent {
     static let userInfoKey = "gamification.rewardEvent"
 }
 
-// MARK: - Coupon
-
-struct Coupon: Identifiable, Codable {
-    let id: String
-    let storeName: String
-    let storeLogoColor: CodableColor
-    let title: String
-    let description: String
-    let discountText: String
-    let priceCents: Int
-    let expiresAt: Date
-    var isRedeemed: Bool
-    var redeemedAt: Date?
-    var qrPayload: String
-
-    var priceEuros: Double { Double(priceCents) / 100.0 }
-    var priceFormatted: String { String(format: "€%.2f", priceEuros) }
-    var isExpired: Bool { Date() > expiresAt }
-
-    static let mockCoupons: [Coupon] = [
-        Coupon(id: "c1", storeName: "Lidl",         storeLogoColor: CodableColor(Color(red: 0.0, green: 0.5, blue: 1.0)),   title: "10% off Fresh Produce",  description: "Valid on all fresh produce at Lidl",          discountText: "10% off",   priceCents: 150, expiresAt: Date().addingTimeInterval(86400 * 14), isRedeemed: false, redeemedAt: nil, qrPayload: "LIDL-FRESH-10PCT"),
-        Coupon(id: "c2", storeName: "Colruyt",      storeLogoColor: CodableColor(Color(red: 0.9, green: 0.1, blue: 0.1)),   title: "€2 Off Your Next Shop",  description: "Min. spend €20 at Colruyt",                   discountText: "€2 off",    priceCents: 100, expiresAt: Date().addingTimeInterval(86400 * 30), isRedeemed: false, redeemedAt: nil, qrPayload: "COL-2EUR-OFF"),
-        Coupon(id: "c3", storeName: "Delhaize",     storeLogoColor: CodableColor(Color(red: 0.1, green: 0.6, blue: 0.2)),   title: "Free Yoghurt",           description: "Free Alpro yoghurt with any purchase",        discountText: "Free item", priceCents: 200, expiresAt: Date().addingTimeInterval(86400 * 7),  isRedeemed: false, redeemedAt: nil, qrPayload: "DEL-YOGHURT-FREE"),
-        Coupon(id: "c4", storeName: "Aldi",         storeLogoColor: CodableColor(Color(red: 0.0, green: 0.45, blue: 0.85)), title: "€1 Off Bakery Items",    description: "Valid on all bakery items at Aldi",            discountText: "€1 off",    priceCents: 50,  expiresAt: Date().addingTimeInterval(86400 * 21), isRedeemed: false, redeemedAt: nil, qrPayload: "ALDI-BAKERY-1EUR"),
-        Coupon(id: "c5", storeName: "Carrefour",    storeLogoColor: CodableColor(Color(red: 0.0, green: 0.45, blue: 0.8)),  title: "15% off Wine & Beer",    description: "Valid on selected wines and beers",            discountText: "15% off",   priceCents: 300, expiresAt: Date().addingTimeInterval(86400 * 10), isRedeemed: false, redeemedAt: nil, qrPayload: "CAR-WINE-15PCT"),
-        Coupon(id: "c6", storeName: "Albert Heijn",  storeLogoColor: CodableColor(Color(red: 0.0, green: 0.55, blue: 0.95)), title: "Bonus Points x2",       description: "Double bonus points this weekend",             discountText: "2x points", priceCents: 75,  expiresAt: Date().addingTimeInterval(86400 * 3),  isRedeemed: false, redeemedAt: nil, qrPayload: "AH-DOUBLE-BONUS"),
-    ]
-}
