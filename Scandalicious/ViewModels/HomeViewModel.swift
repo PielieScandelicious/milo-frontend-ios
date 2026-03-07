@@ -19,6 +19,7 @@ struct RecentReceipt: Identifiable {
     let spinsAwarded: Int
     let date: Date
     var isReferralReward: Bool = false
+    var isStreakReward: Bool = false
 
     /// Map a backend cashback transaction to a displayable receipt.
     static func from(_ tx: CashbackTransactionResponse) -> RecentReceipt {
@@ -26,6 +27,7 @@ struct RecentReceipt: Identifiable {
             tx.storeName?.localizedCaseInsensitiveContains($0.displayName) == true
         }
         let color = store?.accentColor ?? .gray
+        let streakOrange = Color(red: 1.0, green: 0.5, blue: 0.0)
 
         // Parse ISO 8601 created_at
         let formatter = ISO8601DateFormatter()
@@ -34,15 +36,29 @@ struct RecentReceipt: Identifiable {
             ?? ISO8601DateFormatter().date(from: tx.createdAt)
             ?? Date()
 
+        let displayName: String
+        let displayColor: Color
+        if tx.isStreakReward {
+            displayName = tx.storeName ?? "Streak Reward"
+            displayColor = streakOrange
+        } else if tx.isReferralReward {
+            displayName = "Referral Bonus"
+            displayColor = Color(red: 0.35, green: 0.65, blue: 1.0)
+        } else {
+            displayName = tx.storeName?.localizedCapitalized ?? "Store"
+            displayColor = color
+        }
+
         return RecentReceipt(
             id: tx.id,
-            storeName: tx.isReferralReward ? "Referral Bonus" : (tx.storeName?.localizedCapitalized ?? "Store"),
-            storeColor: tx.isReferralReward ? Color(red: 0.35, green: 0.65, blue: 1.0) : color,
+            storeName: displayName,
+            storeColor: displayColor,
             totalAmount: tx.receiptTotal,
             cashbackAmount: tx.cashbackAmount,
             spinsAwarded: tx.spinsAwarded,
             date: date,
-            isReferralReward: tx.isReferralReward
+            isReferralReward: tx.isReferralReward,
+            isStreakReward: tx.isStreakReward
         )
     }
 }
@@ -77,14 +93,19 @@ class HomeViewModel {
     var recentReceipts: [RecentReceipt] = []
 
     private var completionObserver: Any?
+    private var rewardClaimedObserver: Any?
 
     init() {
         loadRecentReceipts()
         observeReceiptCompletion()
+        observeRewardClaimed()
     }
 
     deinit {
         if let observer = completionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = rewardClaimedObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
@@ -196,6 +217,18 @@ class HomeViewModel {
             Task { @MainActor in
                 await self.fetchCashbackForReceipt(receiptId: receiptId, updateUI: false)
             }
+        }
+    }
+
+    // MARK: - Reward Claimed Observer
+
+    private func observeRewardClaimed() {
+        rewardClaimedObserver = NotificationCenter.default.addObserver(
+            forName: .rewardClaimed,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.loadRecentReceipts()
         }
     }
 

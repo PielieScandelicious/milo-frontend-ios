@@ -70,6 +70,7 @@ class GamificationManager: ObservableObject {
                 try? await Task.sleep(for: .seconds(1))
                 self?.fetchAndSyncWallet()
                 self?.fetchReferralInfo()
+                self?.fetchStreakStatus()
             }
         }
     }
@@ -168,8 +169,9 @@ class GamificationManager: ObservableObject {
         userDefaults.set(true, forKey: "\(prefix)_initialized")
         saveState()
 
-        // Sync wallet with backend cashback balance
+        // Sync wallet and streak with backend
         fetchAndSyncWallet()
+        fetchStreakStatus()
     }
 
     private func saveState() {
@@ -233,7 +235,6 @@ class GamificationManager: ObservableObject {
         }
 
         // Spins are now awarded server-side via cashback transaction
-        updateStreakForReceipt()
         saveState()
 
         return RewardEvent(
@@ -248,6 +249,7 @@ class GamificationManager: ObservableObject {
     @Published private(set) var hasDoubleNext: Bool = false
     @Published var spinTestMode: Bool = false
     @Published var forcedSegmentIndex: Int? = nil
+    @Published var streakTestMode: Bool = false
 
     func spinWheel(isRespin: Bool = false) async -> SpinResult? {
         if !spinTestMode {
@@ -315,10 +317,77 @@ class GamificationManager: ObservableObject {
     }
 
     func checkStreakStatus() {
-        guard let lastDate = streak.lastReceiptDate else { return }
-        let daysSince = Calendar.current.dateComponents([.day], from: lastDate, to: Date()).day ?? 0
-        streak.isAtRisk = daysSince >= 5 && daysSince < 7
-        saveState()
+        fetchStreakStatus()
+    }
+
+    // MARK: - Streak
+
+    func fetchStreakStatus() {
+        Task {
+            do {
+                let status = try await CashbackAPIService.shared.getStreakStatus()
+                self.streak = StreakData(
+                    weekCount: status.weekCount,
+                    lastReceiptDate: nil,
+                    hasShield: false,
+                    isAtRisk: status.isAtRisk
+                )
+                self.streak.claimableReward = status.claimableReward
+                self.streak.backendCycle = status.currentCycle
+
+                // Unlock streak badges based on backend week count
+                if status.weekCount >= 2 { unlockBadgeIfNeeded(id: "streak_2") }
+                if status.weekCount >= 4 { unlockBadgeIfNeeded(id: "streak_4") }
+                if status.weekCount >= 8 { unlockBadgeIfNeeded(id: "streak_8") }
+
+                self.saveState()
+            } catch {
+                print("[GamificationManager] Streak fetch failed: \(error)")
+            }
+        }
+    }
+
+    func claimStreakReward() async throws -> StreakClaimResponse {
+        let response = try await CashbackAPIService.shared.claimStreak()
+        if response.success {
+            wallet = WalletBalance(euros: response.newBalance)
+            spinsAvailable = response.newSpinsAvailable
+            streak.claimableReward = nil
+            saveState()
+            fetchStreakStatus()
+            NotificationCenter.default.post(name: .rewardClaimed, object: nil)
+        }
+        return response
+    }
+
+    func testAdvanceStreak() async {
+        do {
+            _ = try await CashbackAPIService.shared.testAdvanceStreak()
+            fetchStreakStatus()
+            fetchAndSyncWallet()
+        } catch {
+            print("[GamificationManager] Test advance streak failed: \(error)")
+        }
+    }
+
+    func testSetStreakWeek(_ week: Int) async {
+        do {
+            _ = try await CashbackAPIService.shared.testSetStreakWeek(week)
+            fetchStreakStatus()
+            fetchAndSyncWallet()
+        } catch {
+            print("[GamificationManager] Test set streak week failed: \(error)")
+        }
+    }
+
+    func testResetStreak() async {
+        do {
+            _ = try await CashbackAPIService.shared.testResetStreak()
+            fetchStreakStatus()
+            fetchAndSyncWallet()
+        } catch {
+            print("[GamificationManager] Test reset streak failed: \(error)")
+        }
     }
 
     // MARK: - Referral
@@ -417,26 +486,6 @@ class GamificationManager: ObservableObject {
     }
 
     // MARK: - Private Helpers
-
-    private func updateStreakForReceipt() {
-        let now = Date()
-        streak.lastReceiptDate = now
-        streak.isAtRisk = false
-        streak.weekCount += 1
-
-        if streak.weekCount == 2 { unlockBadgeIfNeeded(id: "streak_2") }
-        if streak.weekCount == 4 { unlockBadgeIfNeeded(id: "streak_4") }
-        if streak.weekCount == 8 { unlockBadgeIfNeeded(id: "streak_8") }
-
-        // Award weekly streak reward
-        let reward = StreakData.weeklyReward(for: streak.weekCount)
-        if reward.isCash {
-            wallet.add(euros: reward.cashValue)
-        } else {
-            let spinStr = reward.label.components(separatedBy: " ").first ?? "1"
-            spinsAvailable += Int(spinStr) ?? 1
-        }
-    }
 
     private func unlockBadgeIfNeeded(id: String) {
         guard let index = badges.firstIndex(where: { $0.id == id }),

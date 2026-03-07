@@ -80,7 +80,11 @@ struct RewardsView: View {
                     }
 
                     // Streak card
-                    StreakCardView(streak: gm.streak)
+                    StreakCardView(streak: gm.streak) {
+                        Task {
+                            _ = try? await gm.claimStreakReward()
+                        }
+                    }
                         .padding(.horizontal, 20)
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 12)
@@ -120,6 +124,7 @@ struct RewardsView: View {
                 appeared = true
             }
             gm.fetchAndSyncWallet()
+            gm.fetchStreakStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: .badgeUnlocked)) { _ in
             if let badge = gm.lastUnlockedBadge {

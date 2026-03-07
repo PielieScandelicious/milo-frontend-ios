@@ -12,6 +12,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let rewardEarned  = Notification.Name("gamification.rewardEarned")
+    static let rewardClaimed = Notification.Name("gamification.rewardClaimed")
     static let spinCompleted = Notification.Name("gamification.spinCompleted")
     static let badgeUnlocked = Notification.Name("gamification.badgeUnlocked")
 }
@@ -67,30 +68,43 @@ struct StreakData: Codable {
     var lastReceiptDate: Date?
     var hasShield: Bool
     var isAtRisk: Bool
+    var claimableReward: StreakClaimableRewardResponse?
+    var backendCycle: [StreakCycleEntryResponse]?
 
-    /// Every week has a reward. Every 4th week is cash (increasing); other weeks are spins (increasing).
+    enum CodingKeys: String, CodingKey {
+        case weekCount, lastReceiptDate, hasShield, isAtRisk
+    }
+
+    var hasClaimableReward: Bool {
+        claimableReward != nil
+    }
+
+    /// Reward schedule:
+    /// Weeks 1-3: 1 spin | Week 4: €1
+    /// Weeks 5-7: 2 spins | Week 8: €1
+    /// Weeks 9-11: 3 spins | Week 12: €1
+    /// After: 3 spins/week, €1 every 4th week
     static func weeklyReward(for week: Int) -> (label: String, icon: String, isCash: Bool, cashValue: Double) {
-        if week > 0 && week % 4 == 0 {
-            // Cash every 4 weeks: €0.50 base, doubles every 3 cash milestones
-            let cashIndex = week / 4  // 1, 2, 3, 4, 5 ...
-            let amounts: [Double] = [0.50, 1.0, 1.50, 2.0, 3.0, 5.0, 7.50, 10.0, 15.0, 20.0, 30.0, 50.0, 75.0]
-            let amount = cashIndex <= amounts.count ? amounts[cashIndex - 1] : amounts.last!
-            let label = amount >= 1.0 ? String(format: "€%.0f", amount) : String(format: "€%.2f", amount)
-            return (label, "banknote.fill", true, amount)
+        guard week > 0 else {
+            return ("1 spin", "arrow.trianglehead.2.clockwise.rotate.90", false, 0)
         }
-        // Spin weeks: base 1 spin, +1 every 4 weeks
-        let spins = 1 + (week / 4)
+        if week % 4 == 0 {
+            return ("€1", "banknote.fill", true, 1.0)
+        }
+        let cycle = min((week - 1) / 4, 2)
+        let spins = cycle + 1
         return ("\(spins) spin\(spins > 1 ? "s" : "")", "arrow.trianglehead.2.clockwise.rotate.90", false, 0)
     }
 
-    var nextWeekReward: (label: String, icon: String, isCash: Bool, cashValue: Double) {
-        StreakData.weeklyReward(for: weekCount + 1)
-    }
-
-    /// The current 4-week cycle (e.g. week 10 → cycle is W9, W10, W11, W12)
-    /// Each entry includes whether it's completed (week <= weekCount)
     var currentCycle: [(week: Int, label: String, icon: String, isCash: Bool, completed: Bool)] {
-        let cycleStart = lastCashWeek + 1  // first week after last cash
+        if let bc = backendCycle {
+            return bc.map { entry in
+                let icon = entry.rewardType == "cash" ? "banknote.fill" : "arrow.trianglehead.2.clockwise.rotate.90"
+                return (entry.week, entry.label, icon, entry.rewardType == "cash", entry.completed)
+            }
+        }
+        // Fallback to local computation
+        let cycleStart = lastCashWeek + 1
         return (0..<4).map { i in
             let w = cycleStart + i
             let r = StreakData.weeklyReward(for: w)
@@ -98,17 +112,14 @@ struct StreakData: Codable {
         }
     }
 
-    /// Last cash week that was reached (or 0 if none yet)
     var lastCashWeek: Int {
         (weekCount / 4) * 4
     }
 
-    /// Next cash milestone week
     var nextCashWeek: Int {
         lastCashWeek + 4
     }
 
-    /// Weeks remaining until next cash reward
     var weeksUntilCash: Int {
         nextCashWeek - weekCount
     }

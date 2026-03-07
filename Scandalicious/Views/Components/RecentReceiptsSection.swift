@@ -125,18 +125,32 @@ private struct RecentReceiptRow: View {
         endPoint: .trailing
     )
     private let referralBlue = Color(red: 0.35, green: 0.65, blue: 1.0)
+    private let streakOrange = Color(red: 1.0, green: 0.5, blue: 0.0)
+    private let cashGreen = Color(red: 0.2, green: 0.85, blue: 0.4)
+
+    private var iconName: String {
+        if receipt.isStreakReward { return "flame.fill" }
+        if receipt.isReferralReward { return "person.2.fill" }
+        return "storefront.fill"
+    }
+
+    private var iconColor: Color {
+        if receipt.isStreakReward { return streakOrange }
+        if receipt.isReferralReward { return referralBlue }
+        return receipt.storeColor
+    }
 
     var body: some View {
         HStack(spacing: 12) {
             // Icon
             ZStack {
                 Circle()
-                    .fill((receipt.isReferralReward ? referralBlue : receipt.storeColor).opacity(0.15))
+                    .fill(iconColor.opacity(0.15))
                     .frame(width: 36, height: 36)
 
-                Image(systemName: receipt.isReferralReward ? "person.2.fill" : "storefront.fill")
+                Image(systemName: iconName)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(receipt.isReferralReward ? referralBlue : receipt.storeColor)
+                    .foregroundStyle(iconColor)
             }
 
             // Name + date
@@ -155,7 +169,18 @@ private struct RecentReceiptRow: View {
 
             // Amounts
             VStack(alignment: .trailing, spacing: 3) {
-                if receipt.isReferralReward {
+                if receipt.isStreakReward {
+                    // Streak rewards: show cash or spins as primary
+                    if receipt.cashbackAmount > 0 {
+                        Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(cashGreen)
+                    } else if receipt.spinsAwarded > 0 {
+                        Text("+\(receipt.spinsAwarded) \(receipt.spinsAwarded == 1 ? "spin" : "spins")")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(goldGradient)
+                    }
+                } else if receipt.isReferralReward {
                     Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(referralBlue)
@@ -165,19 +190,21 @@ private struct RecentReceiptRow: View {
                         .foregroundStyle(.white)
                 }
 
-                HStack(spacing: 6) {
-                    if !receipt.isReferralReward {
-                        Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(cashbackGradient)
-                    }
+                if !receipt.isStreakReward {
+                    HStack(spacing: 6) {
+                        if !receipt.isReferralReward {
+                            Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(cashbackGradient)
+                        }
 
-                    if receipt.spinsAwarded > 0 {
-                        Text("+\(receipt.spinsAwarded) \(receipt.spinsAwarded == 1 ? "spin" : "spins")")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(receipt.isReferralReward
-                                ? LinearGradient(colors: [referralBlue, referralBlue.opacity(0.7)], startPoint: .leading, endPoint: .trailing)
-                                : goldGradient)
+                        if receipt.spinsAwarded > 0 {
+                            Text("+\(receipt.spinsAwarded) \(receipt.spinsAwarded == 1 ? "spin" : "spins")")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(receipt.isReferralReward
+                                    ? LinearGradient(colors: [referralBlue, referralBlue.opacity(0.7)], startPoint: .leading, endPoint: .trailing)
+                                    : goldGradient)
+                        }
                     }
                 }
             }

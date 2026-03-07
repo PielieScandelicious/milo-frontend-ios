@@ -39,6 +39,7 @@ struct CashbackTransactionResponse: Codable, Identifiable {
     let receiptDate: String?
     let spinsAwarded: Int
     let isReferralReward: Bool
+    let isStreakReward: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -52,6 +53,23 @@ struct CashbackTransactionResponse: Codable, Identifiable {
         case receiptDate = "receipt_date"
         case spinsAwarded = "spins_awarded"
         case isReferralReward = "is_referral_reward"
+        case isStreakReward = "is_streak_reward"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        receiptId = try container.decode(String.self, forKey: .receiptId)
+        receiptTotal = try container.decode(Double.self, forKey: .receiptTotal)
+        cashbackAmount = try container.decode(Double.self, forKey: .cashbackAmount)
+        effectiveRate = try container.decode(Double.self, forKey: .effectiveRate)
+        status = try container.decode(String.self, forKey: .status)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        storeName = try container.decodeIfPresent(String.self, forKey: .storeName)
+        receiptDate = try container.decodeIfPresent(String.self, forKey: .receiptDate)
+        spinsAwarded = try container.decodeIfPresent(Int.self, forKey: .spinsAwarded) ?? 0
+        isReferralReward = try container.decodeIfPresent(Bool.self, forKey: .isReferralReward) ?? false
+        isStreakReward = try container.decodeIfPresent(Bool.self, forKey: .isStreakReward) ?? false
     }
 }
 
@@ -128,6 +146,68 @@ struct CashbackPreviewResponse: Codable {
     }
 }
 
+// MARK: - Streak Response Models
+
+struct StreakCycleEntryResponse: Codable {
+    let week: Int
+    let label: String
+    let rewardType: String
+    let completed: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case week, label, completed
+        case rewardType = "reward_type"
+    }
+}
+
+struct StreakClaimableRewardResponse: Codable {
+    let rewardId: String
+    let weekNumber: Int
+    let rewardType: String
+    let spinsAmount: Int
+    let cashAmount: Double
+
+    enum CodingKeys: String, CodingKey {
+        case rewardId = "reward_id"
+        case weekNumber = "week_number"
+        case rewardType = "reward_type"
+        case spinsAmount = "spins_amount"
+        case cashAmount = "cash_amount"
+    }
+}
+
+struct StreakStatusResponse: Codable {
+    let weekCount: Int
+    let currentCycle: [StreakCycleEntryResponse]
+    let claimableReward: StreakClaimableRewardResponse?
+    let isAtRisk: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case weekCount = "week_count"
+        case currentCycle = "current_cycle"
+        case claimableReward = "claimable_reward"
+        case isAtRisk = "is_at_risk"
+    }
+}
+
+struct StreakClaimResponse: Codable {
+    let success: Bool
+    let rewardType: String
+    let spinsCredited: Int
+    let cashCredited: Double
+    let newBalance: Double
+    let newSpinsAvailable: Int
+
+    enum CodingKeys: String, CodingKey {
+        case success
+        case rewardType = "reward_type"
+        case spinsCredited = "spins_credited"
+        case cashCredited = "cash_credited"
+        case newBalance = "new_balance"
+        case newSpinsAvailable = "new_spins_available"
+    }
+}
+
 // MARK: - API Errors
 
 enum CashbackAPIError: LocalizedError {
@@ -198,6 +278,34 @@ actor CashbackAPIService {
         )
     }
 
+    // MARK: - Streak Endpoints
+
+    func fetchStreakStatus() async throws -> StreakStatusResponse {
+        return try await performRequest(endpoint: "/streak/status")
+    }
+
+    func claimStreakReward() async throws -> StreakClaimResponse {
+        return try await performPostRequestWithData(endpoint: "/streak/claim", bodyData: Data())
+    }
+
+    func testAdvanceStreak(amount: Double = 100) async throws -> StreakStatusResponse {
+        return try await performPostRequestWithData(
+            endpoint: "/streak/test/advance?amount=\(amount)",
+            bodyData: Data()
+        )
+    }
+
+    func testSetStreakWeek(_ week: Int) async throws -> StreakStatusResponse {
+        return try await performPostRequestWithData(
+            endpoint: "/streak/test/set-week?week=\(week)",
+            bodyData: Data()
+        )
+    }
+
+    func testResetStreak() async throws -> StreakStatusResponse {
+        return try await performPostRequestWithData(endpoint: "/streak/test/reset", bodyData: Data())
+    }
+
     // MARK: - Spin Endpoints
 
     func spinWheel(hasDoubleNext: Bool = false, isRespin: Bool = false, forceSegment: Int? = nil) async throws -> SpinResult {
@@ -228,6 +336,14 @@ actor CashbackAPIService {
 
     nonisolated func performSpin(hasDoubleNext: Bool = false, isRespin: Bool = false, forceSegment: Int? = nil) async throws -> SpinResult {
         return try await spinWheel(hasDoubleNext: hasDoubleNext, isRespin: isRespin, forceSegment: forceSegment)
+    }
+
+    nonisolated func getStreakStatus() async throws -> StreakStatusResponse {
+        return try await fetchStreakStatus()
+    }
+
+    nonisolated func claimStreak() async throws -> StreakClaimResponse {
+        return try await claimStreakReward()
     }
 
     // MARK: - Private
