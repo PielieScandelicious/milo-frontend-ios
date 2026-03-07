@@ -210,6 +210,11 @@ class BudgetViewModel: ObservableObject {
             let newProgress = progressResponse.toBudgetProgress()
             print("[BudgetVM] ✅ API returned: spend=€\(newProgress.currentSpend), budget=€\(newProgress.budget.monthlyAmount), categories=\(newProgress.categoryProgress.count)")
             state = .active(newProgress)
+
+            // Check budget badges at end of month (last 2 days)
+            if newProgress.daysElapsed >= newProgress.daysInMonth - 2, newProgress.budget.monthlyAmount > 0 {
+                GamificationManager.shared.checkBudgetBadges(spentRatio: newProgress.spendRatio)
+            }
         } catch let error as BudgetAPIError {
             switch error {
             case .notFound, .noBudgetSet:
