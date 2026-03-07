@@ -10,8 +10,6 @@ import SwiftUI
 struct RewardsView: View {
     @ObservedObject private var gm = GamificationManager.shared
     @State private var showSpinWheel = false
-    @State private var showBadgeUnlock = false
-    @State private var badgeToShow: Badge? = nil
     @State private var appeared = false
     @State private var contentOpacity: Double = 0
     @State private var showBadgeTestMode = false
@@ -95,16 +93,6 @@ struct RewardsView: View {
                 .padding(.top, 20)
             }
 
-            // Badge unlock overlay
-            if showBadgeUnlock, let badge = badgeToShow {
-                BadgeUnlockView(badge: badge) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showBadgeUnlock = false
-                    }
-                }
-                .transition(.opacity)
-                .zIndex(20)
-            }
         }
         .navigationBarHidden(true)
         .opacity(contentOpacity)
@@ -123,14 +111,6 @@ struct RewardsView: View {
             }
             gm.fetchAndSyncWallet()
             gm.fetchStreakStatus()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .badgeUnlocked)) { _ in
-            if let badge = gm.lastUnlockedBadge {
-                badgeToShow = badge
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    showBadgeUnlock = true
-                }
-            }
         }
     }
 

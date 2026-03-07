@@ -28,6 +28,9 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .home
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
+    @State private var showBadgeUnlock = false
+    @State private var badgeToShow: Badge? = nil
+    @State private var badgeQueue: [Badge] = []
 
     enum Tab: Int, Hashable {
         case budget = 0
@@ -85,6 +88,20 @@ struct ContentView: View {
                     .transition(.opacity)
             }
 
+            // Badge unlock overlay (app-wide, works from any tab)
+            if showBadgeUnlock, let badge = badgeToShow {
+                BadgeUnlockView(badge: badge) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        showBadgeUnlock = false
+                    }
+                    // Show next queued badge after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        showNextQueuedBadge()
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(100)
+            }
         }
         .animation(.easeInOut(duration: 0.4), value: hasLoadedInitialData)
         .environmentObject(transactionManager)
@@ -101,6 +118,21 @@ struct ContentView: View {
         }
         .onChange(of: selectedTab) { oldValue, newValue in
         }
+        .onReceive(NotificationCenter.default.publisher(for: .badgeUnlocked)) { _ in
+            if let badge = GamificationManager.shared.lastUnlockedBadge {
+                if showBadgeUnlock {
+                    // Already showing a badge — queue this one
+                    if !badgeQueue.contains(where: { $0.id == badge.id }) {
+                        badgeQueue.append(badge)
+                    }
+                } else {
+                    badgeToShow = badge
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        showBadgeUnlock = true
+                    }
+                }
+            }
+        }
         .confirmationDialog(L("sign_out"), isPresented: $showSignOutConfirmation) {
             Button(L("sign_out"), role: .destructive) {
                 do {
@@ -111,6 +143,17 @@ struct ContentView: View {
             Button(L("cancel"), role: .cancel) {}
         } message: {
             Text(L("sign_out_confirm"))
+        }
+    }
+
+    // MARK: - Badge Queue
+
+    private func showNextQueuedBadge() {
+        guard !badgeQueue.isEmpty else { return }
+        let next = badgeQueue.removeFirst()
+        badgeToShow = next
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            showBadgeUnlock = true
         }
     }
 
