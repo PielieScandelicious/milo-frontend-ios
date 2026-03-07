@@ -25,6 +25,13 @@ class GamificationManager: ObservableObject {
     @Published private(set) var lastUnlockedBadge: Badge? = nil
     @Published private(set) var lastSpinResult: SpinResult? = nil
 
+    // Withdrawal state
+    @Published private(set) var withdrawalInfo: WithdrawalInfoResponse? = nil
+    @Published private(set) var hasPendingWithdrawal: Bool = false
+    @Published private(set) var activeWithdrawal: WithdrawalItemResponse? = nil
+    @Published private(set) var withdrawalHistory: [WithdrawalItemResponse] = []
+    @Published var withdrawalTestMode: Bool = false
+
     // Referral state
     @Published private(set) var referralCode: String? = nil
     @Published private(set) var referralCount: Int = 0
@@ -102,6 +109,10 @@ class GamificationManager: ObservableObject {
         hasUnclaimedReferralReward = false
         unclaimedReferralEuros = 0
         unclaimedReferralSpins = 0
+        withdrawalInfo = nil
+        hasPendingWithdrawal = false
+        activeWithdrawal = nil
+        withdrawalHistory = []
     }
 
     private func loadState() {
@@ -201,6 +212,7 @@ class GamificationManager: ObservableObject {
                 print("[GamificationManager] Wallet sync failed: \(error)")
             }
         }
+        fetchWithdrawalInfo()
     }
 
     // MARK: - Public API
@@ -351,6 +363,57 @@ class GamificationManager: ObservableObject {
         } catch {
             return (false, "Failed to apply referral code. Please try again.", nil)
         }
+    }
+
+    // MARK: - Withdrawal
+
+    func fetchWithdrawalInfo() {
+        Task {
+            do {
+                let info = try await WithdrawalAPIService.shared.getInfo()
+                self.withdrawalInfo = info
+                self.hasPendingWithdrawal = info.hasPendingWithdrawal
+                self.activeWithdrawal = info.activeWithdrawal
+            } catch {
+                print("[GamificationManager] Withdrawal info fetch failed: \(error)")
+            }
+        }
+    }
+
+    func fetchWithdrawalHistory() {
+        Task {
+            do {
+                let history = try await WithdrawalAPIService.shared.getHistory()
+                self.withdrawalHistory = history.withdrawals
+                self.hasPendingWithdrawal = history.hasPending
+            } catch {
+                print("[GamificationManager] Withdrawal history fetch failed: \(error)")
+            }
+        }
+    }
+
+    func submitWithdrawal(amount: Double, iban: String) async throws -> WithdrawalCreateResponse {
+        let response = try await WithdrawalAPIService.shared.submitWithdrawal(amount: amount, iban: iban)
+        wallet = WalletBalance(euros: response.newBalance)
+        hasPendingWithdrawal = true
+        saveState()
+        fetchWithdrawalInfo()
+        return response
+    }
+
+    func testAutoProcessWithdrawal(_ withdrawalId: String) async throws {
+        _ = try await WithdrawalAPIService.shared.autoProcess(withdrawalId: withdrawalId)
+        fetchWithdrawalInfo()
+        fetchAndSyncWallet()
+    }
+
+    func testResetWithdrawals() async throws {
+        _ = try await WithdrawalAPIService.shared.resetWithdrawals()
+        hasPendingWithdrawal = false
+        activeWithdrawal = nil
+        withdrawalHistory = []
+        fetchWithdrawalInfo()
+        fetchAndSyncWallet()
     }
 
     // MARK: - Private Helpers
