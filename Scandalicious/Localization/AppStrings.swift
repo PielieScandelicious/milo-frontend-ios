@@ -151,6 +151,9 @@ enum AppStrings {
         "prompt_price_title": ["en": "Spot the price creep", "nl": "Ontdek prijsstijgingen", "fr": "Détecter les hausses de prix"],
         "prompt_price_subtitle": ["en": "Are my groceries getting pricier?", "nl": "Worden mijn boodschappen duurder?", "fr": "Mes courses deviennent-elles plus chères ?"],
         "prompt_price_message": ["en": "Are any of my regularly purchased grocery items getting more expensive over time?", "nl": "Worden sommige van mijn vaste boodschappen geleidelijk duurder?", "fr": "Certains de mes articles habituels deviennent-ils plus chers avec le temps ?"],
+        "prompt_health_title": ["en": "Rate my nutrition", "nl": "Beoordeel mijn voeding", "fr": "Évaluer ma nutrition"],
+        "prompt_health_subtitle": ["en": "How healthy is my shopping?", "nl": "Hoe gezond zijn mijn boodschappen?", "fr": "Mes courses sont-elles saines ?"],
+        "prompt_health_message": ["en": "Based on my recent grocery purchases, how healthy is my diet? What improvements could I make?", "nl": "Op basis van mijn recente boodschappen, hoe gezond is mijn voeding? Welke verbeteringen kan ik maken?", "fr": "D'après mes achats récents, mon alimentation est-elle saine ? Quelles améliorations pourrais-je apporter ?"],
         "error_encountered": ["en": "I'm sorry, I encountered an error", "nl": "Sorry, er is een fout opgetreden", "fr": "Désolé, une erreur s'est produite"],
         "please_try_again": ["en": "Please try again.", "nl": "Probeer het opnieuw.", "fr": "Veuillez réessayer."],
 
