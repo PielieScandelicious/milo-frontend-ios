@@ -38,6 +38,7 @@ struct CashbackTransactionResponse: Codable, Identifiable {
     let storeName: String?
     let receiptDate: String?
     let spinsAwarded: Int
+    let isReferralReward: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -50,6 +51,7 @@ struct CashbackTransactionResponse: Codable, Identifiable {
         case storeName = "store_name"
         case receiptDate = "receipt_date"
         case spinsAwarded = "spins_awarded"
+        case isReferralReward = "is_referral_reward"
     }
 }
 

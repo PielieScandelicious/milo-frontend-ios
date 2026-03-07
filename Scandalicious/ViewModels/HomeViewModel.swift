@@ -18,6 +18,7 @@ struct RecentReceipt: Identifiable {
     let cashbackAmount: Double
     let spinsAwarded: Int
     let date: Date
+    var isReferralReward: Bool = false
 
     /// Map a backend cashback transaction to a displayable receipt.
     static func from(_ tx: CashbackTransactionResponse) -> RecentReceipt {
@@ -35,12 +36,13 @@ struct RecentReceipt: Identifiable {
 
         return RecentReceipt(
             id: tx.id,
-            storeName: tx.storeName?.localizedCapitalized ?? "Store",
-            storeColor: color,
+            storeName: tx.isReferralReward ? "Referral Bonus" : (tx.storeName?.localizedCapitalized ?? "Store"),
+            storeColor: tx.isReferralReward ? Color(red: 0.35, green: 0.65, blue: 1.0) : color,
             totalAmount: tx.receiptTotal,
             cashbackAmount: tx.cashbackAmount,
             spinsAwarded: tx.spinsAwarded,
-            date: date
+            date: date,
+            isReferralReward: tx.isReferralReward
         )
     }
 }
@@ -60,6 +62,13 @@ class HomeViewModel {
     var cashbackAmount: Double = 0
     var spinsAwarded: Int = 0
     var isGoldTier: Bool = true
+
+    // Referral reward reveal
+    var showReferralReveal: Bool = false
+    var referralEurosAwarded: Double = 0
+    var referralSpinsAwarded: Int = 0
+    var animatedReferralValue: Double = 0
+    var showReferralConfetti: Bool = false
 
     // Mini game
     var showMiniGame: Bool = false
@@ -123,6 +132,37 @@ class HomeViewModel {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                 showCashbackReveal = true
             }
+        }
+    }
+
+    // MARK: - Claim Referral Reward
+
+    func claimReferralReward() {
+        Task { @MainActor in
+            do {
+                let result = try await GamificationManager.shared.claimReferralReward()
+                referralEurosAwarded = result.eurosCredited
+                referralSpinsAwarded = result.spinsCredited
+                animatedReferralValue = 0
+                showReferralConfetti = false
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                    showReferralReveal = true
+                }
+            } catch {
+                print("[HomeViewModel] Referral claim failed: \(error)")
+            }
+        }
+    }
+
+    func dismissReferralReveal() {
+        withAnimation(.easeIn(duration: 0.25)) {
+            showReferralReveal = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.showReferralConfetti = false
+            self.animatedReferralValue = 0
+            // Reload recent receipts from backend (includes claimed referral entries)
+            self.loadRecentReceipts()
         }
     }
 
@@ -213,6 +253,8 @@ class HomeViewModel {
             } catch {
                 print("[HomeViewModel] Failed to load recent receipts: \(error)")
             }
+            // Also refresh referral info (unclaimed reward state)
+            GamificationManager.shared.fetchReferralInfo()
         }
     }
 

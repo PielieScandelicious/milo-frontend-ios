@@ -26,6 +26,10 @@ struct ProfileView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var hasUnsavedChanges = false
+    @State private var showReferralCodeSheet = false
+    @State private var referralCodeInput = ""
+    @State private var referralMessage: String?
+    @State private var showReferralResult = false
 
     // Store original values to detect changes
     @State private var originalNickname = ""
@@ -342,6 +346,21 @@ struct ProfileView: View {
                 Text("My Progress")
             }
 
+            // Referral Code
+            if !GamificationManager.shared.hasAppliedReferralCode {
+                Section {
+                    Button {
+                        showReferralCodeSheet = true
+                    } label: {
+                        Label("Enter Referral Code", systemImage: "person.2.fill")
+                    }
+                } header: {
+                    Text("Referral")
+                } footer: {
+                    Text("Got a friend's code? Enter it to earn €1 + 3 free spins when you scan your first receipt.")
+                }
+            }
+
             // Sign Out
             Section {
                 Button(role: .destructive) {
@@ -389,6 +408,58 @@ struct ProfileView: View {
             Button(L("ok"), role: .cancel) {}
         } message: {
             Text(errorMessage ?? L("unknown_error"))
+        }
+        .sheet(isPresented: $showReferralCodeSheet) {
+            NavigationStack {
+                VStack(spacing: 20) {
+                    Text("Enter your friend's referral code")
+                        .font(.headline)
+                        .padding(.top, 20)
+
+                    TextField("Referral code", text: $referralCodeInput)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .padding()
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+
+                    Button {
+                        Task {
+                            let result = await GamificationManager.shared.applyReferralCode(referralCodeInput)
+                            referralMessage = result.message
+                            showReferralCodeSheet = false
+                            showReferralResult = true
+                        }
+                    } label: {
+                        Text("Apply Code")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                    .disabled(referralCodeInput.trimmingCharacters(in: .whitespaces).count < 4)
+                    .padding(.horizontal)
+
+                    Spacer()
+                }
+                .navigationTitle("Referral Code")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showReferralCodeSheet = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+        .alert("Referral", isPresented: $showReferralResult) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(referralMessage ?? "")
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscription)
         .onAppear {

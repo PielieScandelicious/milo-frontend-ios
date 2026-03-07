@@ -25,6 +25,15 @@ class GamificationManager: ObservableObject {
     @Published private(set) var lastUnlockedBadge: Badge? = nil
     @Published private(set) var lastSpinResult: SpinResult? = nil
 
+    // Referral state
+    @Published private(set) var referralCode: String? = nil
+    @Published private(set) var referralCount: Int = 0
+    @Published private(set) var referralEarned: Double = 0
+    @Published private(set) var hasAppliedReferralCode: Bool = false
+    @Published private(set) var hasUnclaimedReferralReward: Bool = false
+    @Published private(set) var unclaimedReferralEuros: Double = 0
+    @Published private(set) var unclaimedReferralSpins: Int = 0
+
     // MARK: - Private
 
     private let userDefaults = UserDefaults.standard
@@ -53,6 +62,7 @@ class GamificationManager: ObservableObject {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(1))
                 self?.fetchAndSyncWallet()
+                self?.fetchReferralInfo()
             }
         }
     }
@@ -85,6 +95,13 @@ class GamificationManager: ObservableObject {
         badges = Badge.allBadges.map { var b = $0; b.isUnlocked = false; b.unlockedAt = nil; return b }
         spinsAvailable = 0
         ownedCoupons = []
+        referralCode = nil
+        referralCount = 0
+        referralEarned = 0
+        hasAppliedReferralCode = false
+        hasUnclaimedReferralReward = false
+        unclaimedReferralEuros = 0
+        unclaimedReferralSpins = 0
     }
 
     private func loadState() {
@@ -131,6 +148,12 @@ class GamificationManager: ObservableObject {
             ownedCoupons = decoded
         }
 
+        // Referral state
+        referralCode = userDefaults.string(forKey: "\(prefix)_referralCode")
+        referralCount = userDefaults.integer(forKey: "\(prefix)_referralCount")
+        referralEarned = userDefaults.double(forKey: "\(prefix)_referralEarned")
+        hasAppliedReferralCode = userDefaults.bool(forKey: "\(prefix)_hasAppliedReferral")
+
         userDefaults.set(true, forKey: "\(prefix)_initialized")
         saveState()
 
@@ -148,6 +171,10 @@ class GamificationManager: ObservableObject {
         if let data = try? encoder.encode(ownedCoupons) { userDefaults.set(data, forKey: "\(prefix)_ownedCoupons") }
         userDefaults.set(spinsAvailable, forKey: "\(prefix)_spins")
         userDefaults.set(hasDoubleNext, forKey: "\(prefix)_doubleNext")
+        if let code = referralCode { userDefaults.set(code, forKey: "\(prefix)_referralCode") }
+        userDefaults.set(referralCount, forKey: "\(prefix)_referralCount")
+        userDefaults.set(referralEarned, forKey: "\(prefix)_referralEarned")
+        userDefaults.set(hasAppliedReferralCode, forKey: "\(prefix)_hasAppliedReferral")
     }
 
     // MARK: - Wallet & Gold Tier Sync
@@ -280,6 +307,50 @@ class GamificationManager: ObservableObject {
         let daysSince = Calendar.current.dateComponents([.day], from: lastDate, to: Date()).day ?? 0
         streak.isAtRisk = daysSince >= 5 && daysSince < 7
         saveState()
+    }
+
+    // MARK: - Referral
+
+    func fetchReferralInfo() {
+        Task {
+            do {
+                let info = try await ReferralAPIService.shared.getReferralInfo()
+                self.referralCode = info.referralCode
+                self.referralCount = info.completedReferrals
+                self.referralEarned = info.totalEarned
+                self.hasUnclaimedReferralReward = info.hasUnclaimedReward
+                self.unclaimedReferralEuros = info.unclaimedRewardEuros
+                self.unclaimedReferralSpins = info.unclaimedRewardSpins
+                self.saveState()
+            } catch {
+                print("[GamificationManager] Referral info fetch failed: \(error)")
+            }
+        }
+    }
+
+    func claimReferralReward() async throws -> ClaimReferralRewardResponse {
+        let response = try await ReferralAPIService.shared.claimReward()
+        if response.success {
+            hasUnclaimedReferralReward = false
+            unclaimedReferralEuros = 0
+            unclaimedReferralSpins = 0
+            wallet = WalletBalance(euros: response.newBalance)
+            saveState()
+        }
+        return response
+    }
+
+    func applyReferralCode(_ code: String) async -> (success: Bool, message: String, referrerName: String?) {
+        do {
+            let response = try await ReferralAPIService.shared.applyCode(code)
+            if response.success {
+                hasAppliedReferralCode = true
+                saveState()
+            }
+            return (response.success, response.message, response.referrerName)
+        } catch {
+            return (false, "Failed to apply referral code. Please try again.", nil)
+        }
     }
 
     // MARK: - Private Helpers

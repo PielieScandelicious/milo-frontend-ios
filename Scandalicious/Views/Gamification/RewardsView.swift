@@ -53,6 +53,12 @@ struct RewardsView: View {
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 12)
 
+                    // Referral card
+                    ReferralCardView()
+                        .padding(.horizontal, 20)
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+
                     // Coupon store
                     CouponStoreView()
                         .padding(.horizontal, 20)

@@ -109,7 +109,7 @@ struct RecentReceiptsSection: View {
     }
 }
 
-// MARK: - Mock Receipt Row
+// MARK: - Receipt Row
 
 private struct RecentReceiptRow: View {
     let receipt: RecentReceipt
@@ -124,21 +124,22 @@ private struct RecentReceiptRow: View {
         startPoint: .leading,
         endPoint: .trailing
     )
+    private let referralBlue = Color(red: 0.35, green: 0.65, blue: 1.0)
 
     var body: some View {
         HStack(spacing: 12) {
-            // Store color indicator
+            // Icon
             ZStack {
                 Circle()
-                    .fill(receipt.storeColor.opacity(0.15))
+                    .fill((receipt.isReferralReward ? referralBlue : receipt.storeColor).opacity(0.15))
                     .frame(width: 36, height: 36)
 
-                Image(systemName: "storefront.fill")
+                Image(systemName: receipt.isReferralReward ? "person.2.fill" : "storefront.fill")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(receipt.storeColor)
+                    .foregroundStyle(receipt.isReferralReward ? referralBlue : receipt.storeColor)
             }
 
-            // Store name + date
+            // Name + date
             VStack(alignment: .leading, spacing: 3) {
                 Text(receipt.storeName)
                     .font(.system(size: 14, weight: .semibold))
@@ -154,19 +155,29 @@ private struct RecentReceiptRow: View {
 
             // Amounts
             VStack(alignment: .trailing, spacing: 3) {
-                Text(String(format: "\u{20AC}%.2f", receipt.totalAmount))
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                if receipt.isReferralReward {
+                    Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(referralBlue)
+                } else {
+                    Text(String(format: "\u{20AC}%.2f", receipt.totalAmount))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                }
 
                 HStack(spacing: 6) {
-                    Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(cashbackGradient)
+                    if !receipt.isReferralReward {
+                        Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(cashbackGradient)
+                    }
 
                     if receipt.spinsAwarded > 0 {
                         Text("+\(receipt.spinsAwarded) \(receipt.spinsAwarded == 1 ? "spin" : "spins")")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(goldGradient)
+                            .foregroundStyle(receipt.isReferralReward
+                                ? LinearGradient(colors: [referralBlue, referralBlue.opacity(0.7)], startPoint: .leading, endPoint: .trailing)
+                                : goldGradient)
                     }
                 }
             }

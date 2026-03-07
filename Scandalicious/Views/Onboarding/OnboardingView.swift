@@ -14,6 +14,7 @@ struct OnboardingView: View {
     @State private var age = ""
     @State private var selectedLanguage: ProfileLanguage = .english
     @State private var selectedStores: Set<GroceryStore> = []
+    @State private var referralCode = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
@@ -224,6 +225,30 @@ struct OnboardingView: View {
                     .buttonStyle(.plain)
                 }
             }
+
+            // Referral code (optional)
+            HStack(spacing: 12) {
+                Image(systemName: "person.2.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.blue)
+                    .frame(width: 20)
+
+                TextField("Referral code (optional)", text: $referralCode)
+                    .foregroundStyle(.white)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .font(.system(size: 16, weight: .medium, design: .monospaced))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.07))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                    )
+            )
         }
         .padding(16)
         .background(
@@ -381,6 +406,12 @@ struct OnboardingView: View {
                     language: selectedLanguage.rawValue,
                     preferredStores: storeValues
                 )
+
+                // Apply referral code if provided
+                let trimmedReferral = referralCode.trimmingCharacters(in: .whitespaces)
+                if !trimmedReferral.isEmpty {
+                    let _ = await GamificationManager.shared.applyReferralCode(trimmedReferral)
+                }
 
                 await MainActor.run {
                     LanguageManager.shared.currentLanguage = selectedLanguage

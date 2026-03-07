@@ -11,6 +11,7 @@ import SwiftUI
 struct HomeTabView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject private var processingManager = ReceiptProcessingManager.shared
+    @ObservedObject private var gamificationManager = GamificationManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     @State private var viewModel = HomeViewModel()
@@ -48,6 +49,13 @@ struct HomeTabView: View {
                     CashbackRevealOverlay(viewModel: viewModel)
                         .transition(.opacity)
                         .zIndex(100)
+                }
+
+                // Referral reveal overlay
+                if viewModel.showReferralReveal {
+                    ReferralRevealOverlay(viewModel: viewModel)
+                        .transition(.opacity)
+                        .zIndex(101)
                 }
             }
             .toolbar {
@@ -127,6 +135,18 @@ struct HomeTabView: View {
                                 .fill(Color.white.opacity(0.06))
                         )
                     }
+                }
+
+                // Referral bonus claim card
+                if gamificationManager.hasUnclaimedReferralReward {
+                    ReferralBonusClaimCard {
+                        viewModel.claimReferralReward()
+                    }
+                    .padding(.horizontal, 20)
+                    .transition(.asymmetric(
+                        insertion: .push(from: .top).combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
                 }
 
                 // Multi-receipt processing cards
