@@ -115,8 +115,10 @@ class HomeViewModel {
             processingStoreColor = .white
         }
 
-        // Fetch real cashback then show reveal
+        // Claim the reward on the backend (PENDING → CONFIRMED, credits wallet),
+        // then fetch updated summary so the overlay shows the correct amount.
         Task { @MainActor in
+            _ = try? await CashbackAPIService.shared.claim(receiptId: receipt.id)
             await fetchCashbackForReceipt(receiptId: receipt.id)
             withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                 showCashbackReveal = true

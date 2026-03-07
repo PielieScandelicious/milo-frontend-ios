@@ -83,6 +83,20 @@ struct CashbackHistoryResponse: Codable {
     }
 }
 
+struct CashbackClaimResponse: Codable {
+    let receiptId: String
+    let cashbackAmount: Double
+    let spinsAwarded: Int
+    let newBalance: Double
+
+    enum CodingKeys: String, CodingKey {
+        case receiptId = "receipt_id"
+        case cashbackAmount = "cashback_amount"
+        case spinsAwarded = "spins_awarded"
+        case newBalance = "new_balance"
+    }
+}
+
 struct CashbackPreviewSegment: Codable {
     let segment: Int
     let sliceStart: Double
@@ -173,6 +187,15 @@ actor CashbackAPIService {
         )
     }
 
+    // MARK: - Claim Endpoint
+
+    func claimCashback(receiptId: String) async throws -> CashbackClaimResponse {
+        return try await performPostRequestWithData(
+            endpoint: "/cashback/claim/\(receiptId)",
+            bodyData: Data()
+        )
+    }
+
     // MARK: - Spin Endpoints
 
     func spinWheel(hasDoubleNext: Bool = false, isRespin: Bool = false, forceSegment: Int? = nil) async throws -> SpinResult {
@@ -184,6 +207,10 @@ actor CashbackAPIService {
     }
 
     // MARK: - Nonisolated Wrappers
+
+    nonisolated func claim(receiptId: String) async throws -> CashbackClaimResponse {
+        return try await claimCashback(receiptId: receiptId)
+    }
 
     nonisolated func getBalance() async throws -> CashbackBalanceResponse {
         return try await fetchBalance()

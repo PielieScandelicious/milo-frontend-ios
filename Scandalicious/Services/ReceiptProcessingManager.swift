@@ -228,8 +228,10 @@ class ReceiptProcessingManager: ObservableObject {
 
     private func persistReceipts() {
         guard let defaults = UserDefaults(suiteName: appGroupId) else { return }
-        let active = processingReceipts.filter { !$0.isTerminal }
-        if let data = try? JSONEncoder().encode(active) {
+        // Persist non-terminal receipts AND completed ones awaiting user claim.
+        // Failed receipts are excluded — they require no user action.
+        let toSave = processingReceipts.filter { $0.status != .failed }
+        if let data = try? JSONEncoder().encode(toSave) {
             defaults.set(data, forKey: storageKey)
         }
     }
