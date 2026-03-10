@@ -12,6 +12,7 @@ struct OnboardingView: View {
     @State private var nickname = ""
     @State private var selectedGender: ProfileGender = .male
     @State private var age = ""
+    @State private var householdNumber = ""
     @State private var selectedLanguage: ProfileLanguage = .english
     @State private var selectedStores: Set<GroceryStore> = []
     @State private var referralCode = ""
@@ -159,6 +160,33 @@ struct OnboardingView: View {
                         let filtered = newValue.filter { $0.isNumber }
                         if filtered.count > 3 { age = String(filtered.prefix(3)) }
                         else if filtered != newValue { age = filtered }
+                    }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.07))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                    )
+            )
+
+            // Household Number
+            HStack(spacing: 12) {
+                Image(systemName: "house.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.purple)
+                    .frame(width: 20)
+
+                TextField(L("household_number"), text: $householdNumber)
+                    .foregroundStyle(.white)
+                    .keyboardType(.numberPad)
+                    .onChange(of: householdNumber) { _, newValue in
+                        let filtered = newValue.filter { $0.isNumber }
+                        if filtered.count > 2 { householdNumber = String(filtered.prefix(2)) }
+                        else if filtered != newValue { householdNumber = filtered }
                     }
             }
             .padding(.horizontal, 16)
@@ -397,12 +425,14 @@ struct OnboardingView: View {
             do {
                 let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
                 let ageValue = Int(age)
+                let householdValue = Int(householdNumber)
                 let storeValues = selectedStores.isEmpty ? nil : selectedStores.map(\.rawValue)
 
                 let profile = try await ProfileAPIService().updateProfile(
                     nickname: trimmedNickname,
                     gender: selectedGender.rawValue,
                     age: ageValue,
+                    householdNumber: householdValue,
                     language: selectedLanguage.rawValue,
                     preferredStores: storeValues
                 )

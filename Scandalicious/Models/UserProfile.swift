@@ -14,6 +14,7 @@ struct UserProfile: Codable {
     var nickname: String?
     var gender: String?
     var age: Int?
+    var householdNumber: Int?
     var language: String?
     var preferredStores: [String]?
     var profileCompleted: Bool
@@ -27,6 +28,7 @@ struct UserProfile: Codable {
         case nickname
         case gender
         case age
+        case householdNumber = "household_number"
         case language
         case preferredStores = "preferred_stores"
         case profileCompleted = "profile_completed"
@@ -39,6 +41,7 @@ struct UserProfileUpdate: Codable {
     var nickname: String?
     var gender: String?
     var age: Int?
+    var householdNumber: Int?
     var language: String?
     var preferredStores: [String]?
 
@@ -46,6 +49,7 @@ struct UserProfileUpdate: Codable {
         case nickname
         case gender
         case age
+        case householdNumber = "household_number"
         case language
         case preferredStores = "preferred_stores"
     }

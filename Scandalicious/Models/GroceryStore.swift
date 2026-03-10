@@ -15,12 +15,8 @@ enum GroceryStore: String, CaseIterable, Identifiable {
     case aldi = "Aldi"
     case albertHeijn = "Albert Heijn"
     case okay = "Okay"
-    case intermarche = "Intermarché"
     case spar = "Spar"
     case bioPlanet = "Bio-Planet"
-    case action = "Action"
-    case kruidvat = "Kruidvat"
-    case jumbo = "Jumbo"
 
     var id: String { rawValue }
     var displayName: String { rawValue }
@@ -34,12 +30,8 @@ enum GroceryStore: String, CaseIterable, Identifiable {
         case .aldi: return "store-aldi"
         case .albertHeijn: return "store-albert-heijn"
         case .okay: return "store-okay"
-        case .intermarche: return "store-intermarche"
         case .spar: return "store-spar"
         case .bioPlanet: return "store-bioplanet"
-        case .action: return "store-action"
-        case .kruidvat: return "store-kruidvat"
-        case .jumbo: return "store-jumbo"
         }
     }
 
@@ -52,12 +44,8 @@ enum GroceryStore: String, CaseIterable, Identifiable {
         case .aldi: return Color(red: 0.90, green: 0.25, blue: 0.25)
         case .albertHeijn: return Color(red: 0.95, green: 0.80, blue: 0.20)
         case .okay: return Color(red: 0.95, green: 0.55, blue: 0.15)
-        case .intermarche: return Color(red: 0.85, green: 0.20, blue: 0.20)
         case .spar: return Color(red: 0.15, green: 0.60, blue: 0.30)
         case .bioPlanet: return Color(red: 0.30, green: 0.75, blue: 0.45)
-        case .action: return Color(red: 0.10, green: 0.30, blue: 0.65)
-        case .kruidvat: return Color(red: 0.85, green: 0.10, blue: 0.15)
-        case .jumbo: return Color(red: 0.95, green: 0.75, blue: 0.0)
         }
     }
 

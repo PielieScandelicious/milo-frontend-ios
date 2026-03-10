@@ -6,35 +6,30 @@
 //
 
 import SwiftUI
-import StoreKit
 import FirebaseAuth
 
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authManager: AuthenticationManager
-    @EnvironmentObject var subscriptionManager: SubscriptionManager
 
     @State private var nickname = ""
     @State private var selectedGender: Gender = .notSpecified
     @State private var age = ""
+    @State private var householdNumber = ""
     @State private var selectedLanguage: ProfileLanguage?
     @State private var selectedStores: Set<GroceryStore> = []
-    @State private var showManageSubscription = false
     @State private var isLoading = false
     @State private var isSaving = false
     @State private var showSaveSuccess = false
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var hasUnsavedChanges = false
-    @State private var showReferralCodeSheet = false
-    @State private var referralCodeInput = ""
-    @State private var referralMessage: String?
-    @State private var showReferralResult = false
 
     // Store original values to detect changes
     @State private var originalNickname = ""
     @State private var originalGender: Gender = .notSpecified
     @State private var originalAge = ""
+    @State private var originalHouseholdNumber = ""
     @State private var originalLanguage: ProfileLanguage?
     @State private var originalStores: Set<GroceryStore> = []
 
@@ -116,6 +111,23 @@ struct ProfileView: View {
                             let filtered = newValue.filter { $0.isNumber }
                             if filtered.count > 3 { age = String(filtered.prefix(3)) }
                             else if filtered != newValue { age = filtered }
+                            checkForChanges()
+                        }
+                }
+
+                HStack {
+                    Text(L("household_number"))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    TextField(L("household_number"), text: $householdNumber)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .keyboardType(.numberPad)
+                        .disabled(isLoading || isSaving)
+                        .onChange(of: householdNumber) { _, newValue in
+                            let filtered = newValue.filter { $0.isNumber }
+                            if filtered.count > 2 { householdNumber = String(filtered.prefix(2)) }
+                            else if filtered != newValue { householdNumber = filtered }
                             checkForChanges()
                         }
                 }
@@ -244,51 +256,6 @@ struct ProfileView: View {
                 Text(L("account"))
             }
 
-            // Subscription
-            Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(L("current_plan"))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        subscriptionStatusBadge
-                    }
-
-                    if case .subscribed(let expirationDate, _) = subscriptionManager.subscriptionStatus {
-                        HStack {
-                            Text(L("renews_on"))
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Text(formatDate(expirationDate))
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if case .inTrial(let expirationDate, _) = subscriptionManager.subscriptionStatus {
-                        HStack {
-                            Text(L("trial_ends"))
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Text(formatDate(expirationDate))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    HStack {
-                        Spacer()
-                        Button {
-                            showManageSubscription = true
-                        } label: {
-                            Text(L("manage_subscription"))
-                                .fontWeight(.semibold)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(Color(red: 0.0, green: 0.48, blue: 1.0))
-                        Spacer()
-                    }
-                }
-            } header: {
-                Text(L("subscription"))
-            }
-
             // Insights
             Section {
                 NavigationLink {
@@ -346,21 +313,6 @@ struct ProfileView: View {
                 Text("My Progress")
             }
 
-            // Referral Code
-            if !GamificationManager.shared.hasAppliedReferralCode {
-                Section {
-                    Button {
-                        showReferralCodeSheet = true
-                    } label: {
-                        Label("Enter Referral Code", systemImage: "person.2.fill")
-                    }
-                } header: {
-                    Text("Referral")
-                } footer: {
-                    Text("Got a friend's code? Enter it to earn €1 + 3 free spins when you scan your first receipt.")
-                }
-            }
-
             // Sign Out
             Section {
                 Button(role: .destructive) {
@@ -409,143 +361,11 @@ struct ProfileView: View {
         } message: {
             Text(errorMessage ?? L("unknown_error"))
         }
-        .sheet(isPresented: $showReferralCodeSheet) {
-            NavigationStack {
-                VStack(spacing: 20) {
-                    Text("Enter your friend's referral code")
-                        .font(.headline)
-                        .padding(.top, 20)
-
-                    TextField("Referral code", text: $referralCodeInput)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .font(.system(size: 20, weight: .bold, design: .monospaced))
-                        .multilineTextAlignment(.center)
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-
-                    Button {
-                        Task {
-                            let result = await GamificationManager.shared.applyReferralCode(referralCodeInput)
-                            referralMessage = result.message
-                            showReferralCodeSheet = false
-                            showReferralResult = true
-                        }
-                    } label: {
-                        Text("Apply Code")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.purple)
-                    .disabled(referralCodeInput.trimmingCharacters(in: .whitespaces).count < 4)
-                    .padding(.horizontal)
-
-                    Spacer()
-                }
-                .navigationTitle("Referral Code")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { showReferralCodeSheet = false }
-                    }
-                }
-            }
-            .presentationDetents([.medium])
-        }
-        .alert("Referral", isPresented: $showReferralResult) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(referralMessage ?? "")
-        }
-        .manageSubscriptionsSheet(isPresented: $showManageSubscription)
         .onAppear {
             Task {
-                // Load products first, then check status
-                await subscriptionManager.loadProducts()
-                await subscriptionManager.updateSubscriptionStatus()
-
-                // Load profile data
                 await loadProfile()
             }
         }
-        .onChange(of: showManageSubscription) { oldValue, newValue in
-            // Refresh subscription status when returning from manage subscription sheet
-            if oldValue == true && newValue == false {
-                Task {
-                    // Sync with Apple servers to get latest subscription changes
-                    try? await AppStore.sync()
-
-                    // In StoreKit testing, add a small delay to allow changes to propagate
-                    try? await Task.sleep(for: .milliseconds(500))
-
-                    // Reload products to ensure we have latest info
-                    await subscriptionManager.loadProducts()
-
-                    // Update subscription status
-                    await subscriptionManager.updateSubscriptionStatus()
-
-                    // Force another refresh after a delay (for StoreKit testing)
-                    try? await Task.sleep(for: .seconds(1))
-                    await subscriptionManager.updateSubscriptionStatus()
-                }
-            }
-        }
-    }
-
-    private var subscriptionStatusBadge: some View {
-        Group {
-            switch subscriptionManager.subscriptionStatus {
-            case .subscribed(_, let productId):
-                let planName = productId.contains("yearly") ? L("premium_yearly") : L("premium_monthly")
-                Text(planName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(red: 0.45, green: 0.15, blue: 0.85))
-                    .clipShape(Capsule())
-            case .inTrial(_, let productId):
-                let planName = productId.contains("yearly") ? L("premium_yearly_trial") : L("premium_monthly_trial")
-                Text(planName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(red: 0.55, green: 0.25, blue: 0.95))
-                    .clipShape(Capsule())
-            case .expired:
-                Text(L("expired"))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.orange)
-                    .clipShape(Capsule())
-            case .notSubscribed:
-                Text(L("free"))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.gray)
-                    .clipShape(Capsule())
-            }
-        }
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
     }
 
     // MARK: - Profile Data Management
@@ -561,6 +381,7 @@ struct ProfileView: View {
                 nickname = profile.nickname ?? ""
                 selectedGender = Gender.from(apiValue: profile.gender)
                 age = profile.age != nil ? "\(profile.age!)" : ""
+                householdNumber = profile.householdNumber != nil ? "\(profile.householdNumber!)" : ""
                 selectedLanguage = ProfileLanguage.from(apiValue: profile.language)
                 selectedStores = GroceryStore.from(rawValues: profile.preferredStores)
                 LanguageManager.shared.syncFromProfile(profile.language)
@@ -569,6 +390,7 @@ struct ProfileView: View {
                 originalNickname = nickname
                 originalGender = selectedGender
                 originalAge = age
+                originalHouseholdNumber = householdNumber
                 originalLanguage = selectedLanguage
                 originalStores = selectedStores
 
@@ -593,12 +415,14 @@ struct ProfileView: View {
             do {
                 let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
                 let ageValue = Int(age)
+                let householdValue = Int(householdNumber)
                 let storeValues = selectedStores.isEmpty ? [] : selectedStores.map(\.rawValue)
 
                 let profile = try await ProfileAPIService().updateProfile(
                     nickname: trimmedNickname.isEmpty ? nil : trimmedNickname,
                     gender: selectedGender.apiValue,
                     age: ageValue,
+                    householdNumber: householdValue,
                     language: selectedLanguage?.rawValue,
                     preferredStores: storeValues
                 )
@@ -608,6 +432,7 @@ struct ProfileView: View {
                     originalNickname = nickname
                     originalGender = selectedGender
                     originalAge = age
+                    originalHouseholdNumber = householdNumber
                     originalLanguage = selectedLanguage
                     originalStores = selectedStores
 
@@ -637,6 +462,7 @@ struct ProfileView: View {
         hasUnsavedChanges = nickname != originalNickname ||
                            selectedGender != originalGender ||
                            age != originalAge ||
+                           householdNumber != originalHouseholdNumber ||
                            selectedLanguage != originalLanguage ||
                            selectedStores != originalStores
     }
@@ -687,6 +513,5 @@ private struct ProfileStoreChipView: View {
     NavigationStack {
         ProfileView()
             .environmentObject(AuthenticationManager())
-            .environmentObject(SubscriptionManager.shared)
     }
 }

@@ -98,6 +98,7 @@ enum AppStrings {
         "subscription": ["en": "Subscription", "nl": "Abonnement", "fr": "Abonnement"],
         "insights": ["en": "Insights", "nl": "Inzichten", "fr": "Analyses"],
         "year_in_review": ["en": "Year in Review", "nl": "Jaaroverzicht", "fr": "Bilan annuel"],
+        "household_number": ["en": "Household size", "nl": "Gezinsgrootte", "fr": "Taille du ménage"],
         "profile_updated": ["en": "Your profile has been updated successfully", "nl": "Je profiel is succesvol bijgewerkt", "fr": "Votre profil a été mis à jour avec succès"],
         "grocery_stores": ["en": "Grocery Stores", "nl": "Supermarkten", "fr": "Supermarchés"],
         "select_stores": ["en": "Your stores", "nl": "Jouw winkels", "fr": "Vos magasins"],

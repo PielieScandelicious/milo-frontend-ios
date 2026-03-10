@@ -6,22 +6,10 @@ struct YearInReviewView: View {
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var yearSummary: YearSummaryResponse?
     @State private var isLoading = false
-    @State private var availableYears: [Int] = []
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Year picker
-                if availableYears.count > 1 {
-                    Picker("Year", selection: $selectedYear) {
-                        ForEach(availableYears, id: \.self) { year in
-                            Text(String(year)).tag(year)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 16)
-                }
-
                 if isLoading {
                     ProgressView()
                         .padding(.top, 40)
@@ -50,10 +38,6 @@ struct YearInReviewView: View {
         .navigationTitle(L("year_in_review"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            computeAvailableYears()
-            loadData()
-        }
-        .onChange(of: selectedYear) { _, _ in
             loadData()
         }
     }
@@ -194,27 +178,6 @@ struct YearInReviewView: View {
     }
 
     // MARK: - Data Loading
-
-    private func computeAvailableYears() {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM yyyy"
-        dateFormatter.locale = Locale(identifier: "en_US")
-
-        var years: Set<Int> = []
-        for meta in periodMetadata {
-            if let date = dateFormatter.date(from: meta.period) {
-                years.insert(Calendar.current.component(.year, from: date))
-            }
-        }
-
-        let currentYear = Calendar.current.component(.year, from: Date())
-        years.insert(currentYear)
-
-        availableYears = years.sorted(by: >)
-        if !availableYears.contains(selectedYear), let first = availableYears.first {
-            selectedYear = first
-        }
-    }
 
     private func loadData() {
         isLoading = true
