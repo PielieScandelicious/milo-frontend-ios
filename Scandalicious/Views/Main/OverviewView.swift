@@ -97,6 +97,7 @@ struct OverviewView: View {
     @State private var cachedBreakdownsByPeriod: [String: [StoreBreakdown]] = [:]  // Cache for period breakdowns
     @State private var displayedBreakdownsPeriod: String = ""  // Track which period displayedBreakdowns belongs to
     @State private var loadedReceiptPeriods: Set<String> = []  // Track which periods have loaded receipts
+    @State private var preloadedCategoryItems: [String: [String: [APITransaction]]] = [:]  // Preloaded category items: period -> categoryId -> transactions
     @State private var expandedReceiptId: String? // For inline receipt expansion
     // scrollOffset removed — gradient header now manages its own scroll state via ScrollFadingGradientView
     @State private var cachedAvailablePeriods: [String] = [] // Cached for performance
@@ -498,7 +499,48 @@ struct OverviewView: View {
             }
         }
 
-        // Load receipts from backend on first appear
+        // Consume preloaded data from BudgetTabPreloadCache if available
+        let cache = BudgetTabPreloadCache.shared
+        if cache.hasPreloaded {
+            // Apply preloaded receipts
+            for (period, receipts) in cache.receiptsByPeriod {
+                loadedReceiptPeriods.insert(period)
+                if period == selectedPeriod {
+                    receiptsViewModel.applyPreloadedReceipts(receipts)
+                    rebuildSortedReceipts()
+                }
+            }
+
+            // Apply preloaded budget progress & history
+            if let progress = cache.budgetProgress {
+                budgetViewModel.applyPreloadedProgress(progress)
+            }
+            if !cache.budgetHistory.isEmpty {
+                budgetViewModel.applyPreloadedHistory(cache.budgetHistory)
+            }
+
+            // Apply preloaded category data
+            for (period, response) in cache.categoryDataByPeriod {
+                pieChartSummaryCache[period] = response
+            }
+
+            // Apply preloaded category line items (keyed by categoryId)
+            // Store all periods in persistent cache for use across period changes
+            preloadedCategoryItems = cache.categoryItemsByPeriod
+            // Apply current period's items to active state
+            if let currentPeriodItems = cache.categoryItemsByPeriod[selectedPeriod] {
+                for (categoryId, transactions) in currentPeriodItems {
+                    categoryItems[categoryId] = transactions
+                    categoryCurrentPage[categoryId] = 1
+                    categoryHasMore[categoryId] = transactions.count >= 5
+                }
+            }
+
+            // Clear cache to free memory
+            cache.reset()
+        }
+
+        // Load receipts from backend on first appear (skipped if preloaded)
         let periodToLoad = selectedPeriod
         if !loadedReceiptPeriods.contains(periodToLoad) {
             loadedReceiptPeriods.insert(periodToLoad)
@@ -508,14 +550,15 @@ struct OverviewView: View {
             }
         }
 
-        // Load budget and promo data — deferred to avoid competing with tab transition animation
-        Task {
-            try? await Task.sleep(for: .milliseconds(150))
-            await budgetViewModel.loadBudget()
+        // Load budget data (skipped if preloaded)
+        if case .idle = budgetViewModel.state {
+            Task {
+                try? await Task.sleep(for: .milliseconds(150))
+                await budgetViewModel.loadBudget()
+            }
         }
 
-
-        // Load category data from backend
+        // Load category data from backend (skipped if preloaded — guard inside fetchCategoryData checks cache)
         let initialPeriod = selectedPeriod
         Task { await fetchCategoryData(for: initialPeriod) }
 
@@ -536,6 +579,12 @@ struct OverviewView: View {
         await receiptsViewModel.loadReceipts(period: period, storeName: nil, reset: true)
         rebuildSortedReceipts()
 
+        // 4. Refresh budget progress (current month only)
+        let currentMonthString = PeriodFormatters.periodFormatter.string(from: Date())
+        if period == currentMonthString {
+            await budgetViewModel.refreshProgress()
+        }
+
         // 5. Rebuild all view-local caches from fresh dataManager state
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.3)) {
@@ -546,7 +595,6 @@ struct OverviewView: View {
                 categoryHasMore.removeAll()
                 categoryLoadingMore = nil
             }
-            pieChartSummaryCache.removeValue(forKey: period)
             updateAvailablePeriodsCache()
             lastRefreshTime = Date()
         }
@@ -568,9 +616,15 @@ struct OverviewView: View {
             receiptPeriod = PeriodFormatters.periodFormatter.string(from: Date())
         }
 
+        // Show syncing indicator immediately
+        manuallySyncingPeriod = receiptPeriod
+        syncedConfirmationPeriod = nil
+
         Task {
             // Brief delay for backend to finalize
             try? await Task.sleep(for: .seconds(1))
+
+            let syncStart = Date()
 
             await refreshPeriodData(for: receiptPeriod)
 
@@ -579,8 +633,30 @@ struct OverviewView: View {
                 chartRefreshToken += 1
             }
 
-            // Sync budget
-            await budgetViewModel.refreshProgress()
+            // Ensure "Syncing" label is visible for minimum duration
+            let elapsed = Date().timeIntervalSince(syncStart)
+            let minimumSyncingDuration: TimeInterval = 1.5
+            if elapsed < minimumSyncingDuration {
+                try? await Task.sleep(for: .seconds(minimumSyncingDuration - elapsed))
+            }
+
+            // Transition to "Synced"
+            let syncedPeriod = manuallySyncingPeriod
+            await MainActor.run {
+                manuallySyncingPeriod = nil
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    syncedConfirmationPeriod = syncedPeriod
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+
+            // Auto-hide "Synced" after 2 seconds
+            try? await Task.sleep(for: .seconds(2))
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    syncedConfirmationPeriod = nil
+                }
+            }
         }
     }
 
@@ -625,6 +701,16 @@ struct OverviewView: View {
         categoryCurrentPage.removeAll()
         categoryHasMore.removeAll()
         categoryLoadingMore = nil
+
+        // Restore preloaded category items for the new period if available
+        if let preloadedItems = preloadedCategoryItems[newValue] {
+            for (categoryId, transactions) in preloadedItems {
+                categoryItems[categoryId] = transactions
+                categoryCurrentPage[categoryId] = 1
+                categoryHasMore[categoryId] = transactions.count >= 5
+            }
+        }
+
         if pieChartSummaryCache[newValue] == nil {
             Task { await fetchCategoryData(for: newValue) }
         }
@@ -1918,7 +2004,7 @@ struct OverviewView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Syncing status indicator for manual pull-to-refresh
+    /// Syncing status indicator for pull-to-refresh and receipt uploads
     @ViewBuilder
     private func syncingIndicator(for period: String) -> some View {
         let isManualSyncing = manuallySyncingPeriod == period

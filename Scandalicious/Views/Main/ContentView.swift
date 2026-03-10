@@ -159,9 +159,10 @@ struct ContentView: View {
 
     // MARK: - Full Data Loading
 
-    /// Fetches period metadata and current month breakdowns from the backend,
-    /// then dismisses the loading screen.
+    /// Fetches period metadata and preloads all Budget tab data for the current month
+    /// and 2 previous months, then dismisses the loading screen.
     private func loadAllData() async {
+        // Phase 1: Lightweight period metadata (all periods)
         await dataManager.fetchPeriodMetadata()
 
         guard !dataManager.periodMetadata.isEmpty else {
@@ -169,12 +170,172 @@ struct ContentView: View {
             return
         }
 
-        // Load the current (most recent) period's store breakdowns
-        if let currentPeriod = dataManager.periodMetadata.first?.period {
-            await dataManager.fetchPeriodDetails(currentPeriod)
+        // Phase 2: Parallel preload of ALL Budget tab data for 3 months
+        let targetPeriods = computeTargetPeriods()
+        let cache = BudgetTabPreloadCache.shared
+
+        await withTaskGroup(of: Void.self) { group in
+            // Store breakdowns for all 3 periods (parallel)
+            for period in targetPeriods {
+                group.addTask {
+                    await self.dataManager.fetchPeriodDetails(period)
+                }
+            }
+
+            // Receipts for all 3 periods (parallel, all pages)
+            for period in targetPeriods {
+                group.addTask {
+                    await self.preloadReceipts(for: period, into: cache)
+                }
+            }
+
+            // Category breakdown (pie chart) + category line items for all 3 periods (parallel)
+            for period in targetPeriods {
+                group.addTask {
+                    let components = self.parsePeriodComponents(period)
+                    guard components.month > 0 && components.year > 0 else { return }
+
+                    // First: fetch pie chart summary to get category names
+                    guard let response = try? await AnalyticsAPIService.shared.getPieChartSummary(
+                        month: components.month,
+                        year: components.year
+                    ) else { return }
+
+                    await MainActor.run {
+                        cache.categoryDataByPeriod[period] = response
+                    }
+
+                    // Then: fetch first page of transactions for each category (parallel)
+                    let categories = response.categories
+                    guard !categories.isEmpty else { return }
+                    guard let dates = self.parsePeriodToDates(period) else { return }
+
+                    await withTaskGroup(of: (String, [APITransaction]).self) { itemGroup in
+                        for category in categories {
+                            itemGroup.addTask {
+                                var filters = TransactionFilters()
+                                filters.category = category.name
+                                filters.page = 1
+                                filters.pageSize = 5
+                                filters.startDate = dates.start
+                                filters.endDate = dates.end
+
+                                if let txResponse = try? await AnalyticsAPIService.shared.getTransactions(filters: filters) {
+                                    return (category.categoryId, txResponse.transactions)
+                                }
+                                return (category.categoryId, [])
+                            }
+                        }
+
+                        var itemsForPeriod: [String: [APITransaction]] = [:]
+                        for await (categoryId, transactions) in itemGroup {
+                            if !transactions.isEmpty {
+                                itemsForPeriod[categoryId] = transactions
+                            }
+                        }
+
+                        await MainActor.run {
+                            cache.categoryItemsByPeriod[period] = itemsForPeriod
+                        }
+                    }
+                }
+            }
+
+            // Budget auto-rollover then progress (current month only)
+            group.addTask {
+                try? await BudgetAPIService.shared.performAutoRollover()
+                if let progress = try? await BudgetAPIService.shared.getBudgetProgress() {
+                    await MainActor.run {
+                        cache.budgetProgress = progress
+                    }
+                }
+            }
+
+            // Budget history
+            group.addTask {
+                if let history = try? await BudgetAPIService.shared.getBudgetHistory() {
+                    await MainActor.run {
+                        cache.budgetHistory = history.budgetHistory
+                    }
+                }
+            }
         }
 
-        await MainActor.run { hasLoadedInitialData = true }
+        await MainActor.run {
+            cache.hasPreloaded = true
+            hasLoadedInitialData = true
+        }
+    }
+
+    // MARK: - Preload Helpers
+
+    /// Compute target periods: current month + 2 previous months
+    private func computeTargetPeriods() -> [String] {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "MMMM yyyy"
+        fmt.locale = Locale(identifier: "en_US")
+        let now = Date()
+        return (0...2).reversed().compactMap { i in
+            Calendar.current.date(byAdding: .month, value: -i, to: now).map { fmt.string(from: $0) }
+        }
+    }
+
+    /// Parse period string (e.g. "March 2026") to month/year components
+    private func parsePeriodComponents(_ period: String) -> (month: Int, year: Int) {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "MMMM yyyy"
+        fmt.locale = Locale(identifier: "en_US")
+        guard let date = fmt.date(from: period) else {
+            let now = Date()
+            return (Calendar.current.component(.month, from: now), Calendar.current.component(.year, from: now))
+        }
+        return (Calendar.current.component(.month, from: date), Calendar.current.component(.year, from: date))
+    }
+
+    /// Parse period string to start/end dates for receipt filtering
+    private func parsePeriodToDates(_ period: String) -> (start: Date, end: Date)? {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "MMMM yyyy"
+        fmt.locale = Locale(identifier: "en_US")
+        fmt.timeZone = TimeZone(identifier: "UTC")
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
+        guard let date = fmt.date(from: period) else { return nil }
+        guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) else { return nil }
+        guard let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, second: -1), to: startOfMonth) else { return nil }
+        return (startOfMonth, endOfMonth)
+    }
+
+    /// Preload all receipt pages for a given period into the cache
+    private func preloadReceipts(for period: String, into cache: BudgetTabPreloadCache) async {
+        guard let dates = parsePeriodToDates(period) else { return }
+
+        var allReceipts: [APIReceipt] = []
+        var currentPage = 1
+        let pageSize = 20
+
+        // Load all pages
+        while true {
+            var filters = ReceiptFilters()
+            filters.startDate = dates.start
+            filters.endDate = dates.end
+            filters.page = currentPage
+            filters.pageSize = pageSize
+
+            guard let response = try? await AnalyticsAPIService.shared.getReceipts(filters: filters) else { break }
+            allReceipts.append(contentsOf: response.receipts)
+
+            if response.page >= response.totalPages {
+                break
+            }
+            currentPage += 1
+        }
+
+        await MainActor.run {
+            cache.receiptsByPeriod[period] = allReceipts
+        }
     }
 }
 

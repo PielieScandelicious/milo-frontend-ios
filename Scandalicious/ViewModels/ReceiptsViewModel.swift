@@ -96,6 +96,13 @@ class ReceiptsViewModel: ObservableObject {
         hasMorePages = false
     }
 
+    /// Apply preloaded receipts from BudgetTabPreloadCache (skips API call)
+    func applyPreloadedReceipts(_ receipts: [APIReceipt]) {
+        self.receipts = receipts
+        self.state = .success(receipts)
+        self.hasMorePages = false
+    }
+
     /// Load next page of receipts (always single-page, never auto-loads all)
     func loadNextPage(period: String, storeName: String? = nil) async {
         guard hasMorePages else { return }

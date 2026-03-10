@@ -184,6 +184,19 @@ class BudgetViewModel: ObservableObject {
         await loadBudgetForPeriod(period)
     }
 
+    // MARK: - Preload Cache Consumption
+
+    /// Apply preloaded budget progress from BudgetTabPreloadCache (skips API call)
+    func applyPreloadedProgress(_ response: BudgetProgressResponse) {
+        state = .active(response.toBudgetProgress())
+    }
+
+    /// Apply preloaded budget history from BudgetTabPreloadCache (skips API call)
+    func applyPreloadedHistory(_ history: [BudgetHistory]) {
+        budgetHistory = history
+        isLoadingHistory = false
+    }
+
     // MARK: - Period Helpers
 
     private func convertToAPIFormat(_ displayPeriod: String) -> String {
