@@ -22,7 +22,7 @@ struct DigitalReceiptHintCard: View {
                         .fill(accent.opacity(0.12))
                         .frame(width: 40, height: 40)
 
-                    Image(systemName: "square.and.arrow.up.fill")
+                    Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(accent)
                 }
@@ -64,6 +64,31 @@ struct DigitalReceiptHintCard: View {
                 .padding(.horizontal, 16)
 
                 VStack(alignment: .leading, spacing: 12) {
+                    // How to upload instruction
+                    HStack(spacing: 10) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(accent)
+                            .frame(width: 28, height: 28)
+                            .background(accent.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("How to upload")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.6))
+
+                            Text("Open your digital receipt in the store's app (Colruyt, Delhaize, ...), tap the **Share** button, and select **Milo** to upload it.")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(10)
+                    .background(Color.white.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    // Cashback explanation
                     Text("The more you spend, the higher your cashback rate. Your rate increases progressively:")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.4))
