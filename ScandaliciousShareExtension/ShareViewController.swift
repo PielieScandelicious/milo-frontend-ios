@@ -478,36 +478,40 @@ class ShareViewController: UIViewController {
             return
         }
 
-        // Show success immediately for instant feedback
-        updateStatus(.success(message: ""))
+        // Show uploading state while waiting for backend confirmation
+        updateStatus(.uploading(subtitle: "Uploading receipt..."))
 
-        // Start upload with expiring activity to ensure it completes
-        ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading PDF receipt") { expired in
-            if expired {
-                return
+        do {
+            let result = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
+            if case .accepted(let accepted) = result {
+                self.persistProcessingReceipt(receiptId: accepted.receiptId, filename: accepted.filename)
+                self.signalMainAppToRefresh()
             }
 
-            Task {
-                do {
-                    let result = try await ReceiptUploadService.shared.uploadPDFReceipt(from: pdfURL)
-                    if case .accepted(let accepted) = result {
-                        // Persist receipt ID first, then signal — main app must see the
-                        // receipt ID in UserDefaults before it calls reloadPersistedReceipts()
-                        self.persistProcessingReceipt(receiptId: accepted.receiptId, filename: accepted.filename)
-                        self.signalMainAppToRefresh()
-                    }
-                } catch ReceiptUploadError.duplicateReceipt {
-                    await MainActor.run {
-                        self.updateStatus(.failed(message: "This receipt has already been uploaded.", canRetry: false))
-                    }
-                } catch {
-                    // Other errors are not shown — user already saw the success animation
-                }
+            // Backend confirmed upload — show success
+            await MainActor.run {
+                self.updateStatus(.success(message: ""))
             }
+
+            // Keep success visible briefly for the animation
+            try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8 seconds
+
+        } catch ReceiptUploadError.duplicateReceipt {
+            await MainActor.run {
+                self.updateStatus(.failed(message: "This receipt has already been uploaded. You can't upload the same receipt twice.", canRetry: false, title: "Duplicate Receipt"))
+            }
+
+            // Keep error visible long enough to read
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+
+        } catch {
+            await MainActor.run {
+                self.updateStatus(.failed(message: self.getUserFriendlyError(from: error), canRetry: false))
+            }
+
+            // Keep error visible long enough to read
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
         }
-
-        // Keep success visible briefly for the animation (matches scan view timing)
-        try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8 seconds
 
         // Complete the request
         await MainActor.run {
@@ -523,36 +527,40 @@ class ShareViewController: UIViewController {
             return
         }
 
-        // Show success immediately for instant feedback
-        updateStatus(.success(message: ""))
+        // Show uploading state while waiting for backend confirmation
+        updateStatus(.uploading(subtitle: "Uploading receipt..."))
 
-        // Start upload with expiring activity to ensure it completes
-        ProcessInfo.processInfo.performExpiringActivity(withReason: "Uploading receipt") { expired in
-            if expired {
-                return
+        do {
+            let result = try await ReceiptUploadService.shared.uploadReceipt(image: image)
+            if case .accepted(let accepted) = result {
+                self.persistProcessingReceipt(receiptId: accepted.receiptId, filename: accepted.filename)
+                self.signalMainAppToRefresh()
             }
 
-            Task {
-                do {
-                    let result = try await ReceiptUploadService.shared.uploadReceipt(image: image)
-                    if case .accepted(let accepted) = result {
-                        // Persist receipt ID first, then signal — main app must see the
-                        // receipt ID in UserDefaults before it calls reloadPersistedReceipts()
-                        self.persistProcessingReceipt(receiptId: accepted.receiptId, filename: accepted.filename)
-                        self.signalMainAppToRefresh()
-                    }
-                } catch ReceiptUploadError.duplicateReceipt {
-                    await MainActor.run {
-                        self.updateStatus(.failed(message: "This receipt has already been uploaded.", canRetry: false))
-                    }
-                } catch {
-                    // Other errors are not shown — user already saw the success animation
-                }
+            // Backend confirmed upload — show success
+            await MainActor.run {
+                self.updateStatus(.success(message: ""))
             }
+
+            // Keep success visible briefly for the animation
+            try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8 seconds
+
+        } catch ReceiptUploadError.duplicateReceipt {
+            await MainActor.run {
+                self.updateStatus(.failed(message: "This receipt has already been uploaded. You can't upload the same receipt twice.", canRetry: false, title: "Duplicate Receipt"))
+            }
+
+            // Keep error visible long enough to read
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+
+        } catch {
+            await MainActor.run {
+                self.updateStatus(.failed(message: self.getUserFriendlyError(from: error), canRetry: false))
+            }
+
+            // Keep error visible long enough to read
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
         }
-
-        // Keep success visible briefly for the animation (matches scan view timing)
-        try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8 seconds
 
         // Complete the request
         await MainActor.run {
