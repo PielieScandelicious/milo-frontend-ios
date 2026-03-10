@@ -622,10 +622,6 @@ struct CategoryBudgetGrid: View {
         VStack(spacing: 8) {
             // Header
             HStack {
-                Text(L("category_budgets"))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.5))
-
                 Spacer()
 
                 if let onSeeAll = onSeeAll, !categories.isEmpty {

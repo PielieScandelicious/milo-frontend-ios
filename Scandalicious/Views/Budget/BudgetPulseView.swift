@@ -717,10 +717,6 @@ struct BudgetPulseView: View {
                 }
             }
 
-            Text(title)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
-
             Spacer()
 
             if hasExistingBudget {
@@ -1241,103 +1237,7 @@ struct BudgetPulseView: View {
     // MARK: - Past Month Budget History View
 
     private var pastMonthBudgetHistoryView: some View {
-        Group {
-            if let history = pastMonthHistoryForSelectedPeriod {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(history.displayMonth)
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
-
-                            if history.wasSmartBudget {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "sparkles")
-                                        .font(.system(size: 10, weight: .semibold))
-                                    Text(L("budget"))
-                                        .font(.system(size: 11, weight: .semibold))
-                                }
-                                .foregroundColor(Color(red: 0.3, green: 0.7, blue: 1.0))
-                            }
-                        }
-
-                        Spacer()
-
-                        if history.wasDeleted {
-                            HStack(spacing: 4) {
-                                Image(systemName: "trash.fill")
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text(L("deleted"))
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.3))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(red: 1.0, green: 0.55, blue: 0.3).opacity(0.15))
-                            .cornerRadius(6)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("monthly_budget"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.5))
-
-                        Text(String(format: "€%.0f", history.monthlyAmount))
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
-
-                    if let allocations = history.categoryAllocations, !allocations.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(L("category_targets"))
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.5))
-
-                            VStack(spacing: 4) {
-                                ForEach(allocations.prefix(4)) { allocation in
-                                    HStack {
-                                        Circle()
-                                            .fill(allocation.category.categoryColor)
-                                            .frame(width: 6, height: 6)
-
-                                        Text(CategoryRegistryManager.shared.displayNameForSubCategory(allocation.category))
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.8))
-
-                                        Spacer()
-
-                                        Text(String(format: "€%.0f", allocation.amount))
-                                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                            .foregroundColor(.white)
-                                    }
-                                }
-
-                                if allocations.count > 4 {
-                                    Text("+ \(allocations.count - 4) more")
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.4))
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(16)
-            } else {
-                HStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.exclamationmark")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white.opacity(0.3))
-
-                    Text(L("no_budget_month"))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-
-                    Spacer()
-                }
-                .padding(16)
-            }
-        }
+        PastMonthHistoryWidget(history: pastMonthHistoryForSelectedPeriod)
     }
 
     private var pastMonthHistoryForSelectedPeriod: BudgetHistory? {
@@ -1461,13 +1361,6 @@ struct BudgetPulseView: View {
 
         return VStack(spacing: 14) {
             if hasTotalBudget {
-                // Section title
-                Text(L("monthly_budget"))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.5))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-
                 // Pie chart + budget info side by side (centered)
                 HStack(spacing: 14) {
                     BudgetPieChartView(progress: progress, size: 80)

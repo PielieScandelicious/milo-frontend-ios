@@ -496,7 +496,11 @@ struct CategoryPickerSheet: View {
     private var availableCategories: [String] {
         let all = registry.allSubCategories.filter { !existingCategories.contains($0) }
         if searchText.isEmpty { return all }
-        return all.filter { $0.lowercased().contains(searchText.lowercased()) }
+        let query = searchText.lowercased()
+        return all.filter {
+            $0.lowercased().contains(query) ||
+            registry.displayNameForSubCategory($0).lowercased().contains(query)
+        }
     }
 
     var body: some View {
@@ -541,7 +545,7 @@ struct CategoryPickerSheet: View {
                                             .foregroundStyle(category.categoryColor)
                                     }
 
-                                    Text(category.localizedCategoryName)
+                                    Text(registry.displayNameForSubCategory(category))
                                         .font(.system(size: 15, weight: .medium))
                                         .foregroundColor(.white)
 

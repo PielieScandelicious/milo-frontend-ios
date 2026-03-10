@@ -468,6 +468,15 @@ extension Color {
 
 // MARK: - Budget History
 
+struct CategorySpendHistory: Codable {
+    let category: String
+    let amount: Double   // budget target
+    let spent: Double    // actual spend
+
+    var isOverBudget: Bool { spent > amount }
+    var spendRatio: Double { amount > 0 ? spent / amount : 0 }
+}
+
 struct BudgetHistory: Codable, Identifiable {
     let id: String
     let userId: String
@@ -477,6 +486,8 @@ struct BudgetHistory: Codable, Identifiable {
     let wasSmartBudget: Bool
     let wasDeleted: Bool
     let createdAt: String
+    let totalSpent: Double
+    let categorySpend: [CategorySpendHistory]?
 
     var id_computed: String { id }
 
@@ -489,20 +500,49 @@ struct BudgetHistory: Codable, Identifiable {
         case wasSmartBudget = "was_smart_budget"
         case wasDeleted = "was_deleted"
         case createdAt = "created_at"
+        case totalSpent = "total_spent"
+        case categorySpend = "category_spend"
     }
 
+    var hasTotalBudget: Bool { monthlyAmount > 0 }
+
+    var spendRatio: Double {
+        monthlyAmount > 0 ? totalSpent / monthlyAmount : 0
+    }
+
+    var isOverBudget: Bool { hasTotalBudget && totalSpent > monthlyAmount }
+
+    /// Short localized month display, e.g. "Feb 26"
     var displayMonth: String {
         let components = month.split(separator: "-")
         guard components.count == 2,
-              let year = components.last,
-              let monthNum = Int(components.first ?? "0"),
-              monthNum >= 1 && monthNum <= 12 else {
+              let year = Int(components[0]),
+              let monthNum = Int(components[1]),
+              monthNum >= 1, monthNum <= 12 else {
             return month
         }
 
-        let monthNames = ["January", "February", "March", "April", "May", "June",
-                         "July", "August", "September", "October", "November", "December"]
-        return "\(monthNames[monthNum - 1]) \(year)"
+        var cal = Calendar(identifier: .gregorian)
+        cal.locale = Locale.current
+        let monthName = cal.shortMonthSymbols[monthNum - 1].capitalized
+        let shortYear = year % 100
+        return "\(monthName) \(String(format: "%02d", shortYear))"
+    }
+
+    /// Full localized month display, e.g. "February 2026"
+    var displayMonthFull: String {
+        let components = month.split(separator: "-")
+        guard components.count == 2,
+              let year = Int(components[0]),
+              let monthNum = Int(components[1]),
+              monthNum >= 1, monthNum <= 12 else {
+            return month
+        }
+
+        var cal = Calendar(identifier: .gregorian)
+        cal.locale = Locale.current
+        let monthName = cal.monthSymbols[monthNum - 1].capitalized
+        return "\(monthName) \(year)"
     }
 }
 
