@@ -220,14 +220,18 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
 
                     // All items sorted alphabetically
                     if !sortedTransactions.isEmpty {
-                        VStack(spacing: 6) {
-                            ForEach(Array(sortedTransactions.enumerated()), id: \.offset) { index, item in
-                                LineItemRow(item: item)
+                        ScrollView {
+                            VStack(spacing: 6) {
+                                ForEach(Array(sortedTransactions.enumerated()), id: \.offset) { index, item in
+                                    LineItemRow(item: item)
+                                }
                             }
+                            .padding(.horizontal, 14)
+                            .padding(.top, 12)
+                            .padding(.bottom, 10)
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                        .padding(.bottom, 10)
+                        .frame(maxHeight: 300)
+                        .scrollIndicators(.visible)
                         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: sortedTransactions.count)
                     }
                 }

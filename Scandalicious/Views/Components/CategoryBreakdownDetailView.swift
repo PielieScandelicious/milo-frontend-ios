@@ -280,13 +280,17 @@ struct CategoryBreakdownDetailView: View {
                     .frame(height: 1)
                     .padding(.horizontal, 14)
 
-                // LazyVStack for spacing between items (lazy rendering for pagination)
-                LazyVStack(spacing: 8) {
-                    expandedItemsContent(category)
+                // Scrollable item list with max height
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        expandedItemsContent(category)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+                .frame(maxHeight: 280)
+                .scrollIndicators(.visible)
             }
         }
         .background(

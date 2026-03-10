@@ -719,20 +719,31 @@ struct StoreDetailView: View {
 
             // Expanded transactions list
             if expandedCategoryName == segment.label {
-                VStack(spacing: 8) {
+                VStack(spacing: 0) {
                     if loadingCategories.contains(segment.label) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            HStack(spacing: 10) {
-                                SkeletonRect(width: 16, height: 16, cornerRadius: 8)
-                                SkeletonRect(width: 100, height: 13)
-                                Spacer()
-                                SkeletonRect(width: 50, height: 13)
+                        VStack(spacing: 8) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                HStack(spacing: 10) {
+                                    SkeletonRect(width: 16, height: 16, cornerRadius: 8)
+                                    SkeletonRect(width: 100, height: 13)
+                                    Spacer()
+                                    SkeletonRect(width: 50, height: 13)
+                                }
                             }
                         }
                         .shimmer()
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                     } else if let transactions = categoryTransactions[segment.label], !transactions.isEmpty {
-                        CategoryTransactionsContent(transactions: transactions)
+                        ScrollView {
+                            VStack(spacing: 8) {
+                                CategoryTransactionsContent(transactions: transactions)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                        }
+                        .frame(maxHeight: 280)
+                        .scrollIndicators(.visible)
                     } else {
                         Text(L("no_transactions"))
                             .font(.system(size: 13, weight: .medium))
@@ -740,7 +751,6 @@ struct StoreDetailView: View {
                             .padding(.vertical, 8)
                     }
                 }
-                .padding(.horizontal, 8)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
                 .transition(.opacity)
