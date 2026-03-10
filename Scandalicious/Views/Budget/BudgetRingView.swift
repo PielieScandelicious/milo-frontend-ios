@@ -138,12 +138,11 @@ struct MiniBudgetRing: View {
                 .animation(.spring(response: 0.8, dampingFraction: 0.8), value: animationProgress)
                 .animation(.easeInOut(duration: 0.3), value: spendRatio)
 
-            // Warning icon at 85%+ thresholds
-            if spendRatio >= 0.85 {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: size * 0.32, weight: .semibold))
-                    .foregroundColor(ringColor ?? paceStatus.color)
-            }
+            // Center percentage
+            Text("\(Int(min(spendRatio, 9.99) * 100))%")
+                .font(.system(size: size * 0.24, weight: .bold, design: .rounded))
+                .foregroundColor(ringColor ?? paceStatus.color)
+                .transaction { $0.animation = nil }
         }
         .onAppear {
             animationProgress = 1.0

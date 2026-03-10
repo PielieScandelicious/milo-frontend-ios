@@ -61,11 +61,16 @@ private struct BudgetTotalRing: View {
                 .animation(.spring(response: 0.8, dampingFraction: 0.8), value: animationProgress)
                 .animation(.easeInOut(duration: 0.3), value: spendFraction)
 
-            // Center icon
-            Image(systemName: "banknote.fill")
-                .font(.system(size: size * 0.22, weight: .medium))
-                .foregroundColor(.white.opacity(0.35))
-                .transaction { $0.animation = nil }
+            // Center percentage
+            VStack(spacing: 1) {
+                Text("\(Int(min(spendFraction, 9.99) * 100))%")
+                    .font(.system(size: size * 0.2, weight: .bold, design: .rounded))
+                    .foregroundColor(ringColor)
+                Text(L("spent"))
+                    .font(.system(size: size * 0.09, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .transaction { $0.animation = nil }
         }
         .frame(width: size, height: size)
         .onAppear {
