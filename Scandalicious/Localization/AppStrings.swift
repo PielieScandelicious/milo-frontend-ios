@@ -91,7 +91,7 @@ enum AppStrings {
         "save_changes": ["en": "Save Changes", "nl": "Wijzigingen opslaan", "fr": "Enregistrer les modifications"],
         "account": ["en": "Account", "nl": "Account", "fr": "Compte"],
         "not_available": ["en": "Not available", "nl": "Niet beschikbaar", "fr": "Non disponible"],
-        "current_plan": ["en": "Current Plan", "nl": "Huidig abonnement", "fr": "Abonnement actuel"],
+        "c            rurrent_plan": ["en": "Current Plan", "nl": "Huidig abonnement", "fr": "Abonnement actuel"],
         "renews_on": ["en": "Renews On", "nl": "Verlengt op", "fr": "Renouvellement le"],
         "trial_ends": ["en": "Trial Ends", "nl": "Proefperiode eindigt", "fr": "Fin de l'essai"],
         "manage_subscription": ["en": "Manage Subscription", "nl": "Abonnement beheren", "fr": "Gérer l'abonnement"],

@@ -13,6 +13,7 @@ struct ProfileView: View {
     @EnvironmentObject var authManager: AuthenticationManager
 
     @State private var nickname = ""
+    @State private var instagramHandle = ""
     @State private var selectedGender: Gender = .notSpecified
     @State private var age = ""
     @State private var householdNumber = ""
@@ -27,6 +28,7 @@ struct ProfileView: View {
 
     // Store original values to detect changes
     @State private var originalNickname = ""
+    @State private var originalInstagramHandle = ""
     @State private var originalGender: Gender = .notSpecified
     @State private var originalAge = ""
     @State private var originalHouseholdNumber = ""
@@ -141,6 +143,22 @@ struct ProfileView: View {
                 .disabled(isLoading || isSaving)
                 .onChange(of: selectedLanguage) { _, _ in
                     checkForChanges()
+                }
+
+                HStack {
+                    Image(systemName: "camera.fill")
+                        .foregroundStyle(.primary)
+                        .frame(width: 20)
+                    Text("@")
+                        .foregroundStyle(.secondary)
+                    TextField("Instagram handle", text: $instagramHandle)
+                        .foregroundStyle(.secondary)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .disabled(isLoading || isSaving)
+                        .onChange(of: instagramHandle) { _, _ in
+                            checkForChanges()
+                        }
                 }
             } header: {
                 Text(L("personal_information"))
@@ -379,6 +397,7 @@ struct ProfileView: View {
             let profile = try await ProfileAPIService().getProfile()
             await MainActor.run {
                 nickname = profile.nickname ?? ""
+                instagramHandle = profile.instagramHandle ?? ""
                 selectedGender = Gender.from(apiValue: profile.gender)
                 age = profile.age != nil ? "\(profile.age!)" : ""
                 householdNumber = profile.householdNumber != nil ? "\(profile.householdNumber!)" : ""
@@ -388,6 +407,7 @@ struct ProfileView: View {
 
                 // Store original values
                 originalNickname = nickname
+                originalInstagramHandle = instagramHandle
                 originalGender = selectedGender
                 originalAge = age
                 originalHouseholdNumber = householdNumber
@@ -414,6 +434,7 @@ struct ProfileView: View {
         Task {
             do {
                 let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
+                let trimmedInstagramHandle = instagramHandle.trimmingCharacters(in: .whitespaces)
                 let ageValue = Int(age)
                 let householdValue = Int(householdNumber)
                 let storeValues = selectedStores.isEmpty ? [] : selectedStores.map(\.rawValue)
@@ -424,12 +445,14 @@ struct ProfileView: View {
                     age: ageValue,
                     householdNumber: householdValue,
                     language: selectedLanguage?.rawValue,
-                    preferredStores: storeValues
+                    preferredStores: storeValues,
+                    instagramHandle: trimmedInstagramHandle.isEmpty ? nil : trimmedInstagramHandle
                 )
 
                 await MainActor.run {
                     // Update original values
                     originalNickname = nickname
+                    originalInstagramHandle = instagramHandle
                     originalGender = selectedGender
                     originalAge = age
                     originalHouseholdNumber = householdNumber
@@ -460,6 +483,7 @@ struct ProfileView: View {
 
     private func checkForChanges() {
         hasUnsavedChanges = nickname != originalNickname ||
+                           instagramHandle != originalInstagramHandle ||
                            selectedGender != originalGender ||
                            age != originalAge ||
                            householdNumber != originalHouseholdNumber ||

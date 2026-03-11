@@ -22,6 +22,7 @@ struct HomeTabView: View {
     @State private var contentOpacity: Double = 0
     @State private var showMiloGame = false
     @State private var showWalletPassCreator = false
+    @State private var lotteryStatus: LotteryStatus?
     @Environment(\.scenePhase) private var scenePhase
 
     private let headerBlueColor = Color(red: 0.04, green: 0.15, blue: 0.30)
@@ -68,6 +69,13 @@ struct HomeTabView: View {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
                 contentOpacity = 1.0
             }
+            Task {
+                if let status = try? await LotteryAPIService().getLotteryStatus() {
+                    await MainActor.run {
+                        lotteryStatus = status
+                    }
+                }
+            }
         }
         .fullScreenCover(isPresented: $showCamera) {
             CustomCameraView(capturedImage: $capturedImage)
@@ -80,6 +88,7 @@ struct HomeTabView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 checkForShareExtensionUploads()
+                refreshLotteryStatus()
             }
         }
         .sheet(isPresented: $showProfile) {
@@ -166,8 +175,10 @@ struct HomeTabView: View {
                     .padding(.horizontal, 20)
 
                 // Monthly lottery
-                MonthlyLotteryCard()
-                    .padding(.horizontal, 20)
+                MonthlyLotteryCard(lotteryStatus: lotteryStatus) {
+                    refreshLotteryStatus()
+                }
+                .padding(.horizontal, 20)
 
                 // Wallet Pass creator
                 WalletPassCard {
@@ -269,6 +280,14 @@ struct HomeTabView: View {
 
     private func checkForShareExtensionUploads() {
         processingManager.reloadPersistedReceipts()
+    }
+
+    private func refreshLotteryStatus() {
+        Task {
+            if let status = try? await LotteryAPIService().getLotteryStatus() {
+                await MainActor.run { lotteryStatus = status }
+            }
+        }
     }
 }
 

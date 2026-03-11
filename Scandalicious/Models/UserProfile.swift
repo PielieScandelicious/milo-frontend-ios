@@ -17,6 +17,7 @@ struct UserProfile: Codable {
     var householdNumber: Int?
     var language: String?
     var preferredStores: [String]?
+    var instagramHandle: String?
     var profileCompleted: Bool
     let createdAt: String?
     let updatedAt: String?
@@ -31,6 +32,7 @@ struct UserProfile: Codable {
         case householdNumber = "household_number"
         case language
         case preferredStores = "preferred_stores"
+        case instagramHandle = "instagram_handle"
         case profileCompleted = "profile_completed"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -44,6 +46,7 @@ struct UserProfileUpdate: Codable {
     var householdNumber: Int?
     var language: String?
     var preferredStores: [String]?
+    var instagramHandle: String?
 
     enum CodingKeys: String, CodingKey {
         case nickname
@@ -52,6 +55,7 @@ struct UserProfileUpdate: Codable {
         case householdNumber = "household_number"
         case language
         case preferredStores = "preferred_stores"
+        case instagramHandle = "instagram_handle"
     }
 }
 
