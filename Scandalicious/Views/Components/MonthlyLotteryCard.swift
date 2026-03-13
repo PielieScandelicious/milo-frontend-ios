@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import PhotosUI
 
 struct MonthlyLotteryCard: View {
     var lotteryStatus: LotteryStatus?
@@ -18,9 +17,9 @@ struct MonthlyLotteryCard: View {
     @State private var isSavingHandle = false
     @State private var handleSaved = false
 
-    @State private var selectedPhoto: PhotosPickerItem?
-    @State private var isUploadingProof = false
-    @State private var proofUploaded = false
+    @State private var isDeclaring = false
+    @State private var showConditionsAlert = false
+    @State private var missingConditions: [String] = []
 
     private let gold = Color(red: 1.0, green: 0.84, blue: 0.0)
     private let emerald = Color(red: 0.20, green: 0.78, blue: 0.55)
@@ -55,10 +54,10 @@ struct MonthlyLotteryCard: View {
         .background(cardBackground)
         .overlay(cardBorder)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isExpanded)
-        .onChange(of: selectedPhoto) { _, newValue in
-            if let item = newValue {
-                uploadProofImage(item)
-            }
+        .alert("Complete these steps first", isPresented: $showConditionsAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(missingConditions.joined(separator: "\n"))
         }
     }
 
@@ -175,7 +174,7 @@ struct MonthlyLotteryCard: View {
             let prize = lotteryStatus?.prizeAmount ?? 100
             Text("\u{20AC}\(prize)")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(gold)
+                .foregroundStyle(progressColor)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Monthly prize")
@@ -212,13 +211,63 @@ struct MonthlyLotteryCard: View {
         }
     }
 
+    private var postURL: String? {
+        lotteryStatus?.postUrl
+    }
+
     private var step3Card: some View {
         let met = lotteryStatus?.hasShare ?? false
-        return StepCardView(number: 3, met: met, title: "Share our post on your story", subtitle: proofSubtitle, gold: gold, emerald: emerald) {
+        return StepCardView(number: 3, met: met, title: "Share our post on your story", subtitle: shareSubtitle, gold: gold, emerald: emerald) {
             if !met {
-                proofUploadButton
+                VStack(alignment: .leading, spacing: 8) {
+                    if postURL != nil {
+                        postLinkRow
+                    }
+                    declareShareButton
+                }
             }
         }
+    }
+
+    private var postLinkRow: some View {
+        Button {
+            if let urlString = postURL, let url = URL(string: urlString) {
+                UIApplication.shared.open(url)
+            }
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.51, green: 0.23, blue: 0.71),
+                                    Color(red: 0.83, green: 0.18, blue: 0.42),
+                                    Color(red: 1.0, green: 0.60, blue: 0.15)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 28, height: 28)
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                }
+                Text("Tap to view & share on story")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.7))
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(gold.opacity(0.6))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
+        }
+        .padding(.leading, 38)
     }
 
     @ViewBuilder
@@ -291,50 +340,41 @@ struct MonthlyLotteryCard: View {
         .disabled(instagramHandle.isEmpty || isSavingHandle)
     }
 
-    // MARK: - Proof Upload
+    // MARK: - Share Declaration
 
-    private var proofSubtitle: String {
+    private var shareSubtitle: String {
         if lotteryStatus?.hasShare == true { return "Verified" }
         switch lotteryStatus?.proofStatus {
-        case "pending_review": return "Proof uploaded - under review"
-        case "rejected": return "Proof rejected - try again"
-        default: return "Upload a screenshot of your story"
+        case "pending_review": return "Awaiting verification"
+        case "rejected": return "Not verified - try again"
+        default: return "Share the post & confirm below"
         }
     }
 
-    private var proofUploadButton: some View {
-        let fillColor: Color = {
-            if isUploadingProof { return Color.white.opacity(0.04) }
-            if lotteryStatus?.proofStatus == "pending_review" { return Color.orange.opacity(0.08) }
-            return gold.opacity(0.1)
-        }()
-        let strokeColor: Color = {
-            if isUploadingProof { return Color.white.opacity(0.06) }
-            if lotteryStatus?.proofStatus == "pending_review" { return Color.orange.opacity(0.2) }
-            return gold.opacity(0.2)
-        }()
+    private var declareShareButton: some View {
+        let isPending = lotteryStatus?.proofStatus == "pending_review"
+        let fillColor: Color = isPending ? Color.orange.opacity(0.08) : gold.opacity(0.1)
+        let strokeColor: Color = isPending ? Color.orange.opacity(0.2) : gold.opacity(0.2)
 
-        return PhotosPicker(
-            selection: $selectedPhoto,
-            matching: .images,
-            photoLibrary: .shared()
-        ) {
-            proofButtonLabel
+        return Button {
+            declareShare()
+        } label: {
+            declareShareLabel
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(RoundedRectangle(cornerRadius: 10).fill(fillColor))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(strokeColor, lineWidth: 0.5))
         }
-        .disabled(isUploadingProof)
+        .disabled(isDeclaring || isPending)
         .padding(.leading, 38)
     }
 
     @ViewBuilder
-    private var proofButtonLabel: some View {
-        if isUploadingProof {
+    private var declareShareLabel: some View {
+        if isDeclaring {
             HStack(spacing: 8) {
                 ProgressView().tint(.white).scaleEffect(0.8)
-                Text("Uploading...")
+                Text("Confirming...")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.6))
             }
@@ -347,8 +387,8 @@ struct MonthlyLotteryCard: View {
             }
         } else {
             HStack(spacing: 8) {
-                Image(systemName: "camera.fill").font(.system(size: 12)).foregroundStyle(gold)
-                Text("Upload screenshot")
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(gold)
+                Text("I shared it")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(gold)
             }
@@ -438,31 +478,30 @@ struct MonthlyLotteryCard: View {
         }
     }
 
-    private func uploadProofImage(_ item: PhotosPickerItem) {
-        isUploadingProof = true
+    private func declareShare() {
+        var missing: [String] = []
+        if lotteryStatus?.hasInstagram != true {
+            missing.append("Step 1: Link your Instagram account")
+        }
+        if lotteryStatus?.hasReceipt != true {
+            missing.append("Step 2: Scan a receipt this month")
+        }
+        if !missing.isEmpty {
+            missingConditions = missing
+            showConditionsAlert = true
+            return
+        }
+
+        isDeclaring = true
         Task {
             do {
-                guard let data = try await item.loadTransferable(type: Data.self) else {
-                    await MainActor.run { isUploadingProof = false }
-                    return
-                }
-                let uiImage = UIImage(data: data)
-                guard let jpegData = uiImage?.jpegData(compressionQuality: 0.7) else {
-                    await MainActor.run { isUploadingProof = false }
-                    return
-                }
-                try await LotteryAPIService().uploadProof(imageData: jpegData)
+                try await LotteryAPIService().declareShare()
                 await MainActor.run {
-                    isUploadingProof = false
-                    proofUploaded = true
-                    selectedPhoto = nil
+                    isDeclaring = false
                     onStatusChanged?()
                 }
             } catch {
-                await MainActor.run {
-                    isUploadingProof = false
-                    selectedPhoto = nil
-                }
+                await MainActor.run { isDeclaring = false }
             }
         }
     }

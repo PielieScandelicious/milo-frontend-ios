@@ -81,36 +81,27 @@ actor LotteryAPIService {
         }
     }
 
-    // MARK: - Upload Proof
+    // MARK: - Declare Share
 
-    func uploadProof(imageData: Data) async throws {
+    func declareShare() async throws {
         guard let token = try await getFirebaseToken() else {
             throw LotteryError.unauthorized
         }
 
-        guard let url = URL(string: "\(baseURL)/lottery/proof") else {
+        guard let url = URL(string: "\(baseURL)/lottery/declare-share") else {
             throw LotteryError.invalidResponse
         }
 
-        let boundary = UUID().uuidString
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"proof.jpg\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-        body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                throw LotteryError.serverError("Failed to upload proof")
+                throw LotteryError.serverError("Failed to declare share")
             }
         } catch let error as LotteryError {
             throw error

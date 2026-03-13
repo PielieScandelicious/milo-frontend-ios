@@ -12,8 +12,8 @@ struct LotteryStatus: Codable {
     let hasInstagram: Bool
     let hasReceipt: Bool
     let hasShare: Bool
-    let hasProof: Bool
     let proofStatus: String?
+    let postUrl: String?
     let currentMonth: String
     let prizeAmount: Int
     let drawingStatus: String
@@ -24,8 +24,8 @@ struct LotteryStatus: Codable {
         case hasInstagram = "has_instagram"
         case hasReceipt = "has_receipt"
         case hasShare = "has_share"
-        case hasProof = "has_proof"
         case proofStatus = "proof_status"
+        case postUrl = "post_url"
         case currentMonth = "current_month"
         case prizeAmount = "prize_amount"
         case drawingStatus = "drawing_status"
