@@ -37,27 +37,45 @@ struct CodableColor: Codable {
     }
 }
 
-// MARK: - Wallet Balance
+// MARK: - Wallet Balance (Milo Points)
+// Conversion: 10,000 pts = €10.00  |  1 pt = €0.001
 
 struct WalletBalance: Codable {
-    var cents: Int
+    /// Points balance (primary currency)
+    var points: Int
 
-    var euros: Double { Double(cents) / 100.0 }
+    /// Euro value computed from points
+    var euros: Double { Double(points) / 1000.0 }
 
-    var formatted: String {
-        String(format: "€%.2f", euros)
-    }
+    var formatted: String { "\(points) pts" }
 
+    var euroFormatted: String { String(format: "= €%.2f", euros) }
+
+    /// Minimum payout threshold
+    static let minimumPayoutPoints = 10_000
+
+    var canWithdraw: Bool { points >= WalletBalance.minimumPayoutPoints }
+
+    // Legacy initializers kept for compat
     init(euros: Double) {
-        self.cents = Int((euros * 100).rounded())
+        self.points = Int((euros * 1000).rounded())
     }
 
+    init(points: Int) {
+        self.points = points
+    }
+
+    // Legacy cents-based init (converts to points)
     init(cents: Int) {
-        self.cents = cents
+        self.points = cents * 10  // 100 cents = 1 euro = 1000 points, so 1 cent = 10 points
+    }
+
+    mutating func add(points amount: Int) {
+        points += amount
     }
 
     mutating func add(euros amount: Double) {
-        cents += Int((amount * 100).rounded())
+        points += Int((amount * 1000).rounded())
     }
 }
 
@@ -65,6 +83,7 @@ struct WalletBalance: Codable {
 
 struct StreakData: Codable {
     var weekCount: Int
+    var streakLevel: Int  // 1 = Level 1 (first month), 2 = Level 2 (continuous)
     var lastReceiptDate: Date?
     var hasShield: Bool
     var isAtRisk: Bool
@@ -72,56 +91,68 @@ struct StreakData: Codable {
     var backendCycle: [StreakCycleEntryResponse]?
 
     enum CodingKeys: String, CodingKey {
-        case weekCount, lastReceiptDate, hasShield, isAtRisk
+        case weekCount, lastReceiptDate, hasShield, isAtRisk, streakLevel
     }
 
-    var hasClaimableReward: Bool {
-        claimableReward != nil
+    init(weekCount: Int = 0, streakLevel: Int = 1, lastReceiptDate: Date? = nil,
+         hasShield: Bool = false, isAtRisk: Bool = false) {
+        self.weekCount = weekCount
+        self.streakLevel = streakLevel
+        self.lastReceiptDate = lastReceiptDate
+        self.hasShield = hasShield
+        self.isAtRisk = isAtRisk
     }
 
-    /// Reward schedule:
-    /// Weeks 1-3: 1 spin | Week 4: €1
-    /// Weeks 5-7: 2 spins | Week 8: €1
-    /// Weeks 9-11: 3 spins | Week 12: €1
-    /// After: 3 spins/week, €1 every 4th week
-    static func weeklyReward(for week: Int) -> (label: String, icon: String, isCash: Bool, cashValue: Double) {
-        guard week > 0 else {
-            return ("1 spin", "arrow.trianglehead.2.clockwise.rotate.90", false, 0)
+    var hasClaimableReward: Bool { claimableReward != nil }
+
+    var isLevel2: Bool { streakLevel >= 2 }
+
+    var levelDisplayName: String { isLevel2 ? "Level 2" : "Level 1" }
+
+    /// Reward schedule per level.
+    static func weeklyReward(for cyclePosition: Int, level: Int) -> (label: String, icon: String, isPoints: Bool, points: Int, isSpin: Bool, spinType: String) {
+        let pos = ((cyclePosition - 1) % 4) + 1
+        if level == 1 {
+            switch pos {
+            case 1: return ("Geen beloning", "xmark.circle", false, 0, false, "")
+            case 2: return ("1 Standaard Spin", "arrow.trianglehead.2.clockwise.rotate.90", false, 0, true, "standard")
+            case 3: return ("150 pts", "star.fill", true, 150, false, "")
+            case 4: return ("1 Premium Spin + 50 pts", "crown.fill", true, 50, true, "premium")
+            default: return ("", "", false, 0, false, "")
+            }
+        } else {
+            switch pos {
+            case 1: return ("150 pts", "star.fill", true, 150, false, "")
+            case 2: return ("1 Standaard Spin + 100 pts", "arrow.trianglehead.2.clockwise.rotate.90", true, 100, true, "standard")
+            case 3: return ("1 Standaard Spin + 150 pts", "arrow.trianglehead.2.clockwise.rotate.90", true, 150, true, "standard")
+            case 4: return ("1 Premium Spin + 200 pts", "crown.fill", true, 200, true, "premium")
+            default: return ("", "", false, 0, false, "")
+            }
         }
-        if week % 4 == 0 {
-            return ("€1", "banknote.fill", true, 1.0)
-        }
-        let cycle = min((week - 1) / 4, 2)
-        let spins = cycle + 1
-        return ("\(spins) spin\(spins > 1 ? "s" : "")", "arrow.trianglehead.2.clockwise.rotate.90", false, 0)
     }
 
     var currentCycle: [(week: Int, label: String, icon: String, isCash: Bool, completed: Bool)] {
         if let bc = backendCycle {
             return bc.map { entry in
-                let icon = entry.rewardType == "cash" ? "banknote.fill" : "arrow.trianglehead.2.clockwise.rotate.90"
-                return (entry.week, entry.label, icon, entry.rewardType == "cash", entry.completed)
+                let icon: String
+                switch entry.rewardType {
+                case "spins", "mixed": icon = entry.label.contains("Premium") ? "crown.fill" : "arrow.trianglehead.2.clockwise.rotate.90"
+                case "points": icon = "star.fill"
+                default: icon = "xmark.circle"
+                }
+                return (entry.week, entry.label, icon, entry.rewardType == "points", entry.completed)
             }
         }
-        // Fallback to local computation
-        let cycleStart = lastCashWeek + 1
+        let cycleStart = max(weekCount - ((weekCount - 1) % 4), 1)
         return (0..<4).map { i in
             let w = cycleStart + i
-            let r = StreakData.weeklyReward(for: w)
-            return (w, r.label, r.icon, r.isCash, w <= weekCount)
+            let r = StreakData.weeklyReward(for: i + 1, level: streakLevel)
+            return (w, r.label, r.icon, r.isPoints, w <= weekCount)
         }
     }
 
-    var lastCashWeek: Int {
-        (weekCount / 4) * 4
-    }
-
-    var nextCashWeek: Int {
-        lastCashWeek + 4
-    }
-
-    var weeksUntilCash: Int {
-        nextCashWeek - weekCount
+    var cyclePosition: Int {
+        weekCount > 0 ? ((weekCount - 1) % 4) + 1 : 0
     }
 
     var flameScale: Double {
@@ -130,20 +161,111 @@ struct StreakData: Codable {
     }
 }
 
-// MARK: - Gold Tier
+// MARK: - Tier Level (Bronze / Silver / Gold)
 
-struct GoldTierStatus: Codable {
-    var isGoldTier: Bool = true
+enum TierLevel: String, Codable, CaseIterable {
+    case bronze = "bronze"
+    case silver = "silver"
+    case gold   = "gold"
 
-    var displayName: String { isGoldTier ? "Gold" : "No Tier" }
+    var displayName: String {
+        switch self {
+        case .bronze: return "Brons"
+        case .silver: return "Zilver"
+        case .gold:   return "Goud"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .bronze: return "medal.fill"
+        case .silver: return "medal.fill"
+        case .gold:   return "crown.fill"
+        }
+    }
 
     var gradientColors: [Color] {
-        isGoldTier
-            ? [Color(red: 1.0, green: 0.88, blue: 0.35),
-               Color(red: 0.80, green: 0.60, blue: 0.0)]
-            : [Color(white: 0.25), Color(white: 0.15)]
+        switch self {
+        case .bronze:
+            return [Color(red: 0.80, green: 0.50, blue: 0.20),
+                    Color(red: 0.60, green: 0.35, blue: 0.10)]
+        case .silver:
+            return [Color(white: 0.75), Color(white: 0.55)]
+        case .gold:
+            return [Color(red: 1.0, green: 0.88, blue: 0.35),
+                    Color(red: 0.80, green: 0.60, blue: 0.0)]
+        }
+    }
+
+    var spinDescription: String {
+        switch self {
+        case .bronze: return "1 Standaard Spin"
+        case .silver: return "1 Standaard Spin + 75 pts"
+        case .gold:   return "1 Premium Spin"
+        }
+    }
+
+    var requirement: String {
+        switch self {
+        case .bronze: return "< 4 tickets/maand"
+        case .silver: return "4-9 tickets/maand"
+        case .gold:   return "10+ tickets/maand"
+        }
+    }
+
+    // Legacy helper
+    var isGoldTier: Bool { self == .gold }
+}
+
+// MARK: - Kickstart Progress
+
+struct KickstartProgress: Codable {
+    var ticketsCompleted: Int
+    var totalTickets: Int
+    var isCompleted: Bool
+
+    var progressFraction: Double {
+        guard totalTickets > 0 else { return 0 }
+        return Double(ticketsCompleted) / Double(totalTickets)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case ticketsCompleted = "tickets_completed"
+        case totalTickets = "total_tickets"
+        case isCompleted = "is_completed"
     }
 }
+
+// MARK: - Spin Type
+
+enum SpinWheelType: String, Codable {
+    case standard = "standard"
+    case premium  = "premium"
+
+    var displayName: String {
+        switch self {
+        case .standard: return "Standaard Spin"
+        case .premium:  return "Premium Spin"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .standard: return "arrow.trianglehead.2.clockwise.rotate.90"
+        case .premium:  return "crown.fill"
+        }
+    }
+
+    var evPoints: Int {
+        switch self {
+        case .standard: return 100
+        case .premium:  return 200
+        }
+    }
+}
+
+// Legacy alias for code that references GoldTierStatus
+typealias GoldTierStatus = TierLevel
 
 // MARK: - Badge
 
@@ -201,53 +323,83 @@ enum SpinSegmentType: String, Codable {
     case cash
     case mystery
     case tryAgain = "try_again"
-    case doubleNext = "double_next"
     case jackpot
+    // Legacy (no longer used but kept for decoding old responses)
+    case doubleNext = "double_next"
 }
 
 struct SpinSegment: Identifiable {
     let id: Int
     let label: String
-    let value: Double
+    let pointsValue: Int      // Points (0 for try_again/mystery)
     let segmentType: SpinSegmentType
     let isJackpot: Bool
     let color: Color
     let icon: String?
 
-    static let segments: [SpinSegment] = [
-        SpinSegment(id: 0, label: "€0.10",        value: 0.10, segmentType: .cash,       isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),   icon: nil),
-        SpinSegment(id: 1, label: "Mystery",       value: 0.0,  segmentType: .mystery,    isJackpot: false, color: Color(red: 0.6, green: 0.2, blue: 1.0),   icon: "gift.fill"),
-        SpinSegment(id: 2, label: "€1",            value: 1.00, segmentType: .cash,       isJackpot: false, color: Color(red: 1.0, green: 0.65, blue: 0.0),  icon: nil),
-        SpinSegment(id: 3, label: "2x",            value: 0.0,  segmentType: .doubleNext, isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),   icon: "bolt.fill"),
-        SpinSegment(id: 4, label: "€0.50",         value: 0.50, segmentType: .cash,       isJackpot: false, color: Color(red: 0.2, green: 0.8, blue: 0.4),   icon: nil),
-        SpinSegment(id: 5, label: "Retry",         value: 0.0,  segmentType: .tryAgain,   isJackpot: false, color: Color(red: 0.0, green: 0.8, blue: 0.7),   icon: "arrow.counterclockwise"),
-        SpinSegment(id: 6, label: "€2",            value: 2.00, segmentType: .cash,       isJackpot: false, color: Color(red: 0.9, green: 0.2, blue: 0.4),   icon: nil),
-        SpinSegment(id: 7, label: "Jackpot",        value: 5.00, segmentType: .jackpot,    isJackpot: true,  color: Color(red: 1.0, green: 0.84, blue: 0.0),  icon: "star.fill"),
+    // Standard wheel segments (EV ~100 pts)
+    static let standardSegments: [SpinSegment] = [
+        SpinSegment(id: 0, label: "50 pts",   pointsValue: 50,   segmentType: .cash,     isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),  icon: nil),
+        SpinSegment(id: 1, label: "Mystery",  pointsValue: 0,    segmentType: .mystery,  isJackpot: false, color: Color(red: 0.6, green: 0.2, blue: 1.0),  icon: "gift.fill"),
+        SpinSegment(id: 2, label: "200 pts",  pointsValue: 200,  segmentType: .cash,     isJackpot: false, color: Color(red: 1.0, green: 0.65, blue: 0.0), icon: nil),
+        SpinSegment(id: 3, label: "Try Again",pointsValue: 0,    segmentType: .tryAgain, isJackpot: false, color: Color(red: 0.0, green: 0.8, blue: 0.7),  icon: "arrow.counterclockwise"),
+        SpinSegment(id: 4, label: "100 pts",  pointsValue: 100,  segmentType: .cash,     isJackpot: false, color: Color(red: 0.2, green: 0.8, blue: 0.4),  icon: nil),
+        SpinSegment(id: 5, label: "150 pts",  pointsValue: 150,  segmentType: .cash,     isJackpot: false, color: Color(red: 0.9, green: 0.4, blue: 0.7),  icon: nil),
+        SpinSegment(id: 6, label: "75 pts",   pointsValue: 75,   segmentType: .cash,     isJackpot: false, color: Color(red: 0.4, green: 0.6, blue: 1.0),  icon: nil),
+        SpinSegment(id: 7, label: "JACKPOT",  pointsValue: 1000, segmentType: .jackpot,  isJackpot: true,  color: Color(red: 1.0, green: 0.84, blue: 0.0), icon: "star.fill"),
     ]
+
+    // Premium wheel segments (EV ~200 pts) — gold/amber palette
+    static let premiumSegments: [SpinSegment] = [
+        SpinSegment(id: 0, label: "100 pts",  pointsValue: 100,  segmentType: .cash,     isJackpot: false, color: Color(red: 1.0, green: 0.7, blue: 0.2),  icon: nil),
+        SpinSegment(id: 1, label: "Mystery",  pointsValue: 0,    segmentType: .mystery,  isJackpot: false, color: Color(red: 0.7, green: 0.3, blue: 1.0),  icon: "gift.fill"),
+        SpinSegment(id: 2, label: "400 pts",  pointsValue: 400,  segmentType: .cash,     isJackpot: false, color: Color(red: 1.0, green: 0.5, blue: 0.0),  icon: nil),
+        SpinSegment(id: 3, label: "Try Again",pointsValue: 0,    segmentType: .tryAgain, isJackpot: false, color: Color(red: 0.9, green: 0.7, blue: 0.0),  icon: "arrow.counterclockwise"),
+        SpinSegment(id: 4, label: "200 pts",  pointsValue: 200,  segmentType: .cash,     isJackpot: false, color: Color(red: 0.85, green: 0.6, blue: 0.1), icon: nil),
+        SpinSegment(id: 5, label: "300 pts",  pointsValue: 300,  segmentType: .cash,     isJackpot: false, color: Color(red: 1.0, green: 0.4, blue: 0.1),  icon: nil),
+        SpinSegment(id: 6, label: "150 pts",  pointsValue: 150,  segmentType: .cash,     isJackpot: false, color: Color(red: 0.95, green: 0.75, blue: 0.1),icon: nil),
+        SpinSegment(id: 7, label: "JACKPOT",  pointsValue: 2000, segmentType: .jackpot,  isJackpot: true,  color: Color(red: 1.0, green: 0.84, blue: 0.0), icon: "star.fill"),
+    ]
+
+    static func segments(for spinType: SpinWheelType) -> [SpinSegment] {
+        spinType == .premium ? premiumSegments : standardSegments
+    }
 }
 
 struct SpinResult: Codable {
     let segmentIndex: Int
     let segmentLabel: String
     let segmentType: String
-    let cashValue: Double
+    let pointsValue: Int
     let isJackpot: Bool
-    let isDoubled: Bool
-    let mysteryRevealValue: Double?
+    let mysteryRevealValue: Int?
     let grantsFreeSpin: Bool
-    let grantsDoubleNext: Bool
-    let newBalance: Double
-    let spinsRemaining: Int
+    let spinType: String
+    let newPointsBalance: Int
+    let standardSpinsRemaining: Int
+    let premiumSpinsRemaining: Int
+
+    // Legacy fields (still returned for backward compat)
+    let cashValue: Double?
+    let isDoubled: Bool?
+    let grantsDoubleNext: Bool?
+    let newBalance: Double?
+    let spinsRemaining: Int?
 
     enum CodingKeys: String, CodingKey {
         case segmentIndex = "segment_index"
         case segmentLabel = "segment_label"
         case segmentType = "segment_type"
-        case cashValue = "cash_value"
+        case pointsValue = "points_value"
         case isJackpot = "is_jackpot"
-        case isDoubled = "is_doubled"
         case mysteryRevealValue = "mystery_reveal_value"
         case grantsFreeSpin = "grants_free_spin"
+        case spinType = "spin_type"
+        case newPointsBalance = "new_points_balance"
+        case standardSpinsRemaining = "standard_spins_remaining"
+        case premiumSpinsRemaining = "premium_spins_remaining"
+        case cashValue = "cash_value"
+        case isDoubled = "is_doubled"
         case grantsDoubleNext = "grants_double_next"
         case newBalance = "new_balance"
         case spinsRemaining = "spins_remaining"
@@ -257,16 +409,25 @@ struct SpinResult: Codable {
 // MARK: - Mystery Bonus
 
 enum MysteryBonusType {
-    case cashBonus(Double)
+    case pointsBonus(Int)
     case spinToken
     case nothing
 
-    // 25% cash, 10% spin, 65% nothing
-    static func random() -> MysteryBonusType {
+    // 25% points, 10% spin, 65% nothing
+    static func random(spinType: SpinWheelType = .standard) -> MysteryBonusType {
         let roll = Int.random(in: 0..<100)
-        if roll < 25 { return .cashBonus([0.10, 0.20].randomElement()!) }
+        if roll < 25 {
+            let candidates = spinType == .premium ? [100, 200] : [50, 100]
+            return .pointsBonus(candidates.randomElement()!)
+        }
         if roll < 35 { return .spinToken }
         return .nothing
+    }
+
+    // Legacy helper
+    var cashBonusEuros: Double? {
+        if case .pointsBonus(let pts) = self { return Double(pts) / 1000.0 }
+        return nil
     }
 }
 
@@ -275,10 +436,47 @@ enum MysteryBonusType {
 struct RewardEvent {
     let storeName: String?
     let receiptAmount: Double?
-    let coinsAwarded: Double
+
+    // Points breakdown
+    let pointsTotal: Int
+    let fixedPoints: Int
+    let groteKarPoints: Int
+    let kickstartBonusPoints: Int
+    let spinType: SpinWheelType?
+    let isKickstart: Bool
+    let isStreakSaver: Bool
+
+    // Legacy / misc
     let spinsAwarded: Int
     let mysteryBonus: MysteryBonusType
 
     static let userInfoKey = "gamification.rewardEvent"
+
+    // Legacy computed
+    var coinsAwarded: Double { Double(pointsTotal) / 1000.0 }
+
+    init(storeName: String? = nil,
+         receiptAmount: Double? = nil,
+         pointsTotal: Int = 0,
+         fixedPoints: Int = 0,
+         groteKarPoints: Int = 0,
+         kickstartBonusPoints: Int = 0,
+         spinType: SpinWheelType? = nil,
+         isKickstart: Bool = false,
+         isStreakSaver: Bool = false,
+         spinsAwarded: Int = 0,
+         mysteryBonus: MysteryBonusType = .nothing) {
+        self.storeName = storeName
+        self.receiptAmount = receiptAmount
+        self.pointsTotal = pointsTotal
+        self.fixedPoints = fixedPoints
+        self.groteKarPoints = groteKarPoints
+        self.kickstartBonusPoints = kickstartBonusPoints
+        self.spinType = spinType
+        self.isKickstart = isKickstart
+        self.isStreakSaver = isStreakSaver
+        self.spinsAwarded = spinsAwarded
+        self.mysteryBonus = mysteryBonus
+    }
 }
 

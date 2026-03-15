@@ -326,7 +326,7 @@ private struct MysteryBonusCard: View {
 
     private var bonusIconName: String {
         switch bonus {
-        case .cashBonus: return "plus.circle.fill"
+        case .pointsBonus: return "plus.circle.fill"
         case .spinToken: return "arrow.trianglehead.2.clockwise.rotate.90"
         case .nothing:   return "minus"
         }
@@ -334,7 +334,7 @@ private struct MysteryBonusCard: View {
 
     private var bonusIconColor: Color {
         switch bonus {
-        case .cashBonus: return Color(red: 1.0, green: 0.84, blue: 0.0)
+        case .pointsBonus: return Color(red: 1.0, green: 0.84, blue: 0.0)
         case .spinToken: return Color(red: 0.6, green: 0.9, blue: 1.0)
         case .nothing:   return .white.opacity(0.3)
         }
@@ -342,7 +342,7 @@ private struct MysteryBonusCard: View {
 
     private var bonusIconBackground: Color {
         switch bonus {
-        case .cashBonus: return Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.12)
+        case .pointsBonus: return Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.12)
         case .spinToken: return Color(red: 0.6, green: 0.9, blue: 1.0).opacity(0.12)
         case .nothing:   return Color(white: 0.1)
         }
@@ -351,12 +351,12 @@ private struct MysteryBonusCard: View {
     @ViewBuilder
     private var bonusText: some View {
         switch bonus {
-        case .cashBonus(let amount):
+        case .pointsBonus(let pts):
             VStack(alignment: .leading, spacing: 1) {
-                Text("Cash Bonus!")
+                Text("Points Bonus!")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0))
-                Text(String(format: "+€%.2f added", amount))
+                Text("+\(pts) pts added")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
             }
@@ -383,7 +383,7 @@ private struct MysteryBonusCard: View {
 
     private var bonusBackground: Color {
         switch bonus {
-        case .cashBonus: return Color(red: 0.12, green: 0.10, blue: 0.03)
+        case .pointsBonus: return Color(red: 0.12, green: 0.10, blue: 0.03)
         case .spinToken: return Color(red: 0.04, green: 0.08, blue: 0.12)
         case .nothing:   return Color(white: 0.07)
         }
@@ -391,7 +391,7 @@ private struct MysteryBonusCard: View {
 
     private var bonusBorderColor: Color {
         switch bonus {
-        case .cashBonus: return Color(red: 1.0, green: 0.84, blue: 0.0)
+        case .pointsBonus: return Color(red: 1.0, green: 0.84, blue: 0.0)
         case .spinToken: return Color(red: 0.6, green: 0.9, blue: 1.0)
         case .nothing:   return Color.white.opacity(0.08)
         }

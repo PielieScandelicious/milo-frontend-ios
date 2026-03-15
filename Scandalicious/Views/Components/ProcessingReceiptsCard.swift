@@ -281,7 +281,7 @@ struct ProcessingReceiptRow: View {
                 Text(receipt.errorMessage ?? "Processing failed")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.red.opacity(0.7))
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 HStack(spacing: 4) {
                     Text("Tap to claim")

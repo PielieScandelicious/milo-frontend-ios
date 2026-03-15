@@ -49,18 +49,36 @@ struct StreakCardView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.white.opacity(0.5))
                             .offset(y: 2)
+
+                        // Level 1 / Level 2 badge
+                        Text(streak.levelDisplayName)
+                            .font(.system(size: 9, weight: .heavy))
+                            .tracking(0.5)
+                            .foregroundStyle(streak.isLevel2 ? .black : .white.opacity(0.7))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule().fill(streak.isLevel2
+                                    ? LinearGradient(colors: [gold, orange], startPoint: .leading, endPoint: .trailing)
+                                    : LinearGradient(colors: [Color(white: 0.2), Color(white: 0.15)], startPoint: .leading, endPoint: .trailing))
+                            )
+                            .offset(y: 2)
                     }
 
                     if streak.isAtRisk {
-                        Text("Scan a receipt to keep your streak!")
+                        Text("Scan een kassaticket om je streak te houden!")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.red.opacity(0.9))
                     } else if streak.hasClaimableReward {
-                        Text("Reward ready to claim!")
+                        Text("Beloning klaar om te claimen!")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(gold)
+                    } else if streak.isLevel2 {
+                        Text("Level 2 — blijf scannen voor bonussen!")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(gold.opacity(0.7))
                     } else {
-                        Text("Scan weekly to earn rewards")
+                        Text("Scan wekelijks voor beloningen")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white.opacity(0.35))
                     }
@@ -125,48 +143,49 @@ struct StreakCardView: View {
 
     @ViewBuilder
     private func claimButton(for reward: StreakClaimableRewardResponse) -> some View {
-        let isCash = reward.rewardType == "cash"
+        let hasPoints = reward.pointsAmount > 0
+        let hasSpin = reward.spinsAmount > 0
+        let isPremium = reward.spinWheelType == .premium
+        let accentColor: Color = isPremium ? gold : cashGreen
 
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                claimScale = 0.92
-            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { claimScale = 0.92 }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    claimScale = 1.0
-                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { claimScale = 1.0 }
                 onClaim?()
             }
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: isCash ? "banknote.fill" : "arrow.trianglehead.2.clockwise.rotate.90")
+                Image(systemName: hasSpin
+                      ? (isPremium ? "crown.fill" : "arrow.trianglehead.2.clockwise.rotate.90")
+                      : "star.fill")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
 
-                Text(isCash
-                     ? "Claim \(String(format: "€%.2f", reward.cashAmount))"
-                     : "Claim \(reward.spinsAmount) spin\(reward.spinsAmount > 1 ? "s" : "")")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                // Build label: e.g. "Claim 150 pts" or "Claim 1 Premium Spin" or "Claim Spin + 100 pts"
+                Group {
+                    if hasSpin && hasPoints {
+                        Text("Claim \(isPremium ? "Premium" : "Standaard") Spin + \(reward.pointsAmount) pts")
+                    } else if hasSpin {
+                        Text("Claim \(reward.spinsAmount) \(isPremium ? "Premium" : "Standaard") Spin")
+                    } else {
+                        Text("Claim \(reward.pointsAmount) pts")
+                    }
+                }
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(
                 Capsule()
                     .fill(
-                        isCash
-                            ? LinearGradient(
-                                colors: [cashGreen, Color(red: 0.1, green: 0.7, blue: 0.3)],
-                                startPoint: .topLeading, endPoint: .bottomTrailing)
-                            : LinearGradient(
-                                colors: [gold, orange],
-                                startPoint: .topLeading, endPoint: .bottomTrailing)
+                        isPremium
+                            ? LinearGradient(colors: [gold, orange], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            : LinearGradient(colors: [cashGreen, Color(red: 0.1, green: 0.7, blue: 0.3)], startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
-                    .shadow(
-                        color: (isCash ? cashGreen : orange).opacity(0.4),
-                        radius: 12, y: 4
-                    )
+                    .shadow(color: accentColor.opacity(0.4), radius: 12, y: 4)
             )
         }
         .buttonStyle(.plain)
@@ -307,27 +326,40 @@ struct StreakCardView: View {
                     .foregroundStyle(.white.opacity(0.9))
             }
 
-            Text("Scan at least one receipt over \u{20AC}50 each week to keep your streak going. Rewards grow the longer you keep it up!")
+            Text("Scan elke week een kassaticket om je streak te houden. Level 2 geeft hogere beloningen!")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.55))
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Reward tiers
-            VStack(alignment: .leading, spacing: 6) {
-                streakInfoRow(weeks: "Weeks 1-3", reward: "+1 spin / week", icon: "arrow.trianglehead.2.clockwise.rotate.90", color: gold)
-                streakInfoRow(weeks: "Week 4", reward: "\u{20AC}1.00 cash", icon: "banknote.fill", color: cashGreen)
-                streakInfoRow(weeks: "Weeks 5-7", reward: "+2 spins / week", icon: "arrow.trianglehead.2.clockwise.rotate.90", color: gold)
-                streakInfoRow(weeks: "Week 8", reward: "\u{20AC}1.00 cash", icon: "banknote.fill", color: cashGreen)
-                streakInfoRow(weeks: "Weeks 9-11", reward: "+3 spins / week", icon: "arrow.trianglehead.2.clockwise.rotate.90", color: gold)
-                streakInfoRow(weeks: "Week 12+", reward: "\u{20AC}1.00 every 4th week", icon: "banknote.fill", color: cashGreen)
+            // Level 1 schedule
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Level 1 (maand 1)")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(.bottom, 2)
+                streakInfoRow(weeks: "Week 1", reward: "Geen beloning", icon: "xmark.circle", color: .white.opacity(0.3))
+                streakInfoRow(weeks: "Week 2", reward: "+1 Standaard Spin", icon: "arrow.trianglehead.2.clockwise.rotate.90", color: gold)
+                streakInfoRow(weeks: "Week 3", reward: "+150 pts", icon: "star.fill", color: cashGreen)
+                streakInfoRow(weeks: "Week 4", reward: "+1 Premium Spin + 50 pts", icon: "crown.fill", color: gold)
             }
 
-            // Grace period note
+            // Level 2 schedule
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Level 2 (doorlopend)")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(gold.opacity(0.7))
+                    .padding(.bottom, 2)
+                streakInfoRow(weeks: "Week 1", reward: "+150 pts", icon: "star.fill", color: cashGreen)
+                streakInfoRow(weeks: "Week 2", reward: "+1 Standaard Spin + 100 pts", icon: "arrow.trianglehead.2.clockwise.rotate.90", color: gold)
+                streakInfoRow(weeks: "Week 3", reward: "+1 Standaard Spin + 150 pts", icon: "arrow.trianglehead.2.clockwise.rotate.90", color: gold)
+                streakInfoRow(weeks: "Week 4", reward: "+1 Premium Spin + 200 pts", icon: "crown.fill", color: gold)
+            }
+
             HStack(spacing: 6) {
                 Image(systemName: "clock.fill")
                     .font(.system(size: 10))
                     .foregroundStyle(.white.opacity(0.35))
-                Text("You have until Monday to scan and keep your streak.")
+                Text("Je hebt tot maandag om te scannen en je streak te bewaren.")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.35))
             }

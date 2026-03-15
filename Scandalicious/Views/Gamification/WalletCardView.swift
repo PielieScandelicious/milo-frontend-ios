@@ -12,7 +12,7 @@ struct WalletCardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header with tier badge
             HStack {
                 Image(systemName: "wallet.bifold.fill")
                     .font(.system(size: 18, weight: .semibold))
@@ -21,21 +21,20 @@ struct WalletCardView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
                 Spacer()
+                // Three-tier badge: Bronze / Silver / Gold
                 HStack(spacing: 4) {
-                    if gm.goldTierStatus.isGoldTier {
-                        Image(systemName: "medal.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.black.opacity(0.7))
-                    }
-                    Text(gm.goldTierStatus.displayName)
+                    Image(systemName: gm.tierLevel.icon)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(gm.tierLevel == .gold ? .black : .white.opacity(0.9))
+                    Text(gm.tierLevel.displayName)
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(gm.goldTierStatus.isGoldTier ? .black : .white.opacity(0.35))
+                        .foregroundStyle(gm.tierLevel == .gold ? .black : .white.opacity(0.9))
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(
                     LinearGradient(
-                        colors: gm.goldTierStatus.gradientColors,
+                        colors: gm.tierLevel.gradientColors,
                         startPoint: .leading, endPoint: .trailing
                     )
                 )
@@ -43,9 +42,9 @@ struct WalletCardView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
-            .padding(.bottom, 14)
+            .padding(.bottom, 8)
 
-            // Balance
+            // Points balance (large)
             Text(gm.wallet.formatted)
                 .font(.system(size: 52, weight: .black, design: .rounded))
                 .foregroundStyle(
@@ -61,7 +60,12 @@ struct WalletCardView: View {
                 )
                 .shadow(color: Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.3), radius: 12)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: gm.wallet.cents)
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: gm.wallet.points)
+
+            // Euro equivalent
+            Text(gm.wallet.euroFormatted)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.4))
                 .padding(.bottom, 18)
         }
         .background(
