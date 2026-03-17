@@ -10,7 +10,17 @@ import SwiftUI
 
 // MARK: - Promo Recommendation Response
 
+enum PromoReportStatus: String, Codable {
+    case ready
+    case noEnrichedProfile = "no_enriched_profile"
+    case noReportAvailable = "no_report_available"
+}
+
 struct PromoRecommendationResponse: Codable {
+    let reportId: String?
+    let reportStatus: PromoReportStatus
+    let message: String
+    let generatedAt: String?
     let weeklySavings: Double
     let dealCount: Int
     let promoWeek: PromoWeek
@@ -19,7 +29,14 @@ struct PromoRecommendationResponse: Codable {
     let smartSwitch: PromoSmartSwitch?
     let summary: PromoSummary
 
+    var isReady: Bool { reportStatus == .ready }
+    var weekKey: String { "\(promoWeek.isoYear)-W\(String(format: "%02d", promoWeek.isoWeek))" }
+
     enum CodingKeys: String, CodingKey {
+        case reportId = "report_id"
+        case reportStatus = "report_status"
+        case message
+        case generatedAt = "generated_at"
         case weeklySavings = "weekly_savings"
         case dealCount = "deal_count"
         case promoWeek = "promo_week"
@@ -36,11 +53,22 @@ struct PromoWeek: Codable {
     let start: String   // DD/MM format
     let end: String     // DD/MM format
     let label: String   // e.g. "Week 5"
+    let isoYear: Int
+    let isoWeek: Int
+
+    enum CodingKeys: String, CodingKey {
+        case start
+        case end
+        case label
+        case isoYear = "iso_year"
+        case isoWeek = "iso_week"
+    }
 }
 
 // MARK: - Top Pick
 
 struct PromoTopPick: Codable, Identifiable {
+    let itemKey: String?
     let brand: String
     let productName: String
     let emoji: String
@@ -59,6 +87,7 @@ struct PromoTopPick: Codable, Identifiable {
     var id: String { "\(brand)-\(productName)-\(store)" }
 
     enum CodingKeys: String, CodingKey {
+        case itemKey = "item_key"
         case brand
         case productName = "product_name"
         case emoji
@@ -79,6 +108,7 @@ struct PromoTopPick: Codable, Identifiable {
 // MARK: - Store Item
 
 struct PromoStoreItem: Codable, Identifiable {
+    let itemKey: String?
     let brand: String
     let productName: String
     let emoji: String
@@ -95,6 +125,7 @@ struct PromoStoreItem: Codable, Identifiable {
     var id: String { "\(brand)-\(productName)-\(mechanism)" }
 
     enum CodingKeys: String, CodingKey {
+        case itemKey = "item_key"
         case brand
         case productName = "product_name"
         case emoji

@@ -60,6 +60,7 @@ class ReceiptProcessingManager: ObservableObject {
             totalAmount: nil,
             itemsCount: 0,
             errorMessage: nil,
+            errorCode: nil,
             detectedDate: nil,
             completedAt: nil,
             processingStartedAt: startsImmediately ? Date() : nil
@@ -151,7 +152,11 @@ class ReceiptProcessingManager: ObservableObject {
                     processingReceipts[index].storeName = response.storeName
                     processingReceipts[index].totalAmount = response.totalAmount
                     processingReceipts[index].itemsCount = response.itemsCount
-                    processingReceipts[index].errorMessage = response.errorMessage
+                    processingReceipts[index].errorCode = response.errorCode
+                    processingReceipts[index].errorMessage = Self.userFacingMessage(
+                        errorCode: response.errorCode,
+                        fallback: response.errorMessage
+                    )
                     processingReceipts[index].detectedDate = response.detectedDate
 
                     // NOTE: processingStartedAt is managed exclusively by
@@ -222,6 +227,22 @@ class ReceiptProcessingManager: ObservableObject {
 
     private func isTerminal(_ status: ReceiptStatus) -> Bool {
         status == .completed || status == .success || status == .failed
+    }
+
+    // MARK: - Fraud Error Messages
+
+    private static func userFacingMessage(errorCode: String?, fallback: String?) -> String? {
+        guard let code = errorCode else { return fallback }
+        switch code {
+        case "receipt_too_old":
+            return "This receipt is too old. Only receipts from the last 7 days are accepted."
+        case "duplicate_content":
+            return "This receipt appears to be a duplicate of one you already uploaded."
+        case "pdf_tampering_detected":
+            return "This file appears to have been modified. Please upload the original PDF."
+        default:
+            return fallback
+        }
     }
 
     // MARK: - Persistence

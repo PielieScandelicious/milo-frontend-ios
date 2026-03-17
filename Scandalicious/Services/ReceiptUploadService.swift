@@ -19,6 +19,7 @@ enum ReceiptUploadError: LocalizedError {
     case networkError(Error)
     case deleteFailed(String)
     case duplicateReceipt
+    case fraudDetected(String)
 
     var errorDescription: String? {
         switch self {
@@ -36,6 +37,8 @@ enum ReceiptUploadError: LocalizedError {
             return "Failed to delete receipt: \(message)"
         case .duplicateReceipt:
             return "This receipt has already been uploaded"
+        case .fraudDetected(let message):
+            return message
         }
     }
 }
@@ -250,7 +253,20 @@ actor ReceiptUploadService {
             case 409:
                 throw ReceiptUploadError.duplicateReceipt
 
-            case 400...408, 410...428, 430...499:
+            case 400:
+                // Check if this is a fraud detection rejection
+                if let errorBody = try? JSONDecoder().decode([String: String].self, from: data),
+                   errorBody["error"] == "receipt_fraud" {
+                    let message = errorBody["message"] ?? "This file appears to have been modified. Please upload the original PDF."
+                    throw ReceiptUploadError.fraudDetected(message)
+                }
+                if let errorBody = try? JSONDecoder().decode([String: String].self, from: data),
+                   let message = errorBody["error"] ?? errorBody["message"] {
+                    throw ReceiptUploadError.serverError(message)
+                }
+                throw ReceiptUploadError.serverError("Client error: 400")
+
+            case 401...408, 410...428, 430...499:
                 if let errorMessage = try? JSONDecoder().decode([String: String].self, from: data),
                    let message = errorMessage["error"] ?? errorMessage["message"] {
                     throw ReceiptUploadError.serverError(message)

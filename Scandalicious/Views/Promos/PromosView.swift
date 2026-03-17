@@ -68,6 +68,9 @@ struct PromosView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .opacity(contentOpacity)
+        .refreshable {
+            await viewModel.loadPromos(forceRefresh: true)
+        }
         .onAppear {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
                 contentOpacity = 1.0
@@ -95,8 +98,12 @@ struct PromosView: View {
         case .idle, .loading:
             PromoSkeletonView()
         case .success(let data):
-            if data.dealCount == 0 {
-                PromoEmptyView()
+            if !data.isReady || data.dealCount == 0 {
+                PromoEmptyView(
+                    status: data.reportStatus,
+                    title: emptyTitle(for: data),
+                    message: data.message
+                )
             } else {
                 promoContent(data)
             }
@@ -131,7 +138,12 @@ struct PromosView: View {
                                     .padding(.leading, 64)
                                     .padding(.trailing, 16)
                             }
-                            PromoTopPickCard(pick: pick, index: index)
+                            PromoTopPickCard(
+                                pick: pick,
+                                index: index,
+                                onExpand: { viewModel.trackTopPickOpened(pick) },
+                                onOpenFolder: { viewModel.trackFolderOpened(for: pick) }
+                            )
                         }
                     }
                     .background(
@@ -177,7 +189,11 @@ struct PromosView: View {
                         .padding(.horizontal, 20)
 
                     ForEach(Array(data.stores.enumerated()), id: \.element.id) { index, store in
-                        PromoStoreSection(store: store, index: index)
+                        PromoStoreSection(
+                            store: store,
+                            index: index,
+                            onExpand: { viewModel.trackStoreSectionOpened(store) }
+                        )
                     }
                     .padding(.horizontal, 16)
                 }
@@ -186,6 +202,17 @@ struct PromosView: View {
             // Summary
             PromoSummaryFooter(summary: data.summary, stores: data.stores)
                 .padding(.horizontal, 16)
+        }
+    }
+
+    private func emptyTitle(for data: PromoRecommendationResponse) -> String {
+        switch data.reportStatus {
+        case .ready:
+            return "No deals this week"
+        case .noEnrichedProfile:
+            return "Keep scanning receipts"
+        case .noReportAvailable:
+            return "Report not ready yet"
         }
     }
 }

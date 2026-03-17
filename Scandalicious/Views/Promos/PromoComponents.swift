@@ -96,14 +96,13 @@ struct PromoBannerCard: View {
                     bannerSkeleton
                 }
                 .buttonStyle(.plain)
-            case .success(let data) where data.dealCount > 0:
+            case .success(let data) where data.isReady && data.dealCount > 0:
                 bannerContent(data)
-            case .success:
-                // deal_count == 0 — still tappable to open PromosView & refresh
+            case .success(let data):
                 NavigationLink {
                     PromosView(viewModel: viewModel)
                 } label: {
-                    debugBanner("No deals found yet — tap to check for deals!")
+                    debugBanner(bannerMessage(for: data))
                 }
                 .buttonStyle(.plain)
             case .error:
@@ -142,6 +141,17 @@ struct PromoBannerCard: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
         )
+    }
+
+    private func bannerMessage(for data: PromoRecommendationResponse) -> String {
+        switch data.reportStatus {
+        case .ready:
+            return "No deals this week — tap to open your weekly report"
+        case .noEnrichedProfile:
+            return "Keep scanning receipts to unlock weekly deals"
+        case .noReportAvailable:
+            return "This week's report isn't ready yet"
+        }
     }
 
     private func bannerContent(_ data: PromoRecommendationResponse) -> some View {
@@ -299,14 +309,21 @@ struct PromoSectionHeader: View {
 struct PromoTopPickCard: View {
     let pick: PromoTopPick
     let index: Int
+    let onExpand: () -> Void
+    let onOpenFolder: () -> Void
     @State private var isExpanded = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Compact header row — always visible
             Button {
+                let opening = !isExpanded
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                     isExpanded.toggle()
+                }
+                if opening {
+                    onExpand()
                 }
             } label: {
                 HStack(spacing: 12) {
@@ -406,7 +423,10 @@ struct PromoTopPickCard: View {
                         Spacer()
 
                         if let urlString = pick.promoFolderUrl, let url = URL(string: urlString) {
-                            Link(destination: url) {
+                            Button {
+                                onOpenFolder()
+                                openURL(url)
+                            } label: {
                                 HStack(spacing: 3) {
                                     Text("View in folder")
                                         .font(.system(size: 11, weight: .medium))
@@ -415,6 +435,7 @@ struct PromoTopPickCard: View {
                                 }
                                 .foregroundColor(.blue.opacity(0.8))
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -554,6 +575,7 @@ struct PromoSmartSwitchCard: View {
 struct PromoStoreSection: View {
     let store: PromoStore
     let index: Int
+    let onExpand: () -> Void
     @State private var isExpanded = false
     @State private var appeared = false
 
@@ -611,8 +633,12 @@ struct PromoStoreSection: View {
             // Show more / less
             if store.items.count > initialItemCount {
                 Button {
+                    let opening = !isExpanded
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         isExpanded.toggle()
+                    }
+                    if opening {
+                        onExpand()
                     }
                 } label: {
                     HStack(spacing: 4) {
@@ -816,9 +842,13 @@ struct PromoSkeletonView: View {
 // MARK: - Empty State
 
 struct PromoEmptyView: View {
+    let status: PromoReportStatus
+    let title: String
+    let message: String
+
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "bag.fill")
+            Image(systemName: iconName)
                 .font(.system(size: 44))
                 .foregroundStyle(
                     LinearGradient(
@@ -828,11 +858,11 @@ struct PromoEmptyView: View {
                     )
                 )
 
-            Text("No deals this week")
+            Text(title)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
 
-            Text("Keep scanning receipts so we can find\npersonalized deals for you")
+            Text(message)
                 .font(.system(size: 14))
                 .foregroundColor(.white.opacity(0.5))
                 .multilineTextAlignment(.center)
@@ -840,6 +870,17 @@ struct PromoEmptyView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
         .padding(.horizontal, 32)
+    }
+
+    private var iconName: String {
+        switch status {
+        case .ready:
+            return "bag.fill"
+        case .noEnrichedProfile:
+            return "doc.text.viewfinder"
+        case .noReportAvailable:
+            return "clock.badge.exclamationmark"
+        }
     }
 }
 

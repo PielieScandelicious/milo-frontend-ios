@@ -8,6 +8,15 @@
 import Foundation
 import FirebaseAuth
 
+enum PromoEventType: String, Encodable {
+    case reportViewed = "report_viewed"
+    case dealOpened = "deal_opened"
+    case folderOpened = "folder_opened"
+    case storeSectionOpened = "store_section_opened"
+    case feedbackPositive = "feedback_positive"
+    case feedbackNegative = "feedback_negative"
+}
+
 actor PromoAPIService {
     static let shared = PromoAPIService()
 
@@ -57,7 +66,7 @@ actor PromoAPIService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 180  // Pinecone search + Gemini generation is slow
+        request.timeoutInterval = 30
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -93,6 +102,61 @@ actor PromoAPIService {
             throw error
         } catch {
             throw PromoError.networkError(error)
+        }
+    }
+
+    // MARK: - Promo Events
+
+    func logEvent(
+        reportId: String,
+        eventType: PromoEventType,
+        itemKey: String? = nil,
+        storeName: String? = nil,
+        metadata: [String: String]? = nil
+    ) async {
+        guard let token = try? await getFirebaseToken() else { return }
+        guard let url = URL(string: "\(baseURL)/promos/events") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 15
+
+        struct PromoEventRequest: Encodable {
+            let reportId: String
+            let eventType: PromoEventType
+            let itemKey: String?
+            let storeName: String?
+            let metadata: [String: String]?
+
+            enum CodingKeys: String, CodingKey {
+                case reportId = "report_id"
+                case eventType = "event_type"
+                case itemKey = "item_key"
+                case storeName = "store_name"
+                case metadata
+            }
+        }
+
+        do {
+            request.httpBody = try JSONEncoder().encode(
+                PromoEventRequest(
+                    reportId: reportId,
+                    eventType: eventType,
+                    itemKey: itemKey,
+                    storeName: storeName,
+                    metadata: metadata
+                )
+            )
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return }
+            if httpResponse.statusCode >= 300 {
+                print("[PromoAPI] event logging failed with status \(httpResponse.statusCode)")
+            }
+        } catch {
+            print("[PromoAPI] event logging failed: \(error.localizedDescription)")
         }
     }
 

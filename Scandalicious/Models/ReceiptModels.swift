@@ -189,6 +189,7 @@ struct ReceiptStatusResponse: Codable, Sendable {
     let totalAmount: Double?
     let itemsCount: Int
     let errorMessage: String?
+    let errorCode: String?
 
     enum CodingKeys: String, CodingKey {
         case receiptId = "receipt_id"
@@ -199,6 +200,7 @@ struct ReceiptStatusResponse: Codable, Sendable {
         case totalAmount = "total_amount"
         case itemsCount = "items_count"
         case errorMessage = "error_message"
+        case errorCode = "error_code"
     }
 }
 
@@ -213,6 +215,7 @@ struct ProcessingReceipt: Identifiable, Codable, Equatable {
     var totalAmount: Double?
     var itemsCount: Int
     var errorMessage: String?
+    var errorCode: String?
     var detectedDate: String?
     var completedAt: Date?
     var processingStartedAt: Date?  // when backend actually started processing (nil = queued)
