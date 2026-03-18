@@ -707,6 +707,8 @@ class ShareViewController: UIViewController {
                 return "Unable to delete receipt. Please try again."
             case .duplicateReceipt:
                 return "This receipt has already been uploaded."
+            case .fraudDetected:
+                return "This receipt could not be verified. Please contact support."
             }
         }
 
