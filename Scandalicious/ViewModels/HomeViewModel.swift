@@ -91,6 +91,10 @@ class HomeViewModel {
     var spinsAwarded: Int = 0
     var isGoldTier: Bool = true
 
+    /// Tier used by the overlay for label text.
+    /// Normally mirrors GamificationManager; overridden by the test stub.
+    var displayTierLevel: TierLevel = GamificationManager.shared.tierLevel
+
     // Referral reward reveal
     var showReferralReveal: Bool = false
     var referralEurosAwarded: Double = 0
@@ -280,6 +284,7 @@ class HomeViewModel {
                     self.pointsTotal = 0; self.spinsAwarded = 0; self.cashbackAmount = 0
                 }
                 self.isGoldTier = summary.isGoldTier
+                self.displayTierLevel = TierLevel(rawValue: summary.tierLevel) ?? GamificationManager.shared.tierLevel
             }
 
             // Refresh recent receipts list

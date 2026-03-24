@@ -693,4 +693,15 @@ class GamificationManager: ObservableObject {
             unlockBadgeIfNeeded(id: badges[index].id)
         }
     }
+
+    #if DEBUG
+    /// Directly adds points and spins to the local wallet — no backend call.
+    /// Used by the cashback test stub so rewards are reflected in the UI.
+    func injectTestReward(points: Int, standardSpins: Int = 0, premiumSpins: Int = 0) {
+        wallet.add(points: points)
+        self.standardSpins += standardSpins
+        self.premiumSpins += premiumSpins
+        saveState()
+    }
+    #endif
 }

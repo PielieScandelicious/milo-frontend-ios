@@ -18,6 +18,10 @@ struct HomeTabView: View {
     @State private var showCamera = false
     @State private var capturedImage: UIImage?
     @State private var showProfile = false
+    @State private var showCashbackInfo = false
+    #if DEBUG
+    @State private var showCashbackTestStub = false
+    #endif
 
     @State private var contentOpacity: Double = 0
     @State private var showMiloGame = false
@@ -98,9 +102,17 @@ struct HomeTabView: View {
                     .environmentObject(subscriptionManager)
             }
         }
+        .sheet(isPresented: $showCashbackInfo) {
+            CashbackInfoView()
+        }
         .sheet(isPresented: $showWalletPassCreator) {
             WalletPassCreatorView()
         }
+        #if DEBUG
+        .sheet(isPresented: $showCashbackTestStub) {
+            CashbackTestStubView(viewModel: viewModel)
+        }
+        #endif
     }
 
     // MARK: - Main Content
@@ -170,19 +182,9 @@ struct HomeTabView: View {
                     .transition(.opacity)
                 }
 
-                // Digital receipt hint
-                DigitalReceiptHintCard()
-                    .padding(.horizontal, 20)
-
                 // Monthly lottery
                 MonthlyLotteryCard(lotteryStatus: lotteryStatus) {
                     refreshLotteryStatus()
-                }
-                .padding(.horizontal, 20)
-
-                // Wallet Pass creator
-                WalletPassCard {
-                    showWalletPassCreator = true
                 }
                 .padding(.horizontal, 20)
 
@@ -262,8 +264,33 @@ struct HomeTabView: View {
     // MARK: - Profile Menu Button
 
     private var profileMenuButton: some View {
-        Button {
-            showProfile = true
+        Menu {
+            Button {
+                showProfile = true
+            } label: {
+                Label("Profile", systemImage: "person.circle")
+            }
+
+            Button {
+                showCashbackInfo = true
+            } label: {
+                Label("Cashback", systemImage: "star.circle")
+            }
+
+            Button {
+                showWalletPassCreator = true
+            } label: {
+                Label("Wallet Pass Creator", systemImage: "wallet.pass")
+            }
+
+            #if DEBUG
+            Divider()
+            Button {
+                showCashbackTestStub = true
+            } label: {
+                Label("Test Cashback Rewards", systemImage: "flask.fill")
+            }
+            #endif
         } label: {
             Circle()
                 .fill(Color.white.opacity(0.15))
