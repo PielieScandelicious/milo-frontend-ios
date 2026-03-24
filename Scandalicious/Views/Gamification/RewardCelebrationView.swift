@@ -68,7 +68,7 @@ struct RewardCelebrationView: View {
                         icon: "arrow.trianglehead.2.clockwise.rotate.90",
                         iconColor: Color(red: 0.6, green: 0.9, blue: 1.0),
                         title: "\(event.spinsAwarded) spin\(event.spinsAwarded == 1 ? "" : "s") earned",
-                        subtitle: gm.goldTierStatus.isGoldTier ? "Gold Tier perk" : "Reward"
+                        subtitle: "Reward"
                     )
                 }
                 .opacity(showContent ? 1 : 0)

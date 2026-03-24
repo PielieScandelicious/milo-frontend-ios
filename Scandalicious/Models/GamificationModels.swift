@@ -130,21 +130,6 @@ struct StreakData: Codable {
     }
 }
 
-// MARK: - Gold Tier
-
-struct GoldTierStatus: Codable {
-    var isGoldTier: Bool = true
-
-    var displayName: String { isGoldTier ? "Gold" : "No Tier" }
-
-    var gradientColors: [Color] {
-        isGoldTier
-            ? [Color(red: 1.0, green: 0.88, blue: 0.35),
-               Color(red: 0.80, green: 0.60, blue: 0.0)]
-            : [Color(white: 0.25), Color(white: 0.15)]
-    }
-}
-
 // MARK: - Badge
 
 struct Badge: Identifiable, Codable, Equatable {
@@ -215,14 +200,14 @@ struct SpinSegment: Identifiable {
     let icon: String?
 
     static let segments: [SpinSegment] = [
-        SpinSegment(id: 0, label: "€0.10",        value: 0.10, segmentType: .cash,       isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),   icon: nil),
-        SpinSegment(id: 1, label: "Mystery",       value: 0.0,  segmentType: .mystery,    isJackpot: false, color: Color(red: 0.6, green: 0.2, blue: 1.0),   icon: "gift.fill"),
-        SpinSegment(id: 2, label: "€1",            value: 1.00, segmentType: .cash,       isJackpot: false, color: Color(red: 1.0, green: 0.65, blue: 0.0),  icon: nil),
-        SpinSegment(id: 3, label: "2x",            value: 0.0,  segmentType: .doubleNext, isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),   icon: "bolt.fill"),
-        SpinSegment(id: 4, label: "€0.50",         value: 0.50, segmentType: .cash,       isJackpot: false, color: Color(red: 0.2, green: 0.8, blue: 0.4),   icon: nil),
-        SpinSegment(id: 5, label: "Retry",         value: 0.0,  segmentType: .tryAgain,   isJackpot: false, color: Color(red: 0.0, green: 0.8, blue: 0.7),   icon: "arrow.counterclockwise"),
-        SpinSegment(id: 6, label: "€2",            value: 2.00, segmentType: .cash,       isJackpot: false, color: Color(red: 0.9, green: 0.2, blue: 0.4),   icon: nil),
-        SpinSegment(id: 7, label: "Jackpot",        value: 5.00, segmentType: .jackpot,    isJackpot: true,  color: Color(red: 1.0, green: 0.84, blue: 0.0),  icon: "star.fill"),
+        SpinSegment(id: 0, label: "€0.10",   value: 0.10, segmentType: .cash,       isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),  icon: nil),
+        SpinSegment(id: 1, label: "Mystery",  value: 0.0,  segmentType: .mystery,    isJackpot: false, color: Color(red: 0.6, green: 0.2, blue: 1.0),  icon: "gift.fill"),
+        SpinSegment(id: 2, label: "€1",       value: 1.00, segmentType: .cash,       isJackpot: false, color: Color(red: 1.0, green: 0.65, blue: 0.0), icon: nil),
+        SpinSegment(id: 3, label: "2x",       value: 0.0,  segmentType: .doubleNext, isJackpot: false, color: Color(red: 0.3, green: 0.7, blue: 1.0),  icon: "bolt.fill"),
+        SpinSegment(id: 4, label: "€0.50",    value: 0.50, segmentType: .cash,       isJackpot: false, color: Color(red: 0.2, green: 0.8, blue: 0.4),  icon: nil),
+        SpinSegment(id: 5, label: "Retry",    value: 0.0,  segmentType: .tryAgain,   isJackpot: false, color: Color(red: 0.0, green: 0.8, blue: 0.7),  icon: "arrow.counterclockwise"),
+        SpinSegment(id: 6, label: "€2",       value: 2.00, segmentType: .cash,       isJackpot: false, color: Color(red: 0.9, green: 0.2, blue: 0.4),  icon: nil),
+        SpinSegment(id: 7, label: "Jackpot",  value: 5.00, segmentType: .jackpot,    isJackpot: true,  color: Color(red: 1.0, green: 0.84, blue: 0.0), icon: "star.fill"),
     ]
 }
 

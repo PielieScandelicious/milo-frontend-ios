@@ -18,7 +18,6 @@ class GamificationManager: ObservableObject {
 
     @Published private(set) var wallet: WalletBalance = WalletBalance(euros: 0)
     @Published private(set) var streak: StreakData = StreakData(weekCount: 0, lastReceiptDate: nil, hasShield: false, isAtRisk: false)
-    @Published private(set) var goldTierStatus: GoldTierStatus = GoldTierStatus(isGoldTier: true)
     @Published private(set) var badges: [Badge] = Badge.allBadges
     @Published private(set) var spinsAvailable: Int = 0
     @Published private(set) var lastUnlockedBadge: Badge? = nil
@@ -69,7 +68,6 @@ class GamificationManager: ObservableObject {
                 try? await Task.sleep(for: .seconds(1))
                 self?.fetchAndSyncWallet()
                 self?.fetchReferralInfo()
-                self?.fetchStreakStatus()
 
                 // Check receipt-related badges
                 let storeName = notification.userInfo?["storeName"] as? String
@@ -115,7 +113,6 @@ class GamificationManager: ObservableObject {
     private func resetToDefaults() {
         wallet = WalletBalance(euros: 0)
         streak = StreakData(weekCount: 0, lastReceiptDate: nil, hasShield: false, isAtRisk: false)
-        goldTierStatus = GoldTierStatus(isGoldTier: true)
         badges = Badge.allBadges.map { var b = $0; b.isUnlocked = false; b.unlockedAt = nil; return b }
         spinsAvailable = 0
         referralCode = nil
@@ -147,21 +144,6 @@ class GamificationManager: ObservableObject {
             wallet = decoded
         } else {
             wallet = WalletBalance(euros: 0)
-        }
-
-        if let data = userDefaults.data(forKey: "\(prefix)_streak"),
-           let decoded = try? decoder.decode(StreakData.self, from: data) {
-            streak = decoded
-            checkStreakStatus()
-        } else {
-            streak = StreakData(weekCount: 3, lastReceiptDate: Date().addingTimeInterval(-86400 * 5), hasShield: false, isAtRisk: false)
-        }
-
-        if let data = userDefaults.data(forKey: "\(prefix)_goldTier"),
-           let decoded = try? decoder.decode(GoldTierStatus.self, from: data) {
-            goldTierStatus = decoded
-        } else {
-            goldTierStatus = GoldTierStatus(isGoldTier: true)
         }
 
         spinsAvailable = userDefaults.integer(forKey: "\(prefix)_spins")
@@ -209,9 +191,8 @@ class GamificationManager: ObservableObject {
         userDefaults.set(true, forKey: "\(prefix)_initialized")
         saveState()
 
-        // Sync wallet and streak with backend
+        // Sync wallet with backend
         fetchAndSyncWallet()
-        fetchStreakStatus()
     }
 
     private func saveState() {
@@ -219,7 +200,6 @@ class GamificationManager: ObservableObject {
         let encoder = JSONEncoder()
         if let data = try? encoder.encode(wallet)         { userDefaults.set(data, forKey: "\(prefix)_wallet") }
         if let data = try? encoder.encode(streak)         { userDefaults.set(data, forKey: "\(prefix)_streak") }
-        if let data = try? encoder.encode(goldTierStatus) { userDefaults.set(data, forKey: "\(prefix)_goldTier") }
         if let data = try? encoder.encode(badges)         { userDefaults.set(data, forKey: "\(prefix)_badges") }
         userDefaults.set(spinsAvailable, forKey: "\(prefix)_spins")
         userDefaults.set(hasDoubleNext, forKey: "\(prefix)_doubleNext")
@@ -234,11 +214,10 @@ class GamificationManager: ObservableObject {
         userDefaults.set(hasAppliedReferralCode, forKey: "\(prefix)_hasAppliedReferral")
     }
 
-    // MARK: - Wallet & Gold Tier Sync
+    // MARK: - Wallet Sync
 
     func syncWalletWithBackend(balance: Double, isGoldTier: Bool, spins: Int? = nil) {
         wallet = WalletBalance(euros: balance)
-        goldTierStatus = GoldTierStatus(isGoldTier: isGoldTier)
         if let spins {
             spinsAvailable = spins
         }
@@ -251,7 +230,6 @@ class GamificationManager: ObservableObject {
             do {
                 let balance = try await CashbackAPIService.shared.getBalance()
                 self.wallet = WalletBalance(euros: balance.currentBalance)
-                self.goldTierStatus = GoldTierStatus(isGoldTier: balance.isGoldTier)
                 self.spinsAvailable = balance.spinsAvailable
                 self.saveState()
             } catch {
@@ -293,7 +271,6 @@ class GamificationManager: ObservableObject {
     @Published private(set) var hasDoubleNext: Bool = false
     @Published var spinTestMode: Bool = false
     @Published var forcedSegmentIndex: Int? = nil
-    @Published var streakTestMode: Bool = false
     @Published var badgeTestMode: Bool = false
 
     // MARK: - Badge Tracking Stats
@@ -351,92 +328,14 @@ class GamificationManager: ObservableObject {
     /// Called by the view after wheel animation completes to sync all state.
     /// Deferred so counters don't update while the wheel is still spinning.
     func applySpinResult(_ result: SpinResult) {
-        // Sync wallet and spins with server-authoritative values
         wallet = WalletBalance(euros: result.newBalance)
         spinsAvailable = result.spinsRemaining
-
-        // Update double-next state
         if result.grantsDoubleNext {
             hasDoubleNext = true
         } else if result.isDoubled {
             hasDoubleNext = false
         }
         saveState()
-    }
-
-    func checkStreakStatus() {
-        fetchStreakStatus()
-    }
-
-    // MARK: - Streak
-
-    func fetchStreakStatus() {
-        Task {
-            do {
-                let status = try await CashbackAPIService.shared.getStreakStatus()
-                self.streak = StreakData(
-                    weekCount: status.weekCount,
-                    lastReceiptDate: nil,
-                    hasShield: false,
-                    isAtRisk: status.isAtRisk
-                )
-                self.streak.claimableReward = status.claimableReward
-                self.streak.backendCycle = status.currentCycle
-
-                // Unlock streak badges based on backend week count
-                if status.weekCount >= 2  { unlockBadgeIfNeeded(id: "streak_2") }
-                if status.weekCount >= 4  { unlockBadgeIfNeeded(id: "streak_4") }
-                if status.weekCount >= 8  { unlockBadgeIfNeeded(id: "streak_8") }
-                if status.weekCount >= 12 { unlockBadgeIfNeeded(id: "streak_12") }
-
-                self.saveState()
-            } catch {
-                print("[GamificationManager] Streak fetch failed: \(error)")
-            }
-        }
-    }
-
-    func claimStreakReward() async throws -> StreakClaimResponse {
-        let response = try await CashbackAPIService.shared.claimStreak()
-        if response.success {
-            wallet = WalletBalance(euros: response.newBalance)
-            spinsAvailable = response.newSpinsAvailable
-            streak.claimableReward = nil
-            saveState()
-            fetchStreakStatus()
-            NotificationCenter.default.post(name: .rewardClaimed, object: nil)
-        }
-        return response
-    }
-
-    func testAdvanceStreak() async {
-        do {
-            _ = try await CashbackAPIService.shared.testAdvanceStreak()
-            fetchStreakStatus()
-            fetchAndSyncWallet()
-        } catch {
-            print("[GamificationManager] Test advance streak failed: \(error)")
-        }
-    }
-
-    func testSetStreakWeek(_ week: Int) async {
-        do {
-            _ = try await CashbackAPIService.shared.testSetStreakWeek(week)
-            fetchStreakStatus()
-            fetchAndSyncWallet()
-        } catch {
-            print("[GamificationManager] Test set streak week failed: \(error)")
-        }
-    }
-
-    func testResetStreak() async {
-        do {
-            _ = try await CashbackAPIService.shared.testResetStreak()
-            fetchStreakStatus()
-            fetchAndSyncWallet()
-        } catch {
-            print("[GamificationManager] Test reset streak failed: \(error)")
-        }
     }
 
     // MARK: - Referral

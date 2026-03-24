@@ -47,8 +47,6 @@ struct SpinWheelView: View {
                 if showConfetti { ConfettiView() }
 
                 VStack(spacing: 24) {
-                    spinsCounter
-
                     // Double Next indicator
                     if gm.hasDoubleNext {
                         doubleNextBanner
@@ -153,35 +151,6 @@ struct SpinWheelView: View {
                 testModePanel
             }
         }
-    }
-
-    // MARK: - Spins Counter
-
-    private var spinsCounter: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "sparkle")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(gold)
-            if gm.spinTestMode {
-                Text("TEST MODE — Infinite spins")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.green)
-            } else {
-                Text("\(gm.spinsAvailable) spin\(gm.spinsAvailable == 1 ? "" : "s") available")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            Capsule()
-                .fill(gm.spinTestMode ? Color.green.opacity(0.1) : Color(white: 0.08))
-                .overlay(
-                    Capsule()
-                        .stroke(gm.spinTestMode ? Color.green.opacity(0.3) : gold.opacity(0.15), lineWidth: 0.5)
-                )
-        )
     }
 
     // MARK: - Double Next Banner
@@ -342,7 +311,6 @@ struct SpinWheelView: View {
             VStack(spacing: 24) {
                 Spacer()
 
-                // Gift icon with glow
                 ZStack {
                     Circle()
                         .fill(purple.opacity(mysteryRevealed ? 0.2 : 0.05))
@@ -358,7 +326,6 @@ struct SpinWheelView: View {
                 .animation(.easeOut(duration: 0.6), value: mysteryRevealed)
 
                 if mysteryRevealed {
-                    // Counting value
                     Text(String(format: "€%.2f", mysteryCountValue))
                         .font(.system(size: 52, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
@@ -407,16 +374,13 @@ struct SpinWheelView: View {
 
         for i in 0...steps {
             let t = Double(i) / Double(steps)
-            // Ease-out cubic for a slow-down feel
             let eased = 1.0 - pow(1.0 - t, 3)
             let delay = eased * totalDuration
 
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                // Linear interpolation of the value with eased timing
                 let progress = Double(i) / Double(steps)
                 mysteryCountValue = target * progress
 
-                // Tick haptic on some steps
                 if i % 4 == 0 && i < steps {
                     tickGenerator.impactOccurred(intensity: 0.3 + 0.4 * progress)
                 }
@@ -427,11 +391,9 @@ struct SpinWheelView: View {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) {
                         mysteryCountDone = true
                     }
-                    // Show result card
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.3)) {
                         showResult = true
                     }
-                    // Auto-dismiss after a beat
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                         withAnimation(.easeOut(duration: 0.3)) {
                             showMysteryReveal = false
@@ -519,8 +481,7 @@ struct SpinWheelView: View {
                         Toggle("Force 2x Active", isOn: Binding(
                             get: { gm.hasDoubleNext },
                             set: { _ in
-                                // Toggle by forcing a double_next spin then resetting
-                                gm.forcedSegmentIndex = 5 // Double Next segment
+                                gm.forcedSegmentIndex = 3 // DoubleNext segment
                             }
                         ))
                         .tint(.yellow)
@@ -759,6 +720,16 @@ private struct WheelCanvas: View {
             }
         }
         .rotationEffect(.degrees(rotation))
+    }
+}
+
+// MARK: - Scale Scan Button Style
+
+struct ScaleScanButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 

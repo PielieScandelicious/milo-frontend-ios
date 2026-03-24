@@ -15,8 +15,6 @@ struct HomeTabView: View {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     @State private var viewModel = HomeViewModel()
-    @State private var showCamera = false
-    @State private var capturedImage: UIImage?
     @State private var showProfile = false
 
     @State private var contentOpacity: Double = 0
@@ -26,31 +24,11 @@ struct HomeTabView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private let headerBlueColor = Color(red: 0.04, green: 0.15, blue: 0.30)
-    private let deepPurple = Color(red: 0.35, green: 0.10, blue: 0.60)
-
     var body: some View {
         NavigationStack {
             ZStack {
                 // Main scrollable content
                 mainContent
-
-                // Floating scan button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        floatingScanButton
-                            .padding(.trailing, 24)
-                            .padding(.bottom, 24)
-                    }
-                }
-
-                // Cashback reveal overlay
-                if viewModel.showCashbackReveal {
-                    CashbackRevealOverlay(viewModel: viewModel)
-                        .transition(.opacity)
-                        .zIndex(100)
-                }
 
                 // Referral reveal overlay
                 if viewModel.showReferralReveal {
@@ -76,14 +54,6 @@ struct HomeTabView: View {
                     }
                 }
             }
-        }
-        .fullScreenCover(isPresented: $showCamera) {
-            CustomCameraView(capturedImage: $capturedImage)
-        }
-        .onChange(of: capturedImage) { _, newImage in
-            guard let image = newImage else { return }
-            capturedImage = nil
-            viewModel.uploadAndProcess(image: image)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -170,19 +140,9 @@ struct HomeTabView: View {
                     .transition(.opacity)
                 }
 
-                // Digital receipt hint
-                DigitalReceiptHintCard()
-                    .padding(.horizontal, 20)
-
                 // Monthly lottery
                 MonthlyLotteryCard(lotteryStatus: lotteryStatus) {
                     refreshLotteryStatus()
-                }
-                .padding(.horizontal, 20)
-
-                // Wallet Pass creator
-                WalletPassCard {
-                    showWalletPassCreator = true
                 }
                 .padding(.horizontal, 20)
 
@@ -229,41 +189,20 @@ struct HomeTabView: View {
         .ignoresSafeArea()
     }
 
-    // MARK: - Floating Scan Button
-
-    private var floatingScanButton: some View {
-        Button {
-            showCamera = true
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        } label: {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.45, green: 0.15, blue: 0.70),
-                                deepPurple
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 64, height: 64)
-                    .shadow(color: deepPurple.opacity(0.5), radius: 12, y: 6)
-
-                Image(systemName: "doc.text.viewfinder")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-        }
-        .buttonStyle(ScaleScanButtonStyle())
-    }
-
     // MARK: - Profile Menu Button
 
     private var profileMenuButton: some View {
-        Button {
-            showProfile = true
+        Menu {
+            Button {
+                showProfile = true
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+            }
+            Button {
+                showWalletPassCreator = true
+            } label: {
+                Label("Wallet Pass", systemImage: "wallet.pass")
+            }
         } label: {
             Circle()
                 .fill(Color.white.opacity(0.15))

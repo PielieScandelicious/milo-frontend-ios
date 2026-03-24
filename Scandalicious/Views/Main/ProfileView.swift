@@ -288,23 +288,6 @@ struct ProfileView: View {
             // My Progress (Gamification)
             Section {
                 HStack {
-                    Label("Tier", systemImage: "medal.fill")
-                    Spacer()
-                    Text(GamificationManager.shared.goldTierStatus.displayName)
-                        .font(.subheadline.bold())
-                        .foregroundStyle(GamificationManager.shared.goldTierStatus.isGoldTier ? .white : .white.opacity(0.5))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            LinearGradient(
-                                colors: GamificationManager.shared.goldTierStatus.gradientColors,
-                                startPoint: .leading, endPoint: .trailing
-                            )
-                        )
-                        .clipShape(Capsule())
-                }
-
-                HStack {
                     Label("Streak", systemImage: "flame.fill")
                     Spacer()
                     Text("\(GamificationManager.shared.streak.weekCount) weeks")

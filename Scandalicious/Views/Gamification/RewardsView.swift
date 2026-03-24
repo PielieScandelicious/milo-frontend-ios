@@ -52,16 +52,6 @@ struct RewardsView: View {
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 12)
 
-                    // Streak card
-                    StreakCardView(streak: gm.streak) {
-                        Task {
-                            _ = try? await gm.claimStreakReward()
-                        }
-                    }
-                        .padding(.horizontal, 20)
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 12)
-
                     // Referral card
                     ReferralCardView()
                         .padding(.horizontal, 20)
@@ -110,7 +100,6 @@ struct RewardsView: View {
                 appeared = true
             }
             gm.fetchAndSyncWallet()
-            gm.fetchStreakStatus()
         }
     }
 
@@ -118,21 +107,14 @@ struct RewardsView: View {
 
     private var spinsCard: some View {
         HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("FREE SPINS")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("SPIN THE WHEEL")
                     .font(.system(size: 11, weight: .bold))
                     .tracking(1.2)
                     .foregroundStyle(.white.opacity(0.5))
-                HStack(alignment: .lastTextBaseline, spacing: 4) {
-                    Text("\(gm.spinsAvailable)")
-                        .font(.system(size: 32, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: gm.spinsAvailable)
-                    Text("available")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
+                Text("Try your luck")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.8))
             }
             Spacer()
             Button {
@@ -147,21 +129,15 @@ struct RewardsView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 14)
                             .fill(
-                                gm.spinsAvailable > 0
-                                    ? LinearGradient(colors: [Color(red: 0.55, green: 0.2, blue: 0.95),
-                                                               Color(red: 0.35, green: 0.1, blue: 0.65)],
-                                                     startPoint: .topLeading, endPoint: .bottomTrailing)
-                                    : LinearGradient(colors: [Color(white: 0.2), Color(white: 0.15)],
-                                                     startPoint: .topLeading, endPoint: .bottomTrailing)
+                                LinearGradient(
+                                    colors: [Color(red: 0.55, green: 0.2, blue: 0.95),
+                                             Color(red: 0.35, green: 0.1, blue: 0.65)],
+                                    startPoint: .topLeading, endPoint: .bottomTrailing
+                                )
                             )
-                            .shadow(color: Color(red: 0.45, green: 0.15, blue: 0.85).opacity(
-                                gm.spinsAvailable > 0 ? 0.5 : 0), radius: 12, y: 6)
+                            .shadow(color: Color(red: 0.45, green: 0.15, blue: 0.85).opacity(0.5), radius: 12, y: 6)
                     )
             }
-            #if PRODUCTION
-            .disabled(gm.spinsAvailable == 0)
-            .opacity(gm.spinsAvailable == 0 ? 0.5 : 1.0)
-            #endif
         }
         .padding(20)
         .glassCard()
@@ -318,7 +294,6 @@ struct BadgeTestModeSheet: View {
                     statRow("Unique Categories", value: "\(gm.uniqueCategories.count)")
                     statRow("Grocery Receipts", value: "\(gm.groceryReceiptCount)")
                     statRow("Referrals", value: "\(gm.referralCount)")
-                    statRow("Streak Weeks", value: "\(gm.streak.weekCount)")
                 }
 
                 Section("Simulate Events") {
