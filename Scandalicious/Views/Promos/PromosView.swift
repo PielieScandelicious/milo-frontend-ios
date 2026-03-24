@@ -122,66 +122,6 @@ struct PromosView: View {
             PromoHeroCard(data: data)
                 .padding(.horizontal, 16)
 
-            // Top Picks
-            if !data.topPicks.isEmpty {
-                VStack(spacing: 12) {
-                    PromoSectionHeader(title: "TOP PICKS FOR YOU", icon: "star.fill")
-                        .padding(.horizontal, 20)
-
-                    // All picks in a single glass card
-                    VStack(spacing: 0) {
-                        ForEach(Array(data.topPicks.enumerated()), id: \.element.id) { index, pick in
-                            if index > 0 {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.06))
-                                    .frame(height: 0.5)
-                                    .padding(.leading, 64)
-                                    .padding(.trailing, 16)
-                            }
-                            PromoTopPickCard(
-                                pick: pick,
-                                index: index,
-                                onExpand: { viewModel.trackTopPickOpened(pick) },
-                                onOpenFolder: { viewModel.trackFolderOpened(for: pick) }
-                            )
-                        }
-                    }
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color(white: 0.08))
-                    )
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.04), Color.white.opacity(0.02)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.5
-                            )
-                    )
-                    .padding(.horizontal, 16)
-                }
-            }
-
-            // Smart Switch
-            if let smartSwitch = data.smartSwitch {
-                PromoSmartSwitchCard(smartSwitch: smartSwitch)
-                    .padding(.horizontal, 16)
-            }
-
             // Store sections
             if !data.stores.isEmpty {
                 VStack(spacing: 12) {
@@ -200,7 +140,7 @@ struct PromosView: View {
             }
 
             // Summary
-            PromoSummaryFooter(summary: data.summary, stores: data.stores)
+            PromoSummaryFooter(summary: data.summary)
                 .padding(.horizontal, 16)
         }
     }

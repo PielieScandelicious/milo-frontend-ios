@@ -16,7 +16,6 @@ class PromosViewModel: ObservableObject {
     private let apiService = PromoAPIService.shared
     private var isLoading = false
     private var viewedReportIDs: Set<String> = []
-    private var openedDealKeys: Set<String> = []
     private var openedStoreKeys: Set<String> = []
 
     // MARK: - Load
@@ -69,27 +68,6 @@ class PromosViewModel: ObservableObject {
         }
     }
 
-    func trackTopPickOpened(_ pick: PromoTopPick) {
-        guard let report = readyReport, let reportID = report.reportId else { return }
-        let itemKey = pick.itemKey ?? Self.syntheticItemKey(
-            productName: pick.productName,
-            storeName: pick.store,
-            mechanism: pick.mechanism,
-            validityStart: pick.validityStart,
-            validityEnd: pick.validityEnd
-        )
-        guard openedDealKeys.insert(itemKey).inserted else { return }
-        Task {
-            await apiService.logEvent(
-                reportId: reportID,
-                eventType: .dealOpened,
-                itemKey: itemKey,
-                storeName: pick.store,
-                metadata: ["surface": "top_pick"]
-            )
-        }
-    }
-
     func trackStoreSectionOpened(_ store: PromoStore) {
         guard let report = readyReport, let reportID = report.reportId else { return }
         let storeKey = "\(reportID)|\(store.storeName)"
@@ -99,26 +77,6 @@ class PromosViewModel: ObservableObject {
                 reportId: reportID,
                 eventType: .storeSectionOpened,
                 storeName: store.storeName
-            )
-        }
-    }
-
-    func trackFolderOpened(for pick: PromoTopPick) {
-        guard let report = readyReport, let reportID = report.reportId else { return }
-        let itemKey = pick.itemKey ?? Self.syntheticItemKey(
-            productName: pick.productName,
-            storeName: pick.store,
-            mechanism: pick.mechanism,
-            validityStart: pick.validityStart,
-            validityEnd: pick.validityEnd
-        )
-        Task {
-            await apiService.logEvent(
-                reportId: reportID,
-                eventType: .folderOpened,
-                itemKey: itemKey,
-                storeName: pick.store,
-                metadata: ["surface": "top_pick"]
             )
         }
     }
@@ -138,19 +96,4 @@ class PromosViewModel: ObservableObject {
         return response
     }
 
-    private static func syntheticItemKey(
-        productName: String,
-        storeName: String,
-        mechanism: String,
-        validityStart: String,
-        validityEnd: String
-    ) -> String {
-        [
-            productName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-            storeName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-            mechanism.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-            validityStart,
-            validityEnd
-        ].joined(separator: "|")
-    }
 }
