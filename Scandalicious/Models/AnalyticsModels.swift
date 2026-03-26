@@ -1073,11 +1073,60 @@ struct PeriodMetadata: Codable, Identifiable {
 /// Response from GET /api/v2/analytics/summary with month/year params
 /// Used for the interactive Pie Chart drill-down view
 /// Contains both category and store breakdowns
+/// Group-level spending aggregation for pie chart
+struct PieChartGroup: Codable, Identifiable {
+    let groupName: String
+    let groupIcon: String
+    let groupColorHex: String
+    let totalSpent: Double
+    let percentage: Double
+    let transactionCount: Int
+    let categories: [CategorySpendItem]
+
+    var id: String { groupName }
+
+    enum CodingKeys: String, CodingKey {
+        case groupName = "group_name"
+        case groupIcon = "group_icon"
+        case groupColorHex = "group_color_hex"
+        case totalSpent = "total_spent"
+        case percentage
+        case transactionCount = "transaction_count"
+        case categories
+    }
+
+    /// Color from hex string
+    var color: Color {
+        Color(hex: groupColorHex) ?? .gray
+    }
+
+    /// Formatted percentage string
+    var percentageText: String {
+        String(format: "%.1f%%", percentage)
+    }
+
+    /// Formatted amount string
+    var amountText: String {
+        String(format: "€%.2f", totalSpent)
+    }
+
+    /// Convert to ChartData for IconDonutChartView
+    var toChartData: ChartData {
+        ChartData(
+            value: totalSpent,
+            color: color,
+            iconName: groupIcon,
+            label: groupName
+        )
+    }
+}
+
 struct PieChartSummaryResponse: Codable {
     let month: Int
     let year: Int
     let totalSpent: Double
     let categories: [CategorySpendItem]
+    let groups: [PieChartGroup]
     let stores: [PieChartStore]
     let totalItems: Int?
     let averageItemPrice: Double?
@@ -1087,6 +1136,7 @@ struct PieChartSummaryResponse: Codable {
         case year
         case totalSpent = "total_spent"
         case categories
+        case groups
         case stores
         case totalItems = "total_items"
         case averageItemPrice = "average_item_price"
@@ -1098,6 +1148,7 @@ struct PieChartSummaryResponse: Codable {
         year = try container.decode(Int.self, forKey: .year)
         totalSpent = try container.decode(Double.self, forKey: .totalSpent)
         categories = try container.decodeIfPresent([CategorySpendItem].self, forKey: .categories) ?? []
+        groups = try container.decodeIfPresent([PieChartGroup].self, forKey: .groups) ?? []
         stores = try container.decodeIfPresent([PieChartStore].self, forKey: .stores) ?? []
         totalItems = try container.decodeIfPresent(Int.self, forKey: .totalItems)
         averageItemPrice = try container.decodeIfPresent(Double.self, forKey: .averageItemPrice)
@@ -1177,6 +1228,9 @@ struct CategorySpendItem: Codable, Identifiable {
     let colorHex: String          // Hex color e.g., "#FF6B6B"
     let percentage: Double        // Percentage of total spend
     let transactionCount: Int     // Number of transactions
+    let group: String?            // Group name e.g., "Pantry"
+    let groupColorHex: String?    // Group color hex
+    let groupIcon: String?        // Group SF Symbol icon
 
     var id: String { categoryId }
 
@@ -1187,6 +1241,9 @@ struct CategorySpendItem: Codable, Identifiable {
         case colorHex = "color_hex"
         case percentage
         case transactionCount = "transaction_count"
+        case group
+        case groupColorHex = "group_color_hex"
+        case groupIcon = "group_icon"
     }
 
     // MARK: - Computed Properties
