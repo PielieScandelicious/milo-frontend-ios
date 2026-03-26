@@ -50,6 +50,12 @@ struct RewardsView: View {
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 12)
 
+                    // Charity donations
+                    CharityCardView()
+                        .padding(.horizontal, 20)
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+
                     // Withdraw cash
                     WithdrawCardView()
                         .padding(.horizontal, 20)

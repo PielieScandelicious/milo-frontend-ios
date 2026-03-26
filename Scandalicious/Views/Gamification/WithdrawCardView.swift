@@ -188,13 +188,75 @@ struct WithdrawCardView: View {
 
     @ViewBuilder
     private func ineligibleContent(reason: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "clock.fill")
-                .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.4))
-            Text(reason)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+        if let info = gm.withdrawalInfo,
+           reason.lowercased().contains("receipt") || reason.lowercased().contains("scan") {
+            receiptProgressContent(
+                count: info.confirmedCashbackCount ?? 0,
+                required: 5,
+                reason: reason
+            )
+        } else {
+            HStack(spacing: 10) {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.4))
+                Text(reason)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func receiptProgressContent(count: Int, required: Int, reason: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.text.viewfinder")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.8))
+                Text(reason)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+
+            // Progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 6)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0),
+                                         Color(red: 0.9, green: 0.6, blue: 0.0)],
+                                startPoint: .leading, endPoint: .trailing
+                            )
+                        )
+                        .frame(
+                            width: geo.size.width * min(CGFloat(count) / CGFloat(required), 1.0),
+                            height: 6
+                        )
+                        .animation(.spring(response: 0.5), value: count)
+                }
+            }
+            .frame(height: 6)
+
+            HStack {
+                ForEach(0..<required, id: \.self) { i in
+                    Circle()
+                        .fill(i < count ? Color(red: 1.0, green: 0.84, blue: 0.0) : Color.white.opacity(0.1))
+                        .frame(width: 8, height: 8)
+                        .overlay(
+                            Circle().stroke(Color.white.opacity(i < count ? 0 : 0.2), lineWidth: 1)
+                        )
+                }
+                Spacer()
+                Text("\(count)/\(required) receipts")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
         }
         .padding(.vertical, 4)
     }

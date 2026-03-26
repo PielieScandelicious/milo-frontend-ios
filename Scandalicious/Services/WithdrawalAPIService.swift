@@ -18,6 +18,7 @@ struct WithdrawalInfoResponse: Codable {
     let lastIbanLast4: String?
     let canWithdraw: Bool
     let cannotWithdrawReason: String?
+    let confirmedCashbackCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case currentBalance = "current_balance"
@@ -29,6 +30,7 @@ struct WithdrawalInfoResponse: Codable {
         case lastIbanLast4 = "last_iban_last4"
         case canWithdraw = "can_withdraw"
         case cannotWithdrawReason = "cannot_withdraw_reason"
+        case confirmedCashbackCount = "confirmed_cashback_count"
     }
 }
 

@@ -30,6 +30,12 @@ class GamificationManager: ObservableObject {
     @Published private(set) var withdrawalHistory: [WithdrawalItemResponse] = []
     @Published var withdrawalTestMode: Bool = false
 
+    // Charity state
+    @Published private(set) var charities: [CharityItem] = []
+    @Published private(set) var charityUserBalance: Double = 0
+    @Published private(set) var charityHistory: [CharityDonationItem] = []
+    @Published private(set) var charityTotalDonated: Double = 0
+
     // Referral state
     @Published private(set) var referralCode: String? = nil
     @Published private(set) var referralCount: Int = 0
@@ -225,6 +231,7 @@ class GamificationManager: ObservableObject {
     }
 
     /// Fetch the latest cashback balance from the backend and update the wallet.
+    /// Also refreshes withdrawal info and charity data after the balance is known.
     func fetchAndSyncWallet() {
         Task {
             do {
@@ -235,8 +242,10 @@ class GamificationManager: ObservableObject {
             } catch {
                 print("[GamificationManager] Wallet sync failed: \(error)")
             }
+            // Refresh withdrawal eligibility and charity data after balance is loaded
+            fetchWithdrawalInfo()
+            fetchCharities()
         }
-        fetchWithdrawalInfo()
     }
 
     // MARK: - Public API
@@ -438,6 +447,41 @@ class GamificationManager: ObservableObject {
         withdrawalHistory = []
         fetchWithdrawalInfo()
         fetchAndSyncWallet()
+    }
+
+    // MARK: - Charity
+
+    func fetchCharities() {
+        Task {
+            do {
+                let response = try await CharityAPIService.shared.getCharities()
+                self.charities = response.charities
+                self.charityUserBalance = response.userBalance
+            } catch {
+                print("[GamificationManager] Charity list fetch failed: \(error)")
+            }
+        }
+    }
+
+    func fetchCharityHistory() {
+        Task {
+            do {
+                let response = try await CharityAPIService.shared.getHistory()
+                self.charityHistory = response.donations
+                self.charityTotalDonated = response.totalDonated
+            } catch {
+                print("[GamificationManager] Charity history fetch failed: \(error)")
+            }
+        }
+    }
+
+    func submitCharityDonation(charityId: String, amount: Double) async throws -> CharityDonateResponse {
+        let response = try await CharityAPIService.shared.donate(charityId: charityId, amount: amount)
+        wallet = WalletBalance(euros: response.newBalance)
+        saveState()
+        fetchCharities()
+        fetchWithdrawalInfo()
+        return response
     }
 
     // MARK: - Badge Helpers
