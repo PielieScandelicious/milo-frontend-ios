@@ -9,12 +9,10 @@ import SwiftUI
 
 struct RewardsView: View {
     @ObservedObject private var gm = GamificationManager.shared
-    @State private var showSpinWheel = false
     @State private var appeared = false
     @State private var contentOpacity: Double = 0
     @State private var showBadgeTestMode = false
 
-    private let brandPurple = Color(red: 0.45, green: 0.15, blue: 0.85)
     private let headerGoldColor = Color(red: 0.18, green: 0.14, blue: 0.05)
 
     var body: some View {
@@ -42,12 +40,6 @@ struct RewardsView: View {
                 VStack(spacing: 20) {
                     // Hero wallet card
                     WalletCardView()
-                        .padding(.horizontal, 20)
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 12)
-
-                    // Spins card
-                    spinsCard
                         .padding(.horizontal, 20)
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 12)
@@ -86,9 +78,6 @@ struct RewardsView: View {
         }
         .navigationBarHidden(true)
         .opacity(contentOpacity)
-        .sheet(isPresented: $showSpinWheel) {
-            SpinWheelView()
-        }
         .sheet(isPresented: $showBadgeTestMode) {
             BadgeTestModeSheet()
         }
@@ -101,46 +90,6 @@ struct RewardsView: View {
             }
             gm.fetchAndSyncWallet()
         }
-    }
-
-    // MARK: - Spins Card
-
-    private var spinsCard: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("SPIN THE WHEEL")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(.white.opacity(0.5))
-                Text("Try your luck")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-            Spacer()
-            Button {
-                showSpinWheel = true
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            } label: {
-                Text("SPIN NOW")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(red: 0.55, green: 0.2, blue: 0.95),
-                                             Color(red: 0.35, green: 0.1, blue: 0.65)],
-                                    startPoint: .topLeading, endPoint: .bottomTrailing
-                                )
-                            )
-                            .shadow(color: Color(red: 0.45, green: 0.15, blue: 0.85).opacity(0.5), radius: 12, y: 6)
-                    )
-            }
-        }
-        .padding(20)
-        .glassCard()
     }
 
     // MARK: - Badge Test Panel (inline)

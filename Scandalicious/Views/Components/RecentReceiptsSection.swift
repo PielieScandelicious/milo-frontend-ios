@@ -131,12 +131,14 @@ private struct RecentReceiptRow: View {
     private var iconName: String {
         if receipt.isStreakReward { return "flame.fill" }
         if receipt.isReferralReward { return "person.2.fill" }
+        if receipt.isBrandCashback { return receipt.brandImageSystemName ?? "tag.fill" }
         return "storefront.fill"
     }
 
     private var iconColor: Color {
         if receipt.isStreakReward { return streakOrange }
         if receipt.isReferralReward { return referralBlue }
+        if receipt.isBrandCashback { return cashGreen }
         return receipt.storeColor
     }
 
@@ -180,6 +182,14 @@ private struct RecentReceiptRow: View {
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(goldGradient)
                     }
+                } else if receipt.isBrandCashback {
+                    // Brand cashback: show earned amount prominently in green
+                    Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(cashGreen)
+                    Text("Cashback")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(cashGreen.opacity(0.7))
                 } else if receipt.isReferralReward {
                     Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -190,7 +200,7 @@ private struct RecentReceiptRow: View {
                         .foregroundStyle(.white)
                 }
 
-                if !receipt.isStreakReward {
+                if !receipt.isStreakReward && !receipt.isBrandCashback {
                     HStack(spacing: 6) {
                         if !receipt.isReferralReward {
                             Text(String(format: "+\u{20AC}%.2f", receipt.cashbackAmount))

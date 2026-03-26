@@ -146,6 +146,10 @@ struct HomeTabView: View {
                 }
                 .padding(.horizontal, 20)
 
+                // Cashback hint card
+                CashbackHintCard()
+                    .padding(.horizontal, 20)
+
                 // Recent rewards
                 RecentReceiptsSection(receipts: viewModel.recentReceipts)
                     .padding(.horizontal, 20)
@@ -228,6 +232,85 @@ struct HomeTabView: View {
             }
         }
     }
+}
+
+// MARK: - Cashback Hint Card
+
+private struct CashbackHintCard: View {
+    private let cashbackGreen = Color(red: 0.25, green: 0.90, blue: 0.55)
+
+    var body: some View {
+        Button(action: openCashbackTab) {
+            VStack(alignment: .leading, spacing: 14) {
+                // Header row
+                HStack(spacing: 8) {
+                    Image(systemName: "tag.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(cashbackGreen)
+                    Text("CASHBACK DEALS")
+                        .font(.system(size: 11, weight: .heavy))
+                        .tracking(1.2)
+                        .foregroundStyle(cashbackGreen)
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(cashbackGreen.opacity(0.6))
+                }
+
+                // Step chips
+                HStack(spacing: 8) {
+                    ForEach(["1 Claim", "2 Upload", "3 Earn"], id: \.self) { step in
+                        Text(step)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(cashbackGreen)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule().fill(cashbackGreen.opacity(0.12))
+                            )
+                    }
+                    Spacer()
+                }
+
+                // Body
+                Text("Earn money back on branded products. Claim a deal before uploading your receipt.")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.65))
+                    .lineSpacing(2)
+                    .multilineTextAlignment(.leading)
+
+                // CTA
+                HStack {
+                    Spacer()
+                    Text("Explore Deals →")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 9)
+                        .background(Capsule().fill(cashbackGreen))
+                }
+            }
+            .padding(18)
+            .glassCard(
+                borderGradient: LinearGradient(
+                    colors: [cashbackGreen.opacity(0.35), cashbackGreen.opacity(0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func openCashbackTab() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        UserDefaults.standard.set(true, forKey: "cashback.openCashbackSegment")
+        NotificationCenter.default.post(name: .switchToDealsTab, object: nil)
+    }
+}
+
+extension Notification.Name {
+    static let switchToDealsTab = Notification.Name("app.switchToDealsTab")
 }
 
 // MARK: - Milo Dachshund Easter Egg

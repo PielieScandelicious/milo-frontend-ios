@@ -28,6 +28,7 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .home
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
+    @StateObject private var brandCashbackViewModel = BrandCashbackViewModel()
     @State private var showBadgeUnlock = false
     @State private var badgeToShow: Badge? = nil
     @State private var badgeQueue: [Badge] = []
@@ -88,6 +89,17 @@ struct ContentView: View {
                     .transition(.opacity)
             }
 
+            // Brand cashback earned overlay (app-wide, works from any tab)
+            if brandCashbackViewModel.showEarnedOverlay {
+                CashbackEarnedOverlay(
+                    dealName: brandCashbackViewModel.lastEarnedDealName,
+                    cashbackAmount: brandCashbackViewModel.lastEarnedAmount,
+                    onDismiss: { brandCashbackViewModel.dismissEarnedOverlay() }
+                )
+                .transition(.opacity)
+                .zIndex(99)
+            }
+
             // Badge unlock overlay (app-wide, works from any tab)
             if showBadgeUnlock, let badge = badgeToShow {
                 BadgeUnlockView(badge: badge) {
@@ -106,6 +118,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.4), value: hasLoadedInitialData)
         .environmentObject(transactionManager)
         .environmentObject(dataManager)
+        .environmentObject(brandCashbackViewModel)
         .preferredColorScheme(.dark)
         .onAppear {
             // Configure data manager on first appear
@@ -117,6 +130,11 @@ struct ContentView: View {
             }
         }
         .onChange(of: selectedTab) { oldValue, newValue in
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToDealsTab)) { _ in
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                selectedTab = .promos
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .badgeUnlocked)) { _ in
             if let badge = GamificationManager.shared.lastUnlockedBadge {

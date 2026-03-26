@@ -9,6 +9,8 @@ import SwiftUI
 
 struct PromosView: View {
     @ObservedObject var viewModel: PromosViewModel
+    @EnvironmentObject var cashbackViewModel: BrandCashbackViewModel
+    @State private var activeSegment: DealsSegment = .weekly
     @State private var scrollOffset: CGFloat = 0
     @State private var contentOpacity: Double = 0
 
@@ -45,7 +47,22 @@ struct PromosView: View {
             GeometryReader { geo in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 20) {
-                        contentForState
+                        // Segment picker
+                        Picker("", selection: $activeSegment) {
+                            ForEach(DealsSegment.allCases, id: \.self) { segment in
+                                Text(segment.rawValue).tag(segment)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
+
+                        // Content for selected segment
+                        if activeSegment == .weekly {
+                            contentForState
+                        } else {
+                            BrandCashbackView(viewModel: cashbackViewModel)
+                        }
                     }
                     .padding(.top, 16)
                     .padding(.bottom, 100)
@@ -65,6 +82,7 @@ struct PromosView: View {
             .onPreferenceChange(PromoScrollOffsetKey.self) { value in
                 scrollOffset = max(0, value)
             }
+
         }
         .navigationBarTitleDisplayMode(.inline)
         .opacity(contentOpacity)
@@ -75,10 +93,34 @@ struct PromosView: View {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
                 contentOpacity = 1.0
             }
+            configureSegmentedControlAppearance()
+            // Auto-switch to Cashback segment if requested from the hint card
+            if UserDefaults.standard.bool(forKey: "cashback.openCashbackSegment") {
+                UserDefaults.standard.removeObject(forKey: "cashback.openCashbackSegment")
+                withAnimation { activeSegment = .cashback }
+            }
         }
         .task {
             await viewModel.loadPromos()
         }
+    }
+
+    // MARK: - Segmented Control Appearance
+
+    private func configureSegmentedControlAppearance() {
+        let appearance = UISegmentedControl.appearance()
+        appearance.selectedSegmentTintColor = UIColor.white.withAlphaComponent(0.12)
+        appearance.backgroundColor = UIColor.white.withAlphaComponent(0.06)
+        appearance.setTitleTextAttributes(
+            [.foregroundColor: UIColor.white.withAlphaComponent(0.5),
+             .font: UIFont.systemFont(ofSize: 13, weight: .semibold)],
+            for: .normal
+        )
+        appearance.setTitleTextAttributes(
+            [.foregroundColor: UIColor.white,
+             .font: UIFont.systemFont(ofSize: 13, weight: .bold)],
+            for: .selected
+        )
     }
 
     // MARK: - Header fade

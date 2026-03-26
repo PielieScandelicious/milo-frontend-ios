@@ -80,7 +80,7 @@ struct ProcessingReceiptsCard: View {
         let active = manager.processingReceipts.filter { !$0.isTerminal }
         let completed = manager.processingReceipts.filter { $0.status == .completed || $0.status == .success }
         if active.isEmpty && !completed.isEmpty {
-            return completed.count == 1 ? "Your reward is ready!" : "Your rewards are ready!"
+            return completed.count == 1 ? "Receipt processed" : "Receipts processed"
         }
         if manager.processingReceipts.count == 1 {
             return "Processing your receipt..."
@@ -195,8 +195,8 @@ struct ProcessingReceiptRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if receipt.status == .completed || receipt.status == .success {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                onClaim()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onDismiss()
             }
         }
     }
@@ -211,9 +211,13 @@ struct ProcessingReceiptRow: View {
                         .foregroundStyle(.white)
                 }
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(successGreen.opacity(0.6))
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .frame(width: 24, height: 24)
+                        .background(Circle().fill(Color.white.opacity(0.08)))
+                }
             }
         } else if receipt.status == .failed {
             Button(action: onDismiss) {
@@ -283,15 +287,10 @@ struct ProcessingReceiptRow: View {
                     .foregroundStyle(.red.opacity(0.7))
                     .lineLimit(1)
             } else {
-                HStack(spacing: 4) {
-                    Text("Tap to claim")
+                if let dateStr = receipt.formattedDate {
+                    Text(dateStr)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color(red: 0.2, green: 0.8, blue: 0.4).opacity(0.8))
-                    if let dateStr = receipt.formattedDate {
-                        Text("\u{2022} \(dateStr)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
+                        .foregroundStyle(.white.opacity(0.4))
                 }
             }
         } else if isActiveOrProcessing {

@@ -20,6 +20,8 @@ struct RecentReceipt: Identifiable {
     let date: Date
     var isReferralReward: Bool = false
     var isStreakReward: Bool = false
+    var isBrandCashback: Bool = false
+    var brandImageSystemName: String? = nil
 
     /// Map a backend cashback transaction to a displayable receipt.
     static func from(_ tx: CashbackTransactionResponse) -> RecentReceipt {
@@ -61,6 +63,21 @@ struct RecentReceipt: Identifiable {
             isStreakReward: tx.isStreakReward
         )
     }
+
+    static func fromBrandCashback(_ entry: EarnedBrandCashbackEntry) -> RecentReceipt {
+        let cashbackGreen = Color(red: 0.25, green: 0.90, blue: 0.55)
+        return RecentReceipt(
+            id: "brand-\(entry.id)",
+            storeName: entry.productName,
+            storeColor: cashbackGreen,
+            totalAmount: 0,
+            cashbackAmount: entry.cashbackAmount,
+            spinsAwarded: 0,
+            date: entry.earnedAt,
+            isBrandCashback: true,
+            brandImageSystemName: entry.imageSystemName
+        )
+    }
 }
 
 // MARK: - Home View Model
@@ -94,11 +111,13 @@ class HomeViewModel {
 
     private var completionObserver: Any?
     private var rewardClaimedObserver: Any?
+    private var brandCashbackObserver: Any?
 
     init() {
         loadRecentReceipts()
         observeReceiptCompletion()
         observeRewardClaimed()
+        observeBrandCashbackEarned()
     }
 
     deinit {
@@ -106,6 +125,9 @@ class HomeViewModel {
             NotificationCenter.default.removeObserver(observer)
         }
         if let observer = rewardClaimedObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = brandCashbackObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
@@ -212,10 +234,15 @@ class HomeViewModel {
             queue: .main
         ) { [weak self] notification in
             guard let self else { return }
-            // Refresh recent receipts when any receipt completes
             let receiptId = notification.userInfo?["receiptId"] as? String
             Task { @MainActor in
                 await self.fetchCashbackForReceipt(receiptId: receiptId, updateUI: false)
+                // Auto-dismiss the processing card after 4s.
+                // Brand cashback overlay (if earned) fires independently via BrandCashbackViewModel.
+                try? await Task.sleep(for: .seconds(4))
+                if let receiptId {
+                    ReceiptProcessingManager.shared.dismiss(receiptId)
+                }
             }
         }
     }
@@ -225,6 +252,18 @@ class HomeViewModel {
     private func observeRewardClaimed() {
         rewardClaimedObserver = NotificationCenter.default.addObserver(
             forName: .rewardClaimed,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.loadRecentReceipts()
+        }
+    }
+
+    // MARK: - Brand Cashback Earned Observer
+
+    private func observeBrandCashbackEarned() {
+        brandCashbackObserver = NotificationCenter.default.addObserver(
+            forName: .brandCashbackEarned,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -276,8 +315,17 @@ class HomeViewModel {
     func loadRecentReceipts() {
         Task { @MainActor in
             do {
-                let summary = try await CashbackAPIService.shared.getSummary()
-                updateRecentReceipts(from: summary.recentTransactions)
+                async let summaryTask = CashbackAPIService.shared.getSummary()
+                async let earnedDealsTask = BrandCashbackService.shared.fetchEarnedDeals()
+
+                let summary = try await summaryTask
+                let earnedDeals = await earnedDealsTask
+
+                var receipts = summary.recentTransactions.map { RecentReceipt.from($0) }
+                let brandReceipts = earnedDeals.map { RecentReceipt.fromBrandCashback($0) }
+                receipts.append(contentsOf: brandReceipts)
+                self.recentReceipts = receipts.sorted { $0.date > $1.date }
+
                 GamificationManager.shared.syncWalletWithBackend(
                     balance: summary.balance.currentBalance,
                     isGoldTier: summary.isGoldTier,

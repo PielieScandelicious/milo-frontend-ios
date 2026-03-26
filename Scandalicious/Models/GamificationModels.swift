@@ -177,7 +177,7 @@ struct Badge: Identifiable, Codable, Equatable {
     ]
 
     /// Number of badges shown in the Achievements grid card.
-    static let gridDisplayCount = 9
+    static let gridDisplayCount = 6
 }
 
 // MARK: - Spin Wheel

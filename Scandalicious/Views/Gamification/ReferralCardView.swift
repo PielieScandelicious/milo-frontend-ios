@@ -43,7 +43,7 @@ struct ReferralCardView: View {
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white.opacity(0.3))
                     }
-                    Text("You both earn \u{20AC}1 + 3 spins")
+                    Text("You both earn \u{20AC}1")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
