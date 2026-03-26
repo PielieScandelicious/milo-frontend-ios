@@ -53,7 +53,7 @@ struct BrandCashbackView: View {
 
                 if viewModel.availableDeals.isEmpty {
                     emptyState
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(.opacity)
                 } else {
                     ForEach(Array(viewModel.availableDeals.enumerated()), id: \.element.id) { index, deal in
                         CashbackDealCard(

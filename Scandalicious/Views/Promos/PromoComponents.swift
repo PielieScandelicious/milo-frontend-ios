@@ -301,6 +301,7 @@ struct PromoStoreSection: View {
     let store: PromoStore
     let index: Int
     let onExpand: () -> Void
+    let onClaim: (PromoStoreItem) -> Void
     @State private var isExpanded = false
     @State private var appeared = false
 
@@ -342,7 +343,7 @@ struct PromoStoreSection: View {
                             .padding(.leading, 64)
                             .padding(.trailing, 16)
                     }
-                    PromoItemRow(item: item)
+                    PromoItemRow(item: item, onClaim: { onClaim(item) })
                 }
             }
 
@@ -385,6 +386,8 @@ struct PromoStoreSection: View {
 
 struct PromoItemRow: View {
     let item: PromoStoreItem
+    let onClaim: () -> Void
+    @State private var isClaimed = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -429,6 +432,23 @@ struct PromoItemRow: View {
                 }
                 .fixedSize()
             }
+
+            // Claim toggle
+            Button {
+                let claiming = !isClaimed
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isClaimed.toggle()
+                }
+                if claiming {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onClaim()
+                }
+            } label: {
+                Image(systemName: isClaimed ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(isClaimed ? promoGreen : Color.white.opacity(0.2))
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

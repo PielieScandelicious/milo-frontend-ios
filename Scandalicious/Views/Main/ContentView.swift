@@ -29,9 +29,17 @@ struct ContentView: View {
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
     @StateObject private var brandCashbackViewModel = BrandCashbackViewModel()
-    @State private var showBadgeUnlock = false
-    @State private var badgeToShow: Badge? = nil
-    @State private var badgeQueue: [Badge] = []
+    @ObservedObject private var gm = GamificationManager.shared
+
+    // Unified overlay queue — all reward overlays flow through here in order:
+    // brand cashback → referral → badge achievements
+    private enum OverlayItem {
+        case brandCashback(dealName: String, amount: Double)
+        case referral(amount: Double)
+        case badge(Badge)
+    }
+    @State private var overlayQueue: [OverlayItem] = []
+    @State private var activeOverlay: OverlayItem? = nil
 
     enum Tab: Int, Hashable {
         case budget = 0
@@ -89,26 +97,31 @@ struct ContentView: View {
                     .transition(.opacity)
             }
 
-            // Brand cashback earned overlay (app-wide, works from any tab)
-            if brandCashbackViewModel.showEarnedOverlay {
-                CashbackEarnedOverlay(
-                    dealName: brandCashbackViewModel.lastEarnedDealName,
-                    cashbackAmount: brandCashbackViewModel.lastEarnedAmount,
-                    onDismiss: { brandCashbackViewModel.dismissEarnedOverlay() }
-                )
-                .transition(.opacity)
-                .zIndex(99)
-            }
-
-            // Badge unlock overlay (app-wide, works from any tab)
-            if showBadgeUnlock, let badge = badgeToShow {
-                BadgeUnlockView(badge: badge) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showBadgeUnlock = false
-                    }
-                    // Show next queued badge after a short delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        showNextQueuedBadge()
+            // Unified reward overlay queue — brand cashback → referral → badges
+            if let overlay = activeOverlay {
+                Group {
+                    switch overlay {
+                    case .brandCashback(let name, let amount):
+                        CashbackEarnedOverlay(
+                            dealName: name,
+                            cashbackAmount: amount,
+                            onDismiss: {
+                                brandCashbackViewModel.dismissEarnedOverlay()
+                                dequeueOverlay()
+                            }
+                        )
+                    case .referral(let amount):
+                        ReferralRevealOverlay(
+                            cashbackAmount: amount,
+                            onDismiss: {
+                                gm.dismissReferralEarnedOverlay()
+                                dequeueOverlay()
+                            }
+                        )
+                    case .badge(let badge):
+                        BadgeUnlockView(badge: badge) {
+                            dequeueOverlay()
+                        }
                     }
                 }
                 .transition(.opacity)
@@ -136,19 +149,22 @@ struct ContentView: View {
                 selectedTab = .promos
             }
         }
+        .onChange(of: brandCashbackViewModel.showEarnedOverlay) { _, showing in
+            if showing {
+                enqueueOverlay(.brandCashback(
+                    dealName: brandCashbackViewModel.lastEarnedDealName,
+                    amount: brandCashbackViewModel.lastEarnedAmount
+                ))
+            }
+        }
+        .onChange(of: gm.showReferralEarnedOverlay) { _, showing in
+            if showing {
+                enqueueOverlay(.referral(amount: gm.pendingOverlayEuros))
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .badgeUnlocked)) { _ in
             if let badge = GamificationManager.shared.lastUnlockedBadge {
-                if showBadgeUnlock {
-                    // Already showing a badge — queue this one
-                    if !badgeQueue.contains(where: { $0.id == badge.id }) {
-                        badgeQueue.append(badge)
-                    }
-                } else {
-                    badgeToShow = badge
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        showBadgeUnlock = true
-                    }
-                }
+                enqueueOverlay(.badge(badge))
             }
         }
         .confirmationDialog(L("sign_out"), isPresented: $showSignOutConfirmation) {
@@ -164,14 +180,27 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Badge Queue
+    // MARK: - Overlay Queue
 
-    private func showNextQueuedBadge() {
-        guard !badgeQueue.isEmpty else { return }
-        let next = badgeQueue.removeFirst()
-        badgeToShow = next
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-            showBadgeUnlock = true
+    private func enqueueOverlay(_ item: OverlayItem) {
+        if activeOverlay == nil {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                activeOverlay = item
+            }
+        } else {
+            overlayQueue.append(item)
+        }
+    }
+
+    private func dequeueOverlay() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            activeOverlay = nil
+        }
+        guard !overlayQueue.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.activeOverlay = self.overlayQueue.removeFirst()
+            }
         }
     }
 

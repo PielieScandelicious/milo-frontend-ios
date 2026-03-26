@@ -154,7 +154,7 @@ struct ReferralCardView: View {
                     Image(systemName: "info.circle")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.3))
-                    Text("Reward unlocks when your friend scans a receipt over \u{20AC}50")
+                    Text("Reward unlocks once your friend claims a cashback deal and earns it by uploading a receipt")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.35))
                 }
@@ -177,7 +177,7 @@ struct ReferralCardView: View {
     }
 
     private func referralShareText(code: String) -> String {
-        "Hey! I've been using Scandalicious to earn cashback on my groceries. Use my referral code \(code) when you sign up and we both get \u{20AC}1 + 3 free spins after you scan your first receipt over \u{20AC}50! Download here: https://apps.apple.com/app/scandalicious/id6742044938"
+        "Hey! I've been using Milo to earn cashback on my groceries. Use my referral code \(code) when you sign up and we both get \u{20AC}1 + 3 free spins — just claim a cashback deal and upload a matching receipt to unlock the reward! Download here: https://apps.apple.com/app/scandalicious/id6742044938"
     }
 }
 

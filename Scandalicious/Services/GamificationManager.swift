@@ -45,10 +45,18 @@ class GamificationManager: ObservableObject {
     @Published private(set) var unclaimedReferralEuros: Double = 0
     @Published private(set) var unclaimedReferralSpins: Int = 0
 
+    // Referral earned overlay (app-wide, auto-triggered)
+    @Published var showReferralEarnedOverlay: Bool = false
+    @Published var pendingOverlayEuros: Double = 0
+    @Published var pendingOverlaySpins: Int = 0
+    @Published var animatedReferralOverlayValue: Double = 0
+    @Published var showReferralOverlayConfetti: Bool = false
+
     // MARK: - Private
 
     private let userDefaults = UserDefaults.standard
     private var currentUserId: String?
+    private var isAutoClaimInProgress: Bool = false
 
     // MARK: - Init
 
@@ -312,17 +320,6 @@ class GamificationManager: ObservableObject {
             lastSpinResult = result
             totalSpinCount += 1
 
-            if result.isJackpot {
-                unlockBadgeIfNeeded(id: "jackpot")
-            }
-            if result.cashValue >= 1 {
-                unlockBadgeIfNeeded(id: "lucky_spin")
-            }
-            if totalSpinCount >= 50 {
-                unlockBadgeIfNeeded(id: "spin_master")
-            }
-            updateBadgeProgress(id: "spin_master", current: Double(min(totalSpinCount, 50)), target: 50)
-
             saveState()
             NotificationCenter.default.post(name: .spinCompleted, object: nil)
             return result
@@ -360,6 +357,12 @@ class GamificationManager: ObservableObject {
                 self.unclaimedReferralEuros = info.unclaimedRewardEuros
                 self.unclaimedReferralSpins = info.unclaimedRewardSpins
 
+                // Auto-claim and show overlay if a reward is waiting
+                if info.hasUnclaimedReward && !self.showReferralEarnedOverlay && !self.isAutoClaimInProgress {
+                    self.isAutoClaimInProgress = true
+                    self.autoClaimAndShowOverlay()
+                }
+
                 // Social Butterfly badge: 3+ completed referrals
                 if info.completedReferrals >= 3 {
                     self.unlockBadgeIfNeeded(id: "social_butterfly")
@@ -370,6 +373,46 @@ class GamificationManager: ObservableObject {
             } catch {
                 print("[GamificationManager] Referral info fetch failed: \(error)")
             }
+        }
+    }
+
+    private func autoClaimAndShowOverlay() {
+        Task {
+            do {
+                let response = try await ReferralAPIService.shared.claimReward()
+                guard response.success else {
+                    isAutoClaimInProgress = false
+                    return
+                }
+                pendingOverlayEuros = response.eurosCredited
+                pendingOverlaySpins = response.spinsCredited
+                hasUnclaimedReferralReward = false
+                unclaimedReferralEuros = 0
+                unclaimedReferralSpins = 0
+                wallet = WalletBalance(euros: response.newBalance)
+                animatedReferralOverlayValue = 0
+                showReferralOverlayConfetti = false
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                    showReferralEarnedOverlay = true
+                }
+                saveState()
+                NotificationCenter.default.post(name: .referralRewardAvailable, object: nil)
+            } catch {
+                print("[GamificationManager] Auto referral claim failed: \(error)")
+                isAutoClaimInProgress = false
+            }
+        }
+    }
+
+    func dismissReferralEarnedOverlay() {
+        withAnimation(.easeIn(duration: 0.25)) {
+            showReferralEarnedOverlay = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.showReferralOverlayConfetti = false
+            self.animatedReferralOverlayValue = 0
+            self.isAutoClaimInProgress = false
+            NotificationCenter.default.post(name: .rewardClaimed, object: nil)
         }
     }
 

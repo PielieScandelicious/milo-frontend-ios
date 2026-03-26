@@ -96,13 +96,6 @@ class HomeViewModel {
     var spinsAwarded: Int = 0
     var isGoldTier: Bool = true
 
-    // Referral reward reveal
-    var showReferralReveal: Bool = false
-    var referralEurosAwarded: Double = 0
-    var referralSpinsAwarded: Int = 0
-    var animatedReferralValue: Double = 0
-    var showReferralConfetti: Bool = false
-
     // Mini game
     var showMiniGame: Bool = false
 
@@ -178,37 +171,6 @@ class HomeViewModel {
         }
     }
 
-    // MARK: - Claim Referral Reward
-
-    func claimReferralReward() {
-        Task { @MainActor in
-            do {
-                let result = try await GamificationManager.shared.claimReferralReward()
-                referralEurosAwarded = result.eurosCredited
-                referralSpinsAwarded = result.spinsCredited
-                animatedReferralValue = 0
-                showReferralConfetti = false
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                    showReferralReveal = true
-                }
-            } catch {
-                print("[HomeViewModel] Referral claim failed: \(error)")
-            }
-        }
-    }
-
-    func dismissReferralReveal() {
-        withAnimation(.easeIn(duration: 0.25)) {
-            showReferralReveal = false
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.showReferralConfetti = false
-            self.animatedReferralValue = 0
-            // Reload recent receipts from backend (includes claimed referral entries)
-            self.loadRecentReceipts()
-        }
-    }
-
     func dismissReward() {
         let receiptId = claimingReceiptId
         withAnimation(.easeIn(duration: 0.25)) {
@@ -237,9 +199,9 @@ class HomeViewModel {
             let receiptId = notification.userInfo?["receiptId"] as? String
             Task { @MainActor in
                 await self.fetchCashbackForReceipt(receiptId: receiptId, updateUI: false)
-                // Auto-dismiss the processing card after 4s.
+                // Auto-dismiss the processing card after 2s.
                 // Brand cashback overlay (if earned) fires independently via BrandCashbackViewModel.
-                try? await Task.sleep(for: .seconds(4))
+                try? await Task.sleep(for: .seconds(2))
                 if let receiptId {
                     ReceiptProcessingManager.shared.dismiss(receiptId)
                 }

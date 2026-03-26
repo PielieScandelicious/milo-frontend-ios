@@ -178,7 +178,7 @@ struct CharityCardView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(gm.charityHistory.count > 0 ? totalDonationCount : "--")")
+                Text(totalDonationCount)
                     .font(.system(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
                 Text("total donations")
@@ -202,29 +202,26 @@ struct CharityCardView: View {
         let count = gm.charities.reduce(0.0) { $0 + $1.communityTotal } / 5.0
         return count >= 1000
             ? String(format: "%.1fk", count / 1000)
-            : "\(Int(count))+"
+            : "\(Int(count))"
     }
 
     // MARK: - Recent Donation Chip
 
     @ViewBuilder
     private func recentDonationChip(_ donation: CharityDonationItem) -> some View {
+        let statusColor = donationStatusColor(donation)
         HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: donationStatusIcon(donation))
                 .font(.system(size: 13))
-                .foregroundStyle(Color(red: 0.2, green: 0.78, blue: 0.45))
+                .foregroundStyle(statusColor)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Last donation: \(String(format: "€%.0f", donation.amount)) → \(donation.charityName)")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(1)
-                Text(donation.isPending ? "Pending transfer" : "Transferred ✓")
+                Text(donation.statusLabel)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(
-                        donation.isPending
-                            ? Color(red: 1.0, green: 0.75, blue: 0.0).opacity(0.8)
-                            : Color(red: 0.2, green: 0.78, blue: 0.45).opacity(0.8)
-                    )
+                    .foregroundStyle(statusColor.opacity(0.9))
             }
             Spacer()
         }
@@ -234,6 +231,26 @@ struct CharityCardView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.white.opacity(0.05))
         )
+    }
+
+    private func donationStatusIcon(_ donation: CharityDonationItem) -> String {
+        switch donation.status {
+        case "transferred":    return "checkmark.circle.fill"
+        case "pending":        return "clock.fill"
+        case "pending_review": return "exclamationmark.circle.fill"
+        case "rejected":       return "xmark.circle.fill"
+        default:               return "circle.fill"
+        }
+    }
+
+    private func donationStatusColor(_ donation: CharityDonationItem) -> Color {
+        switch donation.status {
+        case "transferred":    return Color(red: 0.2, green: 0.78, blue: 0.45)
+        case "pending":        return Color(red: 1.0, green: 0.75, blue: 0.0)
+        case "pending_review": return Color(red: 1.0, green: 0.58, blue: 0.2)
+        case "rejected":       return Color(red: 0.93, green: 0.27, blue: 0.27)
+        default:               return Color.white.opacity(0.4)
+        }
     }
 
     // MARK: - Charity Row

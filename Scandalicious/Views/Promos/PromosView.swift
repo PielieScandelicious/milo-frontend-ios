@@ -174,7 +174,8 @@ struct PromosView: View {
                         PromoStoreSection(
                             store: store,
                             index: index,
-                            onExpand: { viewModel.trackStoreSectionOpened(store) }
+                            onExpand: { viewModel.trackStoreSectionOpened(store) },
+                            onClaim: { item in viewModel.trackDealClaimed(item: item, store: store, reportId: data.reportId) }
                         )
                     }
                     .padding(.horizontal, 16)

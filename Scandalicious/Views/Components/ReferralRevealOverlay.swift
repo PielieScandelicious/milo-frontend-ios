@@ -2,198 +2,159 @@
 //  ReferralRevealOverlay.swift
 //  Scandalicious
 //
-//  Fullscreen overlay that reveals the referral bonus reward
-//  with counting animation, confetti celebration, and smooth transitions.
-//  Follows CashbackRevealOverlay's animation pattern exactly.
+//  App-wide referral bonus overlay. Matches CashbackEarnedOverlay style.
+//  Auto-triggers when a referral reward is earned via GamificationManager.
 //
 
 import SwiftUI
 
 struct ReferralRevealOverlay: View {
-    @Bindable var viewModel: HomeViewModel
+    let cashbackAmount: Double
+    let onDismiss: () -> Void
 
-    @State private var backgroundOpacity: Double = 0
-    @State private var cardScale: CGFloat = 0.7
+    @State private var glowScale: CGFloat = 0.3
+    @State private var glowOpacity: Double = 0
+    @State private var cardScale: CGFloat = 0.1
     @State private var cardOpacity: Double = 0
-    @State private var showContent = false
-    @State private var showAmount = false
-    @State private var showSpins = false
-    @State private var canDismiss = false
+    @State private var textOpacity: Double = 0
+    @State private var ringScale: CGFloat = 0.5
+    @State private var ringOpacity: Double = 0
+    @State private var ring2Scale: CGFloat = 0.3
+    @State private var ring2Opacity: Double = 0
+    @State private var ring3Scale: CGFloat = 0.2
+    @State private var showParticles = false
+    @State private var rotationAngle: Double = 0
+    @State private var shimmerOffset: CGFloat = -200
+    @State private var showCoinBadge = false
     @State private var dismissed = false
 
     private let accentBlue = Color(red: 0.35, green: 0.65, blue: 1.0)
-    private let blueGradient = [
-        Color(red: 0.4, green: 0.7, blue: 1.0),
-        Color(red: 0.2, green: 0.4, blue: 0.9)
-    ]
+    private let accentBlueDark = Color(red: 0.2, green: 0.45, blue: 0.9)
 
     var body: some View {
         ZStack {
-            // Backdrop
             Color.black.opacity(0.85)
                 .ignoresSafeArea()
-                .opacity(backgroundOpacity)
-                .onTapGesture {
-                    guard canDismiss else { return }
-                    dismissWithAnimation()
-                }
+                .onTapGesture { onDismiss() }
 
-            // Confetti
-            if viewModel.showReferralConfetti {
-                ConfettiView()
+            // Particle burst
+            if showParticles {
+                ReferralParticleBurst(color: accentBlue)
             }
 
-            // Card
-            VStack(spacing: 24) {
-                // Referral badge
-                VStack(spacing: 6) {
-                    ZStack {
-                        Circle()
-                            .fill(accentBlue.opacity(0.15))
-                            .frame(width: 52, height: 52)
+            VStack(spacing: 28) {
+                // Icon with rings
+                ZStack {
+                    // Outer rings
+                    Circle()
+                        .stroke(accentBlue.opacity(0.08), lineWidth: 1)
+                        .frame(width: 200, height: 200)
+                        .scaleEffect(ring3Scale)
+                        .opacity(ring2Opacity)
 
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(accentBlue)
-                    }
+                    Circle()
+                        .stroke(accentBlue.opacity(0.12), lineWidth: 1.5)
+                        .frame(width: 160, height: 160)
+                        .scaleEffect(ring2Scale)
+                        .opacity(ring2Opacity)
 
-                    Text("Referral Bonus!")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                .opacity(showContent ? 1 : 0)
-                .offset(y: showContent ? 0 : 8)
+                    Circle()
+                        .stroke(accentBlue.opacity(0.22), lineWidth: 2)
+                        .frame(width: 120, height: 120)
+                        .scaleEffect(ringScale)
+                        .opacity(ringOpacity)
 
-                // Divider
-                LinearGradient(
-                    colors: [.white.opacity(0), .white.opacity(0.2), .white.opacity(0)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(height: 0.5)
-                .opacity(showContent ? 1 : 0)
+                    // Radial glow
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [accentBlue.opacity(0.5), accentBlue.opacity(0.1), .clear],
+                                center: .center, startRadius: 0, endRadius: 90
+                            )
+                        )
+                        .frame(width: 180, height: 180)
+                        .scaleEffect(glowScale)
+                        .opacity(glowOpacity)
+                        .blur(radius: 25)
 
-                // Amount
-                VStack(spacing: 4) {
-                    Text("You earned")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .opacity(showAmount ? 1 : 0)
+                    // Rotating accent arc
+                    Circle()
+                        .trim(from: 0, to: 0.3)
+                        .stroke(
+                            LinearGradient(
+                                colors: [accentBlue, accentBlue.opacity(0)],
+                                startPoint: .leading, endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                        )
+                        .frame(width: 110, height: 110)
+                        .rotationEffect(.degrees(rotationAngle))
 
-                    Text(String(format: "+\u{20AC}%.2f", viewModel.animatedReferralValue))
-                        .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(accentBlue)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: viewModel.animatedReferralValue)
-                        .opacity(showAmount ? 1 : 0)
-                        .scaleEffect(showAmount ? 1 : 0.5)
-
-                    Text("referral bonus")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(accentBlue.opacity(0.6))
-                        .opacity(showAmount ? 1 : 0)
-                }
-
-                // Spins section
-                VStack(spacing: 14) {
-                    // Divider
-                    LinearGradient(
-                        colors: [accentBlue.opacity(0), accentBlue.opacity(0.3), accentBlue.opacity(0)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .frame(height: 0.5)
-
-                    VStack(spacing: 8) {
-                        ZStack {
+                    // Icon circle with shimmer
+                    Circle()
+                        .fill(accentBlue.opacity(0.12))
+                        .frame(width: 100, height: 100)
+                        .overlay(Circle().stroke(accentBlue.opacity(0.35), lineWidth: 2))
+                        .overlay(
                             Circle()
                                 .fill(
                                     LinearGradient(
-                                        colors: blueGradient.map { $0.opacity(0.15) },
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                                        colors: [.clear, .white.opacity(0.2), .clear],
+                                        startPoint: .topLeading, endPoint: .bottomTrailing
                                     )
                                 )
-                                .frame(width: 44, height: 44)
+                                .offset(x: shimmerOffset)
+                                .mask(Circle())
+                        )
 
-                            Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: blueGradient,
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        }
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(accentBlue)
+                        .shadow(color: accentBlue.opacity(0.7), radius: 16)
+                        .shadow(color: accentBlue.opacity(0.3), radius: 30)
 
-                        Text("+\(viewModel.referralSpinsAwarded) spins")
-                            .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-
-                        Text("Free Spins")
-                            .font(.system(size: 10, weight: .heavy))
-                            .tracking(0.5)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule().fill(
-                                    LinearGradient(
-                                        colors: blueGradient,
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                            )
+                    if showCoinBadge {
+                        Image(systemName: "eurosign.circle.fill")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(Color(red: 1.0, green: 0.80, blue: 0.20))
+                            .background(Circle().fill(Color.black).frame(width: 20, height: 20))
+                            .offset(x: 36, y: 36)
+                            .transition(.scale.combined(with: .opacity))
                     }
                 }
-                .opacity(showSpins ? 1 : 0)
-                .offset(y: showSpins ? 0 : 10)
+                .scaleEffect(cardScale)
+                .opacity(cardOpacity)
 
-                // Continue button
-                Button {
-                    dismissWithAnimation()
-                } label: {
-                    Text("Continue")
-                        .font(.system(size: 15, weight: .semibold))
+                // Text content
+                VStack(spacing: 10) {
+                    Text("REFERRAL BONUS")
+                        .font(.system(size: 12, weight: .heavy))
+                        .tracking(2)
+                        .foregroundStyle(accentBlue)
+
+                    Text(String(format: "€%.2f", cashbackAmount))
+                        .font(.system(size: 52, weight: .heavy, design: .rounded))
+                        .foregroundStyle(accentBlue)
+                        .contentTransition(.numericText())
+    
+
+                    Text("Your friend earned their first cashback deal")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(
-                                    LinearGradient(
-                                        colors: blueGradient,
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                        )
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+
+                    Text("Added to your Milo wallet")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.45))
                 }
-                .opacity(canDismiss ? 1 : 0)
-                .allowsHitTesting(canDismiss)
+                .opacity(textOpacity)
+
+                Text("Tap anywhere to continue")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.25))
+                    .opacity(textOpacity)
             }
-            .padding(28)
-            .frame(width: UIScreen.main.bounds.width - 56)
-            .background(
-                RoundedRectangle(cornerRadius: 22)
-                    .fill(Color(white: 0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [accentBlue.opacity(0.25), Color.white.opacity(0.05)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1
-                            )
-                    )
-                    .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
-            )
-            .scaleEffect(cardScale)
-            .opacity(cardOpacity)
         }
         .onAppear { playEntrance() }
     }
@@ -201,79 +162,153 @@ struct ReferralRevealOverlay: View {
     // MARK: - Animations
 
     private func playEntrance() {
-        // Backdrop fade in
-        withAnimation(.easeOut(duration: 0.3)) {
-            backgroundOpacity = 1
-        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
 
-        // Card scale in
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+        // Card slam-in
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.55, blendDuration: 0)) {
             cardScale = 1.0
             cardOpacity = 1.0
         }
 
-        // Show referral info
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                showContent = true
-            }
+        // Glow bloom
+        withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
+            glowScale = 1.2
+            glowOpacity = 1.0
         }
 
-        // Show amount and start counting
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                showAmount = true
+        // Expanding rings
+        withAnimation(.easeOut(duration: 0.7).delay(0.15)) {
+            ringScale = 1.0
+            ringOpacity = 1.0
+        }
+        withAnimation(.easeOut(duration: 0.8).delay(0.25)) {
+            ring2Scale = 1.0
+            ring2Opacity = 1.0
+        }
+        withAnimation(.easeOut(duration: 0.9).delay(0.35)) {
+            ring3Scale = 1.0
+        }
+
+        // Shimmer sweep
+        withAnimation(.easeInOut(duration: 0.8).delay(0.4)) {
+            shimmerOffset = 200
+        }
+
+        // Particles
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            showParticles = true
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        }
+
+        // Rotating arc
+        withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
+            rotationAngle = 360
+        }
+
+        // Pulsing glow
+        withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true).delay(0.8)) {
+            glowOpacity = 0.5
+        }
+
+        // Text fade in
+        withAnimation(.easeOut(duration: 0.5).delay(0.5)) {
+            textOpacity = 1.0
+        }
+
+        // Coin badge pop
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+                showCoinBadge = true
             }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            startCountingAnimation()
         }
 
-        // Show spins
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.1) {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                showSpins = true
-            }
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        }
-
-        // Confetti + enable dismiss
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            viewModel.showReferralConfetti = true
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(.easeOut(duration: 0.3)) {
-                canDismiss = true
-            }
+        // Auto-dismiss after 5s
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            guard !dismissed else { return }
+            dismissed = true
+            onDismiss()
         }
     }
+}
 
-    private func startCountingAnimation() {
-        let target = viewModel.referralEurosAwarded
-        let steps = 30
-        let interval = 1.2 / Double(steps)
+// MARK: - Referral Particle Burst
 
-        for i in 0...steps {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * interval) {
-                let progress = Double(i) / Double(steps)
-                let eased = 1 - pow(1 - progress, 3)
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    viewModel.animatedReferralValue = target * eased
-                }
+private struct ReferralParticleBurst: View {
+    let color: Color
+    @State private var particles: [ReferralParticle] = []
+
+    private let gold = Color(red: 1.0, green: 0.80, blue: 0.20)
+
+    var body: some View {
+        ZStack {
+            ForEach(particles) { p in
+                ReferralParticlePiece(particle: p)
             }
         }
+        .allowsHitTesting(false)
+        .onAppear { generateParticles() }
     }
 
-    private func dismissWithAnimation() {
-        guard !dismissed else { return }
-        dismissed = true
-
-        withAnimation(.easeIn(duration: 0.25)) {
-            cardOpacity = 0
-            cardScale = 0.9
-            backgroundOpacity = 0
+    private func generateParticles() {
+        particles = (0..<40).map { _ in
+            ReferralParticle(
+                angle: Double.random(in: 0...(2 * .pi)),
+                distance: CGFloat.random(in: 60...180),
+                size: CGFloat.random(in: 3...8),
+                color: [color, color.opacity(0.7), gold.opacity(0.8), .white.opacity(0.6)].randomElement()!,
+                delay: Double.random(in: 0...0.15),
+                duration: Double.random(in: 0.5...1.0),
+                isCircle: Bool.random()
+            )
         }
+    }
+}
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            viewModel.dismissReferralReveal()
+private struct ReferralParticle: Identifiable {
+    let id = UUID()
+    let angle: Double
+    let distance: CGFloat
+    let size: CGFloat
+    let color: Color
+    let delay: Double
+    let duration: Double
+    let isCircle: Bool
+}
+
+private struct ReferralParticlePiece: View {
+    let particle: ReferralParticle
+    @State private var offset: CGFloat = 0
+    @State private var opacity: Double = 1
+    @State private var scale: CGFloat = 1
+
+    private var targetX: CGFloat { cos(particle.angle) * particle.distance }
+    private var targetY: CGFloat { sin(particle.angle) * particle.distance }
+
+    var body: some View {
+        Group {
+            if particle.isCircle {
+                Circle()
+                    .fill(particle.color)
+                    .frame(width: particle.size, height: particle.size)
+            } else {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(particle.color)
+                    .frame(width: particle.size, height: particle.size * 0.5)
+                    .rotationEffect(.degrees(particle.angle * 180 / .pi))
+            }
+        }
+        .offset(x: targetX * offset, y: targetY * offset)
+        .scaleEffect(scale)
+        .opacity(opacity)
+        .onAppear {
+            withAnimation(.easeOut(duration: particle.duration).delay(particle.delay)) {
+                offset = 1
+            }
+            withAnimation(.easeIn(duration: particle.duration * 0.4).delay(particle.delay + particle.duration * 0.6)) {
+                opacity = 0
+                scale = 0.3
+            }
         }
     }
 }

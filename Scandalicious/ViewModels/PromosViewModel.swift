@@ -81,6 +81,18 @@ class PromosViewModel: ObservableObject {
         }
     }
 
+    func trackDealClaimed(item: PromoStoreItem, store: PromoStore, reportId: String?) {
+        guard let reportID = reportId else { return }
+        Task {
+            await apiService.logEvent(
+                reportId: reportID,
+                eventType: .dealClaimed,
+                itemKey: item.itemKey,
+                storeName: store.storeName
+            )
+        }
+    }
+
     // MARK: - Convenience for banner
 
     var weeklySavings: Double { state.value?.weeklySavings ?? 0 }

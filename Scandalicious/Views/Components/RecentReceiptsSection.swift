@@ -208,12 +208,10 @@ private struct RecentReceiptRow: View {
                                 .foregroundStyle(cashbackGradient)
                         }
 
-                        if receipt.spinsAwarded > 0 {
+                        if receipt.spinsAwarded > 0 && !receipt.isReferralReward {
                             Text("+\(receipt.spinsAwarded) \(receipt.spinsAwarded == 1 ? "spin" : "spins")")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(receipt.isReferralReward
-                                    ? LinearGradient(colors: [referralBlue, referralBlue.opacity(0.7)], startPoint: .leading, endPoint: .trailing)
-                                    : goldGradient)
+                                .foregroundStyle(goldGradient)
                         }
                     }
                 }

@@ -15,6 +15,7 @@ extension Notification.Name {
     static let rewardClaimed = Notification.Name("gamification.rewardClaimed")
     static let spinCompleted = Notification.Name("gamification.spinCompleted")
     static let badgeUnlocked = Notification.Name("gamification.badgeUnlocked")
+    static let referralRewardAvailable = Notification.Name("gamification.referralRewardAvailable")
 }
 
 // MARK: - Codable Color Wrapper
@@ -157,7 +158,6 @@ struct Badge: Identifiable, Codable, Equatable {
         // Row 2 – First few weeks
         Badge(id: "streak_2",          name: "Getting Started",  description: "Reach a 2-week streak",                  icon: "flag.fill",            iconColor: CodableColor(.orange),                                  isUnlocked: false, unlockedAt: nil),
         Badge(id: "weekend_warrior",   name: "Weekend Warrior",  description: "Scan on both Saturday and Sunday",       icon: "sun.max.fill",         iconColor: CodableColor(Color(red: 1.0, green: 0.6, blue: 0.2)),  isUnlocked: false, unlockedAt: nil),
-        Badge(id: "lucky_spin",        name: "Lucky Spin",       description: "Win €1 or more on the wheel",            icon: "sparkles",             iconColor: CodableColor(.yellow),                                  isUnlocked: false, unlockedAt: nil),
         // Row 3 – ~1 month
         Badge(id: "collector",         name: "Collector",        description: "Scan receipts from 5 different stores",  icon: "storefront.fill",      iconColor: CodableColor(.cyan),                                    isUnlocked: false, unlockedAt: nil),
         Badge(id: "streak_4",          name: "Consistent",       description: "Reach a 4-week streak",                  icon: "flame.fill",           iconColor: CodableColor(Color(red: 1.0, green: 0.5, blue: 0.0)),  isUnlocked: false, unlockedAt: nil),
@@ -171,9 +171,7 @@ struct Badge: Identifiable, Codable, Equatable {
         Badge(id: "streak_12",         name: "Marathon Streak",  description: "Reach a 12-week streak",                 icon: "figure.run",           iconColor: CodableColor(Color(red: 1.0, green: 0.35, blue: 0.2)), isUnlocked: false, unlockedAt: nil),
         Badge(id: "category_explorer", name: "Category Explorer", description: "Buy from 8 different categories",      icon: "square.grid.3x3.fill", iconColor: CodableColor(Color(red: 0.5, green: 0.6, blue: 1.0)),  isUnlocked: false, unlockedAt: nil),
         // Row 6 – Long-term
-        Badge(id: "spin_master",       name: "Spin Master",      description: "Complete 50 spins",                      icon: "arrow.trianglehead.2.clockwise.rotate.90", iconColor: CodableColor(Color(red: 0.6, green: 0.2, blue: 1.0)), isUnlocked: false, unlockedAt: nil),
         Badge(id: "century_club",      name: "Century Club",     description: "Scan 100 receipts",                      icon: "trophy.fill",          iconColor: CodableColor(Color(red: 1.0, green: 0.84, blue: 0.0)), isUnlocked: false, unlockedAt: nil),
-        Badge(id: "jackpot",           name: "Jackpot!",         description: "Hit the jackpot on the wheel",           icon: "crown.fill",           iconColor: CodableColor(.yellow),                                  isUnlocked: false, unlockedAt: nil),
     ]
 
     /// Number of badges shown in the Achievements grid card.

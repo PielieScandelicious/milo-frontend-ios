@@ -79,8 +79,29 @@ struct CharityDonationItem: Codable, Identifiable {
         case transferredAt = "transferred_at"
     }
 
-    var isPending: Bool { status == "pending" }
+    var isPending: Bool { status == "pending" || status == "pending_review" }
     var isTransferred: Bool { status == "transferred" }
+    var isRejected: Bool { status == "rejected" }
+
+    var statusLabel: String {
+        switch status {
+        case "transferred":    return "Transferred ✓"
+        case "pending":        return "Pending transfer"
+        case "pending_review": return "Under review"
+        case "rejected":       return "Rejected"
+        default:               return status
+        }
+    }
+
+    var statusColorName: String {
+        switch status {
+        case "transferred":    return "green"
+        case "pending":        return "yellow"
+        case "pending_review": return "orange"
+        case "rejected":       return "red"
+        default:               return "gray"
+        }
+    }
 }
 
 struct CharityHistoryResponse: Codable {

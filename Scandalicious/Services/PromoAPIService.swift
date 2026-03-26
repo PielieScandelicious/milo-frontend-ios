@@ -11,6 +11,7 @@ import FirebaseAuth
 enum PromoEventType: String, Encodable {
     case reportViewed = "report_viewed"
     case dealOpened = "deal_opened"
+    case dealClaimed = "deal_claimed"
     case folderOpened = "folder_opened"
     case storeSectionOpened = "store_section_opened"
     case feedbackPositive = "feedback_positive"

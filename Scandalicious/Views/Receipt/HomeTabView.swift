@@ -30,12 +30,6 @@ struct HomeTabView: View {
                 // Main scrollable content
                 mainContent
 
-                // Referral reveal overlay
-                if viewModel.showReferralReveal {
-                    ReferralRevealOverlay(viewModel: viewModel)
-                        .transition(.opacity)
-                        .zIndex(101)
-                }
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -114,18 +108,6 @@ struct HomeTabView: View {
                                 .fill(Color.white.opacity(0.06))
                         )
                     }
-                }
-
-                // Referral bonus claim card
-                if gamificationManager.hasUnclaimedReferralReward {
-                    ReferralBonusClaimCard {
-                        viewModel.claimReferralReward()
-                    }
-                    .padding(.horizontal, 20)
-                    .transition(.asymmetric(
-                        insertion: .push(from: .top).combined(with: .opacity),
-                        removal: .scale.combined(with: .opacity)
-                    ))
                 }
 
                 // Multi-receipt processing cards
