@@ -182,12 +182,12 @@ struct HomeTabView: View {
             Button {
                 showProfile = true
             } label: {
-                Label("Settings", systemImage: "gearshape")
+                Label("Profile", systemImage: "gearshape")
             }
             Button {
                 showWalletPassCreator = true
             } label: {
-                Label("Wallet Pass", systemImage: "wallet.pass")
+                Label("Wallet Pass Creator", systemImage: "wallet.pass")
             }
         } label: {
             Circle()

@@ -285,35 +285,6 @@ struct ProfileView: View {
                 Text(L("insights"))
             }
 
-            // My Progress (Gamification)
-            Section {
-                HStack {
-                    Label("Streak", systemImage: "flame.fill")
-                    Spacer()
-                    Text("\(GamificationManager.shared.streak.weekCount) weeks")
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Label("Wallet", systemImage: "wallet.pass.fill")
-                    Spacer()
-                    Text(GamificationManager.shared.wallet.formatted)
-                        .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0))
-                        .fontWeight(.semibold)
-                }
-
-                HStack {
-                    Label("Badges", systemImage: "star.fill")
-                    Spacer()
-                    let unlocked = GamificationManager.shared.badges.filter(\.isUnlocked).count
-                    let total = GamificationManager.shared.badges.count
-                    Text("\(unlocked)/\(total)")
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("My Progress")
-            }
-
             // Sign Out
             Section {
                 Button(role: .destructive) {

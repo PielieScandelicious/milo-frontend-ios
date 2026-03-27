@@ -206,7 +206,7 @@ struct MonthlyLotteryCard: View {
     private var step2Card: some View {
         let met = lotteryStatus?.hasReceipt ?? false
         let sub = met ? "Done" : "Scan any grocery receipt"
-        return StepCardView(number: 2, met: met, title: "Scan a receipt this month", subtitle: sub, gold: gold, emerald: emerald) {
+        return StepCardView(number: 2, met: met, title: "Upload a receipt this month", subtitle: sub, gold: gold, emerald: emerald) {
             EmptyView()
         }
     }
