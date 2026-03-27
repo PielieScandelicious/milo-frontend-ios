@@ -598,6 +598,49 @@ struct OverviewView: View {
             updateAvailablePeriodsCache()
             lastRefreshTime = Date()
         }
+
+        // 6. Pre-fetch category line items so expanding a category is instant after sync
+        await prefetchCategoryItemsAfterSync(for: period)
+    }
+
+    /// Pre-fetches the first page of transactions for all categories in a period.
+    /// Called after a receipt sync so expanding a category shows data immediately without skeleton.
+    private func prefetchCategoryItemsAfterSync(for period: String) async {
+        guard let summaryResponse = pieChartSummaryCache[period] else { return }
+        let categories = summaryResponse.categories
+        guard !categories.isEmpty else { return }
+
+        guard let parsedDate = PeriodFormatters.periodUTCFormatter.date(from: period) else { return }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: parsedDate))!
+        let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+
+        await withTaskGroup(of: (String, [APITransaction], Bool).self) { group in
+            for category in categories {
+                group.addTask {
+                    var filters = TransactionFilters()
+                    filters.category = category.name
+                    filters.page = 1
+                    filters.pageSize = 5
+                    filters.startDate = startOfMonth
+                    filters.endDate = endOfMonth
+
+                    if let response = try? await AnalyticsAPIService.shared.getTransactions(filters: filters) {
+                        return (category.categoryId, response.transactions, response.page < response.totalPages)
+                    }
+                    return (category.categoryId, [], false)
+                }
+            }
+
+            for await (categoryId, transactions, hasMore) in group {
+                await MainActor.run {
+                    categoryItems[categoryId] = transactions
+                    categoryCurrentPage[categoryId] = 1
+                    categoryHasMore[categoryId] = hasMore
+                }
+            }
+        }
     }
 
     private func handleReceiptUploadSuccess(notification: NotificationCenter.Publisher.Output) {
@@ -1415,12 +1458,12 @@ struct OverviewView: View {
                     categoryHasMore[previousId] = nil
 
                     collapseDownCategoryId = nil
-                    expandCategory(category, period: period)
+                    expandCategory(category, period: period, resetScroll: true)
                 }
             } else {
                 // Expanded is below tapped — switch directly so collapse + expand
                 // happen simultaneously. Tapped button stays in place naturally.
-                expandCategory(category, period: period)
+                expandCategory(category, period: period, resetScroll: true)
                 categoryItems[previousId] = nil
                 categoryCurrentPage[previousId] = nil
                 categoryHasMore[previousId] = nil
@@ -1432,9 +1475,12 @@ struct OverviewView: View {
     }
 
     /// Shared logic for expanding a category row
-    private func expandCategory(_ category: CategorySpendItem, period: String) {
-        // Force scroll reset by changing the token (recreates the ScrollView)
-        categoryScrollResetToken += 1
+    private func expandCategory(_ category: CategorySpendItem, period: String, resetScroll: Bool = false) {
+        // Only reset scroll when switching between categories, not on a fresh expansion.
+        // Recreating the ScrollView on every tap causes layout lag even with pre-loaded data.
+        if resetScroll {
+            categoryScrollResetToken += 1
+        }
 
         // Set loading state BEFORE withAnimation so expandedCategoryItemsSection
         // renders skeleton content immediately (gives ClipReveal something to measure)
@@ -1558,13 +1604,31 @@ struct OverviewView: View {
         if hasContent {
             VStack(spacing: 0) {
                 if loadingCategoryId == category.id {
-                    // Skeleton loading state
-                    VStack(spacing: 8) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            SkeletonTransactionRow()
+                    // Skeleton loading state — mirrors expandedCategoryItemRow layout
+                    VStack(spacing: 0) {
+                        ForEach(0..<4, id: \.self) { i in
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    SkeletonRect(width: CGFloat([110, 130, 95, 120][i % 4]), height: 13)
+                                    SkeletonRect(width: CGFloat([70, 85, 60, 75][i % 4]), height: 11)
+                                }
+                                .layoutPriority(1)
+                                Spacer()
+                                SkeletonRect(width: 38, height: 13, cornerRadius: 4)
+                            }
+                            .padding(.vertical, 9)
+                            .padding(.horizontal, 4)
+                            .shimmer()
+                            if i < 3 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.05))
+                                    .frame(height: 0.5)
+                                    .padding(.leading, 32)
+                            }
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
                     .padding(.horizontal, 8)
                 } else if let errorMsg = categoryLoadError[category.id] {
                     // Error state
@@ -1867,9 +1931,8 @@ struct OverviewView: View {
                     .frame(maxHeight: 5 * 42)
                 }
             }
-            .padding(.bottom, isReceiptsSectionExpanded ? 8 : 0)
-            .frame(maxHeight: isReceiptsSectionExpanded ? .infinity : 0)
-            .clipped()
+            .padding(.bottom, 8)
+            .clipReveal(isVisible: isReceiptsSectionExpanded)
         }
         .background(premiumCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -2411,9 +2474,10 @@ private struct ClipReveal: ViewModifier {
                         .onChange(of: geo.size.height) { _, h in
                             contentHeight = h
                             if isVisible {
-                                withAnimation(.spring(response: 0.25, dampingFraction: 1.0)) {
-                                    displayedHeight = h
-                                }
+                                // Snap to new height without animation — avoids a double-bounce
+                                // when skeleton transitions to loaded content (different heights).
+                                // The expand/collapse animation is driven by onChange(of: isVisible).
+                                displayedHeight = h
                             }
                         }
                 }
