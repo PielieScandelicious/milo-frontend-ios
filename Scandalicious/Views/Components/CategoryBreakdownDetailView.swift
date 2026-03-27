@@ -19,10 +19,11 @@ struct CategoryBreakdownDetailView: View {
     @State private var data: PieChartSummaryResponse?
     @State private var isLoading = true
     @State private var error: String?
-    @State private var selectedCategory: CategorySpendItem?
+    @State private var selectedGroup: PieChartGroup?
     @State private var animateChart = false
 
-    // Expandable category state
+    // Expandable group/category state
+    @State private var expandedGroupId: String?
     @State private var expandedCategoryId: String?
     @State private var categoryItems: [String: [APITransaction]] = [:]
     @State private var loadingCategoryId: String?
@@ -164,30 +165,30 @@ struct CategoryBreakdownDetailView: View {
     private func pieChartSection(_ data: PieChartSummaryResponse) -> some View {
         VStack(spacing: 16) {
             ZStack {
-                // Pie Chart using Swift Charts
-                Chart(data.categories) { category in
+                // Pie Chart using Swift Charts — grouped by group
+                Chart(data.groups) { group in
                     SectorMark(
-                        angle: .value("Amount", animateChart ? category.totalSpent : 0),
+                        angle: .value("Amount", animateChart ? group.totalSpent : 0),
                         innerRadius: .ratio(0.5),
                         angularInset: 2
                     )
-                    .foregroundStyle(category.color)
+                    .foregroundStyle(group.color)
                     .cornerRadius(6)
-                    .opacity(selectedCategory == nil || selectedCategory?.id == category.id ? 1.0 : 0.4)
+                    .opacity(selectedGroup == nil || selectedGroup?.id == group.id ? 1.0 : 0.4)
                 }
                 .chartLegend(.hidden)
                 .frame(height: 280)
 
                 // Center content
-                if let selected = selectedCategory {
-                    selectedCenterContent(selected)
+                if let selected = selectedGroup {
+                    selectedGroupCenterContent(selected)
                 } else {
                     defaultCenterContent(data)
                 }
             }
             .onTapGesture {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    selectedCategory = nil
+                    selectedGroup = nil
                 }
             }
         }
@@ -207,7 +208,7 @@ struct CategoryBreakdownDetailView: View {
 
     private func defaultCenterContent(_ data: PieChartSummaryResponse) -> some View {
         VStack(spacing: 4) {
-            Text("\(data.categories.count)")
+            Text("\(data.groups.count)")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
 
@@ -217,22 +218,22 @@ struct CategoryBreakdownDetailView: View {
         }
     }
 
-    private func selectedCenterContent(_ category: CategorySpendItem) -> some View {
+    private func selectedGroupCenterContent(_ group: PieChartGroup) -> some View {
         VStack(spacing: 4) {
-            Image.categorySymbol(category.icon)
-                .frame(width: 24, height: 24)
-                .foregroundStyle(category.color)
+            Image(systemName: group.groupIcon)
+                .font(.system(size: 24))
+                .foregroundStyle(group.color)
 
-            Text(category.name.localizedCategoryName)
+            Text(group.groupName)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
 
-            Text(String(format: "€%.2f", category.totalSpent))
+            Text(String(format: "€%.2f", group.totalSpent))
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(category.color)
+                .foregroundStyle(group.color)
 
-            Text(category.percentageText)
+            Text(group.percentageText)
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.5))
         }
@@ -242,7 +243,7 @@ struct CategoryBreakdownDetailView: View {
     // MARK: - Category List Section
 
     private func categoryListSection(_ data: PieChartSummaryResponse) -> some View {
-        let sortedCategories = data.categories.sorted { $0.totalSpent > $1.totalSpent }
+        let sortedGroups = data.groups.sorted { $0.totalSpent > $1.totalSpent }
 
         return LazyVStack(alignment: .leading, spacing: 12) {
             Text(L("by_category"))
@@ -250,56 +251,56 @@ struct CategoryBreakdownDetailView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 4)
 
-            ForEach(sortedCategories) { category in
-                expandableCategoryCard(category)
+            ForEach(sortedGroups) { group in
+                expandableGroupCard(group)
             }
         }
     }
 
-    // MARK: - Expandable Category Card
+    // MARK: - Expandable Group Card
 
-    private func expandableCategoryCard(_ category: CategorySpendItem) -> some View {
-        let isExpanded = expandedCategoryId == category.id
+    private func expandableGroupCard(_ group: PieChartGroup) -> some View {
+        let isExpanded = expandedGroupId == group.id
 
         return VStack(spacing: 0) {
-            // Category header button
+            // Group header button
             Button {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    toggleCategoryExpansion(category)
+                    if expandedGroupId == group.id {
+                        expandedGroupId = nil
+                        selectedGroup = nil
+                    } else {
+                        expandedGroupId = group.id
+                        selectedGroup = group
+                    }
                 }
             } label: {
-                categoryRowContent(category)
+                groupRowContent(group)
             }
             .buttonStyle(PlainButtonStyle())
 
-            // Expanded items - matching StoreDetailView structure
+            // Expanded categories within this group
             if isExpanded {
-                // Divider
                 Rectangle()
                     .fill(Color.white.opacity(0.08))
                     .frame(height: 1)
                     .padding(.horizontal, 14)
 
-                // Scrollable item list with max height
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        expandedItemsContent(category)
+                VStack(spacing: 8) {
+                    let sortedCategories = group.categories.sorted { $0.totalSpent > $1.totalSpent }
+                    ForEach(sortedCategories) { category in
+                        expandableCategoryCard(category, groupColor: group.color)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 12)
-                    .padding(.bottom, 10)
                 }
-                .frame(maxHeight: 280)
-                .scrollIndicators(.visible)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
             }
         }
         .background(
             ZStack {
-                // Base glass effect
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color.white.opacity(0.04))
 
-                // Subtle gradient
                 RoundedRectangle(cornerRadius: 16)
                     .fill(
                         LinearGradient(
@@ -309,13 +310,12 @@ struct CategoryBreakdownDetailView: View {
                         )
                     )
 
-                // Colored accent glow on the left
                 HStack {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    category.color.opacity(0.15),
+                                    group.color.opacity(0.15),
                                     Color.clear
                                 ],
                                 startPoint: .leading,
@@ -343,43 +343,38 @@ struct CategoryBreakdownDetailView: View {
         )
     }
 
-    // MARK: - Category Row Content
+    // MARK: - Group Row Content
 
-    private func categoryRowContent(_ category: CategorySpendItem) -> some View {
-        let isExpanded = expandedCategoryId == category.id
+    private func groupRowContent(_ group: PieChartGroup) -> some View {
+        let isExpanded = expandedGroupId == group.id
 
         return HStack(spacing: 12) {
-            // Color accent bar on the left (matching StoreDetailView)
             RoundedRectangle(cornerRadius: 2)
-                .fill(category.color)
+                .fill(group.color)
                 .frame(width: 4, height: 32)
 
-            // Category icon
-            Image.categorySymbol(category.icon)
-                .foregroundStyle(category.color)
+            Image(systemName: group.groupIcon)
+                .foregroundStyle(group.color)
                 .frame(width: 16, height: 16)
 
-            // Category name + percentage
             VStack(alignment: .leading, spacing: 2) {
-                Text(category.name.localizedCategoryName)
+                Text(group.groupName)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
 
-                Text(category.percentageText)
+                Text(group.percentageText)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(category.color)
+                    .foregroundColor(group.color)
             }
 
             Spacer(minLength: 4)
 
-            // Amount
-            Text(String(format: "€%.2f", category.totalSpent))
+            Text(String(format: "€%.2f", group.totalSpent))
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
                 .frame(width: 70, alignment: .trailing)
 
-            // Chevron
             Image(systemName: "chevron.down")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white.opacity(0.25))
@@ -390,14 +385,86 @@ struct CategoryBreakdownDetailView: View {
         .contentShape(Rectangle())
     }
 
+    // MARK: - Expandable Category Card (within group)
+
+    private func expandableCategoryCard(_ category: CategorySpendItem, groupColor: Color) -> some View {
+        let isExpanded = expandedCategoryId == category.id
+
+        return VStack(spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    toggleCategoryExpansion(category)
+                }
+            } label: {
+                categoryRowContent(category)
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            if isExpanded {
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 1)
+                    .padding(.horizontal, 10)
+
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        expandedItemsContent(category)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
+                }
+                .frame(maxHeight: 280)
+                .scrollIndicators(.visible)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(isExpanded ? 0.1 : 0.05), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Category Row Content
+
+    private func categoryRowContent(_ category: CategorySpendItem) -> some View {
+        let isExpanded = expandedCategoryId == category.id
+
+        return HStack(spacing: 10) {
+            Image.categorySymbol(category.icon)
+                .foregroundStyle(category.color)
+                .frame(width: 14, height: 14)
+
+            Text(category.name.localizedCategoryName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.9))
+                .lineLimit(1)
+
+            Spacer(minLength: 4)
+
+            Text(String(format: "€%.2f", category.totalSpent))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.8))
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.white.opacity(0.2))
+                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+    }
+
     // MARK: - Toggle Category Expansion
 
     private func toggleCategoryExpansion(_ category: CategorySpendItem) {
         if expandedCategoryId == category.id {
-            // Collapse — clear items so re-expanding fetches fresh data
             let id = category.id
             expandedCategoryId = nil
-            selectedCategory = nil
             categoryItems[id] = nil
             categoryCurrentPage[id] = nil
             categoryHasMorePages[id] = nil
@@ -405,13 +472,9 @@ struct CategoryBreakdownDetailView: View {
             categoryTotalCount[id] = nil
             categoryLoadError[id] = nil
         } else {
-            // Expand and load items
             expandedCategoryId = category.id
-            selectedCategory = category
 
-            // Load items if not already loaded
             if categoryItems[category.id] == nil && loadingCategoryId != category.id {
-                // Set loading state immediately (synchronously) before async Task
                 loadingCategoryId = category.id
                 Task {
                     await loadCategoryItems(category)

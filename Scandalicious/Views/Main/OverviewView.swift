@@ -786,7 +786,10 @@ struct OverviewView: View {
                 totalSpent: category.totalSpent,
                 colorHex: normalizedName.categoryColorHex,
                 percentage: category.percentage,
-                transactionCount: category.transactionCount
+                transactionCount: category.transactionCount,
+                group: category.group,
+                groupColorHex: category.groupColorHex,
+                groupIcon: category.groupIcon
             )
         }
     }
@@ -796,15 +799,11 @@ struct OverviewView: View {
         pieChartSummaryCache[period]?.computedAverageItemPrice
     }
 
-    /// Convert CategorySpendItem array to ChartData for the donut chart
+    /// Convert group data to ChartData for the donut chart
     private func categoryChartData(for period: String) -> [ChartData] {
-        categoryDataForPeriod(period).map { category in
-            ChartData(
-                value: category.totalSpent,
-                color: category.color,
-                iconName: category.icon,
-                label: category.name.localizedCategoryName
-            )
+        let groups = pieChartSummaryCache[period]?.groups ?? []
+        return groups.map { group in
+            group.toChartData
         }
     }
 

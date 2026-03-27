@@ -426,7 +426,10 @@ extension CategorySpendItem: Hashable {
                 totalSpent: 125.50,
                 colorHex: "#FF6B6B",
                 percentage: 25.0,
-                transactionCount: 12
+                transactionCount: 12,
+                group: "Fresh Food",
+                groupColorHex: "#2ECC71",
+                groupIcon: "leaf.fill"
             ),
             period: "January 2026"
         )
