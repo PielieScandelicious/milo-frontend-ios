@@ -639,10 +639,14 @@ struct CategoryBreakdownDetailView: View {
                         }
 
                         // Store name for context
-                        Text(item.storeName.capitalized)
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.3))
-                            .lineLimit(1)
+                        HStack(spacing: 4) {
+                            StoreLogoView(storeName: item.storeName, height: 12)
+
+                            Text(item.storeName.capitalized)
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.3))
+                                .lineLimit(1)
+                        }
                     }
 
                     Spacer()

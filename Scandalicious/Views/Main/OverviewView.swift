@@ -1727,6 +1727,8 @@ struct OverviewView: View {
                 }
 
                 HStack(spacing: 6) {
+                    StoreLogoView(storeName: item.storeName, height: 12)
+
                     Text(item.storeName.capitalized)
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.4))
@@ -2614,6 +2616,8 @@ private struct StoreRowButton: View {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(segment.color)
                     .frame(width: 3, height: 28)
+
+                StoreLogoView(storeName: segment.storeName, height: 20)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(segment.storeName.localizedCapitalized)

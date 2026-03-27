@@ -311,6 +311,8 @@ struct PromoStoreSection: View {
         VStack(alignment: .leading, spacing: 0) {
             // Store header
             HStack(spacing: 10) {
+                StoreLogoView(storeName: store.storeName, height: 22)
+
                 Text(store.storeName)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
@@ -507,6 +509,8 @@ struct PromoSummaryFooter: View {
                     HStack(spacing: 12) {
                         ForEach(summary.storesBreakdown) { breakdown in
                             HStack(spacing: 4) {
+                                StoreLogoView(storeName: breakdown.store, height: 14)
+
                                 Text(breakdown.store)
                                     .font(.system(size: 11))
                                     .foregroundColor(.white.opacity(0.5))

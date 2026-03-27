@@ -140,6 +140,8 @@ struct StoreDetailView: View {
 
     private var storeHeaderSection: some View {
         VStack(spacing: 8) {
+            StoreLogoView(storeName: storeBreakdown.storeName, height: 28)
+
             Text(storeBreakdown.storeName.localizedCapitalized)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.white)

@@ -144,15 +144,20 @@ private struct RecentReceiptRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(iconColor.opacity(0.15))
-                    .frame(width: 36, height: 36)
+            // Icon / Store logo
+            if GroceryStore(rawValue: receipt.storeName) != nil {
+                StoreLogoView(storeName: receipt.storeName, height: 26)
+                    .frame(width: 36)
+            } else {
+                ZStack {
+                    Circle()
+                        .fill(iconColor.opacity(0.15))
+                        .frame(width: 36, height: 36)
 
-                Image(systemName: iconName)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(iconColor)
+                    Image(systemName: iconName)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(iconColor)
+                }
             }
 
             // Name + date

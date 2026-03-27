@@ -471,26 +471,27 @@ struct IconDonutChartView: View {
                 .frame(width: size * 0.58, height: size * 0.58)
 
             VStack(spacing: 4) {
-                // Store/category name
-                Text(segment.data.label.localizedCapitalized)
-                    .font(.system(size: size * 0.07, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                // Store logo or name
+                StoreLogoView(
+                    storeName: segment.data.label,
+                    height: size * 0.22,
+                    fallbackColor: segment.data.color
+                )
+                .fixedSize()
 
                 // Amount
                 Text(String(format: "€%.0f", segment.data.value))
-                    .font(.system(size: size * 0.11, weight: .heavy, design: .rounded))
+                    .font(.system(size: size * 0.09, weight: .heavy, design: .rounded))
                     .foregroundColor(segment.data.color)
 
                 // Percentage
                 Text("\(percentage(for: segment))% of total")
-                    .font(.system(size: size * 0.045, weight: .medium))
+                    .font(.system(size: size * 0.04, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
 
             }
         }
-        .frame(maxWidth: size * 0.55)
+        .frame(maxWidth: size * 0.65)
         .transition(.opacity.combined(with: .scale(scale: 0.9)))
         .onTapGesture {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {

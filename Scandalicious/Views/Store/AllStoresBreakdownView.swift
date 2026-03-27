@@ -127,9 +127,7 @@ struct AllStoresBreakdownView: View {
 
     private func storeRow(segment: StoreChartSegment) -> some View {
         HStack {
-            Circle()
-                .fill(segment.color)
-                .frame(width: 12, height: 12)
+            StoreLogoView(storeName: segment.storeName, height: 18, fallbackColor: segment.color)
 
             Text(segment.storeName.localizedCapitalized)
                 .font(.system(size: 15, weight: .medium))

@@ -225,13 +225,18 @@ struct CategoryDetailView: View {
         VStack(spacing: 0) {
             // Store header
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "storefront.fill")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                if GroceryStore(rawValue: storeData.storeName) != nil {
+                    StoreLogoView(storeName: storeData.storeName, height: 26)
+                        .frame(width: 36)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "storefront.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 2) {

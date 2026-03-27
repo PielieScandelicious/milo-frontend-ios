@@ -162,9 +162,14 @@ struct TransactionTableView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
             VStack(spacing: 2) {
-                Text(category ?? storeName)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
+                HStack(spacing: 6) {
+                    if category == nil {
+                        StoreLogoView(storeName: storeName, height: 18)
+                    }
+                    Text(category ?? storeName)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                }
                 Text(period)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.6))

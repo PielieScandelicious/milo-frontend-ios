@@ -74,10 +74,8 @@ struct ReceiptDetailsView: View {
         VStack(spacing: 16) {
             // Store Name
             if let storeName = receipt.storeName {
-                HStack {
-                    Image(systemName: "storefront.fill")
-                        .font(.title2)
-                        .foregroundStyle(.blue)
+                HStack(spacing: 10) {
+                    StoreLogoView(storeName: storeName, height: 28)
 
                     Text(storeName)
                         .font(.title2)

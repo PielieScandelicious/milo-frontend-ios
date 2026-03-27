@@ -195,14 +195,18 @@ struct CashbackDealCard: View {
                 HStack(spacing: 5) {
                     ForEach(deal.eligibleStores, id: \.self) { storeName in
                         let storeColor = GroceryStore(rawValue: storeName)?.accentColor ?? .white.opacity(0.5)
-                        Text(storeName)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(storeColor)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule().fill(storeColor.opacity(0.12))
-                            )
+                        HStack(spacing: 4) {
+                            StoreLogoView(storeName: storeName, height: 12)
+
+                            Text(storeName)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(storeColor)
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(storeColor.opacity(0.12))
+                        )
                     }
                 }
             }
