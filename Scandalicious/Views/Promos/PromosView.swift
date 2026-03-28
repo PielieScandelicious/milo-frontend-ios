@@ -182,9 +182,6 @@ struct PromosView: View {
                 }
             }
 
-            // Summary
-            PromoSummaryFooter(summary: data.summary)
-                .padding(.horizontal, 16)
         }
     }
 

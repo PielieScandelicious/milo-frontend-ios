@@ -220,7 +220,7 @@ struct PromoHeroCard: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Text("YOUR DEALS THIS WEEK")
+            Text("MILO SNIFFED OUT")
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(1.2)
                 .foregroundColor(.white.opacity(0.5))
@@ -230,35 +230,9 @@ struct PromoHeroCard: View {
                 .foregroundStyle(greenGradient)
                 .contentTransition(.numericText())
 
-            Text("deals across \(data.stores.count) stores")
+            Text("deals for you across \(data.stores.count) \(data.stores.count == 1 ? "store" : "stores")")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
-
-            HStack(spacing: 10) {
-                // Deal count badge
-                HStack(spacing: 4) {
-                    Image(systemName: "tag.fill")
-                        .font(.system(size: 10))
-                    Text("\(data.dealCount) deals")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundColor(.white.opacity(0.7))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(Color.white.opacity(0.08)))
-
-                // Week badge
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 10))
-                    Text("\(data.promoWeek.label): \(data.promoWeek.start) - \(data.promoWeek.end)")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundColor(.white.opacity(0.7))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(Color.white.opacity(0.08)))
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
@@ -445,6 +419,14 @@ struct PromoItemRow: View {
                                         : Color.white.opacity(0.15)
                                 )
                             )
+                            .overlay(
+                                Capsule().stroke(
+                                    item.isMultiBuy
+                                        ? promoGreen.opacity(0.3)
+                                        : Color.white.opacity(0.15),
+                                    lineWidth: 0.5
+                                )
+                            )
                             .fixedSize()
 
                         if let savingsText = item.savingsLabel {
@@ -463,6 +445,10 @@ struct PromoItemRow: View {
                     priceView
                 }
 
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.2))
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -543,82 +529,6 @@ struct PromoItemRow: View {
                     .strikethrough(true, color: .white.opacity(0.3))
             }
             .fixedSize()
-        }
-    }
-}
-
-// MARK: - Summary Footer
-
-struct PromoSummaryFooter: View {
-    let summary: PromoSummary
-    @State private var appeared = false
-
-    var body: some View {
-        VStack(spacing: 16) {
-            // Header
-            PromoSectionHeader(title: "SUMMARY", icon: "chart.bar.fill")
-
-            // Best value store
-            if let bestStore = summary.bestValueStore {
-                HStack(spacing: 8) {
-                    Image(systemName: "trophy.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(.yellow.opacity(0.8))
-
-                    Text("Most deals: **\(bestStore)**")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.7))
-
-                    Text("\(summary.bestValueItems) deals")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            // Store breakdown bars
-            if !summary.storesBreakdown.isEmpty {
-                VStack(spacing: 8) {
-                    // Segmented bar
-                    GeometryReader { geometry in
-                        HStack(spacing: 2) {
-                            ForEach(summary.storesBreakdown) { breakdown in
-                                let proportion = summary.totalItems > 0
-                                    ? Double(breakdown.items) / Double(summary.totalItems)
-                                    : 1.0 / Double(summary.storesBreakdown.count)
-
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.white.opacity(0.3))
-                                    .frame(width: max(4, (geometry.size.width - CGFloat(summary.storesBreakdown.count - 1) * 2) * proportion))
-                            }
-                        }
-                    }
-                    .frame(height: 8)
-
-                    // Legend
-                    HStack(spacing: 12) {
-                        ForEach(summary.storesBreakdown) { breakdown in
-                            HStack(spacing: 4) {
-                                StoreLogoView(storeName: breakdown.store, height: 14)
-
-                                Text(breakdown.store)
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-            }
-
-        }
-        .padding(16)
-        .glassCard()
-        .opacity(appeared ? 1 : 0)
-        .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2)) {
-                appeared = true
-            }
         }
     }
 }
