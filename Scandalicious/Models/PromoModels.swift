@@ -75,16 +75,26 @@ struct PromoStoreItem: Codable, Identifiable {
     let validityEnd: String
     let pageNumber: Int?
     let promoFolderUrl: String?
+    let savingsAmount: Double?
+    let minPurchaseQty: Int?
+    let effectiveUnitPrice: Double?
     let displayName: String?
     let displayMechanism: String?
     let displayDescription: String?
     let displayUnitPrice: String?
     let displaySavingsLabel: String?
+    let bucket: String?
+    let bucketLabel: String?
 
     var id: String { "\(brand)-\(productName)-\(mechanism)" }
 
     /// Whether both original and promo prices are available for display
     var hasPrices: Bool { originalPrice > 0 && promoPrice > 0 }
+
+    /// Whether this is a multi-buy deal (original == promo price, savings come from quantity)
+    var isMultiBuy: Bool {
+        originalPrice > 0 && promoPrice > 0 && abs(originalPrice - promoPrice) < 0.01
+    }
 
     /// Best available product label: display_name if available, else product_name
     var label: String { (displayName?.isEmpty == false ? displayName : productName) ?? productName }
@@ -92,11 +102,8 @@ struct PromoStoreItem: Codable, Identifiable {
     /// Best available mechanism text
     var mechanismLabel: String { (displayMechanism?.isEmpty == false ? displayMechanism : mechanism) ?? mechanism }
 
-    /// Best available savings text
-    var savingsLabel: String? {
-        if savings > 0 { return String(format: "€%.2f saved", savings) }
-        return displaySavingsLabel
-    }
+    /// Savings text — always use the backend's localized label
+    var savingsLabel: String? { displaySavingsLabel }
 
     enum CodingKeys: String, CodingKey {
         case itemKey = "item_key"
@@ -111,11 +118,16 @@ struct PromoStoreItem: Codable, Identifiable {
         case validityEnd = "validity_end"
         case pageNumber = "page_number"
         case promoFolderUrl = "promo_folder_url"
+        case savingsAmount = "savings_amount"
+        case minPurchaseQty = "min_purchase_qty"
+        case effectiveUnitPrice = "effective_unit_price"
         case displayName = "display_name"
         case displayMechanism = "display_mechanism"
         case displayDescription = "display_description"
         case displayUnitPrice = "display_unit_price"
         case displaySavingsLabel = "display_savings_label"
+        case bucket
+        case bucketLabel = "bucket_label"
     }
 }
 

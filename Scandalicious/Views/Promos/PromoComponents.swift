@@ -307,13 +307,36 @@ struct PromoStoreSection: View {
 
     private let initialItemCount = 3
 
+    private var daysLeft: Int? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let endDate = formatter.date(from: store.validityEnd) else { return nil }
+        let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: Calendar.current.startOfDay(for: endDate)).day
+        return days
+    }
+
+    private var daysLeftText: String {
+        guard let days = daysLeft else { return store.validityEnd }
+        if days < 0 { return "Expired" }
+        if days == 0 { return "Last day" }
+        if days == 1 { return "1 day left" }
+        return "\(days) days left"
+    }
+
+    private var daysLeftColor: Color {
+        guard let days = daysLeft else { return .white.opacity(0.3) }
+        if days <= 1 { return Color(red: 0.95, green: 0.3, blue: 0.3) }
+        if days <= 3 { return Color(red: 0.95, green: 0.6, blue: 0.2) }
+        return .white.opacity(0.3)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Store header
             HStack(spacing: 10) {
                 StoreLogoView(storeName: store.storeName, height: 22)
 
-                Text(store.storeName)
+                Text(store.storeName.capitalized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
 
@@ -324,9 +347,9 @@ struct PromoStoreSection: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(promoGreen)
 
-                    Text("valid until \(store.validityEnd)")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.3))
+                    Text(daysLeftText)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(daysLeftColor)
                 }
             }
             .padding(.horizontal, 16)
@@ -345,7 +368,7 @@ struct PromoStoreSection: View {
                             .padding(.leading, 64)
                             .padding(.trailing, 16)
                     }
-                    PromoItemRow(item: item, onClaim: { onClaim(item) })
+                    PromoItemRow(item: item)
                 }
             }
 
@@ -388,72 +411,139 @@ struct PromoStoreSection: View {
 
 struct PromoItemRow: View {
     let item: PromoStoreItem
-    let onClaim: () -> Void
-    @State private var isClaimed = false
+    @State private var isExpanded = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Product label + mechanism
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.label)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
+        VStack(spacing: 0) {
+            // MARK: Collapsed row — always visible
+            HStack(alignment: .center, spacing: 12) {
+                // Left: brand + name + mechanism
+                VStack(alignment: .leading, spacing: 4) {
+                    if !item.brand.isEmpty {
+                        Text(item.brand.uppercased())
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white.opacity(0.4))
+                            .tracking(0.5)
+                            .lineLimit(1)
+                    }
 
-                HStack(spacing: 6) {
-                    Text(item.mechanismLabel)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.white.opacity(0.08)))
-                        .fixedSize()
+                    Text(item.label)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
 
-                    if let savingsText = item.savingsLabel {
-                        Text(savingsText)
-                            .font(.system(size: 10))
-                            .foregroundColor(promoGreen)
+                    HStack(spacing: 6) {
+                        Text(item.mechanismLabel)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(item.isMultiBuy ? promoGreen : .white.opacity(0.7))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule().fill(
+                                    item.isMultiBuy
+                                        ? promoGreen.opacity(0.25)
+                                        : Color.white.opacity(0.15)
+                                )
+                            )
+                            .fixedSize()
+
+                        if let savingsText = item.savingsLabel {
+                            Text(savingsText)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(promoGreen)
+                        }
                     }
                 }
-            }
-            .layoutPriority(1)
+                .layoutPriority(1)
 
-            Spacer(minLength: 4)
+                Spacer(minLength: 4)
 
-            // Prices (only when both available)
-            if item.hasPrices {
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text(String(format: "€%.2f", item.promoPrice))
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(greenGradient)
-
-                    Text(String(format: "€%.2f", item.originalPrice))
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.35))
-                        .strikethrough(true, color: .white.opacity(0.35))
+                // Right: prices
+                if item.hasPrices {
+                    priceView
                 }
-                .fixedSize()
+
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isExpanded.toggle()
+                }
             }
 
-            // Claim toggle
-            Button {
-                let claiming = !isClaimed
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    isClaimed.toggle()
+            // MARK: Expanded detail — shown on tap
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    Divider()
+                        .background(Color.white.opacity(0.08))
+
+                    // Description
+                    if let desc = item.displayDescription, !desc.isEmpty {
+                        Text(desc)
+                            .font(.system(size: 13))
+                            .foregroundColor(.white.opacity(0.7))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    // Folder link
+                    if let urlString = item.promoFolderUrl,
+                       let url = URL(string: urlString) {
+                        Link(destination: url) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "book.pages")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("Bekijk in folder")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 10, weight: .bold))
+                            }
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.white.opacity(0.1))
+                            )
+                        }
+                    }
                 }
-                if claiming {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    onClaim()
-                }
-            } label: {
-                Image(systemName: isClaimed ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(isClaimed ? promoGreen : Color.white.opacity(0.2))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
             }
-            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+    }
+
+    // MARK: - Price View
+
+    @ViewBuilder
+    private var priceView: some View {
+        if item.isMultiBuy, let qty = item.minPurchaseQty, qty > 1 {
+            let totalWithout = item.originalPrice * Double(qty)
+            let totalWith = totalWithout - item.savings
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(String(format: "€%.2f", totalWith))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(greenGradient)
+                Text(String(format: "€%.2f", totalWithout))
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.3))
+                    .strikethrough(true, color: .white.opacity(0.3))
+            }
+            .fixedSize()
+        } else {
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(String(format: "€%.2f", item.promoPrice))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(greenGradient)
+                Text(String(format: "€%.2f", item.originalPrice))
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.3))
+                    .strikethrough(true, color: .white.opacity(0.3))
+            }
+            .fixedSize()
+        }
     }
 }
 
