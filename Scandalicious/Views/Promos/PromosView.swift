@@ -143,22 +143,70 @@ struct PromosView: View {
             PromoSkeletonView()
         case .success(let data):
             VStack(spacing: 20) {
-                // Hero card — always visible
-                PromoHeroCard(stores: viewModel.stores)
-                    .padding(.horizontal, 16)
+                if viewModel.selectedStoreNames.isEmpty {
+                    // No stores selected — show actionable empty state
+                    VStack(spacing: 16) {
+                        Image(systemName: "storefront.fill")
+                            .font(.system(size: 44))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.2), .white.opacity(0.1)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
 
-                // Manage button — always visible so user can add/remove stores
-                manageButton
-                    .padding(.horizontal, 16)
+                        Text("No stores selected")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
 
-                if !data.isReady || data.dealCount == 0 {
-                    PromoEmptyView(
-                        status: data.reportStatus,
-                        title: emptyTitle(for: data),
-                        message: data.message
-                    )
+                        Text("Pick your favourite stores to see personalised weekly deals.")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.5))
+                            .multilineTextAlignment(.center)
+
+                        Button {
+                            showManageSheet = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 14))
+                                Text("Manage Stores")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                Capsule().fill(Color.white.opacity(0.12))
+                            )
+                            .overlay(
+                                Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                            )
+                        }
+                        .padding(.top, 4)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 60)
+                    .padding(.horizontal, 32)
                 } else {
-                    promoContent(data)
+                    // Hero card — visible when stores are selected
+                    PromoHeroCard(stores: viewModel.stores)
+                        .padding(.horizontal, 16)
+
+                    // Manage button
+                    manageButton
+                        .padding(.horizontal, 16)
+
+                    if !data.isReady || data.dealCount == 0 {
+                        PromoEmptyView(
+                            status: data.reportStatus,
+                            title: emptyTitle(for: data),
+                            message: data.message
+                        )
+                    } else {
+                        promoContent(data)
+                    }
                 }
             }
             .sheet(isPresented: $showManageSheet, onDismiss: {
