@@ -142,14 +142,30 @@ struct PromosView: View {
         case .idle, .loading:
             PromoSkeletonView()
         case .success(let data):
-            if !data.isReady || data.dealCount == 0 {
-                PromoEmptyView(
-                    status: data.reportStatus,
-                    title: emptyTitle(for: data),
-                    message: data.message
-                )
-            } else {
-                promoContent(data)
+            VStack(spacing: 20) {
+                // Hero card — always visible
+                PromoHeroCard(stores: viewModel.stores)
+                    .padding(.horizontal, 16)
+
+                // Manage button — always visible so user can add/remove stores
+                manageButton
+                    .padding(.horizontal, 16)
+
+                if !data.isReady || data.dealCount == 0 {
+                    PromoEmptyView(
+                        status: data.reportStatus,
+                        title: emptyTitle(for: data),
+                        message: data.message
+                    )
+                } else {
+                    promoContent(data)
+                }
+            }
+            .sheet(isPresented: $showManageSheet, onDismiss: {
+                viewModel.saveStorePreferences()
+            }) {
+                ManageStoresSheet(viewModel: viewModel)
+                    .onAppear { viewModel.beginManagingStores() }
             }
         case .error(let message):
             PromoErrorView(message: message) {
@@ -158,65 +174,55 @@ struct PromosView: View {
         }
     }
 
+    private var manageButton: some View {
+        HStack {
+            Spacer()
+            Button {
+                showManageSheet = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Manage")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(.white.opacity(0.5))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule().fill(Color.white.opacity(0.08))
+                )
+                .overlay(
+                    Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                )
+            }
+        }
+    }
+
     // MARK: - Main content
 
     private func promoContent(_ data: PromoRecommendationResponse) -> some View {
-        VStack(spacing: 20) {
-            // Hero savings card
-            PromoHeroCard(stores: viewModel.stores)
-                .padding(.horizontal, 16)
-
-            // Store sections
-            VStack(spacing: 12) {
-                // Manage button
-                HStack {
-                    Spacer()
-                    Button {
-                        showManageSheet = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text("Manage")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundColor(.white.opacity(0.5))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule().fill(Color.white.opacity(0.08))
-                        )
-                        .overlay(
-                            Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-                        )
-                    }
-                }
-                .padding(.horizontal, 16)
-
-                if !viewModel.stores.isEmpty {
-                    ForEach(Array(viewModel.stores.enumerated()), id: \.element.id) { index, store in
-                        PromoStoreSection(
-                            store: store,
-                            index: index,
-                            onExpand: { viewModel.trackStoreSectionOpened(store) }
-                        )
-                    }
-                    .padding(.horizontal, 16)
+        // Store sections (hero card and manage button are rendered above)
+        VStack(spacing: 12) {
+            if !viewModel.stores.isEmpty {
+                ForEach(Array(viewModel.stores.enumerated()), id: \.element.id) { index, store in
+                    PromoStoreSection(
+                        store: store,
+                        index: index,
+                        onExpand: { viewModel.trackStoreSectionOpened(store) }
+                    )
                 }
             }
-
         }
-        .sheet(isPresented: $showManageSheet, onDismiss: {
-            viewModel.saveStorePreferences()
-        }) {
-            ManageStoresSheet(viewModel: viewModel)
-                .onAppear { viewModel.beginManagingStores() }
-        }
+        .padding(.horizontal, 16)
     }
 
     private func emptyTitle(for data: PromoRecommendationResponse) -> String {
         switch data.reportStatus {
         case .ready:
+            if data.preferredStores?.isEmpty == true {
+                return "No stores selected"
+            }
             return "No deals this week"
         case .noEnrichedProfile:
             return "Keep scanning receipts"
@@ -238,41 +244,7 @@ struct ManageStoresSheet: View {
         NavigationView {
             List {
                 // MARK: Selected stores (reorderable)
-                Section {
-                    ForEach(viewModel.selectedStoreNames, id: \.self) { name in
-                        HStack(spacing: 12) {
-                            StoreLogoView(storeName: name, height: 22)
-
-                            Text(GroceryStore.fromCanonical(name)?.displayName ?? name.capitalized)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.white)
-
-                            Spacer()
-
-                            let count = viewModel.dealCount(for: name)
-                            if count > 0 {
-                                Text("\(count) deals")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(sheetGreen.opacity(0.8))
-                            }
-                        }
-                        .padding(.vertical, 2)
-                        .listRowBackground(Color(white: 0.10))
-                    }
-                    .onMove(perform: viewModel.moveStore)
-                    .onDelete(perform: viewModel.removeStore)
-                } header: {
-                    Text("Your Stores")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(1.0)
-                        .foregroundColor(.white.opacity(0.4))
-                } footer: {
-                    if !viewModel.selectedStoreNames.isEmpty {
-                        Text("Drag to reorder priority. Swipe to remove.")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.25))
-                    }
-                }
+                selectedStoresSection
 
                 // MARK: Available stores (tap to add)
                 if !viewModel.availableStores.isEmpty {
@@ -316,8 +288,8 @@ struct ManageStoresSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
                 }
             }
             .environment(\.editMode, .constant(.active))
@@ -325,6 +297,57 @@ struct ManageStoresSheet: View {
         .presentationDetents([.medium, .large])
         .preferredColorScheme(.dark)
     }
+
+    // MARK: - Selected Stores Section
+
+    private var selectedStoresSection: some View {
+        Section {
+            ForEach(viewModel.selectedStoreNames, id: \.self) { name in
+                storeRow(name: name)
+            }
+            .onMove(perform: viewModel.moveStore)
+        } header: {
+            Text("Your Stores")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(1.0)
+                .foregroundColor(.white.opacity(0.4))
+        } footer: {
+            if !viewModel.selectedStoreNames.isEmpty {
+                Text("Long press and drag to reorder. Tap \(Image(systemName: "minus.circle.fill")) to remove.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.25))
+            }
+        }
+    }
+
+    private func storeRow(name: String) -> some View {
+        HStack(spacing: 12) {
+            StoreLogoView(storeName: name, height: 22)
+
+            Text(GroceryStore.fromCanonical(name)?.displayName ?? name.capitalized)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            let count = viewModel.dealCount(for: name)
+            Text("\(count) deals")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(count > 0 ? sheetGreen.opacity(0.8) : .white.opacity(0.3))
+
+            Button {
+                withAnimation { viewModel.removeStore(named: name) }
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.red.opacity(0.7))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 2)
+        .listRowBackground(Color(white: 0.10))
+    }
+
 }
 
 // MARK: - Scroll Offset Key

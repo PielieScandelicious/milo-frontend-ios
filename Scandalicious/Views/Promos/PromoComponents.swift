@@ -502,7 +502,7 @@ struct PromoItemRow: View {
                     if !item.brand.isEmpty {
                         Text(item.brand.uppercased())
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(.white.opacity(0.65))
                             .tracking(0.5)
                             .lineLimit(1)
                     }

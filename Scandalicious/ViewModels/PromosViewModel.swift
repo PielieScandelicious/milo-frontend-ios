@@ -206,10 +206,10 @@ class PromosViewModel: ObservableObject {
         }
 
         // Determine selected stores:
-        // 1. Use API preferred_stores if available (includes stores with no deals)
+        // 1. Use API preferred_stores if returned (even if empty — user explicitly cleared them)
         // 2. Keep local selectedStoreNames if already populated (user just saved preferences)
-        // 3. Fall back to stores with deals on truly fresh load
-        if let preferred = response.preferredStores, !preferred.isEmpty {
+        // 3. Fall back to stores with deals on truly fresh load (preferredStores is nil)
+        if let preferred = response.preferredStores {
             selectedStoreNames = preferred
         } else if selectedStoreNames.isEmpty {
             selectedStoreNames = response.stores.map(\.storeName)
