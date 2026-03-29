@@ -218,30 +218,37 @@ struct PromoHeroCard: View {
     let data: PromoRecommendationResponse
     @State private var appeared = false
 
+    private var storeText: String {
+        data.stores.count == 1 ? "store" : "stores"
+    }
+
     var body: some View {
-        VStack(spacing: 14) {
-            Text("MILO SNIFFED OUT")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(1.2)
-                .foregroundColor(.white.opacity(0.5))
-
-            Text("\(data.dealCount)")
-                .font(.system(size: 48, weight: .heavy, design: .rounded))
+        HStack(spacing: 14) {
+            Image(systemName: "pawprint.fill")
+                .font(.system(size: 15))
                 .foregroundStyle(greenGradient)
-                .contentTransition(.numericText())
 
-            Text("deals for you across \(data.stores.count) \(data.stores.count == 1 ? "store" : "stores")")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.5))
+            HStack(spacing: 0) {
+                Text("Milo sniffed out ")
+                    .foregroundColor(.white.opacity(0.6))
+                Text("\(data.dealCount) deals")
+                    .foregroundColor(.white)
+                    .fontWeight(.bold)
+                Text(" across \(data.stores.count) \(storeText)")
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .font(.system(size: 14))
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
         .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .glassCard()
-        .scaleEffect(appeared ? 1 : 0.96)
         .opacity(appeared ? 1 : 0)
         .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            withAnimation(.easeOut(duration: 0.3)) {
                 appeared = true
             }
         }
@@ -275,7 +282,6 @@ struct PromoStoreSection: View {
     let store: PromoStore
     let index: Int
     let onExpand: () -> Void
-    let onClaim: (PromoStoreItem) -> Void
     @State private var isExpanded = false
     @State private var appeared = false
 
@@ -339,8 +345,7 @@ struct PromoStoreSection: View {
                         Rectangle()
                             .fill(Color.white.opacity(0.06))
                             .frame(height: 0.5)
-                            .padding(.leading, 64)
-                            .padding(.trailing, 16)
+                            .padding(.horizontal, 16)
                     }
                     PromoItemRow(item: item)
                 }

@@ -89,6 +89,7 @@ struct PromosView: View {
         .refreshable {
             await viewModel.loadPromos(forceRefresh: true)
         }
+        .tint(.white.opacity(0.6))
         .onAppear {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
                 contentOpacity = 1.0
@@ -109,10 +110,10 @@ struct PromosView: View {
 
     private func configureSegmentedControlAppearance() {
         let appearance = UISegmentedControl.appearance()
-        appearance.selectedSegmentTintColor = UIColor.white.withAlphaComponent(0.12)
-        appearance.backgroundColor = UIColor.white.withAlphaComponent(0.06)
+        appearance.selectedSegmentTintColor = UIColor.white.withAlphaComponent(0.18)
+        appearance.backgroundColor = UIColor.white.withAlphaComponent(0.08)
         appearance.setTitleTextAttributes(
-            [.foregroundColor: UIColor.white.withAlphaComponent(0.5),
+            [.foregroundColor: UIColor.white.withAlphaComponent(0.45),
              .font: UIFont.systemFont(ofSize: 13, weight: .semibold)],
             for: .normal
         )
@@ -167,15 +168,11 @@ struct PromosView: View {
             // Store sections
             if !data.stores.isEmpty {
                 VStack(spacing: 12) {
-                    PromoSectionHeader(title: "DEALS BY STORE", icon: "storefront.fill")
-                        .padding(.horizontal, 20)
-
                     ForEach(Array(data.stores.enumerated()), id: \.element.id) { index, store in
                         PromoStoreSection(
                             store: store,
                             index: index,
-                            onExpand: { viewModel.trackStoreSectionOpened(store) },
-                            onClaim: { item in viewModel.trackDealClaimed(item: item, store: store, reportId: data.reportId) }
+                            onExpand: { viewModel.trackStoreSectionOpened(store) }
                         )
                     }
                     .padding(.horizontal, 16)
