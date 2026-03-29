@@ -217,35 +217,113 @@ struct PromoBannerCard: View {
 struct PromoHeroCard: View {
     let data: PromoRecommendationResponse
     @State private var appeared = false
+    @State private var isExpanded = false
 
     private var storeText: String {
         data.stores.count == 1 ? "store" : "stores"
     }
 
-    var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "pawprint.fill")
-                .font(.system(size: 15))
-                .foregroundStyle(greenGradient)
+    private var maxSavings: Double {
+        data.stores.map(\.totalSavings).max() ?? 1
+    }
 
-            HStack(spacing: 0) {
-                Text("Milo sniffed out ")
+    var body: some View {
+        VStack(spacing: 0) {
+            // Banner row
+            HStack(spacing: 12) {
+                Image(systemName: "pawprint.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(greenGradient)
+                    .fixedSize()
+
+                (Text("Milo sniffed out ")
                     .foregroundColor(.white.opacity(0.6))
-                Text("\(data.dealCount) deals")
+                + Text("\(data.dealCount) deals")
                     .foregroundColor(.white)
                     .fontWeight(.bold)
-                Text(" across \(data.stores.count) \(storeText)")
-                    .foregroundColor(.white.opacity(0.6))
-            }
-            .font(.system(size: 14))
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
+                + Text(" across \(data.stores.count) \(storeText)")
+                    .foregroundColor(.white.opacity(0.6)))
+                .font(.system(size: 14))
+                .lineLimit(2)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.2))
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .fixedSize()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isExpanded.toggle()
+                }
+            }
+
+            // Expanded: savings breakdown by store
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 0.5)
+                        .padding(.horizontal, 16)
+
+                    VStack(spacing: 10) {
+                        ForEach(data.stores.sorted(by: { $0.totalSavings > $1.totalSavings })) { store in
+                            HStack(spacing: 10) {
+                                StoreLogoView(storeName: store.storeName, height: 18)
+
+                                Text(store.storeName.capitalized)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .frame(width: 80, alignment: .leading)
+
+                                // Savings bar
+                                GeometryReader { geo in
+                                    let proportion = maxSavings > 0 ? store.totalSavings / maxSavings : 0
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(greenGradient.opacity(0.6))
+                                        .frame(width: max(4, geo.size.width * proportion))
+                                }
+                                .frame(height: 6)
+
+                                Text(String(format: "€%.2f", store.totalSavings))
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundStyle(greenGradient)
+                                    .frame(width: 55, alignment: .trailing)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+
+                    // Total
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 0.5)
+                        .padding(.horizontal, 16)
+
+                    HStack {
+                        Text("Total potential savings")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+
+                        Spacer()
+
+                        Text(String(format: "€%.2f", data.stores.reduce(0) { $0 + $1.totalSavings }))
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(greenGradient)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                }
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
         .glassCard()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .opacity(appeared ? 1 : 0)
         .onAppear {
             withAnimation(.easeOut(duration: 0.3)) {
