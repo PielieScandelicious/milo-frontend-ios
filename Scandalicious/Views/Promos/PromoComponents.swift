@@ -494,31 +494,26 @@ struct PromoItemRow: View {
                     HStack(spacing: 6) {
                         Text(item.mechanismLabel)
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(item.isMultiBuy ? promoGreen : .white.opacity(0.7))
+                            .foregroundColor(item.isMultiBuy ? promoGreen.opacity(0.85) : .white.opacity(0.7))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(
                                 Capsule().fill(
                                     item.isMultiBuy
-                                        ? promoGreen.opacity(0.25)
+                                        ? promoGreen.opacity(0.12)
                                         : Color.white.opacity(0.15)
                                 )
                             )
                             .overlay(
                                 Capsule().stroke(
                                     item.isMultiBuy
-                                        ? promoGreen.opacity(0.3)
+                                        ? promoGreen.opacity(0.2)
                                         : Color.white.opacity(0.15),
                                     lineWidth: 0.5
                                 )
                             )
                             .fixedSize()
 
-                        if let savingsText = item.savingsLabel {
-                            Text(savingsText)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(promoGreen)
-                        }
                     }
                 }
                 .layoutPriority(1)
