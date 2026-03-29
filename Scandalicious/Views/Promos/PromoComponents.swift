@@ -370,7 +370,9 @@ struct PromoStoreSection: View {
             }
 
         }
+        .clipped()
         .glassCard()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 12)
         .onAppear {
