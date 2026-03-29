@@ -12,12 +12,12 @@ struct StoreLogoView: View {
     var height: CGFloat = 24
     var fallbackColor: Color? = nil
 
-    /// Case-insensitive match: backend sends lowercase ("colruyt", "albert heijn")
-    /// but GroceryStore rawValues are display names ("Colruyt", "Albert Heijn").
+    /// Match by canonical name first, then fall back to display name (case-insensitive).
     private var resolvedStore: GroceryStore? {
-        GroceryStore.allCases.first {
-            $0.rawValue.caseInsensitiveCompare(storeName) == .orderedSame
-        }
+        GroceryStore.fromCanonical(storeName)
+            ?? GroceryStore.allCases.first {
+                $0.rawValue.caseInsensitiveCompare(storeName) == .orderedSame
+            }
     }
 
     var body: some View {

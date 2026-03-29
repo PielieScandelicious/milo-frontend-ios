@@ -215,16 +215,20 @@ struct PromoBannerCard: View {
 // MARK: - Hero Card
 
 struct PromoHeroCard: View {
-    let data: PromoRecommendationResponse
+    let stores: [PromoStore]
     @State private var appeared = false
     @State private var isExpanded = false
 
+    private var dealCount: Int {
+        stores.reduce(0) { $0 + $1.items.count }
+    }
+
     private var storeText: String {
-        data.stores.count == 1 ? "store" : "stores"
+        stores.count == 1 ? "store" : "stores"
     }
 
     private var maxSavings: Double {
-        data.stores.map(\.totalSavings).max() ?? 1
+        stores.map(\.totalSavings).max() ?? 1
     }
 
     var body: some View {
@@ -238,10 +242,10 @@ struct PromoHeroCard: View {
 
                 (Text("Milo sniffed out ")
                     .foregroundColor(.white.opacity(0.6))
-                + Text("\(data.dealCount) deals")
+                + Text("\(dealCount) deals")
                     .foregroundColor(.white)
                     .fontWeight(.bold)
-                + Text(" across \(data.stores.count) \(storeText)")
+                + Text(" across \(stores.count) \(storeText)")
                     .foregroundColor(.white.opacity(0.6)))
                 .font(.system(size: 14))
                 .lineLimit(2)
@@ -263,7 +267,7 @@ struct PromoHeroCard: View {
                 }
             }
 
-            // Expanded: savings breakdown by store
+            // Expanded: savings breakdown by store (in preferred order)
             if isExpanded {
                 VStack(spacing: 0) {
                     Rectangle()
@@ -272,11 +276,11 @@ struct PromoHeroCard: View {
                         .padding(.horizontal, 16)
 
                     VStack(spacing: 10) {
-                        ForEach(data.stores.sorted(by: { $0.totalSavings > $1.totalSavings })) { store in
+                        ForEach(stores) { store in
                             HStack(spacing: 10) {
                                 StoreLogoView(storeName: store.storeName, height: 18)
 
-                                Text(store.storeName.capitalized)
+                                Text(GroceryStore.fromCanonical(store.storeName)?.displayName ?? store.storeName.capitalized)
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(.white.opacity(0.7))
                                     .frame(width: 80, alignment: .leading)
@@ -313,7 +317,7 @@ struct PromoHeroCard: View {
 
                         Spacer()
 
-                        Text(String(format: "€%.2f", data.stores.reduce(0) { $0 + $1.totalSavings }))
+                        Text(String(format: "€%.2f", stores.reduce(0) { $0 + $1.totalSavings }))
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(greenGradient)
                     }
@@ -394,61 +398,78 @@ struct PromoStoreSection: View {
             HStack(spacing: 10) {
                 StoreLogoView(storeName: store.storeName, height: 22)
 
-                Text(store.storeName.capitalized)
+                Text(GroceryStore.fromCanonical(store.storeName)?.displayName ?? store.storeName.capitalized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(store.items.count) deals")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(promoGreen)
+                if !store.items.isEmpty {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(store.items.count) deals")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(promoGreen)
 
-                    Text(daysLeftText)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(daysLeftColor)
+                        Text(daysLeftText)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(daysLeftColor)
+                    }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
             .padding(.bottom, 12)
 
-            // Items
-            let visibleItems = isExpanded ? store.items : Array(store.items.prefix(initialItemCount))
-
-            VStack(spacing: 0) {
-                ForEach(Array(visibleItems.enumerated()), id: \.element.id) { itemIndex, item in
-                    if itemIndex > 0 {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.06))
-                            .frame(height: 0.5)
-                            .padding(.horizontal, 16)
-                    }
-                    PromoItemRow(item: item)
+            if store.items.isEmpty {
+                // Empty state
+                VStack(spacing: 6) {
+                    Text("No deals this week")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.35))
+                    Text("Check back next week for new promotions.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.2))
                 }
-            }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .padding(.bottom, 8)
+            } else {
+                // Items
+                let visibleItems = isExpanded ? store.items : Array(store.items.prefix(initialItemCount))
 
-            // Show more / less
-            if store.items.count > initialItemCount {
-                Button {
-                    let opening = !isExpanded
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        isExpanded.toggle()
+                VStack(spacing: 0) {
+                    ForEach(Array(visibleItems.enumerated()), id: \.element.id) { itemIndex, item in
+                        if itemIndex > 0 {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.06))
+                                .frame(height: 0.5)
+                                .padding(.horizontal, 16)
+                        }
+                        PromoItemRow(item: item)
                     }
-                    if opening {
-                        onExpand()
+                }
+
+                // Show more / less
+                if store.items.count > initialItemCount {
+                    Button {
+                        let opening = !isExpanded
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            isExpanded.toggle()
+                        }
+                        if opening {
+                            onExpand()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(isExpanded ? "Show less" : "Show all \(store.items.count) deals")
+                                .font(.system(size: 13, weight: .medium))
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(isExpanded ? "Show less" : "Show all \(store.items.count) deals")
-                            .font(.system(size: 13, weight: .medium))
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .foregroundColor(.white.opacity(0.5))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
                 }
             }
 

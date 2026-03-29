@@ -24,6 +24,7 @@ struct PromoRecommendationResponse: Codable {
     let dealCount: Int
     let promoWeek: PromoWeek
     let stores: [PromoStore]
+    let preferredStores: [String]?
     let summary: PromoSummary
 
     var isReady: Bool { reportStatus == .ready }
@@ -38,6 +39,7 @@ struct PromoRecommendationResponse: Codable {
         case dealCount = "deal_count"
         case promoWeek = "promo_week"
         case stores
+        case preferredStores = "preferred_stores"
         case summary
     }
 }

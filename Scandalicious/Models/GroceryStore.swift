@@ -12,7 +12,7 @@ enum GroceryStore: String, CaseIterable, Identifiable {
     case delhaize = "Delhaize"
     case proxyDelhaize = "Proxy Delhaize"
     case shopAndGo = "Shop & Go"
-    case carrefour = "Carrefour"
+    case carrefour = "Carrefour Hypermarket"
     case carrefourMarket = "Carrefour Market"
     case carrefourExpress = "Carrefour Express"
     case lidl = "Lidl"
@@ -27,8 +27,37 @@ enum GroceryStore: String, CaseIterable, Identifiable {
     case action = "Action"
     case makro = "Makro"
 
-    var id: String { rawValue }
+    var id: String { canonicalName }
     var displayName: String { rawValue }
+
+    /// Backend canonical name (lowercase, matches store_name in API responses)
+    var canonicalName: String {
+        switch self {
+        case .colruyt: return "colruyt"
+        case .delhaize: return "delhaize"
+        case .proxyDelhaize: return "proxy delhaize"
+        case .shopAndGo: return "shop & go"
+        case .carrefour: return "carrefour"
+        case .carrefourMarket: return "carrefour market"
+        case .carrefourExpress: return "carrefour express"
+        case .lidl: return "lidl"
+        case .aldi: return "aldi"
+        case .albertHeijn: return "albert heijn"
+        case .ahToGo: return "ah to go"
+        case .okay: return "okay"
+        case .okayCompact: return "okay compact"
+        case .spar: return "spar"
+        case .bioPlanet: return "bio-planet"
+        case .jumbo: return "jumbo"
+        case .action: return "action"
+        case .makro: return "makro"
+        }
+    }
+
+    /// Look up a GroceryStore by its backend canonical name
+    static func fromCanonical(_ name: String) -> GroceryStore? {
+        allCases.first { $0.canonicalName == name }
+    }
 
     var logoImageName: String {
         switch self {
@@ -64,8 +93,14 @@ enum GroceryStore: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Stores that have promo folder pipelines configured (YAML configs on backend)
+    static let promoSupported: [GroceryStore] = [
+        .colruyt, .delhaize, .carrefour, .carrefourMarket,
+        .albertHeijn, .okay, .spar, .jumbo
+    ]
+
     static func from(rawValues: [String]?) -> Set<GroceryStore> {
         guard let values = rawValues else { return [] }
-        return Set(values.compactMap { GroceryStore(rawValue: $0) })
+        return Set(values.compactMap { GroceryStore(rawValue: $0) ?? GroceryStore.fromCanonical($0) })
     }
 }

@@ -426,7 +426,7 @@ struct OnboardingView: View {
                 let trimmedNickname = nickname.trimmingCharacters(in: .whitespaces)
                 let ageValue = Int(age)
                 let householdValue = Int(householdNumber)
-                let storeValues = selectedStores.isEmpty ? nil : selectedStores.map(\.rawValue)
+                let storeValues = selectedStores.isEmpty ? nil : selectedStores.map(\.canonicalName)
 
                 let profile = try await ProfileAPIService().updateProfile(
                     nickname: trimmedNickname,
