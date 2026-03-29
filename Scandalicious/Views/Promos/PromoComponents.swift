@@ -510,7 +510,7 @@ struct PromoItemRow: View {
                     Text(item.label)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
-                        .lineLimit(2)
+                        .lineLimit(isExpanded ? nil : 2)
 
                     HStack(spacing: 6) {
                         Text(item.mechanismLabel)
