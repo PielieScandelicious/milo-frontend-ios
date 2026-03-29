@@ -210,6 +210,7 @@ struct PromosView: View {
             viewModel.saveStorePreferences()
         }) {
             ManageStoresSheet(viewModel: viewModel)
+                .onAppear { viewModel.beginManagingStores() }
         }
     }
 

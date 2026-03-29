@@ -24,6 +24,10 @@ class PromosViewModel: ObservableObject {
     private var lastGeneratedAt: String?
     private var viewedReportIDs: Set<String> = []
     private var openedStoreKeys: Set<String> = []
+    /// Snapshot of selectedStoreNames when the manage sheet opens, for dirty checking
+    private var storeNamesBeforeManage: [String] = []
+    /// Guards selectedStoreNames from being overwritten by a concurrent loadPromos while saving
+    private var isSavingStorePreferences = false
 
     // MARK: - Load
 
@@ -146,16 +150,48 @@ class PromosViewModel: ObservableObject {
         rebuildDisplayStores()
     }
 
-    /// Persist selection + order to backend and reload promos
+    /// Call when the manage sheet opens to snapshot current state
+    func beginManagingStores() {
+        storeNamesBeforeManage = selectedStoreNames
+    }
+
+    /// Persist selection + order to backend and reload promos (only if stores added/removed)
     func saveStorePreferences() {
+        let selectionChanged = Set(selectedStoreNames) != Set(storeNamesBeforeManage)
+        let orderChanged = selectedStoreNames != storeNamesBeforeManage
+
+        // Reorder only — update display locally, persist in background, no reload
+        if !selectionChanged && orderChanged {
+            rebuildDisplayStores()
+            Task {
+                do {
+                    _ = try await profileService.updateProfile(
+                        nickname: nil, gender: nil, age: nil,
+                        language: nil, preferredStores: selectedStoreNames
+                    )
+                    print("[PromosVM] store order saved: \(selectedStoreNames)")
+                } catch {
+                    print("[PromosVM] failed to save store order: \(error.localizedDescription)")
+                }
+            }
+            return
+        }
+
+        guard selectionChanged else { return }
+        let storesToSave = selectedStoreNames
+        isSavingStorePreferences = true
         Task {
+            defer { isSavingStorePreferences = false }
             do {
                 _ = try await profileService.updateProfile(
                     nickname: nil, gender: nil, age: nil,
-                    language: nil, preferredStores: selectedStoreNames
+                    language: nil, preferredStores: storesToSave
                 )
-                print("[PromosVM] store preferences saved: \(selectedStoreNames)")
+                print("[PromosVM] store preferences saved: \(storesToSave)")
                 await loadPromos(forceRefresh: true)
+                // Restore the saved selection in case the reload overwrote it
+                selectedStoreNames = storesToSave
+                rebuildDisplayStores()
             } catch {
                 print("[PromosVM] failed to save store preferences: \(error.localizedDescription)")
             }
@@ -176,16 +212,22 @@ class PromosViewModel: ObservableObject {
             allAvailableStores[store.storeName] = store
         }
 
+        print("[PromosVM] populateStoreData: isSaving=\(isSavingStorePreferences), API preferred_stores=\(response.preferredStores ?? []), current selectedStoreNames=\(selectedStoreNames)")
+
         // Determine selected stores:
-        // 1. Use API preferred_stores if available (includes stores with no deals)
-        // 2. Keep local selectedStoreNames if already populated (user just saved preferences)
-        // 3. Fall back to stores with deals on truly fresh load
-        if let preferred = response.preferredStores, !preferred.isEmpty {
-            selectedStoreNames = preferred
-        } else if selectedStoreNames.isEmpty {
-            selectedStoreNames = response.stores.map(\.storeName)
+        // 1. Skip if a store-preference save is in flight (prevents race with concurrent loadPromos)
+        // 2. Use API preferred_stores if available (includes stores with no deals)
+        // 3. Keep local selectedStoreNames if already populated (user just saved preferences)
+        // 4. Fall back to stores with deals on truly fresh load
+        if !isSavingStorePreferences {
+            if let preferred = response.preferredStores, !preferred.isEmpty {
+                selectedStoreNames = preferred
+            } else if selectedStoreNames.isEmpty {
+                selectedStoreNames = response.stores.map(\.storeName)
+            }
         }
-        // else: keep existing selectedStoreNames (preserves user's selection through reload)
+
+        print("[PromosVM] populateStoreData result: selectedStoreNames=\(selectedStoreNames)")
 
         rebuildDisplayStores()
     }

@@ -18,7 +18,6 @@ struct ProfileView: View {
     @State private var age = ""
     @State private var householdNumber = ""
     @State private var selectedLanguage: ProfileLanguage?
-    @State private var selectedStores: Set<GroceryStore> = []
     @State private var isLoading = false
     @State private var isSaving = false
     @State private var showSaveSuccess = false
@@ -33,14 +32,6 @@ struct ProfileView: View {
     @State private var originalAge = ""
     @State private var originalHouseholdNumber = ""
     @State private var originalLanguage: ProfileLanguage?
-    @State private var originalStores: Set<GroceryStore> = []
-
-    // Grid layout: 3 columns
-    private let storeColumns = [
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8)
-    ]
 
     enum Gender: String, CaseIterable {
         case male = "Male"
@@ -162,74 +153,6 @@ struct ProfileView: View {
                 }
             } header: {
                 Text(L("personal_information"))
-            }
-
-            // Grocery Stores
-            Section {
-                LazyVGrid(columns: storeColumns, spacing: 8) {
-                    let stores = GroceryStore.allCases
-                    let remainder = stores.count % 3
-                    let gridStores = remainder == 1 ? Array(stores.dropLast()) : stores
-
-                    ForEach(gridStores) { store in
-                        ProfileStoreChipView(
-                            store: store,
-                            isSelected: selectedStores.contains(store),
-                            isDisabled: isLoading || isSaving,
-                            onTap: {
-                                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                    if selectedStores.contains(store) {
-                                        selectedStores.remove(store)
-                                    } else {
-                                        selectedStores.insert(store)
-                                    }
-                                    checkForChanges()
-                                }
-                            }
-                        )
-                    }
-
-                    if remainder == 1, let lastStore = stores.last {
-                        Color.clear.frame(height: 1)
-                        ProfileStoreChipView(
-                            store: lastStore,
-                            isSelected: selectedStores.contains(lastStore),
-                            isDisabled: isLoading || isSaving,
-                            onTap: {
-                                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                    if selectedStores.contains(lastStore) {
-                                        selectedStores.remove(lastStore)
-                                    } else {
-                                        selectedStores.insert(lastStore)
-                                    }
-                                    checkForChanges()
-                                }
-                            }
-                        )
-                    }
-                }
-                .padding(.vertical, 4)
-            } header: {
-                HStack {
-                    Text(L("grocery_stores"))
-                    Spacer()
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            if selectedStores.count == GroceryStore.allCases.count {
-                                selectedStores.removeAll()
-                            } else {
-                                selectedStores = Set(GroceryStore.allCases)
-                            }
-                            checkForChanges()
-                        }
-                    } label: {
-                        Text(selectedStores.count == GroceryStore.allCases.count ? L("deselect_all") : L("select_all"))
-                            .font(.caption)
-                            .textCase(nil)
-                    }
-                }
-            } footer: {
-                Text(L("select_stores_subtitle"))
             }
 
             // Save Button (if changes)
@@ -356,7 +279,6 @@ struct ProfileView: View {
                 age = profile.age != nil ? "\(profile.age!)" : ""
                 householdNumber = profile.householdNumber != nil ? "\(profile.householdNumber!)" : ""
                 selectedLanguage = ProfileLanguage.from(apiValue: profile.language)
-                selectedStores = GroceryStore.from(rawValues: profile.preferredStores)
                 LanguageManager.shared.syncFromProfile(profile.language)
 
                 // Store original values
@@ -366,7 +288,6 @@ struct ProfileView: View {
                 originalAge = age
                 originalHouseholdNumber = householdNumber
                 originalLanguage = selectedLanguage
-                originalStores = selectedStores
 
                 hasUnsavedChanges = false
                 isLoading = false
@@ -391,15 +312,12 @@ struct ProfileView: View {
                 let trimmedInstagramHandle = instagramHandle.trimmingCharacters(in: .whitespaces)
                 let ageValue = Int(age)
                 let householdValue = Int(householdNumber)
-                let storeValues = selectedStores.isEmpty ? [] : selectedStores.map(\.canonicalName)
-
                 let profile = try await ProfileAPIService().updateProfile(
                     nickname: trimmedNickname.isEmpty ? nil : trimmedNickname,
                     gender: selectedGender.apiValue,
                     age: ageValue,
                     householdNumber: householdValue,
                     language: selectedLanguage?.rawValue,
-                    preferredStores: storeValues,
                     instagramHandle: trimmedInstagramHandle.isEmpty ? nil : trimmedInstagramHandle
                 )
 
@@ -411,7 +329,6 @@ struct ProfileView: View {
                     originalAge = age
                     originalHouseholdNumber = householdNumber
                     originalLanguage = selectedLanguage
-                    originalStores = selectedStores
 
                     if let lang = selectedLanguage {
                         LanguageManager.shared.currentLanguage = lang
@@ -441,49 +358,7 @@ struct ProfileView: View {
                            selectedGender != originalGender ||
                            age != originalAge ||
                            householdNumber != originalHouseholdNumber ||
-                           selectedLanguage != originalLanguage ||
-                           selectedStores != originalStores
-    }
-}
-
-// MARK: - Profile Store Chip View
-
-private struct ProfileStoreChipView: View {
-    let store: GroceryStore
-    let isSelected: Bool
-    let isDisabled: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 4) {
-                Image(store.logoImageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: 55, maxHeight: 26)
-                    .frame(height: 26)
-                Text(store.displayName)
-                    .font(.system(size: 10, weight: .medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ? store.accentColor.opacity(0.15) : Color.clear)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(
-                                isSelected ? store.accentColor.opacity(0.5) : Color.secondary.opacity(0.2),
-                                lineWidth: isSelected ? 1.5 : 1
-                            )
-                    )
-            )
-            .opacity(isSelected ? 1 : 0.6)
-        }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
+                           selectedLanguage != originalLanguage
     }
 }
 
