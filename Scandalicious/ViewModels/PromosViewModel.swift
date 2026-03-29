@@ -26,8 +26,6 @@ class PromosViewModel: ObservableObject {
     private var openedStoreKeys: Set<String> = []
     /// Snapshot of selectedStoreNames when the manage sheet opens, for dirty checking
     private var storeNamesBeforeManage: [String] = []
-    /// Guards selectedStoreNames from being overwritten by a concurrent loadPromos while saving
-    private var isSavingStorePreferences = false
 
     // MARK: - Load
 
@@ -38,11 +36,11 @@ class PromosViewModel: ObservableObject {
 
         let alreadyHasData: Bool = { if case .success = state { return true }; return false }()
 
-        if forceRefresh || {
+        if !alreadyHasData && (forceRefresh || {
             if case .idle = state { return true }
             if case .error = state { return true }
             return false
-        }() {
+        }()) {
             state = .loading
         }
 
@@ -66,7 +64,8 @@ class PromosViewModel: ObservableObject {
             trackReportViewedIfNeeded(response)
             print("[PromosVM] success: status=\(response.reportStatus.rawValue), deals=\(response.dealCount)")
         } catch is CancellationError {
-            print("[PromosVM] fetch cancelled, keeping current state")
+            if case .loading = state { state = .idle }
+            print("[PromosVM] fetch cancelled, restoring to idle if no data")
         } catch {
             guard !Task.isCancelled else {
                 print("[PromosVM] fetch cancelled (URLError), keeping current state")
@@ -178,20 +177,14 @@ class PromosViewModel: ObservableObject {
         }
 
         guard selectionChanged else { return }
-        let storesToSave = selectedStoreNames
-        isSavingStorePreferences = true
         Task {
-            defer { isSavingStorePreferences = false }
             do {
                 _ = try await profileService.updateProfile(
                     nickname: nil, gender: nil, age: nil,
-                    language: nil, preferredStores: storesToSave
+                    language: nil, preferredStores: selectedStoreNames
                 )
-                print("[PromosVM] store preferences saved: \(storesToSave)")
+                print("[PromosVM] store preferences saved: \(selectedStoreNames)")
                 await loadPromos(forceRefresh: true)
-                // Restore the saved selection in case the reload overwrote it
-                selectedStoreNames = storesToSave
-                rebuildDisplayStores()
             } catch {
                 print("[PromosVM] failed to save store preferences: \(error.localizedDescription)")
             }
@@ -212,22 +205,15 @@ class PromosViewModel: ObservableObject {
             allAvailableStores[store.storeName] = store
         }
 
-        print("[PromosVM] populateStoreData: isSaving=\(isSavingStorePreferences), API preferred_stores=\(response.preferredStores ?? []), current selectedStoreNames=\(selectedStoreNames)")
-
         // Determine selected stores:
-        // 1. Skip if a store-preference save is in flight (prevents race with concurrent loadPromos)
-        // 2. Use API preferred_stores if available (includes stores with no deals)
-        // 3. Keep local selectedStoreNames if already populated (user just saved preferences)
-        // 4. Fall back to stores with deals on truly fresh load
-        if !isSavingStorePreferences {
-            if let preferred = response.preferredStores, !preferred.isEmpty {
-                selectedStoreNames = preferred
-            } else if selectedStoreNames.isEmpty {
-                selectedStoreNames = response.stores.map(\.storeName)
-            }
+        // 1. Use API preferred_stores if available (includes stores with no deals)
+        // 2. Keep local selectedStoreNames if already populated (user just saved preferences)
+        // 3. Fall back to stores with deals on truly fresh load
+        if let preferred = response.preferredStores, !preferred.isEmpty {
+            selectedStoreNames = preferred
+        } else if selectedStoreNames.isEmpty {
+            selectedStoreNames = response.stores.map(\.storeName)
         }
-
-        print("[PromosVM] populateStoreData result: selectedStoreNames=\(selectedStoreNames)")
 
         rebuildDisplayStores()
     }
