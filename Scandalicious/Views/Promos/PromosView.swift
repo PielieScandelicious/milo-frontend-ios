@@ -144,59 +144,42 @@ struct PromosView: View {
         case .success(let data):
             VStack(spacing: 20) {
                 if viewModel.selectedStoreNames.isEmpty {
-                    // No stores selected — show actionable empty state
+                    // No stores selected — Apple-style empty state
                     VStack(spacing: 16) {
-                        Image(systemName: "storefront.fill")
+                        Image(systemName: "storefront")
                             .font(.system(size: 44))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.2), .white.opacity(0.1)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .foregroundStyle(.tertiary)
 
-                        Text("No stores selected")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
+                        Text("No Stores Selected")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.primary)
 
                         Text("Pick your favourite stores to see personalised weekly deals.")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.5))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
 
                         Button {
                             showManageSheet = true
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 14))
-                                Text("Manage Stores")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(
-                                Capsule().fill(Color.white.opacity(0.12))
-                            )
-                            .overlay(
-                                Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
-                            )
+                            Label("Add Stores", systemImage: "plus")
+                                .font(.subheadline.weight(.medium))
                         }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                        .tint(.green)
                         .padding(.top, 4)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 60)
                     .padding(.horizontal, 32)
                 } else {
-                    // Hero card — visible when stores are selected
-                    PromoHeroCard(stores: viewModel.stores)
-                        .padding(.horizontal, 16)
-
-                    // Manage button
-                    manageButton
-                        .padding(.horizontal, 16)
+                    // Summary header + store bar grouped together
+                    VStack(spacing: 8) {
+                        PromoSummaryHeader(stores: viewModel.stores)
+                        storeBar
+                    }
+                    .padding(.horizontal, 16)
 
                     if !data.isReady || data.dealCount == 0 {
                         PromoEmptyView(
@@ -222,28 +205,48 @@ struct PromosView: View {
         }
     }
 
-    private var manageButton: some View {
-        HStack {
-            Spacer()
-            Button {
-                showManageSheet = true
-            } label: {
+    private var storeBar: some View {
+        Button {
+            showManageSheet = true
+        } label: {
+            HStack(spacing: 12) {
+                // Overlapping store logos
+                HStack(spacing: -6) {
+                    ForEach(Array(viewModel.selectedStoreNames.prefix(5).enumerated()), id: \.element) { index, name in
+                        StoreLogoView(storeName: name, height: 18)
+                            .frame(width: 28, height: 28)
+                            .background(Color(white: 0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Color(white: 0.06), lineWidth: 1.5))
+                            .zIndex(Double(5 - index))
+                    }
+
+                    if viewModel.selectedStoreNames.count > 5 {
+                        Text("+\(viewModel.selectedStoreNames.count - 5)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.tertiary)
+                            .frame(width: 28, height: 28)
+                            .background(Color(white: 0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    }
+                }
+
+                Text("\(viewModel.selectedStoreNames.count) stores")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
                 HStack(spacing: 4) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("Manage")
-                        .font(.system(size: 12, weight: .semibold))                }
-                .foregroundColor(.white.opacity(0.5))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule().fill(Color.white.opacity(0.08))
-                )
-                .overlay(
-                    Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-                )
+                    Text("Edit")
+                        .font(.subheadline)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                }
+                .foregroundStyle(.secondary)
             }
+            .padding(12)
+            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Main content
@@ -281,120 +284,103 @@ struct PromosView: View {
 
 // MARK: - Manage Stores Sheet
 
-private let sheetGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
-
 struct ManageStoresSheet: View {
     @ObservedObject var viewModel: PromosViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
-                // MARK: Selected stores (reorderable)
                 selectedStoresSection
 
-                // MARK: Available stores (tap to add)
                 if !viewModel.availableStores.isEmpty {
-                    Section {
-                        ForEach(viewModel.availableStores) { store in
-                            Button {
-                                withAnimation {
-                                    viewModel.addStore(store)
-                                }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    StoreLogoView(storeName: store.rawValue, height: 22)
-
-                                    Text(store.displayName)
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.6))
-
-                                    Spacer()
-
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(sheetGreen.opacity(0.6))
-                                }
-                                .padding(.vertical, 2)
-                            }
-                            .listRowBackground(Color(white: 0.08))
-                        }
-                    } header: {
-                        Text("Add Stores")
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(1.0)
-                            .foregroundColor(.white.opacity(0.4))
-                    }
+                    addStoresSection
                 }
             }
             .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color(white: 0.05))
             .navigationTitle("Manage Stores")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                        .fontWeight(.semibold)
                 }
             }
             .environment(\.editMode, .constant(.active))
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
         .preferredColorScheme(.dark)
     }
 
-    // MARK: - Selected Stores Section
+    // MARK: - Selected Stores
 
     private var selectedStoresSection: some View {
         Section {
             ForEach(viewModel.selectedStoreNames, id: \.self) { name in
                 storeRow(name: name)
             }
+            .onDelete { offsets in
+                withAnimation { viewModel.removeStore(at: offsets) }
+            }
             .onMove(perform: viewModel.moveStore)
         } header: {
             Text("Your Stores")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(1.0)
-                .foregroundColor(.white.opacity(0.4))
         } footer: {
             if !viewModel.selectedStoreNames.isEmpty {
-                Text("Long press and drag to reorder. Tap \(Image(systemName: "minus.circle.fill")) to remove.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.25))
+                Text("Drag to reorder. Swipe to remove.")
             }
         }
     }
+
+    // MARK: - Add Stores
+
+    private var addStoresSection: some View {
+        Section("Add Stores") {
+            ForEach(viewModel.availableStores) { store in
+                Button {
+                    withAnimation { viewModel.addStore(store) }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.title3)
+
+                        StoreLogoView(storeName: store.rawValue, height: 22)
+
+                        Text(store.displayName)
+                            .foregroundStyle(.primary)
+
+                        Spacer()
+
+                        let count = viewModel.dealCount(for: store.canonicalName)
+                        if count > 0 {
+                            Text("\(count) deals")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Store Row
 
     private func storeRow(name: String) -> some View {
         HStack(spacing: 12) {
             StoreLogoView(storeName: name, height: 22)
 
             Text(GroceryStore.fromCanonical(name)?.displayName ?? name.capitalized)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white)
 
             Spacer()
 
             let count = viewModel.dealCount(for: name)
             Text("\(count) deals")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(count > 0 ? sheetGreen.opacity(0.8) : .white.opacity(0.3))
-
-            Button {
-                withAnimation { viewModel.removeStore(named: name) }
-            } label: {
-                Image(systemName: "minus.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(.red.opacity(0.7))
-            }
-            .buttonStyle(.plain)
+                .font(.subheadline)
+                .foregroundColor(count > 0 ? .green : Color.white.opacity(0.3))
         }
-        .padding(.vertical, 2)
-        .listRowBackground(Color(white: 0.10))
     }
-
 }
 
 // MARK: - Scroll Offset Key

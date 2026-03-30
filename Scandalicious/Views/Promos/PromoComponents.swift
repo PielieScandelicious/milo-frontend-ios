@@ -7,10 +7,57 @@
 
 import SwiftUI
 
+// MARK: - Wrapping HStack Layout
+
+private struct WrappingHStack: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        let height = rows.enumerated().reduce(CGFloat.zero) { total, entry in
+            let rowHeight = entry.element.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+            return total + rowHeight + (entry.offset > 0 ? spacing : 0)
+        }
+        return CGSize(width: proposal.width ?? 0, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        var y = bounds.minY
+        for row in rows {
+            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+            var x = bounds.minX
+            for subview in row {
+                let size = subview.sizeThatFits(.unspecified)
+                subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += rowHeight + spacing
+        }
+    }
+
+    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[LayoutSubviews.Element]] {
+        let maxWidth = proposal.width ?? .infinity
+        var rows: [[LayoutSubviews.Element]] = [[]]
+        var currentWidth: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentWidth + size.width > maxWidth && !rows[rows.count - 1].isEmpty {
+                rows.append([])
+                currentWidth = 0
+            }
+            rows[rows.count - 1].append(subview)
+            currentWidth += size.width + spacing
+        }
+        return rows
+    }
+}
+
 // MARK: - Color Constants
 
 private let promoGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 private let promoGreenDark = Color(red: 0.10, green: 0.65, blue: 0.40)
+private let promoGold = Color(red: 1.00, green: 0.80, blue: 0.20)
 private let cardBackground = Color(white: 0.08)
 private let cardOverlayTop = Color.white.opacity(0.04)
 private let cardOverlayBottom = Color.white.opacity(0.02)
@@ -214,123 +261,44 @@ struct PromoBannerCard: View {
 
 // MARK: - Hero Card
 
-struct PromoHeroCard: View {
+struct PromoSummaryHeader: View {
     let stores: [PromoStore]
     @State private var appeared = false
-    @State private var isExpanded = false
+
+    private var totalSavings: Double {
+        stores.reduce(0) { $0 + $1.totalSavings }
+    }
 
     private var dealCount: Int {
         stores.reduce(0) { $0 + $1.items.count }
     }
 
-    private var storeText: String {
-        stores.count == 1 ? "store" : "stores"
-    }
-
-    private var maxSavings: Double {
-        stores.map(\.totalSavings).max() ?? 1
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            // Banner row
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(String(format: "€%.2f", totalSavings))
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .foregroundStyle(greenGradient)
+
+            Text("in savings this week")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
+
+            HStack(spacing: 5) {
                 Image(systemName: "pawprint.fill")
-                    .font(.system(size: 15))
+                    .font(.system(size: 11))
                     .foregroundStyle(greenGradient)
-                    .fixedSize()
 
-                (Text("Milo sniffed out ")
-                    .foregroundColor(.white.opacity(0.6))
-                + Text("\(dealCount) deals")
-                    .foregroundColor(.white)
-                    .fontWeight(.bold)
-                + Text(" across \(stores.count) \(storeText)")
-                    .foregroundColor(.white.opacity(0.6)))
-                .font(.system(size: 14))
-                .lineLimit(2)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.2))
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .fixedSize()
+                Text("Milo found \(dealCount) deals")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.35))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    isExpanded.toggle()
-                }
-            }
-
-            // Expanded: savings breakdown by store (in preferred order)
-            if isExpanded {
-                VStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.06))
-                        .frame(height: 0.5)
-                        .padding(.horizontal, 16)
-
-                    VStack(spacing: 10) {
-                        ForEach(stores) { store in
-                            HStack(spacing: 10) {
-                                StoreLogoView(storeName: store.storeName, height: 18)
-
-                                Text(GroceryStore.fromCanonical(store.storeName)?.displayName ?? store.storeName.capitalized)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .frame(width: 80, alignment: .leading)
-
-                                // Savings bar
-                                GeometryReader { geo in
-                                    let proportion = maxSavings > 0 ? store.totalSavings / maxSavings : 0
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .fill(greenGradient.opacity(0.6))
-                                        .frame(width: max(4, geo.size.width * proportion))
-                                }
-                                .frame(height: 6)
-
-                                Text(String(format: "€%.2f", store.totalSavings))
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundStyle(greenGradient)
-                                    .frame(width: 55, alignment: .trailing)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-
-                    // Total
-                    Rectangle()
-                        .fill(Color.white.opacity(0.06))
-                        .frame(height: 0.5)
-                        .padding(.horizontal, 16)
-
-                    HStack {
-                        Text("Total potential savings")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
-
-                        Spacer()
-
-                        Text(String(format: "€%.2f", stores.reduce(0) { $0 + $1.totalSavings }))
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(greenGradient)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                }
-            }
+            .padding(.top, 2)
         }
-        .glassCard()
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
         .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 8)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.3)) {
+            withAnimation(.easeOut(duration: 0.4)) {
                 appeared = true
             }
         }
@@ -369,6 +337,10 @@ struct PromoStoreSection: View {
 
     private let initialItemCount = 3
 
+    private var bestDealId: String? {
+        store.items.filter { $0.savings > 0 }.max(by: { $0.savings < $1.savings })?.id
+    }
+
     private var daysLeft: Int? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -392,87 +364,111 @@ struct PromoStoreSection: View {
         return .white.opacity(0.3)
     }
 
+    private var storeAccentColor: Color {
+        GroceryStore.fromCanonical(store.storeName)?.accentColor ?? promoGreen
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Store header
-            HStack(spacing: 10) {
-                StoreLogoView(storeName: store.storeName, height: 22)
+        ZStack(alignment: .leading) {
+            // Store accent bar
+            RoundedRectangle(cornerRadius: 3)
+                .fill(storeAccentColor)
+                .frame(width: 3)
+                .padding(.vertical, 14)
 
-                Text(GroceryStore.fromCanonical(store.storeName)?.displayName ?? store.storeName.capitalized)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 0) {
+                // Store header
+                HStack(spacing: 10) {
+                    StoreLogoView(storeName: store.storeName, height: 22)
 
-                Spacer()
+                    Text(GroceryStore.fromCanonical(store.storeName)?.displayName ?? store.storeName.capitalized)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
 
-                if !store.items.isEmpty {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(store.items.count) deals")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(promoGreen)
+                    Spacer()
 
-                        Text(daysLeftText)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(daysLeftColor)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
+                    if !store.items.isEmpty {
+                        HStack(spacing: 8) {
+                            if let days = daysLeft, days <= 3 {
+                                Text(daysLeftText)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(days <= 1 ? .red : .orange)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        Capsule().fill((days <= 1 ? Color.red : Color.orange).opacity(0.12))
+                                    )
+                            }
 
-            if store.items.isEmpty {
-                // Empty state
-                VStack(spacing: 6) {
-                    Text("No deals this week")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.35))
-                    Text("Check back next week for new promotions.")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.2))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .padding(.bottom, 8)
-            } else {
-                // Items
-                let visibleItems = isExpanded ? store.items : Array(store.items.prefix(initialItemCount))
+                            Text("\(store.items.count) deals")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
 
-                VStack(spacing: 0) {
-                    ForEach(Array(visibleItems.enumerated()), id: \.element.id) { itemIndex, item in
-                        if itemIndex > 0 {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.06))
-                                .frame(height: 0.5)
-                                .padding(.horizontal, 16)
-                        }
-                        PromoItemRow(item: item)
-                    }
-                }
-
-                // Show more / less
-                if store.items.count > initialItemCount {
-                    Button {
-                        let opening = !isExpanded
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            isExpanded.toggle()
-                        }
-                        if opening {
-                            onExpand()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(isExpanded ? "Show less" : "Show all \(store.items.count) deals")
-                                .font(.system(size: 13, weight: .medium))
-                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            Image(systemName: "chevron.down")
                                 .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.tertiary)
                         }
-                        .foregroundColor(.white.opacity(0.5))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
                     }
                 }
-            }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
 
+                if store.items.isEmpty {
+                    // Empty state
+                    VStack(spacing: 6) {
+                        Text("No deals this week")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.35))
+                        Text("Check back next week for new promotions.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.2))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .padding(.bottom, 8)
+                } else {
+                    // Items
+                    let visibleItems = isExpanded ? store.items : Array(store.items.prefix(initialItemCount))
+
+                    VStack(spacing: 0) {
+                        ForEach(Array(visibleItems.enumerated()), id: \.element.id) { itemIndex, item in
+                            if itemIndex > 0 {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(height: 0.5)
+                                    .padding(.horizontal, 16)
+                            }
+                            PromoItemRow(item: item, isBestDeal: item.id == bestDealId)
+                        }
+                    }
+
+                    // Show more / less
+                    if store.items.count > initialItemCount {
+                        Button {
+                            let opening = !isExpanded
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                isExpanded.toggle()
+                            }
+                            if opening {
+                                onExpand()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(isExpanded ? "Show less" : "Show all \(store.items.count) deals")
+                                    .font(.system(size: 13, weight: .medium))
+                                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            .foregroundColor(.white.opacity(0.5))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                        }
+                    }
+                }
+
+            }
+            .padding(.leading, 6)
         }
         .clipped()
         .glassCard()
@@ -491,7 +487,19 @@ struct PromoStoreSection: View {
 
 struct PromoItemRow: View {
     let item: PromoStoreItem
+    var isBestDeal: Bool = false
     @State private var isExpanded = false
+
+    private var isSpecialDeal: Bool {
+        let mech = item.mechanismLabel.lowercased()
+        return mech.contains("gratis") || mech.contains("free") || mech.contains("cadeau")
+    }
+
+    private var mechanismPillColor: Color {
+        if (item.minPurchaseQty ?? 1) > 1 { return promoGreen }
+        if isSpecialDeal { return promoGold }
+        return .white.opacity(0.7)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -499,42 +507,65 @@ struct PromoItemRow: View {
             HStack(alignment: .center, spacing: 12) {
                 // Left: brand + name + mechanism
                 VStack(alignment: .leading, spacing: 4) {
-                    if !item.brand.isEmpty {
-                        Text(item.brand.uppercased())
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white.opacity(0.65))
-                            .tracking(0.5)
-                            .lineLimit(1)
+                    HStack(spacing: 6) {
+                        if !item.brand.isEmpty {
+                            Text(item.brand.uppercased())
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white.opacity(0.8))
+                                .tracking(0.5)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule().fill(Color.white.opacity(0.08))
+                                )
+                        }
+                        if isBestDeal {
+                            HStack(spacing: 3) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 7, weight: .bold))
+                                Text("BEST DEAL")
+                                    .font(.system(size: 9, weight: .heavy))
+                                    .tracking(0.5)
+                            }
+                            .foregroundColor(promoGold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule().fill(promoGold.opacity(0.12))
+                            )
+                        }
                     }
 
                     Text(item.label)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(isExpanded ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: isExpanded)
 
                     HStack(spacing: 6) {
-                        Text(item.mechanismLabel)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(item.isMultiBuy ? promoGreen.opacity(0.85) : .white.opacity(0.7))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule().fill(
-                                    item.isMultiBuy
-                                        ? promoGreen.opacity(0.12)
-                                        : Color.white.opacity(0.15)
-                                )
-                            )
-                            .overlay(
-                                Capsule().stroke(
-                                    item.isMultiBuy
-                                        ? promoGreen.opacity(0.2)
-                                        : Color.white.opacity(0.15),
-                                    lineWidth: 0.5
-                                )
-                            )
-                            .fixedSize()
-
+                        HStack(spacing: 4) {
+                            if (item.minPurchaseQty ?? 1) > 1 {
+                                Image(systemName: "cart.badge.plus")
+                                    .font(.system(size: 10, weight: .semibold))
+                            } else if isSpecialDeal {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            Text(item.mechanismLabel)
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .foregroundColor(mechanismPillColor)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule().fill(mechanismPillColor.opacity(0.12))
+                        )
+                        .overlay(
+                            Capsule().stroke(mechanismPillColor.opacity(0.2), lineWidth: 0.5)
+                        )
+                        .fixedSize()
                     }
                 }
                 .layoutPriority(1)
@@ -574,18 +605,36 @@ struct PromoItemRow: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
+                    // Info chips
+                    if hasInfoChips {
+                        WrappingHStack(spacing: 8) {
+                            if let unitPrice = item.displayUnitPrice, !unitPrice.isEmpty {
+                                infoChip(icon: "scalemass", text: unitPrice)
+                            }
+                            if let label = item.savingsLabel, !label.isEmpty {
+                                infoChip(icon: "arrow.down.circle", text: label, isAccented: true)
+                            }
+                            if let unitPrice = item.effectiveUnitPrice, unitPrice > 0 {
+                                infoChip(icon: "tag", text: String(format: "€%.2f/pc", unitPrice))
+                            }
+                            if let qty = item.minPurchaseQty, qty > 1 {
+                                infoChip(icon: "number", text: "Min. \(qty)")
+                            }
+                        }
+                    }
+
                     // Folder link
                     if let urlString = item.promoFolderUrl,
                        let url = URL(string: urlString) {
                         Link(destination: url) {
                             HStack(spacing: 6) {
-                                Image(systemName: "book.pages")
-                                    .font(.system(size: 12, weight: .medium))
+                                Image(systemName: "safari")
+                                    .font(.system(size: 13, weight: .medium))
                                 if let page = item.pageNumber {
-                                    Text("Bekijk in folder — p. \(page)")
+                                    Text("\(L("view_in_folder")) — p. \(page)")
                                         .font(.system(size: 13, weight: .semibold))
                                 } else {
-                                    Text("Bekijk in folder")
+                                    Text(L("view_in_folder"))
                                         .font(.system(size: 13, weight: .semibold))
                                 }
                                 Image(systemName: "arrow.up.right")
@@ -593,10 +642,15 @@ struct PromoItemRow: View {
                             }
                             .foregroundColor(Color(red: 0.4, green: 0.6, blue: 1.0))
                             .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 10)
+                            .fixedSize()
                             .background(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.12))
+                                Capsule()
+                                    .fill(Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.10))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.20), lineWidth: 0.5)
                             )
                         }
                     }
@@ -611,31 +665,74 @@ struct PromoItemRow: View {
 
     @ViewBuilder
     private var priceView: some View {
-        if item.isMultiBuy, let qty = item.minPurchaseQty, qty > 1 {
-            let totalWithout = item.originalPrice * Double(qty)
-            let totalWith = totalWithout - item.savings
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(String(format: "€%.2f", totalWith))
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+        let qty = item.minPurchaseQty ?? 1
+        if qty > 1 {
+            // Multi-buy: show total prices for the full deal
+            let totalOriginal = item.originalPrice * Double(qty)
+            let totalUserPays = totalOriginal - item.savings
+            VStack(alignment: .trailing, spacing: 4) {
+                if item.discountPercentage > 0 {
+                    Text("-\(item.discountPercentage)%")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .foregroundStyle(greenGradient)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(promoGreen.opacity(0.15)))
+                }
+                Text(String(format: "€%.2f", totalUserPays))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(greenGradient)
-                Text(String(format: "€%.2f", totalWithout))
-                    .font(.system(size: 11))
+                Text(String(format: "€%.2f", totalOriginal))
+                    .font(.system(size: 10))
                     .foregroundColor(.white.opacity(0.3))
                     .strikethrough(true, color: .white.opacity(0.3))
             }
             .fixedSize()
         } else {
-            VStack(alignment: .trailing, spacing: 2) {
+            // Single-item: show per-unit prices
+            VStack(alignment: .trailing, spacing: 4) {
+                if item.discountPercentage > 0 {
+                    Text("-\(item.discountPercentage)%")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .foregroundStyle(greenGradient)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(promoGreen.opacity(0.15)))
+                }
                 Text(String(format: "€%.2f", item.promoPrice))
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(greenGradient)
                 Text(String(format: "€%.2f", item.originalPrice))
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
                     .foregroundColor(.white.opacity(0.3))
                     .strikethrough(true, color: .white.opacity(0.3))
             }
             .fixedSize()
         }
+    }
+
+    // MARK: - Info Chips
+
+    private var hasInfoChips: Bool {
+        (item.displayUnitPrice != nil && !(item.displayUnitPrice?.isEmpty ?? true))
+        || (item.savingsLabel != nil && !(item.savingsLabel?.isEmpty ?? true))
+        || (item.minPurchaseQty ?? 0) > 1
+    }
+
+    private func infoChip(icon: String, text: String, isAccented: Bool = false) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundColor(isAccented ? promoGreen : .white.opacity(0.6))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isAccented ? promoGreen.opacity(0.10) : Color.white.opacity(0.06))
+        )
     }
 }
 

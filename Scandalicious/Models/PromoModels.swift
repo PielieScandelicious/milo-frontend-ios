@@ -93,11 +93,6 @@ struct PromoStoreItem: Codable, Identifiable {
     /// Whether both original and promo prices are available for display
     var hasPrices: Bool { originalPrice > 0 && promoPrice > 0 }
 
-    /// Whether this is a multi-buy deal (original == promo price, savings come from quantity)
-    var isMultiBuy: Bool {
-        originalPrice > 0 && promoPrice > 0 && abs(originalPrice - promoPrice) < 0.01
-    }
-
     /// Best available product label: display_name if available, else product_name
     var label: String { (displayName?.isEmpty == false ? displayName : productName) ?? productName }
 
