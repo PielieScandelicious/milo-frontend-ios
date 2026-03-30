@@ -149,6 +149,11 @@ struct ContentView: View {
                 selectedTab = .promos
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("app.switchToHomeTab"))) { _ in
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                selectedTab = .home
+            }
+        }
         .onChange(of: brandCashbackViewModel.showEarnedOverlay) { _, showing in
             if showing {
                 enqueueOverlay(.brandCashback(

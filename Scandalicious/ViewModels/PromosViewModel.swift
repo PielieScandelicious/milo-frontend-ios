@@ -18,6 +18,9 @@ class PromosViewModel: ObservableObject {
     /// All stores that have deals this week (even if not selected), keyed by name
     private var allAvailableStores: [String: PromoStore] = [:]
 
+    /// True while reloading after store selection change — shows dachshund instead of stale empty state
+    @Published var isReloadingAfterStoreChange = false
+
     private let apiService = PromoAPIService.shared
     private let profileService = ProfileAPIService()
     private var isLoading = false
@@ -125,7 +128,15 @@ class PromosViewModel: ObservableObject {
 
     /// Deal count for a store name (from this week's data)
     func dealCount(for storeName: String) -> Int {
-        allAvailableStores[storeName]?.items.count ?? 0
+        // First check full store data (selected stores with items)
+        if let count = allAvailableStores[storeName]?.items.count, count > 0 {
+            return count
+        }
+        // Fall back to summary breakdown (covers ALL stores including unselected)
+        if let breakdown = state.value?.summary.storesBreakdown.first(where: { $0.store == storeName }) {
+            return breakdown.items
+        }
+        return 0
     }
 
     func moveStore(from source: IndexSet, to destination: Int) {
@@ -177,6 +188,7 @@ class PromosViewModel: ObservableObject {
         }
 
         guard selectionChanged else { return }
+        isReloadingAfterStoreChange = true
         Task {
             do {
                 _ = try await profileService.updateProfile(
@@ -188,6 +200,7 @@ class PromosViewModel: ObservableObject {
             } catch {
                 print("[PromosVM] failed to save store preferences: \(error.localizedDescription)")
             }
+            isReloadingAfterStoreChange = false
         }
     }
 

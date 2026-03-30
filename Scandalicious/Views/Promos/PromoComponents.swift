@@ -415,18 +415,41 @@ struct PromoStoreSection: View {
                 .padding(.bottom, 12)
 
                 if store.items.isEmpty {
-                    // Empty state
-                    VStack(spacing: 6) {
-                        Text("No deals this week")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white.opacity(0.35))
-                        Text("Check back next week for new promotions.")
+                    // Empty state — per-store, no deals
+                    VStack(spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "tag.slash")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(storeAccentColor.opacity(0.5))
+                            Text("No matching deals this week")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.45))
+                        }
+
+                        Text("New promotions drop every week — check back soon.")
                             .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.2))
+                            .foregroundColor(.white.opacity(0.25))
+                            .multilineTextAlignment(.center)
+
+                        // If the store has a promo folder, link to it
+                        if let folderUrl = store.items.first?.promoFolderUrl,
+                           let url = URL(string: folderUrl) {
+                            Link(destination: url) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "safari")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("Browse full folder")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(storeAccentColor.opacity(0.8))
+                            }
+                            .padding(.top, 2)
+                        }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .padding(.bottom, 8)
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 4)
                 } else {
                     // Items
                     let visibleItems = isExpanded ? store.items : Array(store.items.prefix(initialItemCount))
@@ -750,41 +773,177 @@ struct PromoEmptyView: View {
     let status: PromoReportStatus
     let title: String
     let message: String
+    var onAddStores: (() -> Void)? = nil
+    var onScanReceipt: (() -> Void)? = nil
+
+    @State private var appeared = false
+    @State private var iconPulse = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: iconName)
-                .font(.system(size: 44))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.white.opacity(0.2), .white.opacity(0.1)],
-                        startPoint: .top,
-                        endPoint: .bottom
+        VStack(spacing: 20) {
+            // Icon with animated glow
+            ZStack {
+                // Glow ring behind icon
+                Circle()
+                    .fill(accentColor.opacity(0.08))
+                    .frame(width: 88, height: 88)
+                    .scaleEffect(iconPulse ? 1.12 : 1.0)
+                    .opacity(iconPulse ? 0.6 : 0.3)
+
+                Circle()
+                    .fill(Color(white: 0.08))
+                    .frame(width: 72, height: 72)
+                    .overlay(Circle().stroke(accentColor.opacity(0.2), lineWidth: 1))
+
+                Image(systemName: iconName)
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [accentColor, accentColor.opacity(0.6)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
+            }
+
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text(subtitle)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+            }
+
+            // Status-specific hint
+            if let hint = contextHint {
+                HStack(spacing: 6) {
+                    Image(systemName: hintIcon)
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(hint)
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(accentColor.opacity(0.7))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule().fill(accentColor.opacity(0.08))
                 )
+            }
 
-            Text(title)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
-
-            Text(message)
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.5))
-                .multilineTextAlignment(.center)
+            // CTA buttons
+            ctaButton
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-        .padding(.horizontal, 32)
+        .padding(.vertical, 40)
+        .padding(.horizontal, 24)
+        .glassCard()
+        .padding(.horizontal, 16)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 16)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                appeared = true
+            }
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(0.5)) {
+                iconPulse = true
+            }
+        }
+    }
+
+    // MARK: - Status-specific content
+
+    private var subtitle: String {
+        switch status {
+        case .noReportAvailable:
+            return "Milo is sniffing out the best deals for your stores. Your personalised report refreshes every week."
+        case .noEnrichedProfile:
+            return "Milo personalises deals based on your shopping habits. Scan a few receipts so he knows what you like!"
+        case .ready:
+            return message.isEmpty
+                ? "No matching promotions this week across your selected stores. Milo will keep looking!"
+                : message
+        }
+    }
+
+    private var contextHint: String? {
+        switch status {
+        case .noReportAvailable:
+            return "Usually ready by Monday"
+        case .noEnrichedProfile:
+            return "Scan 2–3 receipts to get started"
+        case .ready:
+            return nil
+        }
+    }
+
+    private var hintIcon: String {
+        switch status {
+        case .noReportAvailable: return "clock"
+        case .noEnrichedProfile: return "camera.viewfinder"
+        case .ready: return "calendar"
+        }
+    }
+
+    private var accentColor: Color {
+        switch status {
+        case .noReportAvailable: return Color(red: 0.40, green: 0.70, blue: 1.0)
+        case .noEnrichedProfile: return promoGreen
+        case .ready: return promoGold
+        }
     }
 
     private var iconName: String {
         switch status {
         case .ready:
-            return "bag.fill"
+            return "pawprint.fill"
         case .noEnrichedProfile:
             return "doc.text.viewfinder"
         case .noReportAvailable:
-            return "clock.badge.exclamationmark"
+            return "sparkle.magnifyingglass"
+        }
+    }
+
+    @ViewBuilder
+    private var ctaButton: some View {
+        switch status {
+        case .noEnrichedProfile:
+            if let onScan = onScanReceipt {
+                Button(action: onScan) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Scan a Receipt")
+                            .font(.system(size: 15, weight: .bold))
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(promoGreen))
+                }
+                .padding(.top, 4)
+            }
+        case .ready:
+            if let onAdd = onAddStores {
+                Button(action: onAdd) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Add More Stores")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundColor(promoGreen)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(Capsule().stroke(promoGreen, lineWidth: 1.5))
+                }
+                .padding(.top, 4)
+            }
+        case .noReportAvailable:
+            EmptyView()
         }
     }
 }
@@ -795,38 +954,63 @@ struct PromoErrorView: View {
     let message: String
     let onRetry: () -> Void
 
+    @State private var appeared = false
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 40))
-                .foregroundColor(.orange)
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.08))
+                    .frame(width: 72, height: 72)
+                    .overlay(Circle().stroke(Color.orange.opacity(0.2), lineWidth: 1))
 
-            Text("Couldn't load deals")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.orange, .orange.opacity(0.7)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
 
-            Text(message)
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.5))
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                Text("Couldn't load deals")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
 
-            Button {
-                onRetry()
-            } label: {
-                HStack(spacing: 6) {
+                Text(message)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+            }
+
+            Button(action: onRetry) {
+                HStack(spacing: 8) {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Retry")
                         .font(.system(size: 14, weight: .semibold))
+                    Text("Try Again")
+                        .font(.system(size: 15, weight: .bold))
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(Capsule().fill(Color.blue))
+                .foregroundColor(.black)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Capsule().fill(Color.orange))
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-        .padding(.horizontal, 32)
+        .padding(.vertical, 40)
+        .padding(.horizontal, 24)
+        .glassCard()
+        .padding(.horizontal, 16)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 16)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                appeared = true
+            }
+        }
     }
 }

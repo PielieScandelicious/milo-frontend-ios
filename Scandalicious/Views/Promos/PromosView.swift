@@ -144,35 +144,8 @@ struct PromosView: View {
         case .success(let data):
             VStack(spacing: 20) {
                 if viewModel.selectedStoreNames.isEmpty {
-                    // No stores selected — Apple-style empty state
-                    VStack(spacing: 16) {
-                        Image(systemName: "storefront")
-                            .font(.system(size: 44))
-                            .foregroundStyle(.tertiary)
-
-                        Text("No Stores Selected")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.primary)
-
-                        Text("Pick your favourite stores to see personalised weekly deals.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-
-                        Button {
-                            showManageSheet = true
-                        } label: {
-                            Label("Add Stores", systemImage: "plus")
-                                .font(.subheadline.weight(.medium))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.regular)
-                        .tint(.green)
-                        .padding(.top, 4)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 60)
-                    .padding(.horizontal, 32)
+                    // Scenario 1: No stores selected
+                    noStoresSelectedView
                 } else {
                     // Summary header + store bar grouped together
                     VStack(spacing: 8) {
@@ -181,11 +154,22 @@ struct PromosView: View {
                     }
                     .padding(.horizontal, 16)
 
-                    if !data.isReady || data.dealCount == 0 {
+                    if viewModel.isReloadingAfterStoreChange {
+                        PromoSkeletonView()
+                    } else if !data.isReady || data.dealCount == 0 {
+                        // Scenarios 2, 3, 4: report not ready / no profile / zero deals
                         PromoEmptyView(
                             status: data.reportStatus,
                             title: emptyTitle(for: data),
-                            message: data.message
+                            message: data.message,
+                            onAddStores: { showManageSheet = true },
+                            onScanReceipt: {
+                                // Navigate to Home/Scan tab
+                                NotificationCenter.default.post(
+                                    name: Notification.Name("app.switchToHomeTab"),
+                                    object: nil
+                                )
+                            }
                         )
                     } else {
                         promoContent(data)
@@ -204,6 +188,108 @@ struct PromosView: View {
             }
         }
     }
+
+    // MARK: - Scenario 1: No stores selected
+
+    private var noStoresSelectedView: some View {
+        VStack(spacing: 24) {
+            // Dachshund icon with store context
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [promoGreenLocal.opacity(0.12), Color.clear],
+                            center: .center, startRadius: 0, endRadius: 56
+                        )
+                    )
+                    .frame(width: 112, height: 112)
+
+                Circle()
+                    .fill(Color(white: 0.08))
+                    .frame(width: 80, height: 80)
+                    .overlay(Circle().stroke(promoGreenLocal.opacity(0.25), lineWidth: 1.5))
+
+                Image(systemName: "storefront")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [promoGreenLocal, promoGreenLocal.opacity(0.6)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                // Paw badge
+                Image(systemName: "pawprint.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(promoGreenLocal)
+                    .background(
+                        Circle()
+                            .fill(Color(white: 0.06))
+                            .frame(width: 28, height: 28)
+                    )
+                    .offset(x: 30, y: 30)
+            }
+
+            VStack(spacing: 10) {
+                Text("Where do you shop?")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text("Pick your favourite stores and Milo will sniff out the best weekly deals for you.")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+            }
+            .padding(.horizontal, 8)
+
+            // Store preview chips
+            storePreviewChips
+
+            // CTA
+            Button {
+                showManageSheet = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Choose Stores")
+                        .font(.system(size: 16, weight: .bold))
+                }
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Capsule().fill(promoGreenLocal))
+            }
+            .padding(.horizontal, 8)
+        }
+        .padding(.vertical, 36)
+        .padding(.horizontal, 24)
+        .glassCard()
+        .padding(.horizontal, 16)
+    }
+
+    private var storePreviewChips: some View {
+        // Show a few popular store logos as a preview of what's available
+        let previewStores: [GroceryStore] = [.colruyt, .delhaize, .carrefour, .lidl, .albertHeijn]
+        return HStack(spacing: -4) {
+            ForEach(Array(previewStores.enumerated()), id: \.element) { index, store in
+                StoreLogoView(storeName: store.rawValue, height: 18)
+                    .frame(width: 36, height: 36)
+                    .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color(white: 0.06), lineWidth: 1.5))
+                    .zIndex(Double(previewStores.count - index))
+            }
+            Text("+\(GroceryStore.promoSupported.count - previewStores.count) more")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.4))
+                .padding(.leading, 12)
+        }
+    }
+
+    // Promo green local ref (same as in PromoComponents)
+    private let promoGreenLocal = Color(red: 0.20, green: 0.85, blue: 0.50)
 
     private var storeBar: some View {
         Button {
@@ -275,9 +361,9 @@ struct PromosView: View {
             }
             return "No deals this week"
         case .noEnrichedProfile:
-            return "Keep scanning receipts"
+            return "Help Milo learn your taste"
         case .noReportAvailable:
-            return "Report not ready yet"
+            return "Milo is on the hunt"
         }
     }
 }
@@ -328,7 +414,7 @@ struct ManageStoresSheet: View {
             Text("Your Stores")
         } footer: {
             if !viewModel.selectedStoreNames.isEmpty {
-                Text("Drag to reorder. Swipe to remove.")
+                Text("Drag to reorder. Tap \(Image(systemName: "minus.circle.fill")) to remove.")
             }
         }
     }
