@@ -581,8 +581,13 @@ struct PromoItemRow: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "book.pages")
                                     .font(.system(size: 12, weight: .medium))
-                                Text("Bekijk in folder")
-                                    .font(.system(size: 13, weight: .semibold))
+                                if let page = item.pageNumber {
+                                    Text("Bekijk in folder — p. \(page)")
+                                        .font(.system(size: 13, weight: .semibold))
+                                } else {
+                                    Text("Bekijk in folder")
+                                        .font(.system(size: 13, weight: .semibold))
+                                }
                                 Image(systemName: "arrow.up.right")
                                     .font(.system(size: 10, weight: .bold))
                             }

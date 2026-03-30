@@ -232,8 +232,7 @@ struct PromosView: View {
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 11, weight: .semibold))
                     Text("Manage")
-                        .font(.system(size: 12, weight: .semibold))
-                }
+                        .font(.system(size: 12, weight: .semibold))                }
                 .foregroundColor(.white.opacity(0.5))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
