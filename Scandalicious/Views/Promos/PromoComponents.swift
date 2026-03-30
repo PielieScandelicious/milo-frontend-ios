@@ -586,12 +586,12 @@ struct PromoItemRow: View {
                                 Image(systemName: "arrow.up.right")
                                     .font(.system(size: 10, weight: .bold))
                             }
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Color(red: 0.4, green: 0.6, blue: 1.0))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color.white.opacity(0.1))
+                                    .fill(Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.12))
                             )
                         }
                     }
