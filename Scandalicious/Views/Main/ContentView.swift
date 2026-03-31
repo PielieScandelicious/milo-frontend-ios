@@ -31,12 +31,10 @@ struct ContentView: View {
     @StateObject private var brandCashbackViewModel = BrandCashbackViewModel()
     @ObservedObject private var gm = GamificationManager.shared
 
-    // Unified overlay queue — all reward overlays flow through here in order:
-    // brand cashback → referral → badge achievements
+    // Unified overlay queue — all reward overlays flow through here in order
     private enum OverlayItem {
         case brandCashback(dealName: String, amount: Double)
         case referral(amount: Double)
-        case badge(Badge)
     }
     @State private var overlayQueue: [OverlayItem] = []
     @State private var activeOverlay: OverlayItem? = nil
@@ -100,10 +98,6 @@ struct ContentView: View {
                                 dequeueOverlay()
                             }
                         )
-                    case .badge(let badge):
-                        BadgeUnlockView(badge: badge) {
-                            dequeueOverlay()
-                        }
                     }
                 }
                 .transition(.opacity)
@@ -147,11 +141,6 @@ struct ContentView: View {
         .onChange(of: gm.showReferralEarnedOverlay) { _, showing in
             if showing {
                 enqueueOverlay(.referral(amount: gm.pendingOverlayEuros))
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .badgeUnlocked)) { _ in
-            if let badge = GamificationManager.shared.lastUnlockedBadge {
-                enqueueOverlay(.badge(badge))
             }
         }
         .confirmationDialog(L("sign_out"), isPresented: $showSignOutConfirmation) {

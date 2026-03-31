@@ -14,28 +14,8 @@ extension Notification.Name {
     static let rewardEarned  = Notification.Name("gamification.rewardEarned")
     static let rewardClaimed = Notification.Name("gamification.rewardClaimed")
     static let spinCompleted = Notification.Name("gamification.spinCompleted")
-    static let badgeUnlocked = Notification.Name("gamification.badgeUnlocked")
+
     static let referralRewardAvailable = Notification.Name("gamification.referralRewardAvailable")
-}
-
-// MARK: - Codable Color Wrapper
-
-struct CodableColor: Codable {
-    var red: Double
-    var green: Double
-    var blue: Double
-    var alpha: Double
-
-    init(_ color: Color) {
-        let uiColor = UIColor(color)
-        var r: CGFloat = 0; var g: CGFloat = 0; var b: CGFloat = 0; var a: CGFloat = 0
-        uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
-        red = Double(r); green = Double(g); blue = Double(b); alpha = Double(a)
-    }
-
-    var color: Color {
-        Color(red: red, green: green, blue: blue, opacity: alpha)
-    }
 }
 
 // MARK: - Wallet Balance
@@ -129,53 +109,6 @@ struct StreakData: Codable {
         let clamped = min(Double(weekCount), 52.0)
         return 1.0 + (clamped / 52.0) * 0.8
     }
-}
-
-// MARK: - Badge
-
-struct Badge: Identifiable, Codable, Equatable {
-    let id: String
-    let name: String
-    let description: String
-    let icon: String
-    let iconColor: CodableColor
-    var isUnlocked: Bool
-    var unlockedAt: Date?
-    var progress: Double?       // 0.0–1.0 progress toward unlock
-    var progressLabel: String?  // e.g. "3/5 stores"
-
-    static func == (lhs: Badge, rhs: Badge) -> Bool {
-        lhs.id == rhs.id && lhs.isUnlocked == rhs.isUnlocked && lhs.progress == rhs.progress
-    }
-
-    /// Ordered by estimated time to achieve (easiest → hardest).
-    /// The grid shows the first 9; the test panel shows all.
-    static let allBadges: [Badge] = [
-        // Row 1 – Instant / first session
-        Badge(id: "first_scan",        name: "First Scan",       description: "Upload your first receipt",              icon: "doc.text.viewfinder",  iconColor: CodableColor(Color(red: 0.2, green: 0.8, blue: 0.4)),  isUnlocked: false, unlockedAt: nil),
-        Badge(id: "night_scanner",     name: "Night Owl",        description: "Upload a receipt after 10 PM",           icon: "moon.fill",            iconColor: CodableColor(.indigo),                                  isUnlocked: false, unlockedAt: nil),
-        Badge(id: "big_spender",       name: "Big Spender",      description: "Scan a receipt over €100",               icon: "banknote.fill",        iconColor: CodableColor(Color(red: 0.2, green: 0.8, blue: 0.4)),  isUnlocked: false, unlockedAt: nil),
-        // Row 2 – First few weeks
-        Badge(id: "streak_2",          name: "Getting Started",  description: "Reach a 2-week streak",                  icon: "flag.fill",            iconColor: CodableColor(.orange),                                  isUnlocked: false, unlockedAt: nil),
-        Badge(id: "weekend_warrior",   name: "Weekend Warrior",  description: "Scan on both Saturday and Sunday",       icon: "sun.max.fill",         iconColor: CodableColor(Color(red: 1.0, green: 0.6, blue: 0.2)),  isUnlocked: false, unlockedAt: nil),
-        // Row 3 – ~1 month
-        Badge(id: "collector",         name: "Collector",        description: "Scan receipts from 5 different stores",  icon: "storefront.fill",      iconColor: CodableColor(.cyan),                                    isUnlocked: false, unlockedAt: nil),
-        Badge(id: "streak_4",          name: "Consistent",       description: "Reach a 4-week streak",                  icon: "flame.fill",           iconColor: CodableColor(Color(red: 1.0, green: 0.5, blue: 0.0)),  isUnlocked: false, unlockedAt: nil),
-        Badge(id: "budget_boss",       name: "Budget Boss",      description: "Finish a month under budget",            icon: "chart.pie.fill",       iconColor: CodableColor(Color(red: 0.3, green: 0.7, blue: 1.0)),  isUnlocked: false, unlockedAt: nil),
-        // Row 4 – ~2 months (beyond grid)
-        Badge(id: "streak_8",          name: "Dedicated",        description: "Reach an 8-week streak",                 icon: "flame.fill",           iconColor: CodableColor(.red),                                     isUnlocked: false, unlockedAt: nil),
-        Badge(id: "penny_pincher",     name: "Penny Pincher",    description: "Finish a month 20%+ under budget",       icon: "scissors",             iconColor: CodableColor(Color(red: 0.0, green: 0.8, blue: 0.7)),  isUnlocked: false, unlockedAt: nil),
-        Badge(id: "grocery_guru",      name: "Grocery Guru",     description: "Scan 20 grocery receipts",               icon: "carrot.fill",          iconColor: CodableColor(Color(red: 0.4, green: 0.85, blue: 0.3)), isUnlocked: false, unlockedAt: nil),
-        // Row 5 – ~3 months
-        Badge(id: "social_butterfly",  name: "Social Butterfly", description: "Refer 3 friends who join Milo",          icon: "person.3.fill",        iconColor: CodableColor(Color(red: 0.85, green: 0.3, blue: 0.9)), isUnlocked: false, unlockedAt: nil),
-        Badge(id: "streak_12",         name: "Marathon Streak",  description: "Reach a 12-week streak",                 icon: "figure.run",           iconColor: CodableColor(Color(red: 1.0, green: 0.35, blue: 0.2)), isUnlocked: false, unlockedAt: nil),
-        Badge(id: "category_explorer", name: "Category Explorer", description: "Buy from 8 different categories",      icon: "square.grid.3x3.fill", iconColor: CodableColor(Color(red: 0.5, green: 0.6, blue: 1.0)),  isUnlocked: false, unlockedAt: nil),
-        // Row 6 – Long-term
-        Badge(id: "century_club",      name: "Century Club",     description: "Scan 100 receipts",                      icon: "trophy.fill",          iconColor: CodableColor(Color(red: 1.0, green: 0.84, blue: 0.0)), isUnlocked: false, unlockedAt: nil),
-    ]
-
-    /// Number of badges shown in the Achievements grid card.
-    static let gridDisplayCount = 6
 }
 
 // MARK: - Spin Wheel

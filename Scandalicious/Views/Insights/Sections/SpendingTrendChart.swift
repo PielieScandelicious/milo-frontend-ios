@@ -27,7 +27,7 @@ struct SpendingTrendChart: View {
     private let chartHeight: CGFloat = 150
 
     var body: some View {
-        if viewModel.trendState == .loading {
+        if viewModel.trendState == .loading && trends.isEmpty {
             chartSkeleton
         } else if trends.isEmpty {
             emptyState
