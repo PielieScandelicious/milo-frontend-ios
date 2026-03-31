@@ -20,7 +20,6 @@ struct HomeTabView: View {
     @State private var contentOpacity: Double = 0
     @State private var showMiloGame = false
     @State private var showWalletPassCreator = false
-    @State private var lotteryStatus: LotteryStatus?
     @Environment(\.scenePhase) private var scenePhase
 
     private let headerBlueColor = Color(red: 0.04, green: 0.15, blue: 0.30)
@@ -41,18 +40,10 @@ struct HomeTabView: View {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
                 contentOpacity = 1.0
             }
-            Task {
-                if let status = try? await LotteryAPIService().getLotteryStatus() {
-                    await MainActor.run {
-                        lotteryStatus = status
-                    }
-                }
-            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 checkForShareExtensionUploads()
-                refreshLotteryStatus()
             }
         }
         .sheet(isPresented: $showProfile) {
@@ -122,19 +113,13 @@ struct HomeTabView: View {
                     .transition(.opacity)
                 }
 
-                // Monthly lottery
-                MonthlyLotteryCard(lotteryStatus: lotteryStatus) {
-                    refreshLotteryStatus()
-                }
+                // Recent uploaded receipts
+                RecentUploadsSection(
+                    receipts: viewModel.uploadedReceipts,
+                    isLoading: viewModel.isLoadingReceipts,
+                    onRefresh: { viewModel.loadUploadedReceipts() }
+                )
                 .padding(.horizontal, 20)
-
-                // Cashback hint card
-                CashbackHintCard()
-                    .padding(.horizontal, 20)
-
-                // Recent rewards
-                RecentReceiptsSection(receipts: viewModel.recentReceipts)
-                    .padding(.horizontal, 20)
 
                 Spacer()
                     .frame(height: 120)
@@ -207,88 +192,6 @@ struct HomeTabView: View {
         processingManager.reloadPersistedReceipts()
     }
 
-    private func refreshLotteryStatus() {
-        Task {
-            if let status = try? await LotteryAPIService().getLotteryStatus() {
-                await MainActor.run { lotteryStatus = status }
-            }
-        }
-    }
-}
-
-// MARK: - Cashback Hint Card
-
-private struct CashbackHintCard: View {
-    private let cashbackGreen = Color(red: 0.25, green: 0.90, blue: 0.55)
-
-    var body: some View {
-        Button(action: openCashbackTab) {
-            VStack(alignment: .leading, spacing: 14) {
-                // Header row
-                HStack(spacing: 8) {
-                    Image(systemName: "tag.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(cashbackGreen)
-                    Text("CASHBACK DEALS")
-                        .font(.system(size: 11, weight: .heavy))
-                        .tracking(1.2)
-                        .foregroundStyle(cashbackGreen)
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(cashbackGreen.opacity(0.6))
-                }
-
-                // Step chips
-                HStack(spacing: 8) {
-                    ForEach(["1 Claim", "2 Upload", "3 Earn"], id: \.self) { step in
-                        Text(step)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(cashbackGreen)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(
-                                Capsule().fill(cashbackGreen.opacity(0.12))
-                            )
-                    }
-                    Spacer()
-                }
-
-                // Body
-                Text("Earn money back on branded products. Claim a deal before uploading your receipt.")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.65))
-                    .lineSpacing(2)
-                    .multilineTextAlignment(.leading)
-
-                // CTA
-                HStack {
-                    Spacer()
-                    Text("Explore Deals →")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 9)
-                        .background(Capsule().fill(cashbackGreen))
-                }
-            }
-            .padding(18)
-            .glassCard(
-                borderGradient: LinearGradient(
-                    colors: [cashbackGreen.opacity(0.35), cashbackGreen.opacity(0.08)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func openCashbackTab() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        UserDefaults.standard.set(true, forKey: "cashback.openCashbackSegment")
-        NotificationCenter.default.post(name: .switchToDealsTab, object: nil)
-    }
 }
 
 extension Notification.Name {

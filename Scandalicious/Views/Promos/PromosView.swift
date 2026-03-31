@@ -9,8 +9,6 @@ import SwiftUI
 
 struct PromosView: View {
     @ObservedObject var viewModel: PromosViewModel
-    @EnvironmentObject var cashbackViewModel: BrandCashbackViewModel
-    @State private var activeSegment: DealsSegment = .weekly
     @State private var scrollOffset: CGFloat = 0
     @State private var contentOpacity: Double = 0
     @State private var showManageSheet = false
@@ -48,22 +46,7 @@ struct PromosView: View {
             GeometryReader { geo in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 20) {
-                        // Segment picker
-                        Picker("", selection: $activeSegment) {
-                            ForEach(DealsSegment.allCases, id: \.self) { segment in
-                                Text(segment.rawValue).tag(segment)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 4)
-
-                        // Content for selected segment
-                        if activeSegment == .weekly {
-                            contentForState
-                        } else {
-                            BrandCashbackView(viewModel: cashbackViewModel)
-                        }
+                        contentForState
                     }
                     .padding(.top, 16)
                     .padding(.bottom, 100)
@@ -96,14 +79,16 @@ struct PromosView: View {
                 contentOpacity = 1.0
             }
             configureSegmentedControlAppearance()
-            // Auto-switch to Cashback segment if requested from the hint card
-            if UserDefaults.standard.bool(forKey: "cashback.openCashbackSegment") {
-                UserDefaults.standard.removeObject(forKey: "cashback.openCashbackSegment")
-                withAnimation { activeSegment = .cashback }
-            }
         }
         .task {
             await viewModel.loadPromos()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .receiptUploadedSuccessfully)) { _ in
+            Task {
+                // Wait for backend to rebuild enriched profile after receipt processing
+                try? await Task.sleep(for: .seconds(3))
+                await viewModel.loadPromos(forceRefresh: true)
+            }
         }
     }
 

@@ -2,9 +2,8 @@
 //  ProcessingReceiptsCard.swift
 //  Scandalicious
 //
-//  Shows receipts being processed in the background with per-receipt status
-//  and progress bars. The backend processes 2 receipts concurrently; queued
-//  receipts show an "In queue" label with no progress movement.
+//  Shows receipts being processed in the background with per-receipt status.
+//  The backend processes 2 receipts concurrently; queued receipts show position.
 //
 
 import SwiftUI
@@ -14,144 +13,149 @@ struct ProcessingReceiptsCard: View {
     @ObservedObject var manager: ReceiptProcessingManager
     let onClaimReceipt: (ProcessingReceipt) -> Void
 
+    private var activeCount: Int {
+        manager.processingReceipts.filter { !$0.isTerminal }.count
+    }
+    private var completedReceipts: [ProcessingReceipt] {
+        manager.processingReceipts.filter { $0.status == .completed || $0.status == .success }
+    }
+    private var allDone: Bool {
+        !manager.hasActiveProcessing && !completedReceipts.isEmpty
+    }
+
     var body: some View {
         if !manager.processingReceipts.isEmpty {
             VStack(spacing: 0) {
-                // Header
-                HStack(spacing: 8) {
-                    headerIcon
-
-                    Text(headerTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.7))
-
-                    Spacer()
-
-                    if manager.processingReceipts.count > 1 {
-                        Text("\(manager.processingReceipts.count) receipts")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.35))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(Color.white.opacity(0.06)))
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .padding(.bottom, 8)
+                headerSection
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 4)
 
                 // Receipt rows
                 ForEach(manager.processingReceipts) { receipt in
                     ProcessingReceiptRow(
                         receipt: receipt,
+                        queuePosition: queuePosition(for: receipt),
                         onDismiss: { manager.dismiss(receipt.id) },
                         onClaim: { onClaimReceipt(receipt) }
                     )
                     .transition(.asymmetric(
-                        insertion: .push(from: .bottom).combined(with: .opacity),
+                        insertion: .move(edge: .top).combined(with: .opacity),
                         removal: .push(from: .bottom).combined(with: .opacity)
                     ))
                 }
 
-                // "Tap Milo to play while you wait" hint when actively processing
+                // Play hint
                 if manager.hasActiveProcessing {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.system(size: 11, weight: .medium))
                         Text("Tap Milo to play while you wait")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.35))
-
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.25))
                     }
-                    .padding(.top, 4)
-                    .padding(.bottom, 10)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
                 }
             }
-            .padding(.bottom, manager.hasActiveProcessing ? 0 : 10)
-            .background(cardBackground)
-            .overlay(completedBorder)
-            .overlay(defaultBorder)
-            .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            .padding(.bottom, manager.hasActiveProcessing ? 0 : 12)
+            .background {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: allDone ? .green.opacity(0.15) : .clear, radius: 12, y: 4)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(borderGradient, lineWidth: allDone ? 1 : 0.5)
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: allDone)
+            .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
+        }
+    }
+
+    // MARK: - Header
+
+    private var headerSection: some View {
+        HStack(spacing: 10) {
+            // Animated icon
+            ZStack {
+                Circle()
+                    .fill(headerIconBackground)
+                    .frame(width: 32, height: 32)
+
+                if allDone {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .symbolEffect(.bounce, value: allDone)
+                } else {
+                    Image(systemName: "doc.text.viewfinder")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.blue)
+                        .symbolEffect(.pulse, isActive: manager.hasActiveProcessing)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(headerTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                if !allDone && manager.processingReceipts.count > 1 {
+                    Text("\(activeCount) remaining")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            // Batch counter pill
+            if manager.processingReceipts.count > 1 {
+                Text("\(manager.processingReceipts.count)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(Circle().fill(.quaternary))
+            }
         }
     }
 
     private var headerTitle: String {
-        let active = manager.processingReceipts.filter { !$0.isTerminal }
-        let completed = manager.processingReceipts.filter { $0.status == .completed || $0.status == .success }
-        if active.isEmpty && !completed.isEmpty {
-            return completed.count == 1 ? "Receipt processed" : "Receipts processed"
+        if allDone {
+            return completedReceipts.count == 1 ? "Receipt processed" : "All receipts processed"
         }
         if manager.processingReceipts.count == 1 {
-            return "Processing your receipt..."
+            return "Processing receipt…"
         }
-        return "Processing receipts"
+        return "Processing receipts…"
     }
 
-    @ViewBuilder
-    private var headerIcon: some View {
-        if manager.hasActiveProcessing {
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.blue)
-                .symbolEffect(.rotate, isActive: true)
-        } else {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color(red: 0.2, green: 0.8, blue: 0.4))
-        }
+    private var headerIconBackground: Color {
+        if allDone { return .green.opacity(0.12) }
+        return .blue.opacity(0.12)
     }
 
-    private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 20)
-            .fill(Color(white: 0.08))
-            .overlay(
-                LinearGradient(
-                    colors: [Color.white.opacity(0.05), Color.white.opacity(0.02)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-    }
-
-    // Green glow border when all are done
-    @ViewBuilder
-    private var completedBorder: some View {
-        let allDone = !manager.hasActiveProcessing
-            && manager.processingReceipts.contains(where: { $0.status == .completed || $0.status == .success })
+    private var borderGradient: LinearGradient {
         if allDone {
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.2, green: 0.8, blue: 0.4).opacity(0.25),
-                            Color.white.opacity(0.05)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+            return LinearGradient(
+                colors: [.green.opacity(0.4), .green.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         }
+        return LinearGradient(
+            colors: [Color.primary.opacity(0.1), Color.primary.opacity(0.05)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
-    // Subtle default border
-    @ViewBuilder
-    private var defaultBorder: some View {
-        let allDone = !manager.hasActiveProcessing
-            && manager.processingReceipts.contains(where: { $0.status == .completed || $0.status == .success })
-        if !allDone {
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
-        }
+    private func queuePosition(for receipt: ProcessingReceipt) -> Int? {
+        guard receipt.isQueued else { return nil }
+        let queued = manager.processingReceipts.filter { $0.isQueued }
+        guard let idx = queued.firstIndex(where: { $0.id == receipt.id }) else { return nil }
+        return idx + 1
     }
 }
 
@@ -159,37 +163,26 @@ struct ProcessingReceiptsCard: View {
 
 struct ProcessingReceiptRow: View {
     let receipt: ProcessingReceipt
+    let queuePosition: Int?
     let onDismiss: () -> Void
     let onClaim: () -> Void
-
-    private let successGreen = Color(red: 0.2, green: 0.8, blue: 0.4)
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                statusIndicator
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(receipt.displayName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-
-                    statusLabel
-                }
-
+                statusIcon
+                receiptInfo
                 Spacer(minLength: 4)
-
-                rightContent
+                trailingContent
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
 
-            // Per-receipt progress bar — only when actively being processed
             if receipt.isActivelyProcessing {
                 ReceiptProgressBar(processingStartedAt: receipt.processingStartedAt)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                    .transition(.opacity)
+                    .padding(.bottom, 10)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .contentShape(Rectangle())
@@ -201,114 +194,112 @@ struct ProcessingReceiptRow: View {
         }
     }
 
-    @ViewBuilder
-    private var rightContent: some View {
-        if receipt.status == .completed || receipt.status == .success {
-            HStack(spacing: 8) {
-                if let amount = receipt.totalAmount {
-                    Text(String(format: "\u{20AC}%.2f", amount))
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                }
-
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.3))
-                        .frame(width: 24, height: 24)
-                        .background(Circle().fill(Color.white.opacity(0.08)))
-                }
-            }
-        } else if receipt.status == .failed {
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.3))
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(Color.white.opacity(0.08)))
-            }
-        }
-    }
-
-    /// Use processingStartedAt as source of truth — the backend reports .processing
-    /// for ALL receipts including queued ones, so we can't rely on status alone.
-    private var isActiveOrProcessing: Bool {
-        receipt.processingStartedAt != nil && !receipt.isTerminal
-    }
-
-    private var isQueued: Bool {
-        receipt.processingStartedAt == nil && !receipt.isTerminal
-    }
+    // MARK: - Status Icon
 
     @ViewBuilder
-    private var statusIndicator: some View {
+    private var statusIcon: some View {
         ZStack {
-            Circle()
-                .fill(statusColor.opacity(0.15))
-                .frame(width: 32, height: 32)
-
             if receipt.isTerminal {
                 if receipt.status == .failed {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 24))
                         .foregroundStyle(.red)
+                        .symbolEffect(.bounce, value: receipt.status)
                 } else {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(successGreen)
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.green)
+                        .symbolEffect(.bounce, value: receipt.status)
                 }
-            } else if isActiveOrProcessing {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.blue)
-                    .symbolEffect(.rotate, isActive: true)
+            } else if receipt.isActivelyProcessing {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(.blue)
             } else {
-                // Queued
-                Image(systemName: "clock")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.4))
+                // Queued — show position number
+                ZStack {
+                    Circle()
+                        .fill(.quaternary)
+                        .frame(width: 26, height: 26)
+                    Text("\(queuePosition ?? 0)")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
+        .frame(width: 28, height: 28)
     }
 
-    private var statusColor: Color {
-        if receipt.isTerminal {
-            return receipt.status == .failed ? .red : Color(red: 0.2, green: 0.8, blue: 0.4)
+    // MARK: - Receipt Info
+
+    private var receiptInfo: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(receipt.displayName)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            statusSubtitle
         }
-        return isActiveOrProcessing ? .blue : Color.white.opacity(0.2)
     }
 
     @ViewBuilder
-    private var statusLabel: some View {
-        if receipt.isTerminal {
-            if receipt.status == .failed {
-                Text(receipt.errorMessage ?? "Processing failed")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.red.opacity(0.7))
-                    .lineLimit(1)
-            } else {
-                if let dateStr = receipt.formattedDate {
-                    Text(dateStr)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
-                }
+    private var statusSubtitle: some View {
+        if receipt.status == .failed {
+            Text(receipt.errorMessage ?? "Processing failed")
+                .font(.system(size: 13))
+                .foregroundStyle(.red)
+                .lineLimit(1)
+        } else if receipt.isTerminal {
+            if let dateStr = receipt.formattedDate {
+                Text(dateStr)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
             }
-        } else if isActiveOrProcessing {
-            Text("Processing...")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.blue.opacity(0.8))
+        } else if receipt.isActivelyProcessing {
+            Text("Scanning items…")
+                .font(.system(size: 13))
+                .foregroundStyle(.blue)
         } else {
-            Text("In queue")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.35))
+            Text("Waiting in queue")
+                .font(.system(size: 13))
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    // MARK: - Trailing Content
+
+    @ViewBuilder
+    private var trailingContent: some View {
+        if receipt.status == .completed || receipt.status == .success {
+            HStack(spacing: 10) {
+                if let amount = receipt.totalAmount {
+                    Text(String(format: "€%.2f", amount))
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .contentTransition(.numericText())
+                }
+
+                dismissButton
+            }
+        } else if receipt.status == .failed {
+            dismissButton
+        }
+    }
+
+    private var dismissButton: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.tertiary)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(.quaternary))
         }
     }
 }
 
 // MARK: - Per-Receipt Progress Bar
 
-/// Animated progress bar using a quadratic-exponential curve.
-/// Only rendered when receipt is actively being processed.
 private struct ReceiptProgressBar: View {
     let processingStartedAt: Date?
 
@@ -317,32 +308,27 @@ private struct ReceiptProgressBar: View {
     @State private var progress: Double = 0
 
     var body: some View {
-        Capsule()
-            .fill(Color.white.opacity(0.06))
-            .frame(height: 3)
-            .overlay(alignment: .leading) {
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.3, green: 0.7, blue: 1.0),
-                                Color(red: 0.45, green: 0.15, blue: 0.85)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
+        GeometryReader { geo in
+            Capsule()
+                .fill(.quaternary)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.blue, .indigo],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
-                    )
-                    .scaleEffect(
-                        x: max(0.01, progress),
-                        y: 1,
-                        anchor: .leading
-                    )
-            }
-            .clipShape(Capsule())
-            .onAppear { updateProgress() }
-            .onReceive(Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()) { _ in
-                updateProgress()
-            }
+                        .frame(width: max(2, geo.size.width * progress))
+                }
+                .clipShape(Capsule())
+        }
+        .frame(height: 4)
+        .onAppear { updateProgress() }
+        .onReceive(Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()) { _ in
+            updateProgress()
+        }
     }
 
     private func updateProgress() {

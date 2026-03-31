@@ -11,7 +11,7 @@ import FirebaseAuth
 // MARK: - Environment key for active tab (used by MiniBudgetRing to replay animation)
 
 private struct SelectedTabIndexKey: EnvironmentKey {
-    static let defaultValue: Int = 2 // home tab by default
+    static let defaultValue: Int = 0 // home tab by default
 }
 
 extension EnvironmentValues {
@@ -42,21 +42,19 @@ struct ContentView: View {
     @State private var activeOverlay: OverlayItem? = nil
 
     enum Tab: Int, Hashable {
-        case budget = 0
+        case home = 0
         case promos = 1
-        case home = 2
-        case dobby = 3
-        case rewards = 4
+        case insights = 2
     }
 
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
-                ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
+                ScanTab()
                     .tabItem {
-                        Label(L("tab_budget"), systemImage: "wallet.bifold.fill")
+                        Label(L("tab_home"), systemImage: "house.fill")
                     }
-                    .tag(Tab.budget)
+                    .tag(Tab.home)
 
                 PromosTab()
                     .tabItem {
@@ -64,27 +62,11 @@ struct ContentView: View {
                     }
                     .tag(Tab.promos)
 
-                ScanTab()
+                ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
                     .tabItem {
-                        Label(L("tab_home"), systemImage: "house.fill")
+                        Label("Insights", systemImage: "chart.pie.fill")
                     }
-                    .tag(Tab.home)
-
-                ScandaLiciousTab()
-                    .tabItem {
-                        Label {
-                            Text(L("tab_milo"))
-                        } icon: {
-                            MiloTabIcon()
-                        }
-                    }
-                    .tag(Tab.dobby)
-
-                RewardsTab()
-                    .tabItem {
-                        Label("Rewards", systemImage: "gift.fill")
-                    }
-                    .tag(Tab.rewards)
+                    .tag(Tab.insights)
             }
             .tint(.blue) // Apple blue
             .toolbarBackground(.ultraThinMaterial, for: .tabBar)
@@ -398,8 +380,7 @@ struct ViewTab: View {
 
     var body: some View {
         NavigationStack {
-            OverviewView(dataManager: dataManager, showSignOutConfirmation: $showSignOutConfirmation)
-                .navigationBarTitleDisplayMode(.inline)
+            InsightsTabView(dataManager: dataManager)
         }
         .id("ViewTab") // Prevent recreation
     }
@@ -422,180 +403,6 @@ struct PromosTab: View {
             PromosView(viewModel: viewModel)
         }
         .id("PromosTab") // Prevent recreation
-    }
-}
-
-// MARK: - ScandaLicious Tab
-struct ScandaLiciousTab: View {
-    var body: some View {
-        NavigationStack {
-            ScandaLiciousAIChatView()
-                .toolbarBackground(.hidden, for: .navigationBar)
-        }
-        .id("ScandaLiciousTab") // Prevent recreation
-    }
-
-    private var syncingStatusBanner: some View {
-        HStack(spacing: 6) {
-            SyncingArrowsView()
-            Text(L("syncing"))
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(.blue)
-        .padding(.top, 12)
-    }
-
-    private var syncedStatusBanner: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "checkmark.icloud.fill")
-                .font(.system(size: 11))
-            Text(L("synced"))
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(.green)
-        .padding(.top, 12)
-    }
-}
-
-// MARK: - Rewards Tab
-struct RewardsTab: View {
-    var body: some View {
-        NavigationStack {
-            RewardsView()
-        }
-        .id("RewardsTab")
-    }
-}
-
-// MARK: - Milo Tab Icon
-
-/// Tiny Dachshund head for the tab bar, rendered as a template image
-/// so iOS can apply the correct tint for selected/unselected states.
-private struct MiloTabIcon: View {
-    var body: some View {
-        Image(uiImage: renderTabIcon())
-            .renderingMode(.template)
-    }
-
-    private func renderTabIcon() -> UIImage {
-        let size: CGFloat = 28
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
-        return renderer.image { ctx in
-            let gc = ctx.cgContext
-            let u = size / 100
-            let cx = size / 2
-            let cy = size / 2
-
-            gc.setFillColor(UIColor.black.cgColor)
-
-            // Left ear (large floppy)
-            gc.beginPath()
-            gc.move(to: CGPoint(x: cx - 18 * u, y: cy - 16 * u))
-            gc.addCurve(
-                to: CGPoint(x: cx - 50 * u, y: cy - 16 * u),
-                control1: CGPoint(x: cx - 28 * u, y: cy - 34 * u),
-                control2: CGPoint(x: cx - 48 * u, y: cy - 32 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx - 44 * u, y: cy + 28 * u),
-                control1: CGPoint(x: cx - 58 * u, y: cy - 2 * u),
-                control2: CGPoint(x: cx - 56 * u, y: cy + 20 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx - 32 * u, y: cy + 26 * u),
-                control1: CGPoint(x: cx - 40 * u, y: cy + 34 * u),
-                control2: CGPoint(x: cx - 36 * u, y: cy + 34 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx - 18 * u, y: cy - 16 * u),
-                control1: CGPoint(x: cx - 26 * u, y: cy + 10 * u),
-                control2: CGPoint(x: cx - 14 * u, y: cy - 4 * u)
-            )
-            gc.closePath()
-            gc.fillPath()
-
-            // Right ear (large floppy)
-            gc.beginPath()
-            gc.move(to: CGPoint(x: cx + 18 * u, y: cy - 16 * u))
-            gc.addCurve(
-                to: CGPoint(x: cx + 50 * u, y: cy - 16 * u),
-                control1: CGPoint(x: cx + 28 * u, y: cy - 34 * u),
-                control2: CGPoint(x: cx + 48 * u, y: cy - 32 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx + 44 * u, y: cy + 28 * u),
-                control1: CGPoint(x: cx + 58 * u, y: cy - 2 * u),
-                control2: CGPoint(x: cx + 56 * u, y: cy + 20 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx + 32 * u, y: cy + 26 * u),
-                control1: CGPoint(x: cx + 40 * u, y: cy + 34 * u),
-                control2: CGPoint(x: cx + 36 * u, y: cy + 34 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx + 18 * u, y: cy - 16 * u),
-                control1: CGPoint(x: cx + 26 * u, y: cy + 10 * u),
-                control2: CGPoint(x: cx + 14 * u, y: cy - 4 * u)
-            )
-            gc.closePath()
-            gc.fillPath()
-
-            // Head (cute dog shape)
-            gc.beginPath()
-            gc.move(to: CGPoint(x: cx, y: cy - 32 * u))
-            gc.addCurve(
-                to: CGPoint(x: cx + 36 * u, y: cy - 6 * u),
-                control1: CGPoint(x: cx + 16 * u, y: cy - 32 * u),
-                control2: CGPoint(x: cx + 32 * u, y: cy - 22 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx + 18 * u, y: cy + 28 * u),
-                control1: CGPoint(x: cx + 36 * u, y: cy + 10 * u),
-                control2: CGPoint(x: cx + 28 * u, y: cy + 26 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx - 18 * u, y: cy + 28 * u),
-                control1: CGPoint(x: cx + 8 * u, y: cy + 34 * u),
-                control2: CGPoint(x: cx - 8 * u, y: cy + 34 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx - 36 * u, y: cy - 6 * u),
-                control1: CGPoint(x: cx - 28 * u, y: cy + 26 * u),
-                control2: CGPoint(x: cx - 36 * u, y: cy + 10 * u)
-            )
-            gc.addCurve(
-                to: CGPoint(x: cx, y: cy - 32 * u),
-                control1: CGPoint(x: cx - 32 * u, y: cy - 22 * u),
-                control2: CGPoint(x: cx - 16 * u, y: cy - 32 * u)
-            )
-            gc.closePath()
-            gc.fillPath()
-
-            // Snout (lighter — leave as filled, template mode handles tint)
-            gc.fillEllipse(in: CGRect(x: cx - 20 * u, y: cy + 2 * u, width: 40 * u, height: 30 * u))
-
-            // Cut out eyes (white = transparent in template mode)
-            gc.setBlendMode(.clear)
-
-            // Left eye
-            gc.fillEllipse(in: CGRect(
-                x: cx - 14 * u - 7 * u, y: cy - 8 * u - 8 * u,
-                width: 14 * u, height: 16 * u
-            ))
-            // Right eye
-            gc.fillEllipse(in: CGRect(
-                x: cx + 14 * u - 7 * u, y: cy - 8 * u - 8 * u,
-                width: 14 * u, height: 16 * u
-            ))
-
-            // Nose cutout
-            gc.fillEllipse(in: CGRect(
-                x: cx - 7 * u, y: cy + 4 * u,
-                width: 14 * u, height: 10 * u
-            ))
-
-            gc.setBlendMode(.normal)
-        }
     }
 }
 

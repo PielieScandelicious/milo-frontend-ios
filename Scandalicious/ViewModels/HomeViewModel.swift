@@ -102,12 +102,17 @@ class HomeViewModel {
     // Recent receipts (from backend)
     var recentReceipts: [RecentReceipt] = []
 
+    // Recent uploaded receipts list (from /receipts endpoint)
+    var uploadedReceipts: [APIReceipt] = []
+    var isLoadingReceipts: Bool = false
+
     private var completionObserver: Any?
     private var rewardClaimedObserver: Any?
     private var brandCashbackObserver: Any?
 
     init() {
         loadRecentReceipts()
+        loadUploadedReceipts()
         observeReceiptCompletion()
         observeRewardClaimed()
         observeBrandCashbackEarned()
@@ -199,6 +204,7 @@ class HomeViewModel {
             let receiptId = notification.userInfo?["receiptId"] as? String
             Task { @MainActor in
                 await self.fetchCashbackForReceipt(receiptId: receiptId, updateUI: false)
+                self.loadUploadedReceipts()
                 // Auto-dismiss the processing card after 2s.
                 // Brand cashback overlay (if earned) fires independently via BrandCashbackViewModel.
                 try? await Task.sleep(for: .seconds(2))
@@ -304,5 +310,21 @@ class HomeViewModel {
     private func updateRecentReceipts(from transactions: [CashbackTransactionResponse]) {
         self.recentReceipts = transactions.map { RecentReceipt.from($0) }
             .sorted { $0.date > $1.date }
+    }
+
+    // MARK: - Uploaded Receipts List
+
+    func loadUploadedReceipts() {
+        Task { @MainActor in
+            isLoadingReceipts = true
+            do {
+                let filters = ReceiptFilters(page: 1, pageSize: 15)
+                let response = try await AnalyticsAPIService.shared.getReceipts(filters: filters)
+                self.uploadedReceipts = response.receipts
+            } catch {
+                print("[HomeViewModel] Failed to load uploaded receipts: \(error)")
+            }
+            isLoadingReceipts = false
+        }
     }
 }
