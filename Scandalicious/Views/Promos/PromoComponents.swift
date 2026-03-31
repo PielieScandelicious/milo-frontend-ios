@@ -492,7 +492,7 @@ struct PromoStoreSection: View {
                                     .frame(height: 0.5)
                                     .padding(.horizontal, 16)
                             }
-                            PromoItemRow(item: item, isBestDeal: item.id == bestDealId)
+                            PromoItemRow(item: item, storeName: store.storeName, isBestDeal: item.id == bestDealId)
                         }
                     }
 
@@ -540,8 +540,11 @@ struct PromoStoreSection: View {
 
 struct PromoItemRow: View {
     let item: PromoStoreItem
+    let storeName: String
     var isBestDeal: Bool = false
     @State private var isExpanded = false
+    @ObservedObject private var groceryStore = GroceryListStore.shared
+    @State private var addTrigger = false
 
     private var isSpecialDeal: Bool {
         let mech = item.mechanismLabel.lowercased()
@@ -629,6 +632,25 @@ struct PromoItemRow: View {
                 if item.hasPrices {
                     priceView
                 }
+
+                // Add to grocery list button
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if groceryStore.contains(item: item, storeName: storeName) {
+                            groceryStore.removeByPromo(item: item, storeName: storeName)
+                        } else {
+                            groceryStore.add(item: item, storeName: storeName)
+                        }
+                        addTrigger.toggle()
+                    }
+                } label: {
+                    Image(systemName: groceryStore.contains(item: item, storeName: storeName) ? "checkmark.circle.fill" : "plus.circle")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(groceryStore.contains(item: item, storeName: storeName) ? promoGreen : .white.opacity(0.3))
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .sensoryFeedback(.impact(weight: .medium), trigger: addTrigger)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))

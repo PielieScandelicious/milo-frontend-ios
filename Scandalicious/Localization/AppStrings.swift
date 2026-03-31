@@ -292,6 +292,17 @@ enum AppStrings {
         "checking_promos": ["en": "Checking promotions across stores", "nl": "Promoties controleren in alle winkels", "fr": "Vérification des promotions dans les magasins"],
         "finding_promotions": ["en": "Finding promotions", "nl": "Promoties zoeken", "fr": "Recherche de promotions"],
 
+        // MARK: - Grocery List
+        "grocery_list": ["en": "Grocery List", "nl": "Boodschappenlijst", "fr": "Liste de courses"],
+        "add_to_list": ["en": "Add to list", "nl": "Toevoegen aan lijst", "fr": "Ajouter à la liste"],
+        "remove_from_list": ["en": "Remove from list", "nl": "Verwijderen van lijst", "fr": "Retirer de la liste"],
+        "clear_checked": ["en": "Clear Checked", "nl": "Afgevinkte wissen", "fr": "Effacer les cochés"],
+        "clear_all": ["en": "Clear All", "nl": "Alles wissen", "fr": "Tout effacer"],
+        "total_savings": ["en": "Total savings", "nl": "Totale besparing", "fr": "Économies totales"],
+        "browse_deals_to_add": ["en": "Browse Deals", "nl": "Bekijk aanbiedingen", "fr": "Parcourir les promos"],
+        "grocery_list_empty_title": ["en": "Your list is empty", "nl": "Je lijst is leeg", "fr": "Votre liste est vide"],
+        "grocery_list_empty_description": ["en": "Tap + on any deal to add it to your grocery list", "nl": "Tik op + bij een aanbieding om het toe te voegen aan je boodschappenlijst", "fr": "Appuyez sur + sur une promo pour l'ajouter à votre liste de courses"],
+
         // MARK: - Insights
         "daily_insight": ["en": "Daily Insight", "nl": "Dagelijks inzicht", "fr": "Analyse du jour"],
         "generating_insight": ["en": "Generating insight...", "nl": "Inzicht genereren...", "fr": "Génération de l'analyse..."],

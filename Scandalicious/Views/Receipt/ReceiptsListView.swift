@@ -91,6 +91,14 @@ struct ReceiptsListView: View {
                         .foregroundColor(.white.opacity(0.6))
                 }
             }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                if viewModel.totalCount > 0 {
+                    Text("\(viewModel.totalCount) \(viewModel.totalCount == 1 ? L("receipt_singular") : L("receipts"))")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
         }
         .navigationDestination(isPresented: $showingReceiptDetail) {
             if let receipt = selectedReceipt {
@@ -104,10 +112,10 @@ struct ReceiptsListView: View {
                 viewModel.state = .success(initial)
                 // Background refresh for fresh data
                 Task {
-                    await viewModel.loadReceipts(period: period, storeName: storeName, reset: true)
+                    await viewModel.loadReceipts(period: period, storeName: storeName, reset: true, loadAll: false)
                 }
             } else {
-                await viewModel.loadReceipts(period: period, storeName: storeName)
+                await viewModel.loadReceipts(period: period, storeName: storeName, loadAll: false)
             }
         }
         .alert(L("error"), isPresented: .constant(viewModel.state.error != nil)) {

@@ -20,6 +20,8 @@ struct HomeTabView: View {
     @State private var contentOpacity: Double = 0
     @State private var showMiloGame = false
     @State private var showWalletPassCreator = false
+    @State private var showGroceryList = false
+    @ObservedObject private var groceryStore = GroceryListStore.shared
     @Environment(\.scenePhase) private var scenePhase
 
     private let headerBlueColor = Color(red: 0.04, green: 0.15, blue: 0.30)
@@ -31,6 +33,9 @@ struct HomeTabView: View {
 
             }
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    groceryListButton
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     profileMenuButton
                 }
@@ -55,6 +60,9 @@ struct HomeTabView: View {
         }
         .sheet(isPresented: $showWalletPassCreator) {
             WalletPassCreatorView()
+        }
+        .sheet(isPresented: $showGroceryList) {
+            GroceryListSheet()
         }
     }
 
@@ -158,6 +166,14 @@ struct HomeTabView: View {
             }
         }
         .ignoresSafeArea()
+    }
+
+    // MARK: - Grocery List Button
+
+    private var groceryListButton: some View {
+        GroceryListToolbarButton(count: groceryStore.activeItemCount) {
+            showGroceryList = true
+        }
     }
 
     // MARK: - Profile Menu Button

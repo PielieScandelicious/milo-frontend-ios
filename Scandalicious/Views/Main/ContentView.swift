@@ -434,10 +434,22 @@ struct ScanTab: View {
 // MARK: - Promos Tab
 struct PromosTab: View {
     @StateObject private var viewModel = PromosViewModel()
+    @ObservedObject private var groceryStore = GroceryListStore.shared
+    @State private var showGroceryList = false
 
     var body: some View {
         NavigationStack {
             PromosView(viewModel: viewModel)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        GroceryListToolbarButton(count: groceryStore.activeItemCount) {
+                            showGroceryList = true
+                        }
+                    }
+                }
+                .sheet(isPresented: $showGroceryList) {
+                    GroceryListSheet()
+                }
         }
         .id("PromosTab") // Prevent recreation
     }

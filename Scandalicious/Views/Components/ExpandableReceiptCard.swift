@@ -16,6 +16,7 @@ protocol ReceiptDisplayable: Identifiable {
     var displayStoreName: String { get }
     var displayDate: Date? { get }
     var displayDateString: String? { get }
+    var displayRelativeTime: String { get }
     var displayTotalAmount: Double { get }
     var displayItemsCount: Int { get }
     var displayTransactions: [ReceiptItemDisplayable] { get }
@@ -35,6 +36,7 @@ extension APIReceipt: ReceiptDisplayable {
     // Note: displayStoreName and displayTotalAmount already exist in APIReceipt
     var displayDate: Date? { dateParsed }
     var displayDateString: String? { receiptDate }
+    var displayRelativeTime: String { relativeTimeAdded }
     var displayItemsCount: Int {
         // Sum quantities to get actual item count (not just line items)
         transactions.reduce(0) { $0 + $1.quantity }
@@ -59,6 +61,7 @@ extension ReceiptUploadResponse: ReceiptDisplayable {
     var displayStoreName: String { storeName ?? "Unknown Store" }
     var displayDate: Date? { parsedDate }
     var displayDateString: String? { receiptDate }
+    var displayRelativeTime: String { "" }
     var displayTotalAmount: Double { totalAmount ?? 0 }
     var displayItemsCount: Int {
         // Sum quantities to get actual item count (not just line items)
@@ -120,6 +123,10 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
         return formatter.string(from: date)
     }
 
+    private var addedTimeAgo: String {
+        receipt.displayRelativeTime
+    }
+
     private var formattedTime: String {
         guard let date = receipt.displayDate else { return "" }
         let formatter = DateFormatter()
@@ -165,7 +172,7 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
 
-                    // Date inline (conditionally shown)
+                    // Date + relative time inline (conditionally shown)
                     if showDate {
                         Text("•")
                             .font(.system(size: 8))
@@ -174,6 +181,16 @@ struct ExpandableReceiptCard<Receipt: ReceiptDisplayable>: View {
                         Text(formattedDate)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.5))
+
+                        if !addedTimeAgo.isEmpty {
+                            Text("•")
+                                .font(.system(size: 8))
+                                .foregroundColor(.white.opacity(0.2))
+
+                            Text(addedTimeAgo)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.35))
+                        }
                     }
 
                     Spacer()

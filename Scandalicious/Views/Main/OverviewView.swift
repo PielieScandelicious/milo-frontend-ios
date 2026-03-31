@@ -105,6 +105,7 @@ struct OverviewView: View {
     @State private var cachedChartDataByPeriod: [String: [ChartData]] = [:] // Cache chart data for IconDonutChart
     @State private var lastBreakdownsHash: Int = 0 // Track if breakdowns changed
     @State private var isReceiptsSectionExpanded = false // Track receipts section expansion
+    @State private var showingAllReceipts = false // Navigate to full receipts list
 
     @State private var showCategoryBreakdownSheet = false // Show category breakdown detail view
     @State private var isPieChartFlipped = true // Track if pie chart is showing categories (true) or stores (false)
@@ -418,6 +419,9 @@ struct OverviewView: View {
             .navigationDestination(isPresented: $showingAllTransactions) {
                 allTransactionsDestination
             }
+            .navigationDestination(isPresented: $showingAllReceipts) {
+                ReceiptsListView(period: selectedPeriod, storeName: nil)
+            }
             .sheet(isPresented: $showingFilterSheet) {
                 FilterSheet(selectedSort: $selectedSort)
             }
@@ -545,7 +549,7 @@ struct OverviewView: View {
         if !loadedReceiptPeriods.contains(periodToLoad) {
             loadedReceiptPeriods.insert(periodToLoad)
             Task {
-                await receiptsViewModel.loadReceipts(period: periodToLoad, storeName: nil, reset: true)
+                await receiptsViewModel.loadReceipts(period: periodToLoad, storeName: nil, reset: true, loadAll: false)
                 rebuildSortedReceipts()
             }
         }
@@ -576,7 +580,7 @@ struct OverviewView: View {
         await fetchCategoryData(for: period, force: true)
 
         // 3. Reload receipts
-        await receiptsViewModel.loadReceipts(period: period, storeName: nil, reset: true)
+        await receiptsViewModel.loadReceipts(period: period, storeName: nil, reset: true, loadAll: false)
         rebuildSortedReceipts()
 
         // 4. Refresh budget progress (current month only)
@@ -1839,13 +1843,24 @@ struct OverviewView: View {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.3)))
                             .scaleEffect(0.6)
-                    } else if !sortedReceipts.isEmpty {
-                        Text("\(sortedReceipts.count)")
+                    } else if receiptsViewModel.totalCount > 0 {
+                        Text("\(receiptsViewModel.totalCount)")
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundColor(.white.opacity(0.4))
                     }
 
                     Spacer()
+
+                    if isReceiptsSectionExpanded && !sortedReceipts.isEmpty {
+                        Button {
+                            showingAllReceipts = true
+                        } label: {
+                            Text(L("see_all"))
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     Image(systemName: "chevron.down")
                         .font(.system(size: 11, weight: .semibold))
@@ -1894,43 +1909,60 @@ struct OverviewView: View {
                     .padding(.vertical, 20)
 
                 case .hasData:
-                    // Fixed-height scrollable container — shows ~5 receipts at a time
-                    ScrollView(.vertical, showsIndicators: true) {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(sortedReceipts.enumerated()), id: \.element.id) { index, receipt in
-                                VStack(spacing: 0) {
-                                    // Subtle divider between receipts
-                                    if index > 0 {
-                                        Rectangle()
-                                            .fill(Color.white.opacity(0.06))
-                                            .frame(height: 0.5)
-                                            .padding(.horizontal, 14)
-                                    }
+                    // Flat list inside parent ScrollView — no nested ScrollView
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(sortedReceipts.enumerated()), id: \.element.id) { index, receipt in
+                            VStack(spacing: 0) {
+                                // Subtle divider between receipts
+                                if index > 0 {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.06))
+                                        .frame(height: 0.5)
+                                        .padding(.horizontal, 14)
+                                }
 
-                                    ExpandableReceiptCard(
-                                        receipt: receipt,
-                                        isExpanded: expandedReceiptId == receipt.id,
-                                        onTap: {
-                                            withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
-                                                if expandedReceiptId == receipt.id {
-                                                    expandedReceiptId = nil
-                                                } else {
-                                                    expandedReceiptId = receipt.id
-                                                }
+                                ExpandableReceiptCard(
+                                    receipt: receipt,
+                                    isExpanded: expandedReceiptId == receipt.id,
+                                    onTap: {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 1.0)) {
+                                            if expandedReceiptId == receipt.id {
+                                                expandedReceiptId = nil
+                                            } else {
+                                                expandedReceiptId = receipt.id
                                             }
                                         }
-                                    )
+                                    }
+                                )
+                            }
+                            .transition(.asymmetric(
+                                insertion: .opacity,
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
+                            .onAppear {
+                                // Infinite scroll: load next page when near the end
+                                if receipt.id == sortedReceipts.last?.id && receiptsViewModel.hasMorePages {
+                                    Task {
+                                        await receiptsViewModel.loadNextPage(period: selectedPeriod, storeName: nil)
+                                        rebuildSortedReceipts()
+                                    }
                                 }
-                                .transition(.asymmetric(
-                                    insertion: .opacity,
-                                    removal: .move(edge: .leading).combined(with: .opacity)
-                                ))
                             }
                         }
+
+                        // Loading indicator for next page
+                        if receiptsViewModel.hasMorePages {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.3)))
+                                    .scaleEffect(0.8)
+                                Spacer()
+                            }
+                            .padding(.vertical, 12)
+                        }
                     }
-                    .scrollBounceBehavior(.basedOnSize)
-                    .id(receiptsScrollResetToken) // Force scroll to top on period change
-                    .frame(maxHeight: 5 * 42)
+                    .id(receiptsScrollResetToken)
                 }
             }
             .padding(.bottom, 8)
@@ -1950,8 +1982,8 @@ struct OverviewView: View {
 
     private func rebuildSortedReceipts() {
         sortedReceiptsCache = receiptsViewModel.receipts.sorted { r1, r2 in
-            let d1 = r1.dateParsed ?? Date.distantPast
-            let d2 = r2.dateParsed ?? Date.distantPast
+            let d1 = r1.createdAtParsed ?? r1.dateParsed ?? Date.distantPast
+            let d2 = r2.createdAtParsed ?? r2.dateParsed ?? Date.distantPast
             return d1 > d2
         }
     }

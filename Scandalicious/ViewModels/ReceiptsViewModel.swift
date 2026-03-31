@@ -18,6 +18,7 @@ class ReceiptsViewModel: ObservableObject {
     @Published var hasMorePages = false
     @Published var currentPage = 1
     @Published var totalPages = 1
+    @Published var totalCount = 0
 
     private let apiService = AnalyticsAPIService.shared
     private var filters = ReceiptFilters()
@@ -64,6 +65,7 @@ class ReceiptsViewModel: ObservableObject {
             }
 
             totalPages = response.totalPages
+            totalCount = response.total
             hasMorePages = response.page < response.totalPages
             state = .success(receipts)
 

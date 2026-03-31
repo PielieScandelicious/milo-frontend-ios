@@ -563,6 +563,7 @@ struct APIReceipt: Codable, Identifiable {
     let totalAmount: Double?
     let itemsCount: Int
     let source: APIReceiptSource
+    let createdAt: String?
     let transactions: [APIReceiptItem]
 
     var id: String { receiptId }
@@ -574,21 +575,23 @@ struct APIReceipt: Codable, Identifiable {
         case totalAmount = "total_amount"
         case itemsCount = "items_count"
         case source
+        case createdAt = "created_at"
         case transactions
     }
 
     /// Manual initializer for creating updated copies
-    init(receiptId: String, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, source: APIReceiptSource = .receiptUpload, transactions: [APIReceiptItem]) {
+    init(receiptId: String, storeName: String?, receiptDate: String?, totalAmount: Double?, itemsCount: Int, source: APIReceiptSource = .receiptUpload, createdAt: String? = nil, transactions: [APIReceiptItem]) {
         self.receiptId = receiptId
         self.storeName = storeName
         self.receiptDate = receiptDate
         self.totalAmount = totalAmount
         self.itemsCount = itemsCount
         self.source = source
+        self.createdAt = createdAt
         self.transactions = transactions
     }
 
-    /// Custom decoder for backwards compatibility (handles missing source field)
+    /// Custom decoder for backwards compatibility (handles missing fields)
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         receiptId = try container.decode(String.self, forKey: .receiptId)
@@ -596,9 +599,25 @@ struct APIReceipt: Codable, Identifiable {
         receiptDate = try container.decodeIfPresent(String.self, forKey: .receiptDate)
         totalAmount = try container.decodeIfPresent(Double.self, forKey: .totalAmount)
         itemsCount = try container.decode(Int.self, forKey: .itemsCount)
-        // Default to receiptUpload for backwards compatibility
         source = try container.decodeIfPresent(APIReceiptSource.self, forKey: .source) ?? .receiptUpload
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         transactions = try container.decode([APIReceiptItem].self, forKey: .transactions)
+    }
+
+    /// Parse the created_at ISO 8601 timestamp
+    var createdAtParsed: Date? {
+        guard let createdAt = createdAt else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: createdAt) ?? ISO8601DateFormatter().date(from: createdAt)
+    }
+
+    /// Relative time string like "2h ago", "1 day ago" using Apple's RelativeDateTimeFormatter
+    var relativeTimeAdded: String {
+        guard let date = createdAtParsed else { return "" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     var dateParsed: Date? {
