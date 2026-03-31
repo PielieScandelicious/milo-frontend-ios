@@ -280,6 +280,38 @@ struct ContentView: View {
                 }
             }
 
+            // Deals: promo recommendations
+            group.addTask {
+                if let promos = try? await PromoAPIService.shared.getRecommendations() {
+                    await MainActor.run {
+                        cache.promoData = promos
+                    }
+                }
+            }
+
+            // Home tab: cashback summary, brand deals, recent receipts
+            group.addTask {
+                if let summary = try? await CashbackAPIService.shared.getSummary() {
+                    await MainActor.run {
+                        cache.cashbackSummary = summary
+                    }
+                }
+            }
+            group.addTask {
+                let deals = await BrandCashbackService.shared.fetchEarnedDeals()
+                await MainActor.run {
+                    cache.earnedBrandDeals = deals
+                }
+            }
+            group.addTask {
+                let filters = ReceiptFilters(page: 1, pageSize: 15)
+                if let response = try? await AnalyticsAPIService.shared.getReceipts(filters: filters) {
+                    await MainActor.run {
+                        cache.recentUploadedReceipts = response.receipts
+                    }
+                }
+            }
+
             // Budget auto-rollover then progress (current month only)
             group.addTask {
                 try? await BudgetAPIService.shared.performAutoRollover()

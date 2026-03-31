@@ -32,6 +32,14 @@ class BudgetTabPreloadCache {
     var trendData: TrendsResponse?
     var insightsPeriodMetadata: [PeriodMetadata] = []
 
+    // Deals prefetch
+    var promoData: PromoRecommendationResponse?
+
+    // Home tab prefetch
+    var cashbackSummary: CashbackSummaryResponse?
+    var earnedBrandDeals: [EarnedBrandCashbackEntry] = []
+    var recentUploadedReceipts: [APIReceipt] = []
+
     // Track whether preloading has completed
     var hasPreloaded = false
 
@@ -46,6 +54,10 @@ class BudgetTabPreloadCache {
         categoryItemsByPeriod.removeAll()
         trendData = nil
         insightsPeriodMetadata = []
+        promoData = nil
+        cashbackSummary = nil
+        earnedBrandDeals = []
+        recentUploadedReceipts = []
         hasPreloaded = false
     }
 }

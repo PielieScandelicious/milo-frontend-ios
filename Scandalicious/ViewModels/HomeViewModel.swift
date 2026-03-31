@@ -111,8 +111,31 @@ class HomeViewModel {
     private var brandCashbackObserver: Any?
 
     init() {
-        loadRecentReceipts()
-        loadUploadedReceipts()
+        // Seed from prefetched cache if available
+        let cache = BudgetTabPreloadCache.shared
+        if cache.hasPreloaded {
+            if let summary = cache.cashbackSummary {
+                var receipts = summary.recentTransactions.map { RecentReceipt.from($0) }
+                let brandReceipts = cache.earnedBrandDeals.map { RecentReceipt.fromBrandCashback($0) }
+                receipts.append(contentsOf: brandReceipts)
+                self.recentReceipts = receipts.sorted { $0.date > $1.date }
+
+                GamificationManager.shared.syncWalletWithBackend(
+                    balance: summary.balance.currentBalance,
+                    isGoldTier: summary.isGoldTier,
+                    spins: summary.balance.spinsAvailable
+                )
+            }
+            if !cache.recentUploadedReceipts.isEmpty {
+                self.uploadedReceipts = cache.recentUploadedReceipts
+            } else {
+                loadUploadedReceipts()
+            }
+        } else {
+            loadRecentReceipts()
+            loadUploadedReceipts()
+        }
+
         observeReceiptCompletion()
         observeRewardClaimed()
         observeBrandCashbackEarned()

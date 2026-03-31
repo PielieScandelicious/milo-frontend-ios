@@ -39,6 +39,19 @@ class PromosViewModel: ObservableObject {
 
         let alreadyHasData: Bool = { if case .success = state { return true }; return false }()
 
+        // On first load, try to use prefetched data from app startup
+        if !forceRefresh && !alreadyHasData {
+            let cache = BudgetTabPreloadCache.shared
+            if let prefetched = cache.promoData {
+                state = .success(prefetched)
+                populateStoreData(from: prefetched)
+                lastGeneratedAt = prefetched.generatedAt
+                trackReportViewedIfNeeded(prefetched)
+                print("[PromosVM] loaded from prefetch cache")
+                return
+            }
+        }
+
         if !alreadyHasData && (forceRefresh || {
             if case .idle = state { return true }
             if case .error = state { return true }

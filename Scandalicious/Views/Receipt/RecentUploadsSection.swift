@@ -162,37 +162,37 @@ struct RecentUploadsSection: View {
             ForEach(0..<3, id: \.self) { index in
                 HStack(spacing: 12) {
                     Circle()
-                        .fill(Color.white.opacity(0.06))
+                        .fill(Color.white.opacity(0.08))
                         .frame(width: 40, height: 40)
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.06))
-                            .frame(width: CGFloat.random(in: 80...120), height: 12)
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.white.opacity(0.04))
-                            .frame(width: 60, height: 10)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Store Name")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text("Today • 5 items")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.4))
                     }
 
                     Spacer()
 
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.white.opacity(0.06))
-                        .frame(width: 55, height: 14)
+                    Text("€00.00")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.vertical, 11)
 
                 if index < 2 {
                     Rectangle()
-                        .fill(Color.white.opacity(0.04))
+                        .fill(Color.white.opacity(0.06))
                         .frame(height: 0.5)
                         .padding(.leading, 56)
                         .padding(.trailing, 16)
                 }
             }
         }
-        .shimmer()
+        .redacted(reason: .placeholder)
         .transition(.opacity.animation(.easeIn(duration: 0.2)))
     }
 

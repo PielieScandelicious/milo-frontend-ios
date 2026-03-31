@@ -178,7 +178,7 @@ struct PromosView: View {
 
     private var noStoresSelectedView: some View {
         VStack(spacing: 24) {
-            // Dachshund icon with store context
+            // Store icon
             ZStack {
                 Circle()
                     .fill(
@@ -203,17 +203,6 @@ struct PromosView: View {
                             endPoint: .bottom
                         )
                     )
-
-                // Paw badge
-                Image(systemName: "pawprint.fill")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(promoGreenLocal)
-                    .background(
-                        Circle()
-                            .fill(Color(white: 0.06))
-                            .frame(width: 28, height: 28)
-                    )
-                    .offset(x: 30, y: 30)
             }
 
             VStack(spacing: 10) {
@@ -221,7 +210,7 @@ struct PromosView: View {
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
 
-                Text("Pick your favourite stores and Milo will sniff out the best weekly deals for you.")
+                Text("Pick your favourite stores and Milo will find the best weekly deals for you.")
                     .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.5))
                     .multilineTextAlignment(.center)

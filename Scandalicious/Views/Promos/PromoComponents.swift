@@ -255,7 +255,37 @@ struct PromoBannerCard: View {
     }
 
     private var bannerSkeleton: some View {
-        DachshundBannerView()
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(promoGreen.opacity(0.15))
+                    .frame(width: 40, height: 40)
+                Image(systemName: "tag.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(greenGradient)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("00 deals matched this week")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("across 0 stores")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.3))
+        }
+        .padding(16)
+        .glassCard(
+            borderGradient: LinearGradient(
+                colors: [promoGreen.opacity(0.25), promoGreenDark.opacity(0.10)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .redacted(reason: .placeholder)
     }
 }
 
@@ -759,11 +789,71 @@ struct PromoItemRow: View {
     }
 }
 
-// MARK: - Skeleton Loading View (Dachshund sniffing animation)
+// MARK: - Skeleton Loading View (redacted placeholder)
 
 struct PromoSkeletonView: View {
     var body: some View {
-        DachshundSniffingView()
+        VStack(spacing: 12) {
+            // Placeholder summary header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("€00.00")
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text("potential savings this week")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+
+            // Placeholder store sections
+            ForEach(0..<2, id: \.self) { _ in
+                VStack(spacing: 0) {
+                    // Store header
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color.white.opacity(0.1))
+                            .frame(width: 36, height: 36)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Store Name")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Text("12 deals • Save €5.00")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+                        Spacer()
+                    }
+                    .padding(16)
+
+                    // Placeholder deal rows
+                    ForEach(0..<3, id: \.self) { _ in
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.white.opacity(0.08))
+                                .frame(width: 48, height: 48)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Product Name Here")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.white)
+                                Text("€3.99 → €2.49")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.4))
+                            }
+                            Spacer()
+                            Text("-25%")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(promoGreen)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    }
+                }
+                .glassCard()
+            }
+            .padding(.horizontal, 16)
+        }
+        .redacted(reason: .placeholder)
     }
 }
 
