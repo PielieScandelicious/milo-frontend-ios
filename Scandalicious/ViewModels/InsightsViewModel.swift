@@ -138,6 +138,29 @@ class InsightsViewModel: ObservableObject {
             .map { $0 }
     }
 
+    var allChanges: [SpendingChange] {
+        guard let current = pieChartSummary?.groups,
+              let previous = previousPieChartSummary?.groups else { return [] }
+
+        let previousDict = Dictionary(uniqueKeysWithValues: previous.map { ($0.groupName, $0.totalSpent) })
+
+        var changes: [SpendingChange] = []
+        for group in current {
+            let prev = previousDict[group.groupName] ?? 0
+            let delta = group.totalSpent - prev
+            guard abs(delta) > 1 else { continue }
+            changes.append(SpendingChange(
+                categoryName: group.groupName,
+                icon: group.groupIcon,
+                color: group.color,
+                currentAmount: group.totalSpent,
+                previousAmount: prev
+            ))
+        }
+
+        return changes.sorted { abs($0.absoluteChange) > abs($1.absoluteChange) }
+    }
+
     var categoryChartData: [ChartData] {
         pieChartSummary?.groups.map { $0.toChartData } ?? []
     }
@@ -174,6 +197,43 @@ class InsightsViewModel: ObservableObject {
 
     func loadInitialData() async {
         guard trendState == .idle else { return }
+
+        // Consume prefetched data from app startup cache
+        let cache = BudgetTabPreloadCache.shared
+        if cache.hasPreloaded {
+            // Seed pie chart cache from prefetched category data
+            let fmt = DateFormatter()
+            fmt.dateFormat = "MMMM yyyy"
+            fmt.locale = Locale(identifier: "en_US")
+            for (periodString, response) in cache.categoryDataByPeriod {
+                if let date = fmt.date(from: periodString) {
+                    let m = Calendar.current.component(.month, from: date)
+                    let y = Calendar.current.component(.year, from: date)
+                    pieChartCache["\(m)-\(y)"] = response
+                }
+            }
+
+            // Use prefetched trends
+            if let trends = cache.trendData {
+                trendData = trends
+                trendState = .loaded
+                if selectedTrendIndex == nil, !trends.trends.isEmpty {
+                    selectedTrendIndex = trends.trends.count - 1
+                }
+            }
+
+            // Use prefetched period metadata
+            if !cache.insightsPeriodMetadata.isEmpty {
+                periodMetadata = cache.insightsPeriodMetadata
+            }
+
+            // Load selected period data (will hit pie chart cache for recent months)
+            if trendState == .loaded {
+                await loadSelectedPeriodData()
+                return
+            }
+        }
+
         await loadTrends()
         await loadPeriodMetadata()
     }

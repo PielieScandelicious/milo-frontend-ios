@@ -9,19 +9,23 @@ import SwiftUI
 
 struct TopChangesCard: View {
     @ObservedObject var viewModel: InsightsViewModel
+    @State private var showAll = false
 
     private var changes: [SpendingChange] {
-        viewModel.topChanges
+        showAll ? viewModel.allChanges : viewModel.topChanges
+    }
+
+    private var hasMore: Bool {
+        viewModel.allChanges.count > viewModel.topChanges.count
     }
 
     private var previousPeriodLabel: String {
-        // Extract just the month name: "January 2026" -> "January"
         let full = viewModel.previousPeriod?.period ?? "last month"
         return full.split(separator: " ").first.map(String.init) ?? full
     }
 
     var body: some View {
-        if changes.isEmpty {
+        if viewModel.topChanges.isEmpty {
             EmptyView()
         } else {
             InsightCardShell {
@@ -43,6 +47,19 @@ struct TopChangesCard: View {
                             }
                         }
                     }
+
+                    if hasMore {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showAll.toggle()
+                            }
+                        } label: {
+                            Text(showAll ? "Show Less" : "Show All")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.blue)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
                 }
             }
         }
@@ -50,7 +67,6 @@ struct TopChangesCard: View {
 
     private func changeRow(_ change: SpendingChange) -> some View {
         HStack(spacing: 14) {
-            // Apple-style filled circle icon (using backend icon)
             ZStack {
                 Circle()
                     .fill(change.color.gradient)
@@ -71,7 +87,6 @@ struct TopChangesCard: View {
 
             Spacer()
 
-            // Change amount with directional arrow
             HStack(spacing: 4) {
                 Image(systemName: change.isIncrease ? "arrow.up.right" : "arrow.down.right")
                     .font(.system(size: 12, weight: .bold))

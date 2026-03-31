@@ -131,29 +131,22 @@ struct InsightsTabView: View {
                 .contentTransition(.opacity)
                 .animation(.easeInOut(duration: 0.2), value: viewModel.selectedPeriodLabel)
 
-            if viewModel.totalSpend > 0 {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text("€")
-                        .font(.system(size: 28, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
-                    Text(String(format: "%.2f", viewModel.totalSpend))
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.4, dampingFraction: 0.9), value: viewModel.totalSpend)
-                }
-                .padding(.top, 2)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("€")
+                    .font(.system(size: 28, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.6))
+                Text(viewModel.totalSpend > 0 ? String(format: "%.2f", viewModel.totalSpend) : "000.00")
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+                    .animation(.spring(response: 0.4, dampingFraction: 0.9), value: viewModel.totalSpend)
+            }
+            .padding(.top, 2)
+            .redacted(reason: viewModel.totalSpend > 0 ? [] : .placeholder)
 
-                if let delta = viewModel.spendingDelta {
-                    SpendingDeltaBadge(percentage: delta)
-                        .padding(.top, 4)
-                }
-            } else if viewModel.trendState == .loading {
-                // Skeleton for total amount
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(0.06))
-                    .frame(width: 180, height: 48)
-                    .padding(.top, 2)
+            if let delta = viewModel.spendingDelta {
+                SpendingDeltaBadge(percentage: delta)
+                    .padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity)
@@ -169,39 +162,21 @@ struct InsightsTabView: View {
                     .withSelectionHandling()
 
                 // Mini stats — fade in when data arrives
-                if viewModel.receiptCount > 0 {
-                    HStack(spacing: 0) {
-                        miniStat(icon: "receipt", value: "\(viewModel.receiptCount)", label: L("receipts"))
-                        Spacer()
-                        if let avg = viewModel.averageBasketSize {
-                            miniStat(icon: "basket", value: String(format: "€%.0f", avg), label: "avg basket")
-                        }
-                        Spacer()
-                        miniStat(
-                            icon: "bag",
-                            value: "\(viewModel.pieChartSummary?.stores.count ?? 0)",
-                            label: L("stores")
-                        )
-                    }
-                    .padding(.top, 4)
-                    .transition(.opacity)
-                } else if viewModel.trendState == .loading {
-                    // Skeleton stats row
-                    HStack(spacing: 0) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            VStack(spacing: 6) {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.white.opacity(0.05))
-                                    .frame(width: 32, height: 14)
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.white.opacity(0.04))
-                                    .frame(width: 44, height: 10)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .padding(.top, 4)
+                let hasStats = viewModel.receiptCount > 0
+                HStack(spacing: 0) {
+                    miniStat(icon: "receipt", value: hasStats ? "\(viewModel.receiptCount)" : "00", label: L("receipts"))
+                    Spacer()
+                    miniStat(icon: "basket", value: hasStats ? String(format: "€%.0f", viewModel.averageBasketSize ?? 0) : "€00", label: "avg basket")
+                    Spacer()
+                    miniStat(
+                        icon: "bag",
+                        value: hasStats ? "\(viewModel.pieChartSummary?.stores.count ?? 0)" : "00",
+                        label: L("stores")
+                    )
                 }
+                .padding(.top, 4)
+                .redacted(reason: hasStats ? [] : .placeholder)
+                .animation(.easeInOut(duration: 0.3), value: hasStats)
             }
         }
     }

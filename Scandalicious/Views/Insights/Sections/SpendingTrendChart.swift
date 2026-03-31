@@ -27,10 +27,12 @@ struct SpendingTrendChart: View {
     private let chartHeight: CGFloat = 150
 
     var body: some View {
-        if viewModel.trendState == .loading && trends.isEmpty {
-            chartSkeleton
-        } else if trends.isEmpty {
+        if trends.isEmpty && viewModel.trendState != .loading {
             emptyState
+        } else if trends.isEmpty {
+            // Placeholder bar chart with redacted modifier
+            placeholderChart
+                .redacted(reason: .placeholder)
         } else {
             VStack(spacing: 14) {
                 // Bar chart
@@ -124,15 +126,27 @@ struct SpendingTrendChart: View {
 
     // MARK: - States
 
-    private var chartSkeleton: some View {
-        HStack(alignment: .bottom, spacing: barSpacing) {
-            ForEach(0..<8, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.white.opacity(0.05))
-                    .frame(height: CGFloat(40 + (i * 12) % 80))
+    private var placeholderChart: some View {
+        VStack(spacing: 14) {
+            HStack(alignment: .bottom, spacing: barSpacing) {
+                ForEach(0..<8, id: \.self) { i in
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.12))
+                        .frame(height: CGFloat(40 + (i * 12) % 80))
+                }
             }
+            .frame(height: chartHeight)
+
+            HStack(spacing: barSpacing) {
+                ForEach(0..<8, id: \.self) { _ in
+                    Text("Jan")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 14)
         }
-        .frame(height: chartHeight)
     }
 
     private var emptyState: some View {

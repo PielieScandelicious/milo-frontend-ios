@@ -264,6 +264,22 @@ struct ContentView: View {
                 }
             }
 
+            // Insights: trends + period metadata (parallel)
+            group.addTask {
+                if let trends = try? await AnalyticsAPIService.shared.getTrends(periodType: .month, numPeriods: 12) {
+                    await MainActor.run {
+                        cache.trendData = trends
+                    }
+                }
+            }
+            group.addTask {
+                if let periods = try? await AnalyticsAPIService.shared.getPeriods(periodType: .month, numPeriods: 52) {
+                    await MainActor.run {
+                        cache.insightsPeriodMetadata = periods.periods
+                    }
+                }
+            }
+
             // Budget auto-rollover then progress (current month only)
             group.addTask {
                 try? await BudgetAPIService.shared.performAutoRollover()

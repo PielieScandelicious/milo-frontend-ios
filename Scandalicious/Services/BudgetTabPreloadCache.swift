@@ -28,6 +28,10 @@ class BudgetTabPreloadCache {
     // Category line items: period -> categoryName -> [APITransaction]
     var categoryItemsByPeriod: [String: [String: [APITransaction]]] = [:]
 
+    // Insights prefetch: trends + period metadata
+    var trendData: TrendsResponse?
+    var insightsPeriodMetadata: [PeriodMetadata] = []
+
     // Track whether preloading has completed
     var hasPreloaded = false
 
@@ -40,6 +44,8 @@ class BudgetTabPreloadCache {
         budgetHistory = []
         categoryDataByPeriod.removeAll()
         categoryItemsByPeriod.removeAll()
+        trendData = nil
+        insightsPeriodMetadata = []
         hasPreloaded = false
     }
 }

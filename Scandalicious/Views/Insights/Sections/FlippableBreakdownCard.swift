@@ -31,7 +31,8 @@ struct FlippableBreakdownCard: View {
 
     var body: some View {
         if viewModel.categoryState == .loading && groups.isEmpty {
-            loadingState
+            placeholderCard
+                .redacted(reason: .placeholder)
         } else if groups.isEmpty && stores.isEmpty {
             EmptyView()
         } else {
@@ -331,12 +332,43 @@ struct FlippableBreakdownCard: View {
         }
     }
 
-    private var loadingState: some View {
+    private var placeholderCard: some View {
         InsightCardShell {
-            ProgressView()
-                .tint(.white.opacity(0.4))
-                .frame(height: 260)
-                .frame(maxWidth: .infinity)
+            VStack(spacing: 20) {
+                HStack {
+                    Text("Categories")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                }
+
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 180, height: 180)
+
+                VStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        HStack(spacing: 14) {
+                            Circle()
+                                .fill(Color.white.opacity(0.1))
+                                .frame(width: 36, height: 36)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Category Name")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(.white)
+                                Text("25% • 12 items")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.white.opacity(0.4))
+                            }
+                            Spacer()
+                            Text("€120.00")
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.vertical, 12)
+                    }
+                }
+            }
         }
     }
 }
