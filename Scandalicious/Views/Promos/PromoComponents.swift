@@ -7,52 +7,6 @@
 
 import SwiftUI
 
-// MARK: - Wrapping HStack Layout
-
-private struct WrappingHStack: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        let height = rows.enumerated().reduce(CGFloat.zero) { total, entry in
-            let rowHeight = entry.element.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            return total + rowHeight + (entry.offset > 0 ? spacing : 0)
-        }
-        return CGSize(width: proposal.width ?? 0, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        var y = bounds.minY
-        for row in rows {
-            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            var x = bounds.minX
-            for subview in row {
-                let size = subview.sizeThatFits(.unspecified)
-                subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
-            }
-            y += rowHeight + spacing
-        }
-    }
-
-    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[LayoutSubviews.Element]] {
-        let maxWidth = proposal.width ?? .infinity
-        var rows: [[LayoutSubviews.Element]] = [[]]
-        var currentWidth: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentWidth + size.width > maxWidth && !rows[rows.count - 1].isEmpty {
-                rows.append([])
-                currentWidth = 0
-            }
-            rows[rows.count - 1].append(subview)
-            currentWidth += size.width + spacing
-        }
-        return rows
-    }
-}
-
 // MARK: - Color Constants
 
 private let promoGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
@@ -295,12 +249,16 @@ struct PromoSummaryHeader: View {
     let stores: [PromoStore]
     @State private var appeared = false
 
+    private var itemsWithImages: [PromoStoreItem] {
+        stores.flatMap { $0.items.filter { $0.thumbnailUrl != nil } }
+    }
+
     private var totalSavings: Double {
-        stores.reduce(0) { $0 + $1.totalSavings }
+        itemsWithImages.reduce(0) { $0 + $1.savings }
     }
 
     private var dealCount: Int {
-        stores.reduce(0) { $0 + $1.items.count }
+        itemsWithImages.count
     }
 
     var body: some View {
@@ -356,457 +314,42 @@ struct PromoSectionHeader: View {
     }
 }
 
-// MARK: - Store Section
+// MARK: - Product Image View
 
-struct PromoStoreSection: View {
-    let store: PromoStore
-    let index: Int
-    let onExpand: () -> Void
-    @State private var isExpanded = false
-    @State private var appeared = false
-
-    private let initialItemCount = 3
-
-    private var bestDealId: String? {
-        store.items.filter { $0.savings > 0 }.max(by: { $0.savings < $1.savings })?.id
-    }
-
-    private var daysLeft: Int? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let endDate = formatter.date(from: store.validityEnd) else { return nil }
-        let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: Calendar.current.startOfDay(for: endDate)).day
-        return days
-    }
-
-    private var daysLeftText: String {
-        guard let days = daysLeft else { return store.validityEnd }
-        if days < 0 { return "Expired" }
-        if days == 0 { return "Last day" }
-        if days == 1 { return "1 day left" }
-        return "\(days) days left"
-    }
-
-    private var daysLeftColor: Color {
-        guard let days = daysLeft else { return .white.opacity(0.3) }
-        if days <= 1 { return Color(red: 0.95, green: 0.3, blue: 0.3) }
-        if days <= 3 { return Color(red: 0.95, green: 0.6, blue: 0.2) }
-        return .white.opacity(0.3)
-    }
-
-    private var storeAccentColor: Color {
-        GroceryStore.fromCanonical(store.storeName)?.accentColor ?? promoGreen
-    }
+struct PromoProductImageView: View {
+    let url: String
+    let size: CGFloat
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            // Store accent bar
-            RoundedRectangle(cornerRadius: 3)
-                .fill(storeAccentColor)
-                .frame(width: 3)
-                .padding(.vertical, 14)
-
-            VStack(alignment: .leading, spacing: 0) {
-                // Store header
-                HStack(spacing: 10) {
-                    StoreLogoView(storeName: store.storeName, height: 22)
-
-                    Text(GroceryStore.fromCanonical(store.storeName)?.displayName ?? store.storeName.capitalized)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-
-                    Spacer()
-
-                    if !store.items.isEmpty {
-                        HStack(spacing: 8) {
-                            if let days = daysLeft, days <= 3 {
-                                Text(daysLeftText)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(days <= 1 ? .red : .orange)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        Capsule().fill((days <= 1 ? Color.red : Color.orange).opacity(0.12))
-                                    )
-                            }
-
-                            Text("\(store.items.count) deals")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 12)
-
-                if store.items.isEmpty {
-                    // Empty state — per-store, no deals
-                    VStack(spacing: 10) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "tag.slash")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(storeAccentColor.opacity(0.5))
-                            Text("No matching deals this week")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white.opacity(0.45))
-                        }
-
-                        Text("New promotions drop every week — check back soon.")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.25))
-                            .multilineTextAlignment(.center)
-
-                        // If the store has a promo folder, link to it
-                        if let folderUrl = store.items.first?.promoFolderUrl,
-                           let url = URL(string: folderUrl) {
-                            Link(destination: url) {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "safari")
-                                        .font(.system(size: 11, weight: .semibold))
-                                    Text("Browse full folder")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundColor(storeAccentColor.opacity(0.8))
-                            }
-                            .padding(.top, 2)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 4)
-                } else {
-                    // Items
-                    let visibleItems = isExpanded ? store.items : Array(store.items.prefix(initialItemCount))
-
-                    VStack(spacing: 0) {
-                        ForEach(Array(visibleItems.enumerated()), id: \.element.id) { itemIndex, item in
-                            if itemIndex > 0 {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.06))
-                                    .frame(height: 0.5)
-                                    .padding(.horizontal, 16)
-                            }
-                            PromoItemRow(item: item, storeName: store.storeName, isBestDeal: item.id == bestDealId)
-                        }
-                    }
-
-                    // Show more / less
-                    if store.items.count > initialItemCount {
-                        Button {
-                            let opening = !isExpanded
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                isExpanded.toggle()
-                            }
-                            if opening {
-                                onExpand()
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(isExpanded ? "Show less" : "Show all \(store.items.count) deals")
-                                    .font(.system(size: 13, weight: .medium))
-                                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                                    .font(.system(size: 10, weight: .semibold))
-                            }
-                            .foregroundColor(.white.opacity(0.5))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                        }
-                    }
-                }
-
-            }
-            .padding(.leading, 6)
-        }
-        .clipped()
-        .glassCard()
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 12)
-        .onAppear {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.8).delay(Double(index) * 0.06)) {
-                appeared = true
+        AsyncImage(url: URL(string: url)) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            case .failure:
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .font(.system(size: size * 0.3, weight: .light))
+                            .foregroundColor(.white.opacity(0.15))
+                    )
+            case .empty:
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+                    .frame(width: size, height: size)
+                    .redacted(reason: .placeholder)
+            @unknown default:
+                EmptyView()
             }
         }
-    }
-}
-
-// MARK: - Item Row (within a store section)
-
-struct PromoItemRow: View {
-    let item: PromoStoreItem
-    let storeName: String
-    var isBestDeal: Bool = false
-    @State private var isExpanded = false
-    @ObservedObject private var groceryStore = GroceryListStore.shared
-    @State private var addTrigger = false
-
-    private var isSpecialDeal: Bool {
-        let mech = item.mechanismLabel.lowercased()
-        return mech.contains("gratis") || mech.contains("free") || mech.contains("cadeau")
-    }
-
-    private var mechanismPillColor: Color {
-        if (item.minPurchaseQty ?? 1) > 1 { return promoGreen }
-        if isSpecialDeal { return promoGold }
-        return .white.opacity(0.7)
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // MARK: Collapsed row — always visible
-            HStack(alignment: .center, spacing: 12) {
-                // Left: brand + name + mechanism
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        if !item.brand.isEmpty {
-                            Text(item.brand.uppercased())
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(.white.opacity(0.8))
-                                .tracking(0.5)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(
-                                    Capsule().fill(Color.white.opacity(0.08))
-                                )
-                        }
-                        if isBestDeal {
-                            HStack(spacing: 3) {
-                                Image(systemName: "star.fill")
-                                    .font(.system(size: 7, weight: .bold))
-                                Text("BEST DEAL")
-                                    .font(.system(size: 9, weight: .heavy))
-                                    .tracking(0.5)
-                            }
-                            .foregroundColor(promoGold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule().fill(promoGold.opacity(0.12))
-                            )
-                        }
-                    }
-
-                    Text(item.label)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(isExpanded ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: isExpanded)
-
-                    HStack(spacing: 6) {
-                        HStack(spacing: 4) {
-                            if (item.minPurchaseQty ?? 1) > 1 {
-                                Image(systemName: "cart.badge.plus")
-                                    .font(.system(size: 10, weight: .semibold))
-                            } else if isSpecialDeal {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 10, weight: .semibold))
-                            }
-                            Text(item.mechanismLabel)
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundColor(mechanismPillColor)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule().fill(mechanismPillColor.opacity(0.12))
-                        )
-                        .overlay(
-                            Capsule().stroke(mechanismPillColor.opacity(0.2), lineWidth: 0.5)
-                        )
-                        .fixedSize()
-                    }
-                }
-                .layoutPriority(1)
-
-                Spacer(minLength: 4)
-
-                // Right: prices
-                if item.hasPrices {
-                    priceView
-                }
-
-                // Add to grocery list button
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        if groceryStore.contains(item: item, storeName: storeName) {
-                            groceryStore.removeByPromo(item: item, storeName: storeName)
-                        } else {
-                            groceryStore.add(item: item, storeName: storeName)
-                        }
-                        addTrigger.toggle()
-                    }
-                } label: {
-                    Image(systemName: groceryStore.contains(item: item, storeName: storeName) ? "checkmark.circle.fill" : "plus.circle")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(groceryStore.contains(item: item, storeName: storeName) ? promoGreen : .white.opacity(0.3))
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(.plain)
-                .sensoryFeedback(.impact(weight: .medium), trigger: addTrigger)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.2))
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    isExpanded.toggle()
-                }
-            }
-
-            // MARK: Expanded detail — shown on tap
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 10) {
-                    Divider()
-                        .background(Color.white.opacity(0.08))
-
-                    // Description
-                    if let desc = item.displayDescription, !desc.isEmpty {
-                        Text(desc)
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.7))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    // Info chips
-                    if hasInfoChips {
-                        WrappingHStack(spacing: 8) {
-                            if let unitPrice = item.displayUnitPrice, !unitPrice.isEmpty {
-                                infoChip(icon: "scalemass", text: unitPrice)
-                            }
-                            if let label = item.savingsLabel, !label.isEmpty {
-                                infoChip(icon: "arrow.down.circle", text: label, isAccented: true)
-                            }
-                            if let unitPrice = item.effectiveUnitPrice, unitPrice > 0 {
-                                infoChip(icon: "tag", text: String(format: "€%.2f/pc", unitPrice))
-                            }
-                            if let qty = item.minPurchaseQty, qty > 1 {
-                                infoChip(icon: "number", text: "Min. \(qty)")
-                            }
-                        }
-                    }
-
-                    // Folder link
-                    if let urlString = item.promoFolderUrl,
-                       let url = URL(string: urlString) {
-                        Link(destination: url) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "safari")
-                                    .font(.system(size: 13, weight: .medium))
-                                if let page = item.pageNumber {
-                                    Text("\(L("view_in_folder")) — p. \(page)")
-                                        .font(.system(size: 13, weight: .semibold))
-                                } else {
-                                    Text(L("view_in_folder"))
-                                        .font(.system(size: 13, weight: .semibold))
-                                }
-                                Image(systemName: "arrow.up.right")
-                                    .font(.system(size: 10, weight: .bold))
-                            }
-                            .foregroundColor(Color(red: 0.4, green: 0.6, blue: 1.0))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .fixedSize()
-                            .background(
-                                Capsule()
-                                    .fill(Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.10))
-                            )
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.20), lineWidth: 0.5)
-                            )
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
-            }
-        }
-    }
-
-    // MARK: - Price View
-
-    @ViewBuilder
-    private var priceView: some View {
-        let qty = item.minPurchaseQty ?? 1
-        if qty > 1 {
-            // Multi-buy: show total prices for the full deal
-            let totalOriginal = item.originalPrice * Double(qty)
-            let totalUserPays = totalOriginal - item.savings
-            VStack(alignment: .trailing, spacing: 4) {
-                if item.discountPercentage > 0 {
-                    Text("-\(item.discountPercentage)%")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .foregroundStyle(greenGradient)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(promoGreen.opacity(0.15)))
-                }
-                Text(String(format: "€%.2f", totalUserPays))
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(greenGradient)
-                Text(String(format: "€%.2f", totalOriginal))
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.3))
-                    .strikethrough(true, color: .white.opacity(0.3))
-            }
-            .fixedSize()
-        } else {
-            // Single-item: show per-unit prices
-            VStack(alignment: .trailing, spacing: 4) {
-                if item.discountPercentage > 0 {
-                    Text("-\(item.discountPercentage)%")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .foregroundStyle(greenGradient)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(promoGreen.opacity(0.15)))
-                }
-                Text(String(format: "€%.2f", item.promoPrice))
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(greenGradient)
-                Text(String(format: "€%.2f", item.originalPrice))
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.3))
-                    .strikethrough(true, color: .white.opacity(0.3))
-            }
-            .fixedSize()
-        }
-    }
-
-    // MARK: - Info Chips
-
-    private var hasInfoChips: Bool {
-        (item.displayUnitPrice != nil && !(item.displayUnitPrice?.isEmpty ?? true))
-        || (item.savingsLabel != nil && !(item.savingsLabel?.isEmpty ?? true))
-        || (item.minPurchaseQty ?? 0) > 1
-    }
-
-    private func infoChip(icon: String, text: String, isAccented: Bool = false) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 10, weight: .semibold))
-            Text(text)
-                .font(.system(size: 11, weight: .medium))
-        }
-        .foregroundColor(isAccented ? promoGreen : .white.opacity(0.6))
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isAccented ? promoGreen.opacity(0.10) : Color.white.opacity(0.06))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
         )
     }
 }
@@ -814,6 +357,11 @@ struct PromoItemRow: View {
 // MARK: - Skeleton Loading View (redacted placeholder)
 
 struct PromoSkeletonView: View {
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
     var body: some View {
         VStack(spacing: 12) {
             // Placeholder summary header
@@ -828,50 +376,54 @@ struct PromoSkeletonView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
 
-            // Placeholder store sections
-            ForEach(0..<2, id: \.self) { _ in
-                VStack(spacing: 0) {
-                    // Store header
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(Color.white.opacity(0.1))
-                            .frame(width: 36, height: 36)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Store Name")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white)
-                            Text("12 deals • Save €5.00")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.4))
-                        }
-                        Spacer()
-                    }
-                    .padding(16)
-
-                    // Placeholder deal rows
-                    ForEach(0..<3, id: \.self) { _ in
-                        HStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white.opacity(0.08))
-                                .frame(width: 48, height: 48)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Product Name Here")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.white)
-                                Text("€3.99 → €2.49")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.white.opacity(0.4))
-                            }
-                            Spacer()
-                            Text("-25%")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(promoGreen)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+            // Placeholder filter bar
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(width: 90, height: 34)
                     }
                 }
-                .glassCard()
+                .padding(.horizontal, 16)
+            }
+
+            // Placeholder product grid
+            LazyVGrid(columns: gridColumns, spacing: 14) {
+                ForEach(0..<6, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Image placeholder
+                        RoundedRectangle(cornerRadius: 0)
+                            .fill(Color(white: 0.15))
+                            .frame(height: 160)
+
+                        // Info placeholder
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("BRAND")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.3))
+                            Text("Product Name Here")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.white.opacity(0.06))
+                                .frame(width: 70, height: 22)
+                            Text("€0.00")
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundStyle(promoGreen)
+                        }
+                        .padding(10)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color(white: 0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
+                }
             }
             .padding(.horizontal, 16)
         }

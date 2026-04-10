@@ -87,6 +87,8 @@ struct PromoStoreItem: Codable, Identifiable {
     let displaySavingsLabel: String?
     let bucket: String?
     let bucketLabel: String?
+    let thumbnailUrl: String?
+    let imageUrl: String?
 
     var id: String { "\(brand)-\(productName)-\(mechanism)" }
 
@@ -125,6 +127,8 @@ struct PromoStoreItem: Codable, Identifiable {
         case displaySavingsLabel = "display_savings_label"
         case bucket
         case bucketLabel = "bucket_label"
+        case thumbnailUrl = "thumbnail_url"
+        case imageUrl = "image_url"
     }
 }
 

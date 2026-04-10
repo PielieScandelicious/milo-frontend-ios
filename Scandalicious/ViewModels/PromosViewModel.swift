@@ -9,6 +9,13 @@ import Foundation
 import SwiftUI
 import Combine
 
+/// A flattened promo item with its store context, for use in the grid layout
+struct PromoGridItem: Identifiable {
+    let id: String
+    let item: PromoStoreItem
+    let storeName: String
+}
+
 @MainActor
 class PromosViewModel: ObservableObject {
     @Published var state: LoadingState<PromoRecommendationResponse> = .idle
@@ -20,6 +27,9 @@ class PromosViewModel: ObservableObject {
 
     /// True while reloading after store selection change — shows dachshund instead of stale empty state
     @Published var isReloadingAfterStoreChange = false
+
+    /// Currently selected store filter (nil = "All")
+    @Published var selectedFilterStore: String? = nil
 
     private let apiService = PromoAPIService.shared
     private let profileService = ProfileAPIService()
@@ -257,6 +267,39 @@ class PromosViewModel: ObservableObject {
     private var readyReport: PromoRecommendationResponse? {
         guard case .success(let response) = state, response.isReady else { return nil }
         return response
+    }
+
+    // MARK: - Grid Filtering
+
+    /// Flat list of all items with store context, filtered by selected store
+    var filteredItems: [PromoGridItem] {
+        let allItems = stores.flatMap { store in
+            store.items
+                .filter { $0.thumbnailUrl != nil }
+                .map { PromoGridItem(
+                    id: "\(store.storeName)-\($0.id)",
+                    item: $0,
+                    storeName: store.storeName
+                )}
+        }
+        if let filter = selectedFilterStore {
+            return allItems.filter { $0.storeName == filter }
+        }
+        return allItems
+    }
+
+    /// Store options for the filter bar: (name, dealCount)
+    var storeFilterOptions: [(name: String, count: Int)] {
+        stores.compactMap { store in
+            let count = store.items.filter { $0.thumbnailUrl != nil }.count
+            guard count > 0 else { return nil }
+            return (name: store.storeName, count: count)
+        }
+    }
+
+    /// Total deal count across all filtered items
+    var totalFilteredCount: Int {
+        storeFilterOptions.reduce(0) { $0 + $1.count }
     }
 
 }

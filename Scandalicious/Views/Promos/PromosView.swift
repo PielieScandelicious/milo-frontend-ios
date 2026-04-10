@@ -12,6 +12,7 @@ struct PromosView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var contentOpacity: Double = 0
     @State private var showManageSheet = false
+    @State private var selectedDetailItem: PromoGridItem?
 
     // Premium emerald header
     private let headerGreen = Color(red: 0.04, green: 0.22, blue: 0.13)
@@ -78,7 +79,6 @@ struct PromosView: View {
             withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
                 contentOpacity = 1.0
             }
-            configureSegmentedControlAppearance()
         }
         .task {
             await viewModel.loadPromos()
@@ -90,24 +90,6 @@ struct PromosView: View {
                 await viewModel.loadPromos(forceRefresh: true)
             }
         }
-    }
-
-    // MARK: - Segmented Control Appearance
-
-    private func configureSegmentedControlAppearance() {
-        let appearance = UISegmentedControl.appearance()
-        appearance.selectedSegmentTintColor = UIColor.white.withAlphaComponent(0.18)
-        appearance.backgroundColor = UIColor.white.withAlphaComponent(0.08)
-        appearance.setTitleTextAttributes(
-            [.foregroundColor: UIColor.white.withAlphaComponent(0.45),
-             .font: UIFont.systemFont(ofSize: 13, weight: .semibold)],
-            for: .normal
-        )
-        appearance.setTitleTextAttributes(
-            [.foregroundColor: UIColor.white,
-             .font: UIFont.systemFont(ofSize: 13, weight: .bold)],
-            for: .selected
-        )
     }
 
     // MARK: - Header fade
@@ -311,20 +293,43 @@ struct PromosView: View {
 
     // MARK: - Main content
 
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
     private func promoContent(_ data: PromoRecommendationResponse) -> some View {
-        // Store sections (hero card and manage button are rendered above)
         VStack(spacing: 12) {
-            if !viewModel.stores.isEmpty {
-                ForEach(Array(viewModel.stores.enumerated()), id: \.element.id) { index, store in
-                    PromoStoreSection(
-                        store: store,
-                        index: index,
-                        onExpand: { viewModel.trackStoreSectionOpened(store) }
-                    )
+            // Store filter bar
+            PromoStoreFilterBar(viewModel: viewModel)
+
+            // Product grid
+            let items = viewModel.filteredItems
+            if items.isEmpty {
+                Text("No deals with this filter")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.4))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else {
+                LazyVGrid(columns: gridColumns, spacing: 14) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, gridItem in
+                        PromoProductCard(
+                            gridItem: gridItem,
+                            index: index,
+                            onTap: { selectedDetailItem = gridItem }
+                        )
+                    }
                 }
+                .padding(.horizontal, 16)
+                .animation(.easeInOut(duration: 0.25), value: viewModel.selectedFilterStore)
             }
         }
-        .padding(.horizontal, 16)
+        .sheet(item: $selectedDetailItem) { gridItem in
+            PromoProductDetailSheet(gridItem: gridItem)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     private func emptyTitle(for data: PromoRecommendationResponse) -> String {
