@@ -46,6 +46,7 @@ struct PromoProductCard: View {
                 imageSection
                 infoSection
             }
+            .frame(maxHeight: .infinity, alignment: .top)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -212,7 +213,9 @@ struct PromoProductCard: View {
                 }
             }
 
-            // Validity + Add button
+            Spacer(minLength: 0)
+
+            // Validity + Add button (pinned to bottom)
             HStack {
                 Text(validityText)
                     .font(.system(size: 10))
@@ -240,6 +243,7 @@ struct PromoProductCard: View {
                 .sensoryFeedback(.impact(weight: .medium), trigger: addTrigger)
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .padding(10)
         .background(Color(white: 0.08))
     }
