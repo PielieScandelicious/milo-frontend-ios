@@ -172,6 +172,8 @@ struct PromoProductCard: View {
                 }
                 Text(item.mechanismLabel)
                     .font(.system(size: 10, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .foregroundColor(mechanismPillColor)
             .padding(.horizontal, 8)
@@ -182,7 +184,6 @@ struct PromoProductCard: View {
             .overlay(
                 Capsule().stroke(mechanismPillColor.opacity(0.2), lineWidth: 0.5)
             )
-            .fixedSize()
 
             // Prices
             if item.hasPrices {
