@@ -170,6 +170,7 @@ private struct FolderScrollOffsetKey: PreferenceKey {
 
 struct PromoFolderBrowserView: View {
     @ObservedObject var viewModel: PromoFoldersViewModel
+    @State private var expandedStoreId: String? = nil
 
     var body: some View {
         switch viewModel.state {
@@ -189,164 +190,84 @@ struct PromoFolderBrowserView: View {
     // MARK: - Content
 
     private var folderContent: some View {
-        VStack(spacing: 28) {
-            // Store filter chips
-            folderStoreFilterBar
-
-            // Store sections with dividers
-            let groups = viewModel.foldersByStore
-            ForEach(Array(groups.enumerated()), id: \.element.storeId) { index, group in
-                storeFolderSection(
+        VStack(spacing: 0) {
+            ForEach(viewModel.foldersByStore, id: \.storeId) { group in
+                storeRow(
                     storeId: group.storeId,
                     displayName: group.displayName,
                     folders: group.folders
                 )
-
-                // Subtle divider between sections
-                if index < groups.count - 1 {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.04))
-                        .frame(height: 1)
-                        .padding(.horizontal, 32)
-                }
             }
         }
     }
 
-    // MARK: - Store Filter Bar
+    // MARK: - Store Row (expandable)
 
-    private var folderStoreFilterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                // "All" chip
-                folderFilterChip(
-                    label: "All",
-                    count: viewModel.totalFolderCount,
-                    isSelected: viewModel.selectedStoreFilter == nil,
-                    storeName: nil
-                ) {
-                    withAnimation(.smooth(duration: 0.25)) {
-                        viewModel.selectedStoreFilter = nil
-                    }
-                }
-
-                // Per-store chips
-                ForEach(viewModel.storeFilterOptions, id: \.storeId) { option in
-                    let store = GroceryStore.fromCanonical(option.storeId)
-                    folderFilterChip(
-                        label: option.displayName,
-                        count: option.count,
-                        isSelected: viewModel.selectedStoreFilter == option.storeId,
-                        storeName: option.storeId
-                    ) {
-                        withAnimation(.smooth(duration: 0.25)) {
-                            viewModel.selectedStoreFilter = option.storeId
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 4)
-        }
-    }
-
-    private func folderFilterChip(
-        label: String,
-        count: Int,
-        isSelected: Bool,
-        storeName: String?,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let name = storeName {
-                    StoreLogoView(storeName: name, height: 14)
-                        .frame(width: 20, height: 20)
-                }
-
-                Text(label)
-                    .font(.system(size: 13, weight: isSelected ? .bold : .medium))
-
-                Text("\(count)")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .white.opacity(0.35))
-            }
-            .foregroundColor(isSelected ? .white : .white.opacity(0.6))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                Capsule().fill(
-                    isSelected
-                        ? folderBlue.opacity(0.25)
-                        : Color.white.opacity(0.06)
-                )
-            )
-            .overlay(
-                Capsule().stroke(
-                    isSelected
-                        ? folderBlue.opacity(0.5)
-                        : Color.white.opacity(0.08),
-                    lineWidth: 0.5
-                )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Store Section
-
-    private func storeFolderSection(
+    private func storeRow(
         storeId: String,
         displayName: String,
         folders: [PromoFolder]
     ) -> some View {
+        let isExpanded = expandedStoreId == storeId
         let storeColor = GroceryStore.fromCanonical(storeId)?.accentColor ?? folderBlue
 
-        return VStack(alignment: .leading, spacing: 14) {
-            // Store header
-            HStack(spacing: 12) {
-                StoreLogoView(storeName: storeId, height: 24)
-                    .frame(width: 40, height: 40)
-                    .background(Color(white: 0.10), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(storeColor.opacity(0.2), lineWidth: 0.5)
-                    )
+        return VStack(spacing: 0) {
+            // Tappable store row
+            Button {
+                withAnimation(.smooth(duration: 0.3)) {
+                    expandedStoreId = isExpanded ? nil : storeId
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    StoreLogoView(storeName: storeId, height: 24)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(isExpanded ? storeColor.opacity(0.1) : Color(white: 0.10))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(isExpanded ? storeColor.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 0.5)
+                        )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(displayName)
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(.white)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(displayName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
 
-                    if let firstFolder = folders.first {
-                        let display = firstFolder.validityDisplay
-                        HStack(spacing: 4) {
-                            if let icon = display.icon {
-                                Image(systemName: icon)
-                                    .font(.system(size: 10, weight: .semibold))
+                        if let firstFolder = folders.first {
+                            let display = firstFolder.validityDisplay
+                            HStack(spacing: 4) {
+                                if let icon = display.icon {
+                                    Image(systemName: icon)
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundColor(display.color)
+                                }
+                                Text(display.text)
+                                    .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(display.color)
                             }
-                            Text(display.text)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(display.color)
                         }
                     }
-                }
 
-                Spacer()
+                    Spacer()
 
-                if folders.count > 1 {
-                    Text("\(folders.count) folders")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(storeColor.opacity(0.7))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(storeColor.opacity(0.1), in: Capsule())
+                    Text("\(folders.count)")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(width: 26)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.3))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
+                .padding(.vertical, 14)
+                .padding(.horizontal, 16)
             }
-            .padding(.horizontal, 16)
+            .buttonStyle(.plain)
 
-            // Folder cards — horizontal scroll
+            // Folder cards — always in tree, height animates to reveal/hide
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(folders) { folder in
@@ -357,7 +278,17 @@ struct PromoFolderBrowserView: View {
                     }
                 }
                 .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
+            .frame(height: isExpanded ? 260 : 0, alignment: .top)
+            .clipped()
+            .opacity(isExpanded ? 1 : 0)
+
+            // Divider
+            Rectangle()
+                .fill(Color.white.opacity(0.05))
+                .frame(height: 1)
+                .padding(.horizontal, 16)
         }
     }
 

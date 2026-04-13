@@ -217,7 +217,7 @@ struct PromoProductDetailSheet: View {
                 Text(item.brand.uppercased())
                     .font(.system(size: 14, weight: .bold))
                     .tracking(1.5)
-                    .foregroundColor(storeAccentColor)
+                    .foregroundColor(detailBrandColor)
             }
 
             // Product name — large, clear
@@ -557,6 +557,7 @@ private struct FlowLayout: Layout {
 
 private let detailGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 private let detailGold = Color(red: 1.00, green: 0.80, blue: 0.20)
+private let detailBrandColor = Color(red: 0.95, green: 0.80, blue: 0.20)
 private let detailWarningAmber = Color(red: 1.0, green: 0.75, blue: 0.25)
 private let detailUrgentOrange = Color(red: 0.95, green: 0.40, blue: 0.30)
 private let detailUrgentRed = Color(red: 0.95, green: 0.25, blue: 0.25)

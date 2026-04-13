@@ -212,7 +212,7 @@ struct PromoProductCard: View {
                 Text(item.brand.uppercased())
                     .font(.system(size: 11, weight: .bold))
                     .tracking(1.0)
-                    .foregroundColor(storeAccentColor.opacity(0.9))
+                    .foregroundColor(promoBrandColor)
                     .lineLimit(1)
             }
 
@@ -360,6 +360,7 @@ struct PromoProductCard: View {
 private let promoCardGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 private let promoCardGreenDark = Color(red: 0.10, green: 0.65, blue: 0.40)
 private let promoCardGold = Color(red: 1.00, green: 0.80, blue: 0.20)
+private let promoBrandColor = Color(red: 0.95, green: 0.80, blue: 0.20)
 private let promoWarningAmber = Color(red: 1.0, green: 0.75, blue: 0.25)
 private let promoUrgentOrange = Color(red: 0.95, green: 0.40, blue: 0.30)
 private let promoUrgentRed = Color(red: 0.95, green: 0.25, blue: 0.25)

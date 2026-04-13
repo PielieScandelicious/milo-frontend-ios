@@ -131,7 +131,7 @@ struct CashbackDealCard: View {
                     Text(deal.brandName.uppercased())
                         .font(.system(size: 10, weight: .semibold))
                         .tracking(0.8)
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(Color(red: 0.95, green: 0.80, blue: 0.20))
 
                     Text(deal.productName)
                         .font(.system(size: 14, weight: .semibold))
