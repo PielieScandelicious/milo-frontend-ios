@@ -114,12 +114,9 @@ struct PromosView: View {
                     // Scenario 1: No stores selected
                     noStoresSelectedView
                 } else {
-                    // Summary header + store bar grouped together
-                    VStack(spacing: 8) {
-                        PromoSummaryHeader(stores: viewModel.stores)
-                        storeBar
-                    }
-                    .padding(.horizontal, 16)
+                    // Summary header
+                    PromoSummaryHeader(stores: viewModel.stores)
+                        .padding(.horizontal, 16)
 
                     if viewModel.isReloadingAfterStoreChange {
                         PromoSkeletonView()
@@ -246,50 +243,6 @@ struct PromosView: View {
 
     // Promo green local ref (same as in PromoComponents)
     private let promoGreenLocal = Color(red: 0.20, green: 0.85, blue: 0.50)
-
-    private var storeBar: some View {
-        Button {
-            showManageSheet = true
-        } label: {
-            HStack(spacing: 12) {
-                // Overlapping store logos
-                HStack(spacing: -6) {
-                    ForEach(Array(viewModel.selectedStoreNames.prefix(5).enumerated()), id: \.element) { index, name in
-                        StoreLogoView(storeName: name, height: 18)
-                            .frame(width: 28, height: 28)
-                            .background(Color(white: 0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Color(white: 0.06), lineWidth: 1.5))
-                            .zIndex(Double(5 - index))
-                    }
-
-                    if viewModel.selectedStoreNames.count > 5 {
-                        Text("+\(viewModel.selectedStoreNames.count - 5)")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 28, height: 28)
-                            .background(Color(white: 0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                    }
-                }
-
-                Text("\(viewModel.selectedStoreNames.count) stores")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                HStack(spacing: 4) {
-                    Text("Edit")
-                        .font(.subheadline)
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.semibold))
-                }
-                .foregroundStyle(.secondary)
-            }
-            .padding(12)
-            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
 
     // MARK: - Main content
 

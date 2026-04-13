@@ -395,29 +395,38 @@ struct PromoSkeletonView: View {
                         // Image placeholder
                         RoundedRectangle(cornerRadius: 0)
                             .fill(Color(white: 0.15))
-                            .frame(height: 160)
+                            .frame(height: 140)
 
                         // Info placeholder
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 5) {
                             Text("BRAND")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(.white.opacity(0.3))
                             Text("Product Name Here")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.white)
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white.opacity(0.06))
-                                .frame(width: 70, height: 22)
+                                .frame(height: 48, alignment: .topLeading)
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.white.opacity(0.08))
+                                .frame(width: 80, height: 26)
                             Text("€0.00")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .font(.system(size: 17, weight: .bold, design: .rounded))
                                 .foregroundStyle(promoGreen)
+                            Spacer(minLength: 0)
+                            HStack {
+                                Text("0 days left")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.white.opacity(0.3))
+                                Spacer()
+                            }
                         }
                         .padding(10)
                     }
+                    .frame(height: PromoProductCard.cardHeight)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color(white: 0.08))
+                            .fill(Color(white: 0.09))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
