@@ -8,17 +8,119 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Folder Page Hotspot
+
+struct PromoFolderHotspot: Codable, Identifiable {
+    let itemId: String
+    let pageNumber: Int
+    let tileBboxXMin: CGFloat
+    let tileBboxYMin: CGFloat
+    let tileBboxXMax: CGFloat
+    let tileBboxYMax: CGFloat
+    let displayName: String
+    let displayBrand: String?
+    let displayMechanism: String
+    let originalPrice: Double
+    let promoPrice: Double
+    let savingsAmount: Double
+    let discountPercentage: Int
+    let minPurchaseQty: Int
+    let validityEnd: String
+    let thumbnailUrl: String?
+    let imageUrl: String?
+    let storeName: String
+
+    var id: String { itemId }
+
+    /// Convert normalized 0-1 coordinates to a CGRect within the actual displayed image area,
+    /// accounting for scaleAspectFit letterboxing.
+    func tileRect(in imageRect: CGRect) -> CGRect {
+        CGRect(
+            x: imageRect.origin.x + tileBboxXMin * imageRect.width,
+            y: imageRect.origin.y + tileBboxYMin * imageRect.height,
+            width: (tileBboxXMax - tileBboxXMin) * imageRect.width,
+            height: (tileBboxYMax - tileBboxYMin) * imageRect.height
+        )
+    }
+
+    /// Convert to PromoStoreItem for GroceryListItem.from()
+    func toPromoStoreItem() -> PromoStoreItem {
+        PromoStoreItem(
+            itemKey: itemId,
+            brand: displayBrand ?? "",
+            productName: displayName,
+            originalPrice: originalPrice,
+            promoPrice: promoPrice,
+            savings: savingsAmount,
+            discountPercentage: discountPercentage,
+            mechanism: displayMechanism,
+            validityStart: "",
+            validityEnd: validityEnd,
+            pageNumber: pageNumber,
+            promoFolderUrl: nil,
+            savingsAmount: savingsAmount,
+            minPurchaseQty: minPurchaseQty,
+            effectiveUnitPrice: nil,
+            displayName: displayName,
+            displayMechanism: displayMechanism,
+            displayDescription: nil,
+            displayUnitPrice: nil,
+            displaySavingsLabel: nil,
+            bucket: nil,
+            bucketLabel: nil,
+            thumbnailUrl: thumbnailUrl,
+            imageUrl: imageUrl
+        )
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case itemId = "item_id"
+        case pageNumber = "page_number"
+        case tileBboxXMin = "tile_bbox_x_min"
+        case tileBboxYMin = "tile_bbox_y_min"
+        case tileBboxXMax = "tile_bbox_x_max"
+        case tileBboxYMax = "tile_bbox_y_max"
+        case displayName = "display_name"
+        case displayBrand = "display_brand"
+        case displayMechanism = "display_mechanism"
+        case originalPrice = "original_price"
+        case promoPrice = "promo_price"
+        case savingsAmount = "savings_amount"
+        case discountPercentage = "discount_percentage"
+        case minPurchaseQty = "min_purchase_qty"
+        case validityEnd = "validity_end"
+        case thumbnailUrl = "thumbnail_url"
+        case imageUrl = "image_url"
+        case storeName = "store_name"
+    }
+}
+
 // MARK: - Folder Page
 
 struct PromoFolderPage: Codable, Identifiable {
     let pageNumber: Int
     let imageUrl: String
+    let hotspots: [PromoFolderHotspot]
 
     var id: Int { pageNumber }
+
+    init(pageNumber: Int, imageUrl: String, hotspots: [PromoFolderHotspot] = []) {
+        self.pageNumber = pageNumber
+        self.imageUrl = imageUrl
+        self.hotspots = hotspots
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        pageNumber = try container.decode(Int.self, forKey: .pageNumber)
+        imageUrl = try container.decode(String.self, forKey: .imageUrl)
+        hotspots = try container.decodeIfPresent([PromoFolderHotspot].self, forKey: .hotspots) ?? []
+    }
 
     enum CodingKeys: String, CodingKey {
         case pageNumber = "page_number"
         case imageUrl = "image_url"
+        case hotspots
     }
 }
 
