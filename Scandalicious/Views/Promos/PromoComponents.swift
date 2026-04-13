@@ -200,9 +200,9 @@ struct PromoBannerCard: View {
         }
         .buttonStyle(.plain)
         .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 8)
+        .scaleEffect(appeared ? 1 : 0.96)
         .onAppear {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            withAnimation(.smooth(duration: 0.4)) {
                 appeared = true
             }
         }
@@ -284,9 +284,8 @@ struct PromoSummaryHeader: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 8)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.4)) {
+            withAnimation(.smooth(duration: 0.5)) {
                 appeared = true
             }
         }
@@ -516,9 +515,9 @@ struct PromoEmptyView: View {
         .glassCard()
         .padding(.horizontal, 16)
         .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 16)
+        .scaleEffect(appeared ? 1 : 0.95)
         .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            withAnimation(.smooth(duration: 0.5)) {
                 appeared = true
             }
             withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(0.5)) {
@@ -679,9 +678,9 @@ struct PromoErrorView: View {
         .glassCard()
         .padding(.horizontal, 16)
         .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 16)
+        .scaleEffect(appeared ? 1 : 0.95)
         .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            withAnimation(.smooth(duration: 0.5)) {
                 appeared = true
             }
         }

@@ -76,7 +76,7 @@ struct PromosView: View {
         }
         .tint(.white.opacity(0.6))
         .onAppear {
-            withAnimation(.easeOut(duration: 0.4).delay(0.1)) {
+            withAnimation(.smooth(duration: 0.5)) {
                 contentOpacity = 1.0
             }
         }
@@ -275,7 +275,7 @@ struct PromosView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .animation(.easeInOut(duration: 0.25), value: viewModel.selectedFilterStore)
+                .animation(.smooth(duration: 0.35), value: viewModel.selectedFilterStore)
             }
         }
         .sheet(item: $selectedDetailItem) { gridItem in

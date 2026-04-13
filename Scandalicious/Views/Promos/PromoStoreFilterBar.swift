@@ -21,7 +21,7 @@ struct PromoStoreFilterBar: View {
                     accentColor: filterGreen,
                     storeName: nil
                 ) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.smooth(duration: 0.25)) {
                         viewModel.selectedFilterStore = nil
                     }
                 }
@@ -38,7 +38,7 @@ struct PromoStoreFilterBar: View {
                         accentColor: accent,
                         storeName: option.name
                     ) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(.smooth(duration: 0.25)) {
                             viewModel.selectedFilterStore = option.name
                         }
                     }

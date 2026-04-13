@@ -114,9 +114,9 @@ struct PromoProductCard: View {
         }
         .buttonStyle(.plain)
         .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 16)
+        .scaleEffect(appeared ? 1 : 0.94)
         .onAppear {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.8).delay(Double(index) * 0.04)) {
+            withAnimation(.smooth(duration: 0.4).delay(Double(index) * 0.05)) {
                 appeared = true
             }
         }
