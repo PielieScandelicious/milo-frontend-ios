@@ -25,7 +25,7 @@ struct ContentView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @StateObject private var transactionManager = TransactionManager()
     @StateObject private var dataManager = StoreDataManager()
-    @State private var selectedTab: Tab = .home
+    @State private var selectedTab: Tab = .folders
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
     @StateObject private var brandCashbackViewModel = BrandCashbackViewModel()
@@ -40,25 +40,32 @@ struct ContentView: View {
     @State private var activeOverlay: OverlayItem? = nil
 
     enum Tab: Int, Hashable {
-        case home = 0
+        case folders = 0
         case promos = 1
-        case insights = 2
+        case receipts = 2
+        case insights = 3
     }
 
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
-                ScanTab()
+                FoldersTab()
                     .tabItem {
-                        Label(L("tab_home"), systemImage: "house.fill")
+                        Label("Folders", systemImage: "newspaper.fill")
                     }
-                    .tag(Tab.home)
+                    .tag(Tab.folders)
 
                 PromosTab()
                     .tabItem {
                         Label("Deals", systemImage: "tag.fill")
                     }
                     .tag(Tab.promos)
+
+                ScanTab()
+                    .tabItem {
+                        Label("Receipts", systemImage: "doc.text.fill")
+                    }
+                    .tag(Tab.receipts)
 
                 ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
                     .tabItem {
@@ -127,7 +134,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("app.switchToHomeTab"))) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                selectedTab = .home
+                selectedTab = .receipts
             }
         }
         .onChange(of: brandCashbackViewModel.showEarnedOverlay) { _, showing in
@@ -289,6 +296,15 @@ struct ContentView: View {
                 }
             }
 
+            // Deals: promo folders (public, no auth)
+            group.addTask {
+                if let folders = try? await PromoAPIService.shared.getFolders() {
+                    await MainActor.run {
+                        cache.promoFolders = folders
+                    }
+                }
+            }
+
             // Home tab: cashback summary, brand deals, recent receipts
             group.addTask {
                 if let summary = try? await CashbackAPIService.shared.getSummary() {
@@ -428,6 +444,18 @@ struct ScanTab: View {
     var body: some View {
         HomeTabView()
             .id("ScanTab") // Prevent recreation
+    }
+}
+
+// MARK: - Folders Tab
+struct FoldersTab: View {
+    @StateObject private var viewModel = PromoFoldersViewModel()
+
+    var body: some View {
+        NavigationStack {
+            FolderHomeView(viewModel: viewModel)
+        }
+        .id("FoldersTab")
     }
 }
 

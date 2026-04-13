@@ -34,6 +34,7 @@ class BudgetTabPreloadCache {
 
     // Deals prefetch
     var promoData: PromoRecommendationResponse?
+    var promoFolders: PromoFoldersResponse?
 
     // Home tab prefetch
     var cashbackSummary: CashbackSummaryResponse?
@@ -55,6 +56,7 @@ class BudgetTabPreloadCache {
         trendData = nil
         insightsPeriodMetadata = []
         promoData = nil
+        promoFolders = nil
         cashbackSummary = nil
         earnedBrandDeals = []
         recentUploadedReceipts = []

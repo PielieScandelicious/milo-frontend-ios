@@ -9,17 +9,13 @@
 import SwiftUI
 
 struct HomeTabView: View {
-    @EnvironmentObject var authManager: AuthenticationManager
     @ObservedObject private var processingManager = ReceiptProcessingManager.shared
     @ObservedObject private var gamificationManager = GamificationManager.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     @State private var viewModel = HomeViewModel()
-    @State private var showProfile = false
 
     @State private var contentOpacity: Double = 0
     @State private var showMiloGame = false
-    @State private var showWalletPassCreator = false
     @State private var showGroceryList = false
     @ObservedObject private var groceryStore = GroceryListStore.shared
     @Environment(\.scenePhase) private var scenePhase
@@ -36,9 +32,6 @@ struct HomeTabView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     groceryListButton
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    profileMenuButton
-                }
             }
         }
         .onAppear {
@@ -50,16 +43,6 @@ struct HomeTabView: View {
             if newPhase == .active {
                 checkForShareExtensionUploads()
             }
-        }
-        .sheet(isPresented: $showProfile) {
-            NavigationStack {
-                ProfileView()
-                    .environmentObject(authManager)
-                    .environmentObject(subscriptionManager)
-            }
-        }
-        .sheet(isPresented: $showWalletPassCreator) {
-            WalletPassCreatorView()
         }
         .sheet(isPresented: $showGroceryList) {
             GroceryListSheet()
@@ -177,30 +160,6 @@ struct HomeTabView: View {
     }
 
     // MARK: - Profile Menu Button
-
-    private var profileMenuButton: some View {
-        Menu {
-            Button {
-                showProfile = true
-            } label: {
-                Label("Profile", systemImage: "gearshape")
-            }
-            Button {
-                showWalletPassCreator = true
-            } label: {
-                Label("Wallet Pass Creator", systemImage: "wallet.pass")
-            }
-        } label: {
-            Circle()
-                .fill(Color.white.opacity(0.15))
-                .frame(width: 36, height: 36)
-                .overlay(
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                )
-        }
-    }
 
     // MARK: - Share Extension Detection
 

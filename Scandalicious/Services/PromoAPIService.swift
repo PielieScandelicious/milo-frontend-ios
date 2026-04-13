@@ -161,6 +161,44 @@ actor PromoAPIService {
         }
     }
 
+    // MARK: - Promo Folders (public, no auth)
+
+    func getFolders() async throws -> PromoFoldersResponse {
+        guard let url = URL(string: "\(baseURL)/promos/folders") else {
+            throw PromoError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 30
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw PromoError.invalidResponse
+            }
+
+            switch httpResponse.statusCode {
+            case 200:
+                do {
+                    return try JSONDecoder().decode(PromoFoldersResponse.self, from: data)
+                } catch {
+                    throw PromoError.decodingError(error.localizedDescription)
+                }
+            case 503:
+                throw PromoError.serviceUnavailable
+            default:
+                throw PromoError.serverError("Server error: \(httpResponse.statusCode)")
+            }
+        } catch let error as PromoError {
+            throw error
+        } catch {
+            throw PromoError.networkError(error)
+        }
+    }
+
     // MARK: - Helper
 
     private func getFirebaseToken() async throws -> String? {
