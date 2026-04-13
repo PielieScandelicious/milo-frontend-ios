@@ -247,42 +247,95 @@ struct PromoBannerCard: View {
 
 struct PromoSummaryHeader: View {
     let stores: [PromoStore]
+    let selectedFilterStore: String?
+
     @State private var appeared = false
 
-    private var itemsWithImages: [PromoStoreItem] {
-        stores.flatMap { $0.items.filter { $0.thumbnailUrl != nil } }
+    private var isFiltered: Bool {
+        selectedFilterStore != nil
     }
 
-    private var totalSavings: Double {
-        itemsWithImages.reduce(0) { $0 + $1.savings }
+    private var filteredStore: PromoStore? {
+        guard let filter = selectedFilterStore else { return nil }
+        return stores.first { $0.storeName == filter }
     }
 
-    private var dealCount: Int {
-        itemsWithImages.count
+    private var groceryStore: GroceryStore? {
+        guard let name = selectedFilterStore else { return nil }
+        return GroceryStore.fromCanonical(name)
+    }
+
+    private var displaySavings: Double {
+        if let store = filteredStore {
+            return store.items.filter { $0.thumbnailUrl != nil }.reduce(0) { $0 + $1.savings }
+        }
+        return stores.flatMap { $0.items.filter { $0.thumbnailUrl != nil } }.reduce(0) { $0 + $1.savings }
+    }
+
+    private var displayDealCount: Int {
+        if let store = filteredStore {
+            return store.items.filter { $0.thumbnailUrl != nil }.count
+        }
+        return stores.flatMap { $0.items.filter { $0.thumbnailUrl != nil } }.count
+    }
+
+    private var accentColor: Color {
+        groceryStore?.accentColor ?? promoGreen
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(String(format: "€%.2f", totalSavings))
-                .font(.system(size: 40, weight: .bold, design: .rounded))
-                .foregroundStyle(greenGradient)
+        VStack(alignment: .leading, spacing: 6) {
+            // Store badge — shown when filtering by a specific store
+            if isFiltered, let store = groceryStore {
+                HStack(spacing: 8) {
+                    StoreLogoView(storeName: store.canonicalName, height: 16)
+                        .frame(width: 24, height: 24)
+                        .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-            Text("in savings this week")
+                    Text(store.displayName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(accentColor)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+
+            // Savings amount
+            Text(String(format: "€%.2f", displaySavings))
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    isFiltered
+                        ? LinearGradient(colors: [accentColor, accentColor.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        : greenGradient
+                )
+                .contentTransition(.numericText(value: displaySavings))
+
+            // Subtitle
+            Text(isFiltered ? "in savings at this store" : "in savings this week")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white.opacity(0.5))
+                .contentTransition(.opacity)
 
+            // Deal count
             HStack(spacing: 5) {
                 Image(systemName: "pawprint.fill")
                     .font(.system(size: 11))
-                    .foregroundStyle(greenGradient)
+                    .foregroundStyle(isFiltered
+                        ? LinearGradient(colors: [accentColor, accentColor.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        : greenGradient
+                    )
 
-                Text("Milo found \(dealCount) deals")
+                Text(isFiltered
+                     ? "\(displayDealCount) deals at \(groceryStore?.displayName ?? "this store")"
+                     : "Milo found \(displayDealCount) deals across \(stores.count) stores"
+                )
                     .font(.system(size: 13))
                     .foregroundColor(.white.opacity(0.35))
+                    .contentTransition(.numericText(value: Double(displayDealCount)))
             }
             .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.smooth(duration: 0.35), value: selectedFilterStore)
         .opacity(appeared ? 1 : 0)
         .onAppear {
             withAnimation(.smooth(duration: 0.5)) {

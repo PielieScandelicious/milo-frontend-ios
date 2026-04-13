@@ -114,9 +114,12 @@ struct PromosView: View {
                     // Scenario 1: No stores selected
                     noStoresSelectedView
                 } else {
-                    // Summary header
-                    PromoSummaryHeader(stores: viewModel.stores)
-                        .padding(.horizontal, 16)
+                    // Summary header — reacts to store filter
+                    PromoSummaryHeader(
+                        stores: viewModel.stores,
+                        selectedFilterStore: viewModel.selectedFilterStore
+                    )
+                    .padding(.horizontal, 16)
 
                     if viewModel.isReloadingAfterStoreChange {
                         PromoSkeletonView()
@@ -274,8 +277,8 @@ struct PromosView: View {
                         )
                     }
                 }
+                .id(viewModel.selectedFilterStore ?? "all")
                 .padding(.horizontal, 16)
-                .animation(.smooth(duration: 0.35), value: viewModel.selectedFilterStore)
             }
         }
         .sheet(item: $selectedDetailItem) { gridItem in

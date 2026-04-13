@@ -116,9 +116,25 @@ struct PromoProductCard: View {
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.94)
         .onAppear {
-            withAnimation(.smooth(duration: 0.4).delay(Double(index) * 0.05)) {
-                appeared = true
-            }
+            triggerEntrance()
+        }
+    }
+
+    // MARK: - Entrance Animation
+
+    /// Stagger delay follows reading order: left→right across each row, then next row.
+    /// In a 2-column grid, index 0 = row0-left, 1 = row0-right, 2 = row1-left, etc.
+    /// Each card gets a small incremental delay for a smooth cascade effect.
+    private func triggerEntrance() {
+        let row = index / 2
+        let col = index % 2
+        let sequentialPosition = row * 2 + col  // reading order: L, R, L, R...
+        let delay = Double(sequentialPosition) * 0.06
+        // Cap the delay so cards far down the list don't wait too long
+        let cappedDelay = min(delay, 0.6)
+
+        withAnimation(.smooth(duration: 0.35).delay(cappedDelay)) {
+            appeared = true
         }
     }
 
