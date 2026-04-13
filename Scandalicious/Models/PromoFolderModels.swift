@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - Folder Page
 
@@ -39,8 +40,43 @@ struct PromoFolder: Codable, Identifiable {
     /// First page image URL, used as cover thumbnail
     var coverImageUrl: String? { pages.first?.imageUrl }
 
-    /// Formatted validity label, e.g. "Until 15/04"
-    var validityLabel: String {
+    /// Days remaining until validity_end
+    var daysRemaining: Int? {
+        let parts = validityEnd.split(separator: "-")
+        guard parts.count == 3,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              let day = Int(parts[2]) else { return nil }
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        guard let endDate = Calendar.current.date(from: components) else { return nil }
+        let today = Calendar.current.startOfDay(for: Date())
+        let end = Calendar.current.startOfDay(for: endDate)
+        return Calendar.current.dateComponents([.day], from: today, to: end).day
+    }
+
+    /// Validity display matching the Deals tab style: text + color + optional icon
+    var validityDisplay: (text: String, color: Color, icon: String?) {
+        guard let days = daysRemaining else {
+            return (validityFallback, .white.opacity(0.4), nil)
+        }
+        switch days {
+        case _ where days < 0:
+            return ("Expired", .white.opacity(0.25), nil)
+        case 0:
+            return ("Last day!", Color(red: 0.95, green: 0.25, blue: 0.25), "exclamationmark.circle.fill")
+        case 1...2:
+            return ("\(days) day\(days == 1 ? "" : "s") left", Color(red: 0.95, green: 0.40, blue: 0.30), "clock.badge.exclamationmark")
+        case 3...5:
+            return ("\(days) days left", Color(red: 1.0, green: 0.75, blue: 0.25), "clock")
+        default:
+            return ("\(days) days left", .white.opacity(0.4), nil)
+        }
+    }
+
+    private var validityFallback: String {
         let parts = validityEnd.split(separator: "-")
         guard parts.count == 3 else { return validityEnd }
         return "Until \(parts[2])/\(parts[1])"

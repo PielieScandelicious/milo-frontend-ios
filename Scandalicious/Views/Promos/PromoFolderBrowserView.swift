@@ -16,10 +16,11 @@ struct FolderHomeView: View {
     @State private var contentOpacity: Double = 0
     @State private var showProfile = false
     @State private var showWalletPassCreator = false
+    @State private var showGroceryList = false
+    @ObservedObject private var groceryStore = GroceryListStore.shared
 
     // Deep blue gradient — distinct from Deals tab's emerald green
     private let headerBlue = Color(red: 0.04, green: 0.12, blue: 0.28)
-    private let accentBlue = Color(red: 0.30, green: 0.55, blue: 0.95)
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -77,6 +78,11 @@ struct FolderHomeView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                GroceryListToolbarButton(count: groceryStore.activeItemCount) {
+                    showGroceryList = true
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button {
@@ -90,14 +96,9 @@ struct FolderHomeView: View {
                         Label("Wallet Pass Creator", systemImage: "wallet.pass")
                     }
                 } label: {
-                    Circle()
-                        .fill(Color.white.opacity(0.15))
-                        .frame(width: 36, height: 36)
-                        .overlay(
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.9))
-                        )
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
             }
         }
@@ -110,6 +111,9 @@ struct FolderHomeView: View {
         }
         .sheet(isPresented: $showWalletPassCreator) {
             WalletPassCreatorView()
+        }
+        .sheet(isPresented: $showGroceryList) {
+            GroceryListSheet()
         }
         .opacity(contentOpacity)
         .refreshable {
@@ -131,8 +135,7 @@ struct FolderHomeView: View {
     @ViewBuilder
     private var heroHeader: some View {
         if case .success(let folders) = viewModel.state, !folders.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
-                // Title
+            VStack(alignment: .leading, spacing: 8) {
                 Text("This Week's Folders")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
@@ -141,58 +144,9 @@ struct FolderHomeView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.5))
                     .lineSpacing(2)
-
-                // Stats row
-                HStack(spacing: 10) {
-                    statPill(
-                        icon: "newspaper.fill",
-                        value: "\(folders.count)",
-                        label: folders.count == 1 ? "folder" : "folders"
-                    )
-
-                    statPill(
-                        icon: "storefront.fill",
-                        value: "\(viewModel.storeIds.count)",
-                        label: viewModel.storeIds.count == 1 ? "store" : "stores"
-                    )
-
-                    let totalPages = folders.reduce(0) { $0 + $1.pageCount }
-                    statPill(
-                        icon: "doc.richtext",
-                        value: "\(totalPages)",
-                        label: "pages"
-                    )
-                }
-                .padding(.top, 2)
             }
             .padding(.bottom, 8)
         }
-    }
-
-    private func statPill(icon: String, value: String, label: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [accentBlue, accentBlue.opacity(0.6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            Text(value)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.4))
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.white.opacity(0.06), in: Capsule())
-        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.5))
     }
 
     // MARK: - Header fade
@@ -365,9 +319,17 @@ struct PromoFolderBrowserView: View {
                         .foregroundColor(.white)
 
                     if let firstFolder = folders.first {
-                        Text(firstFolder.validityLabel)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
+                        let display = firstFolder.validityDisplay
+                        HStack(spacing: 4) {
+                            if let icon = display.icon {
+                                Image(systemName: icon)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(display.color)
+                            }
+                            Text(display.text)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(display.color)
+                        }
                     }
                 }
 

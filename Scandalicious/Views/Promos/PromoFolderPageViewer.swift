@@ -29,7 +29,6 @@ struct PromoFolderPageViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .ignoresSafeArea()
 
             // Page indicator overlay
             VStack {
