@@ -422,10 +422,18 @@ private struct StoreFolderGridCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 StackedCoversView(folders: folders, accent: accent)
                     .frame(maxWidth: .infinity)
                     .aspectRatio(0.88, contentMode: .fit)
+
+                // Sleek selection marker — thin accent capsule centered beneath the covers
+                Capsule()
+                    .fill(accent)
+                    .frame(width: 28, height: 3)
+                    .frame(maxWidth: .infinity)
+                    .opacity(isSelected ? 1 : 0)
+                    .scaleEffect(x: isSelected ? 1 : 0.3, anchor: .center)
 
                 HStack(alignment: .center, spacing: 10) {
                     StoreLogoView(storeName: storeId, height: 22)
