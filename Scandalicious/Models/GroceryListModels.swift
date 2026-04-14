@@ -11,6 +11,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
     let brand: String
     let productName: String
     let displayName: String?
+    let imageUrl: String?
     let storeName: String
     let promoPrice: Double
     let originalPrice: Double
@@ -45,6 +46,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
             brand: item.brand,
             productName: item.productName,
             displayName: item.displayName,
+            imageUrl: item.imageUrl ?? item.thumbnailUrl,
             storeName: storeName,
             promoPrice: item.promoPrice,
             originalPrice: item.originalPrice,

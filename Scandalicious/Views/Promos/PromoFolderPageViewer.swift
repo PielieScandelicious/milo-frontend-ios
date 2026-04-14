@@ -12,6 +12,7 @@ struct PromoFolderPageViewer: View {
     let folder: PromoFolder
     @State private var currentPage: Int = 0
     @State private var showGroceryList = false
+    @State private var selectedHotspot: PromoFolderHotspot?
     @ObservedObject private var groceryStore = GroceryListStore.shared
     @Environment(\.dismiss) private var dismiss
 
@@ -38,7 +39,8 @@ struct PromoFolderPageViewer: View {
                         hotspots: page.hotspots,
                         storeAccentColor: storeAccentColor,
                         storeName: folder.storeId,
-                        groceryStore: groceryStore
+                        groceryStore: groceryStore,
+                        onInfoTap: { selectedHotspot = $0 }
                     )
                     .tag(index)
                 }
@@ -55,12 +57,6 @@ struct PromoFolderPageViewer: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                GroceryListToolbarButton(count: groceryStore.activeItemCount) {
-                    showGroceryList = true
-                }
-            }
-
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 8) {
                     StoreLogoView(storeName: folder.storeId, height: 16)
@@ -72,18 +68,72 @@ struct PromoFolderPageViewer: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                if let url = URL(string: folder.sourceUrl), !folder.sourceUrl.isEmpty {
-                    Link(destination: url) {
-                        Image(systemName: "safari")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
+                ShoppingListPremiumButton(
+                    count: groceryStore.activeItemCount,
+                    accent: storeAccentColor
+                ) {
+                    showGroceryList = true
                 }
             }
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .sheet(isPresented: $showGroceryList) {
             GroceryListSheet()
+        }
+        .sheet(item: $selectedHotspot) { hotspot in
+            PromoProductDetailSheet(
+                gridItem: PromoGridItem(
+                    id: hotspot.itemId,
+                    item: hotspot.toPromoStoreItem(),
+                    storeName: folder.storeId
+                )
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    // MARK: - Shopping List Button
+
+    private struct ShoppingListPremiumButton: View {
+        let count: Int
+        let accent: Color
+        let action: () -> Void
+
+        @State private var bumpTrigger: Int = 0
+        private var hasItems: Bool { count > 0 }
+
+        var body: some View {
+            if #available(iOS 26.0, *) {
+                Button(action: action) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "cart.fill")
+                            .symbolEffect(.bounce.up.byLayer, value: bumpTrigger)
+                        
+                        if hasItems {
+                            Text("\(count)")
+                                .monospacedDigit()
+                                .contentTransition(.numericText(value: Double(count)))
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.5).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.glass)
+                .tint(.white)
+                .accessibilityLabel("Grocery list")
+                .accessibilityValue(hasItems ? "\(count) items" : "empty")
+                .sensoryFeedback(.increase, trigger: count)
+                .animation(.spring(response: 0.35, dampingFraction: 0.65), value: count)
+                .onChange(of: count) { _, newValue in
+                    if newValue > 0 { bumpTrigger &+= 1 }
+                }
+            } else {
+                // Fallback on earlier versions
+            }
         }
     }
 
@@ -134,6 +184,7 @@ struct ZoomablePageView: View {
     let storeAccentColor: Color
     let storeName: String
     let groceryStore: GroceryListStore
+    let onInfoTap: (PromoFolderHotspot) -> Void
 
     var body: some View {
         GeometryReader { geometry in
@@ -143,7 +194,8 @@ struct ZoomablePageView: View {
                 hotspots: hotspots,
                 storeAccentColor: UIColor(storeAccentColor),
                 storeName: storeName,
-                groceryStore: groceryStore
+                groceryStore: groceryStore,
+                onInfoTap: onInfoTap
             )
         }
     }
@@ -160,6 +212,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
     let storeAccentColor: UIColor
     let storeName: String
     let groceryStore: GroceryListStore
+    let onInfoTap: (PromoFolderHotspot) -> Void
 
     func makeUIView(context: Context) -> UIScrollView {
         let scrollView = UIScrollView()
@@ -201,6 +254,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
         context.coordinator.storeAccentColor = storeAccentColor
         context.coordinator.storeName = storeName
         context.coordinator.groceryStore = groceryStore
+        context.coordinator.onInfoTap = onInfoTap
         context.coordinator.loadImage(url: imageUrl, containerSize: containerSize)
 
         return scrollView
@@ -224,6 +278,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
         var storeAccentColor: UIColor = .systemGreen
         var storeName: String = ""
         var groceryStore: GroceryListStore?
+        var onInfoTap: ((PromoFolderHotspot) -> Void)?
         private var hotspotDots: [UIView] = []
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
@@ -332,62 +387,91 @@ struct ZoomableImageContainer: UIViewRepresentable {
 
             guard let hotspot = bestHotspot else { return }
 
-            // Check if already in grocery list
-            let promoItem = hotspot.toPromoStoreItem()
-            guard let store = groceryStore else { return }
+            let impact = UIImpactFeedbackGenerator(style: .soft)
+            impact.impactOccurred()
 
-            if store.contains(item: promoItem, storeName: storeName) {
-                showAlreadyAddedFeedback(for: hotspot, in: imageView)
-            } else {
-                store.add(item: promoItem, storeName: storeName)
-                showAddedFeedback(for: hotspot, in: imageView)
-
-                let impact = UIImpactFeedbackGenerator(style: .medium)
-                impact.impactOccurred()
-            }
+            onInfoTap?(hotspot)
         }
 
         // MARK: - Visual Feedback
 
         private func showAddedFeedback(for hotspot: PromoFolderHotspot, in imageView: UIImageView) {
             let rect = hotspot.tileRect(in: displayedImageRect(in: imageView))
+            let green = UIColor(red: 0.2, green: 0.85, blue: 0.4, alpha: 1.0)
+
+            // Expanding ripple ring
+            let ringSize: CGFloat = max(rect.width, rect.height)
+            let ring = UIView(frame: CGRect(
+                x: rect.midX - ringSize / 2,
+                y: rect.midY - ringSize / 2,
+                width: ringSize,
+                height: ringSize
+            ))
+            ring.layer.cornerRadius = ringSize / 2
+            ring.layer.borderColor = green.withAlphaComponent(0.9).cgColor
+            ring.layer.borderWidth = 3
+            ring.backgroundColor = .clear
+            ring.alpha = 0.9
+            ring.transform = CGAffineTransform(scaleX: 0.2, y: 0.2)
+            imageView.addSubview(ring)
 
             // Highlight rectangle
             let highlight = UIView(frame: rect)
-            highlight.backgroundColor = storeAccentColor.withAlphaComponent(0.15)
-            highlight.layer.borderColor = storeAccentColor.withAlphaComponent(0.4).cgColor
+            highlight.backgroundColor = green.withAlphaComponent(0.18)
+            highlight.layer.borderColor = green.withAlphaComponent(0.5).cgColor
             highlight.layer.borderWidth = 1.5
-            highlight.layer.cornerRadius = 6
+            highlight.layer.cornerRadius = 8
             highlight.alpha = 0
             imageView.addSubview(highlight)
 
             // Checkmark icon
-            let checkSize: CGFloat = 32
-            let checkmark = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
-            checkmark.tintColor = UIColor(red: 0.2, green: 0.85, blue: 0.4, alpha: 1.0)
+            let checkSize: CGFloat = 40
+            let checkmark = UIImageView(image: UIImage(
+                systemName: "checkmark.circle.fill",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: checkSize, weight: .bold)
+            ))
+            checkmark.tintColor = green
             checkmark.frame = CGRect(
                 x: rect.midX - checkSize / 2,
                 y: rect.midY - checkSize / 2,
                 width: checkSize,
                 height: checkSize
             )
+            checkmark.layer.shadowColor = green.cgColor
+            checkmark.layer.shadowOpacity = 0.6
+            checkmark.layer.shadowRadius = 10
+            checkmark.layer.shadowOffset = .zero
             checkmark.alpha = 0
-            checkmark.transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
+            checkmark.transform = CGAffineTransform(scaleX: 0.2, y: 0.2).rotated(by: -.pi / 8)
             imageView.addSubview(checkmark)
 
-            UIView.animate(withDuration: 0.15) {
+            // Ripple expand-fade
+            UIView.animate(withDuration: 0.55, delay: 0, options: [.curveEaseOut]) {
+                ring.transform = CGAffineTransform(scaleX: 1.6, y: 1.6)
+                ring.alpha = 0
+            } completion: { _ in ring.removeFromSuperview() }
+
+            // Highlight fade in, then out
+            UIView.animate(withDuration: 0.18) {
                 highlight.alpha = 1
+            } completion: { _ in
+                UIView.animate(withDuration: 0.35, delay: 0.45) {
+                    highlight.alpha = 0
+                } completion: { _ in highlight.removeFromSuperview() }
+            }
+
+            // Checkmark spring-in, then drift up and fade
+            UIView.animate(withDuration: 0.32,
+                           delay: 0.05,
+                           usingSpringWithDamping: 0.55,
+                           initialSpringVelocity: 1.2) {
                 checkmark.alpha = 1
                 checkmark.transform = .identity
             } completion: { _ in
-                UIView.animate(withDuration: 0.3, delay: 0.4) {
-                    highlight.alpha = 0
+                UIView.animate(withDuration: 0.45, delay: 0.35, options: [.curveEaseIn]) {
                     checkmark.alpha = 0
-                    checkmark.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
-                } completion: { _ in
-                    highlight.removeFromSuperview()
-                    checkmark.removeFromSuperview()
-                }
+                    checkmark.transform = CGAffineTransform(translationX: 0, y: -24).scaledBy(x: 1.1, y: 1.1)
+                } completion: { _ in checkmark.removeFromSuperview() }
             }
 
             updateDotForAddedItem(hotspot: hotspot, in: imageView)
@@ -516,6 +600,19 @@ struct ZoomableImageContainer: UIViewRepresentable {
 
         private func updateDotForAddedItem(hotspot: PromoFolderHotspot, in imageView: UIImageView) {
             guard let region = hotspotDots.first(where: { $0.accessibilityIdentifier == hotspot.itemId }) else { return }
+
+            if let badge = region.viewWithTag(300) {
+                UIView.animate(withDuration: 0.15, animations: {
+                    badge.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+                }) { _ in
+                    UIView.animate(withDuration: 0.2,
+                                   delay: 0,
+                                   usingSpringWithDamping: 0.5,
+                                   initialSpringVelocity: 0.9) {
+                        badge.transform = .identity
+                    }
+                }
+            }
 
             UIView.animate(withDuration: 0.3) {
                 self.applyAddedStyle(to: region)

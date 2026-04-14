@@ -16,8 +16,6 @@ struct FolderHomeView: View {
     @State private var contentOpacity: Double = 0
     @State private var showProfile = false
     @State private var showWalletPassCreator = false
-    @State private var showGroceryList = false
-    @ObservedObject private var groceryStore = GroceryListStore.shared
 
     // Deep blue gradient — distinct from Deals tab's emerald green
     private let headerBlue = Color(red: 0.04, green: 0.12, blue: 0.28)
@@ -78,11 +76,6 @@ struct FolderHomeView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                GroceryListToolbarButton(count: groceryStore.activeItemCount) {
-                    showGroceryList = true
-                }
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button {
@@ -111,9 +104,6 @@ struct FolderHomeView: View {
         }
         .sheet(isPresented: $showWalletPassCreator) {
             WalletPassCreatorView()
-        }
-        .sheet(isPresented: $showGroceryList) {
-            GroceryListSheet()
         }
         .opacity(contentOpacity)
         .refreshable {

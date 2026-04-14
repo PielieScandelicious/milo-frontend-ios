@@ -41,9 +41,10 @@ struct ContentView: View {
 
     enum Tab: Int, Hashable {
         case folders = 0
-        case promos = 1
-        case receipts = 2
-        case insights = 3
+        case groceryList = 1
+        case promos = 2
+        case receipts = 3
+        case insights = 4
     }
 
     var body: some View {
@@ -54,6 +55,12 @@ struct ContentView: View {
                         Label("Folders", systemImage: "newspaper.fill")
                     }
                     .tag(Tab.folders)
+
+                GroceryListTab()
+                    .tabItem {
+                        Label("Grocery List", systemImage: "cart.fill")
+                    }
+                    .tag(Tab.groceryList)
 
                 PromosTab()
                     .tabItem {
@@ -130,6 +137,11 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .switchToDealsTab)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                 selectedTab = .promos
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("app.switchToFoldersTab"))) { _ in
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                selectedTab = .folders
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("app.switchToHomeTab"))) { _ in
@@ -456,6 +468,21 @@ struct FoldersTab: View {
             FolderHomeView(viewModel: viewModel)
         }
         .id("FoldersTab")
+    }
+}
+
+// MARK: - Grocery List Tab
+struct GroceryListTab: View {
+    var body: some View {
+        NavigationStack {
+            GroceryListContentView(
+                leadingToolbar: { EmptyView() },
+                onBrowseTapped: {
+                    NotificationCenter.default.post(name: Notification.Name("app.switchToFoldersTab"), object: nil)
+                }
+            )
+        }
+        .id("GroceryListTab")
     }
 }
 
