@@ -342,29 +342,32 @@ struct FolderCoverCard: View {
     var body: some View {
         VStack(spacing: 0) {
             // Cover image
-            if let coverUrl = folder.coverImageUrl, let url = URL(string: coverUrl) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: cardWidth, height: coverHeight)
-                    case .failure:
-                        folderPlaceholder
-                    default:
-                        Rectangle()
-                            .fill(Color.white.opacity(0.04))
-                            .frame(width: cardWidth, height: coverHeight)
-                            .overlay(
-                                ProgressView()
-                                    .tint(.white.opacity(0.3))
-                            )
+            Group {
+                if let coverUrl = folder.coverImageUrl, let url = URL(string: coverUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: cardWidth, height: coverHeight)
+                        case .failure:
+                            folderPlaceholder
+                        default:
+                            Rectangle()
+                                .fill(Color.white.opacity(0.04))
+                                .frame(width: cardWidth, height: coverHeight)
+                                .overlay(
+                                    ProgressView()
+                                        .tint(.white.opacity(0.3))
+                                )
+                        }
                     }
+                } else {
+                    folderPlaceholder
                 }
-            } else {
-                folderPlaceholder
             }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
             // Info bar
             HStack(spacing: 6) {
@@ -384,17 +387,11 @@ struct FolderCoverCard: View {
                         .foregroundColor(.white.opacity(0.45))
                 }
             }
-            .padding(.horizontal, 11)
-            .padding(.vertical, 9)
-            .background(Color(white: 0.07))
+            .padding(.horizontal, 2)
+            .padding(.top, 8)
         }
         .frame(width: cardWidth)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(storeAccentColor.opacity(0.15), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.35), radius: 10, y: 5)
+        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
     }
 
     private var folderPlaceholder: some View {
@@ -441,13 +438,12 @@ private struct StoreFolderGridCard: View {
                         )
                         .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(displayName)
                             .font(.system(.subheadline, design: .rounded).weight(.semibold))
                             .foregroundStyle(.white)
                             .lineLimit(2)
                             .minimumScaleFactor(0.75)
-                            .fixedSize(horizontal: false, vertical: true)
 
                         HStack(spacing: 4) {
                             Image(systemName: folders.count > 1 ? "square.stack.fill" : "square.fill")
@@ -455,53 +451,21 @@ private struct StoreFolderGridCard: View {
                             Text(folderCountText)
                                 .font(.system(.caption2, design: .rounded).weight(.semibold))
                         }
-                        .foregroundStyle(accent)
+                        .foregroundStyle(.white.opacity(0.55))
+
+                        Spacer(minLength: 0)
                     }
+                    .frame(height: 54, alignment: .topLeading)
 
                     Spacer(minLength: 0)
                 }
             }
-            .padding(14)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-            .background(cardBackground)
-            .overlay(cardBorder)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .shadow(color: .black.opacity(isSelected ? 0.45 : 0.28), radius: isSelected ? 16 : 10, y: 6)
             .scaleEffect(isSelected ? 1.015 : 1.0)
             .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isSelected)
         }
         .buttonStyle(PressableCardStyle())
-    }
-
-    private var cardBackground: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(white: 0.09))
-
-            // Subtle accent wash at the top — Apple News / App Store style
-            LinearGradient(
-                colors: [accent.opacity(0.22), accent.opacity(0.0)],
-                startPoint: .top,
-                endPoint: .center
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .blendMode(.plusLighter)
-            .opacity(0.9)
-        }
-    }
-
-    private var cardBorder: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .strokeBorder(
-                LinearGradient(
-                    colors: isSelected
-                        ? [accent.opacity(0.8), accent.opacity(0.25)]
-                        : [Color.white.opacity(0.12), Color.white.opacity(0.03)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: isSelected ? 1.2 : 0.6
-            )
     }
 
     private var folderCountText: String {
@@ -628,13 +592,5 @@ private struct ExpandedFolderLane: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(accent.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(accent.opacity(0.2), lineWidth: 0.5)
-        )
     }
 }
