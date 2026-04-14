@@ -190,106 +190,47 @@ struct PromoFolderBrowserView: View {
     // MARK: - Content
 
     private var folderContent: some View {
-        VStack(spacing: 0) {
-            ForEach(viewModel.foldersByStore, id: \.storeId) { group in
-                storeRow(
-                    storeId: group.storeId,
-                    displayName: group.displayName,
-                    folders: group.folders
-                )
-            }
+        let groups = viewModel.foldersByStore
+        let rows = stride(from: 0, to: groups.count, by: 2).map {
+            Array(groups[$0..<min($0 + 2, groups.count)])
         }
-    }
 
-    // MARK: - Store Row (expandable)
-
-    private func storeRow(
-        storeId: String,
-        displayName: String,
-        folders: [PromoFolder]
-    ) -> some View {
-        let isExpanded = expandedStoreId == storeId
-        let storeColor = GroceryStore.fromCanonical(storeId)?.accentColor ?? folderBlue
-
-        return VStack(spacing: 0) {
-            // Tappable store row
-            Button {
-                withAnimation(.smooth(duration: 0.3)) {
-                    expandedStoreId = isExpanded ? nil : storeId
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    StoreLogoView(storeName: storeId, height: 24)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(isExpanded ? storeColor.opacity(0.1) : Color(white: 0.10))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(isExpanded ? storeColor.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 0.5)
-                        )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(displayName)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-
-                        if let firstFolder = folders.first {
-                            let display = firstFolder.validityDisplay
-                            HStack(spacing: 4) {
-                                if let icon = display.icon {
-                                    Image(systemName: icon)
-                                        .font(.system(size: 9, weight: .semibold))
-                                        .foregroundColor(display.color)
+        return LazyVStack(spacing: 12) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(row, id: \.storeId) { group in
+                        StoreFolderGridCard(
+                            storeId: group.storeId,
+                            displayName: group.displayName,
+                            folders: group.folders,
+                            isSelected: expandedStoreId == group.storeId,
+                            onTap: {
+                                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                                    expandedStoreId = expandedStoreId == group.storeId ? nil : group.storeId
                                 }
-                                Text(display.text)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(display.color)
                             }
-                        }
+                        )
+                        .frame(maxWidth: .infinity)
                     }
-
-                    Spacer()
-
-                    Text("\(folders.count)")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.5))
-                        .frame(width: 26)
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.3))
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                }
-                .padding(.vertical, 14)
-                .padding(.horizontal, 16)
-            }
-            .buttonStyle(.plain)
-
-            // Folder cards — always in tree, height animates to reveal/hide
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(folders) { folder in
-                        NavigationLink(destination: PromoFolderPageViewer(folder: folder)) {
-                            FolderCoverCard(folder: folder, storeId: storeId)
-                        }
-                        .buttonStyle(.plain)
+                    if row.count == 1 {
+                        Color.clear.frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            }
-            .frame(height: isExpanded ? 260 : 0, alignment: .top)
-            .clipped()
-            .opacity(isExpanded ? 1 : 0)
 
-            // Divider
-            Rectangle()
-                .fill(Color.white.opacity(0.05))
-                .frame(height: 1)
-                .padding(.horizontal, 16)
+                if let expandedId = expandedStoreId,
+                   let expandedGroup = row.first(where: { $0.storeId == expandedId }) {
+                    ExpandedFolderLane(
+                        folders: expandedGroup.folders,
+                        storeId: expandedGroup.storeId
+                    )
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
+                        removal: .opacity
+                    ))
+                }
+            }
         }
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Empty State
@@ -465,5 +406,235 @@ struct FolderCoverCard: View {
                     .font(.system(size: 32, weight: .light))
                     .foregroundColor(.white.opacity(0.15))
             )
+    }
+}
+
+// MARK: - Store Folder Grid Card
+
+private struct StoreFolderGridCard: View {
+    let storeId: String
+    let displayName: String
+    let folders: [PromoFolder]
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    private var accent: Color {
+        GroceryStore.fromCanonical(storeId)?.accentColor
+            ?? Color(red: 0.30, green: 0.55, blue: 0.95)
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 14) {
+                StackedCoversView(folders: folders, accent: accent)
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(0.88, contentMode: .fit)
+
+                HStack(alignment: .center, spacing: 10) {
+                    StoreLogoView(storeName: storeId, height: 22)
+                        .frame(width: 38, height: 38)
+                        .background(
+                            Circle().fill(Color.white)
+                        )
+                        .overlay(
+                            Circle().stroke(Color.black.opacity(0.06), lineWidth: 0.5)
+                        )
+                        .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(displayName)
+                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.75)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        HStack(spacing: 4) {
+                            Image(systemName: folders.count > 1 ? "square.stack.fill" : "square.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text(folderCountText)
+                                .font(.system(.caption2, design: .rounded).weight(.semibold))
+                        }
+                        .foregroundStyle(accent)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity)
+            .background(cardBackground)
+            .overlay(cardBorder)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: .black.opacity(isSelected ? 0.45 : 0.28), radius: isSelected ? 16 : 10, y: 6)
+            .scaleEffect(isSelected ? 1.015 : 1.0)
+            .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isSelected)
+        }
+        .buttonStyle(PressableCardStyle())
+    }
+
+    private var cardBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(white: 0.09))
+
+            // Subtle accent wash at the top — Apple News / App Store style
+            LinearGradient(
+                colors: [accent.opacity(0.22), accent.opacity(0.0)],
+                startPoint: .top,
+                endPoint: .center
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .blendMode(.plusLighter)
+            .opacity(0.9)
+        }
+    }
+
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .strokeBorder(
+                LinearGradient(
+                    colors: isSelected
+                        ? [accent.opacity(0.8), accent.opacity(0.25)]
+                        : [Color.white.opacity(0.12), Color.white.opacity(0.03)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: isSelected ? 1.2 : 0.6
+            )
+    }
+
+    private var folderCountText: String {
+        folders.count == 1 ? "1 folder" : "\(folders.count) folders"
+    }
+}
+
+private struct PressableCardStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Stacked Covers View
+
+private struct StackedCoversView: View {
+    let folders: [PromoFolder]
+    let accent: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let cardW = w * 0.78
+            let cardH = h * 0.96
+
+            ZStack {
+                // Render back-most first, front-most last.
+                ForEach(Array(backLayers.enumerated()), id: \.offset) { index, folder in
+                    let depth = backLayers.count - index
+                    coverCard(folder: folder, width: cardW, height: cardH)
+                        .rotationEffect(.degrees(rotation(for: depth, total: backLayers.count)))
+                        .offset(offset(for: depth, total: backLayers.count))
+                        .opacity(1.0 - Double(depth) * 0.15)
+                        .scaleEffect(1.0 - CGFloat(depth) * 0.03)
+                }
+
+                if let front = folders.first {
+                    coverCard(folder: front, width: cardW, height: cardH)
+                        .shadow(color: .black.opacity(0.45), radius: 8, y: 4)
+                }
+            }
+            .frame(width: w, height: h)
+        }
+    }
+
+    // Up to 2 back layers (3rd folder and beyond are represented by the 2nd back card).
+    private var backLayers: [PromoFolder] {
+        guard folders.count > 1 else { return [] }
+        return Array(folders.dropFirst().prefix(2))
+    }
+
+    private func rotation(for depth: Int, total: Int) -> Double {
+        // depth 1 = closest behind, depth 2 = further behind.
+        let sign: Double = depth == 1 ? 1 : -1
+        return sign * Double(depth) * 5.5
+    }
+
+    private func offset(for depth: Int, total: Int) -> CGSize {
+        let sign: CGFloat = depth == 1 ? 1 : -1
+        return CGSize(width: sign * CGFloat(depth) * 8, height: CGFloat(depth) * 4)
+    }
+
+    @ViewBuilder
+    private func coverCard(folder: PromoFolder, width: CGFloat, height: CGFloat) -> some View {
+        ZStack {
+            if let urlString = folder.coverImageUrl, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    case .failure:
+                        placeholder
+                    default:
+                        Color(white: 0.12)
+                            .overlay(ProgressView().tint(.white.opacity(0.3)))
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
+    }
+
+    private var placeholder: some View {
+        Color(white: 0.10)
+            .overlay(
+                Image(systemName: "newspaper")
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundColor(.white.opacity(0.2))
+            )
+    }
+}
+
+// MARK: - Expanded Folder Lane
+
+private struct ExpandedFolderLane: View {
+    let folders: [PromoFolder]
+    let storeId: String
+
+    private var accent: Color {
+        GroceryStore.fromCanonical(storeId)?.accentColor
+            ?? Color(red: 0.30, green: 0.55, blue: 0.95)
+    }
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(folders) { folder in
+                    NavigationLink(destination: PromoFolderPageViewer(folder: folder)) {
+                        FolderCoverCard(folder: folder, storeId: storeId)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(accent.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(accent.opacity(0.2), lineWidth: 0.5)
+        )
     }
 }
