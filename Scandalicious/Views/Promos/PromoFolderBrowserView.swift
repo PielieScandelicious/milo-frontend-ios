@@ -135,15 +135,25 @@ struct FolderHomeView: View {
     @ViewBuilder
     private var heroHeader: some View {
         if case .success(let folders) = viewModel.state, !folders.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("This Week's Folders")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("This week's folders")
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .tracking(-0.6)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                .white,
+                                .white.opacity(0.75)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
 
-                Text("Browse the latest deals from your favourite stores")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-                    .lineSpacing(2)
+                Text("We keep only what's worth flipping")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .tracking(0.2)
+                    .foregroundStyle(.white.opacity(0.55))
             }
             .padding(.bottom, 8)
         }
