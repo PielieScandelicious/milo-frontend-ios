@@ -174,8 +174,18 @@ struct PromoFolderBrowserView: View {
     @ObservedObject var viewModel: PromoFoldersViewModel
     var scrollProxy: ScrollViewProxy? = nil
     @State private var expandedStoreId: String? = nil
+    @State private var dayToken: Date = Calendar.current.startOfDay(for: Date())
 
     var body: some View {
+        content
+            .id(dayToken)
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                dayToken = Calendar.current.startOfDay(for: Date())
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch viewModel.state {
         case .idle, .loading:
             folderSkeletonView
@@ -194,6 +204,8 @@ struct PromoFolderBrowserView: View {
 
     private var folderContent: some View {
         let groups = viewModel.foldersByStore
+            .map { (storeId: $0.storeId, displayName: $0.displayName, folders: $0.folders.filter { ($0.daysRemaining ?? 0) >= 0 }) }
+            .filter { !$0.folders.isEmpty }
         let rows = stride(from: 0, to: groups.count, by: 2).map {
             Array(groups[$0..<min($0 + 2, groups.count)])
         }
@@ -384,10 +396,31 @@ struct FolderCoverCard: View {
 
             // Info bar
             HStack(spacing: 6) {
-                Text(folder.folderName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
-                    .lineLimit(1)
+                let validity = folder.validityDisplay
+                HStack(spacing: 4) {
+                    if let icon = validity.icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    Text(validity.text)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                }
+                .foregroundColor(validity.color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .fill(validity.color.opacity(0.12))
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(validity.color.opacity(0.25), lineWidth: 0.5)
+                        )
+                )
 
                 Spacer()
 
@@ -600,10 +633,19 @@ private struct ExpandedFolderLane: View {
             ?? Color(red: 0.30, green: 0.55, blue: 0.95)
     }
 
+    private var sortedFolders: [PromoFolder] {
+        folders.sorted { lhs, rhs in
+            let lExpired = (lhs.daysRemaining ?? 0) < 0
+            let rExpired = (rhs.daysRemaining ?? 0) < 0
+            if lExpired != rExpired { return !lExpired }
+            return (lhs.daysRemaining ?? Int.max) < (rhs.daysRemaining ?? Int.max)
+        }
+    }
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(folders) { folder in
+                ForEach(sortedFolders) { folder in
                     NavigationLink(destination: PromoFolderPageViewer(folder: folder)) {
                         FolderCoverCard(folder: folder, storeId: storeId)
                     }

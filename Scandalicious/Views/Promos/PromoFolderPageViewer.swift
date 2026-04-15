@@ -391,7 +391,9 @@ struct ZoomableImageContainer: UIViewRepresentable {
         private func plusBadgeHitRect(for hotspot: PromoFolderHotspot, imageRect: CGRect) -> CGRect {
             let rect = hotspot.tileRect(in: imageRect)
             let insetRect = rect.insetBy(dx: 2, dy: 2)
-            let badgeWidth = Self.badgeWidth
+            let item = hotspot.toPromoStoreItem()
+            let isAdded = groceryStore?.contains(item: item, storeName: storeName) ?? false
+            let badgeWidth = Self.badgeWidth(forText: isAdded ? "ADDED" : "ADD")
             let badgeHeight = Self.badgeHeight
             let badgeX = insetRect.maxX - badgeWidth + 4
             let badgeY = insetRect.minY - 4
@@ -400,8 +402,26 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 .insetBy(dx: -6, dy: -6)
         }
 
-        static let badgeWidth: CGFloat = 66
         static let badgeHeight: CGFloat = 22
+        static let badgeIconSize: CGFloat = 10
+        static let badgeLeadingPad: CGFloat = 8
+        static let badgeIconLabelGap: CGFloat = 3
+        static let badgeTrailingPad: CGFloat = 8
+        static let badgeLabelFont: UIFont = .systemFont(ofSize: 10, weight: .bold)
+
+        /// Computes the badge width that snugly fits the icon + given label text.
+        static func badgeWidth(forText text: String) -> CGFloat {
+            let attrs: [NSAttributedString.Key: Any] = [.font: badgeLabelFont]
+            let bounds = (text as NSString).boundingRect(
+                with: CGSize(width: .greatestFiniteMagnitude, height: badgeHeight),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attrs,
+                context: nil
+            )
+            // Add a small buffer so bold glyph bearings never clip.
+            let textWidth = ceil(bounds.width) + 2
+            return (badgeLeadingPad + badgeIconSize + badgeIconLabelGap + textWidth + badgeTrailingPad).rounded(.up)
+        }
 
         /// Unified premium accent used for hotspot outlines and the ADD pill
         /// across every store's folder — a refined graphite ink that reads
@@ -554,8 +574,8 @@ struct ZoomableImageContainer: UIViewRepresentable {
 
                 // "+ ADD" pill in the top-right corner — clearly tappable shortcut
                 // that adds the item to the grocery list directly (bypasses detail sheet).
-                let badgeWidth = Coordinator.badgeWidth
                 let badgeHeight = Coordinator.badgeHeight
+                let badgeWidth = Coordinator.badgeWidth(forText: "ADD")
                 let badge = UIView(frame: CGRect(
                     x: insetRect.width - badgeWidth + 3,
                     y: -3,
@@ -570,26 +590,26 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 badge.layer.shadowRadius = 3
                 badge.tag = 300
 
-                let iconSize: CGFloat = 10
+                let iconSize = Coordinator.badgeIconSize
                 let iconView = UIImageView(image: UIImage(
                     systemName: "plus",
                     withConfiguration: UIImage.SymbolConfiguration(pointSize: iconSize, weight: .bold)
                 ))
                 iconView.tintColor = .white
                 iconView.contentMode = .scaleAspectFit
-                iconView.frame = CGRect(x: 8, y: (badgeHeight - iconSize) / 2, width: iconSize, height: iconSize)
+                iconView.frame = CGRect(x: Coordinator.badgeLeadingPad, y: (badgeHeight - iconSize) / 2, width: iconSize, height: iconSize)
                 iconView.tag = 301
                 badge.addSubview(iconView)
 
-                let labelX = 8 + iconSize + 3
+                let labelX = Coordinator.badgeLeadingPad + iconSize + Coordinator.badgeIconLabelGap
                 let label = UILabel(frame: CGRect(
                     x: labelX,
                     y: 0,
-                    width: badgeWidth - labelX - 4,
+                    width: badgeWidth - labelX - Coordinator.badgeTrailingPad,
                     height: badgeHeight
                 ))
                 label.text = "ADD"
-                label.font = .systemFont(ofSize: 10, weight: .bold)
+                label.font = Coordinator.badgeLabelFont
                 label.textColor = .white
                 label.textAlignment = .left
                 label.adjustsFontSizeToFitWidth = false
@@ -623,12 +643,13 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 if let icon = badge.viewWithTag(301) as? UIImageView {
                     icon.image = UIImage(
                         systemName: "checkmark",
-                        withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .heavy)
+                        withConfiguration: UIImage.SymbolConfiguration(pointSize: Self.badgeIconSize, weight: .heavy)
                     )
                 }
                 if let label = badge.viewWithTag(302) as? UILabel {
                     label.text = "ADDED"
                 }
+                resizeBadge(badge, forText: "ADDED")
             }
         }
 
@@ -641,19 +662,43 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 if let icon = badge.viewWithTag(301) as? UIImageView {
                     icon.image = UIImage(
                         systemName: "plus",
-                        withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .bold)
+                        withConfiguration: UIImage.SymbolConfiguration(pointSize: Self.badgeIconSize, weight: .bold)
                     )
                 }
                 if let label = badge.viewWithTag(302) as? UILabel {
                     label.text = "ADD"
                 }
+                resizeBadge(badge, forText: "ADD")
             }
+        }
+
+        /// Resizes the badge to fit the given label text, keeping its right edge anchored.
+        private func resizeBadge(_ badge: UIView, forText text: String) {
+            guard let label = badge.viewWithTag(302) as? UILabel else { return }
+            label.lineBreakMode = .byClipping
+            label.numberOfLines = 1
+            label.sizeToFit()
+            let textWidth = ceil(label.frame.width)
+
+            let labelX = Self.badgeLeadingPad + Self.badgeIconSize + Self.badgeIconLabelGap
+            let newWidth = (labelX + textWidth + Self.badgeTrailingPad).rounded(.up)
+
+            let rightEdge = badge.frame.maxX
+            var frame = badge.frame
+            frame.origin.x = rightEdge - newWidth
+            frame.size.width = newWidth
+            badge.frame = frame
+
+            label.frame = CGRect(x: labelX, y: 0, width: textWidth, height: Self.badgeHeight)
         }
 
         private func revertDotForRemovedItem(hotspot: PromoFolderHotspot) {
             guard let region = hotspotDots.first(where: { $0.accessibilityIdentifier == hotspot.itemId }) else { return }
 
-            if let badge = region.viewWithTag(300) {
+            UIView.animate(withDuration: 0.3) {
+                self.applyDefaultStyle(to: region)
+            } completion: { _ in
+                guard let badge = region.viewWithTag(300) else { return }
                 UIView.animate(withDuration: 0.12, animations: {
                     badge.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
                 }) { _ in
@@ -665,18 +710,17 @@ struct ZoomableImageContainer: UIViewRepresentable {
                     }
                 }
             }
-
-            UIView.animate(withDuration: 0.3) {
-                self.applyDefaultStyle(to: region)
-            }
         }
 
         private func updateDotForAddedItem(hotspot: PromoFolderHotspot, in imageView: UIImageView) {
             guard let region = hotspotDots.first(where: { $0.accessibilityIdentifier == hotspot.itemId }) else { return }
 
-            if let badge = region.viewWithTag(300) {
+            UIView.animate(withDuration: 0.3) {
+                self.applyAddedStyle(to: region)
+            } completion: { _ in
+                guard let badge = region.viewWithTag(300) else { return }
                 UIView.animate(withDuration: 0.15, animations: {
-                    badge.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+                    badge.transform = CGAffineTransform(scaleX: 1.15, y: 1.15)
                 }) { _ in
                     UIView.animate(withDuration: 0.2,
                                    delay: 0,
@@ -685,10 +729,6 @@ struct ZoomableImageContainer: UIViewRepresentable {
                         badge.transform = .identity
                     }
                 }
-            }
-
-            UIView.animate(withDuration: 0.3) {
-                self.applyAddedStyle(to: region)
             }
         }
 
