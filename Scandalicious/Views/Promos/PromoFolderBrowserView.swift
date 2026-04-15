@@ -46,27 +46,29 @@ struct FolderHomeView: View {
             .ignoresSafeArea()
 
             GeometryReader { geo in
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        // Hero header
-                        heroHeader
-                            .padding(.horizontal, 16)
+                ScrollViewReader { scrollProxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 20) {
+                            // Hero header
+                            heroHeader
+                                .padding(.horizontal, 16)
 
-                        // Folder browser content
-                        PromoFolderBrowserView(viewModel: viewModel)
-                    }
-                    .padding(.top, 16)
-                    .padding(.bottom, 100)
-                    .frame(width: geo.size.width)
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear
-                                .preference(
-                                    key: FolderScrollOffsetKey.self,
-                                    value: -proxy.frame(in: .named("folderScroll")).origin.y
-                                )
+                            // Folder browser content
+                            PromoFolderBrowserView(viewModel: viewModel, scrollProxy: scrollProxy)
                         }
-                    )
+                        .padding(.top, 16)
+                        .padding(.bottom, 100)
+                        .frame(width: geo.size.width)
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear
+                                    .preference(
+                                        key: FolderScrollOffsetKey.self,
+                                        value: -proxy.frame(in: .named("folderScroll")).origin.y
+                                    )
+                            }
+                        )
+                    }
                 }
             }
             .coordinateSpace(name: "folderScroll")
@@ -170,6 +172,7 @@ private struct FolderScrollOffsetKey: PreferenceKey {
 
 struct PromoFolderBrowserView: View {
     @ObservedObject var viewModel: PromoFoldersViewModel
+    var scrollProxy: ScrollViewProxy? = nil
     @State private var expandedStoreId: String? = nil
 
     var body: some View {
@@ -205,11 +208,21 @@ struct PromoFolderBrowserView: View {
                             folders: group.folders,
                             isSelected: expandedStoreId == group.storeId,
                             onTap: {
+                                let willExpand = expandedStoreId != group.storeId
                                 withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                                    expandedStoreId = expandedStoreId == group.storeId ? nil : group.storeId
+                                    expandedStoreId = willExpand ? group.storeId : nil
+                                }
+                                if willExpand, let scrollProxy {
+                                    // Defer so the ExpandedFolderLane is inserted before we scroll to it.
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                                            scrollProxy.scrollTo(group.storeId, anchor: .top)
+                                        }
+                                    }
                                 }
                             }
                         )
+                        .id(group.storeId)
                         .frame(maxWidth: .infinity)
                     }
                     if row.count == 1 {
