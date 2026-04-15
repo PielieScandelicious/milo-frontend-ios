@@ -119,6 +119,18 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        URLCache.shared = URLCache(
+            memoryCapacity: 20 * 1024 * 1024,
+            diskCapacity: 100 * 1024 * 1024
+        )
+
+        // Warm the grocery-list image cache on launch so images appear instantly
+        // the first time the user opens the tab after cold start.
+        Task { @MainActor in
+            for item in GroceryListStore.shared.items {
+                ImagePrefetcher.shared.prefetch(urlString: item.imageUrl)
+            }
+        }
         return true
     }
 }

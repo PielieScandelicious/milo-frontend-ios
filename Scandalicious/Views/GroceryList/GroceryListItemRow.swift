@@ -74,22 +74,14 @@ struct GroceryListCard: View {
                 .frame(height: 140)
 
             if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: .infinity, maxHeight: 120)
-                            .padding(8)
-                    case .failure:
-                        imagePlaceholder
-                    case .empty:
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: 120)
-                    @unknown default:
-                        imagePlaceholder
-                    }
+                RemoteImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: 120)
+                        .padding(8)
+                } placeholder: {
+                    imagePlaceholder
                 }
             } else {
                 imagePlaceholder
@@ -272,18 +264,15 @@ struct GroceryListCompactCard: View {
     @ViewBuilder
     private var thumbnail: some View {
         if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .padding(4)
-                        .background(Color.white)
-                        .opacity(0.75)
-                default:
-                    fallbackThumb
-                }
+            RemoteImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding(4)
+                    .background(Color.white)
+                    .opacity(0.75)
+            } placeholder: {
+                fallbackThumb
             }
         } else {
             fallbackThumb

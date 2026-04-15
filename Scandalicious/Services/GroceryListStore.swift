@@ -26,6 +26,7 @@ class GroceryListStore: ObservableObject {
         let groceryItem = GroceryListItem.from(item: item, storeName: storeName)
         items.append(groceryItem)
         saveToDisk()
+        ImagePrefetcher.shared.prefetch(urlString: groceryItem.imageUrl)
     }
 
     func remove(id: String) {
