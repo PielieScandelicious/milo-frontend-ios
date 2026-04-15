@@ -180,6 +180,14 @@ struct GroceryListCard: View {
                     .tracking(0.8)
                     .foregroundColor(Color(red: 1.0, green: 0.72, blue: 0.20))
                     .lineLimit(1)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().fill(Color(red: 1.0, green: 0.72, blue: 0.20).opacity(0.15))
+                    )
+                    .overlay(
+                        Capsule().stroke(Color(red: 1.0, green: 0.72, blue: 0.20).opacity(0.25), lineWidth: 0.5)
+                    )
             }
 
             Text(item.label)

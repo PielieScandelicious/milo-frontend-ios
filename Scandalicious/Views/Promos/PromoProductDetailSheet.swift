@@ -206,9 +206,17 @@ struct PromoProductDetailSheet: View {
             // Brand — prominent, in store accent color
             if !item.brand.isEmpty {
                 Text(item.brand.uppercased())
-                    .font(.system(size: 14, weight: .bold))
-                    .tracking(1.5)
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(1.2)
                     .foregroundColor(detailBrandColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule().fill(detailBrandColor.opacity(0.15))
+                    )
+                    .overlay(
+                        Capsule().stroke(detailBrandColor.opacity(0.25), lineWidth: 0.5)
+                    )
             }
 
             // Product name — large, clear
@@ -455,31 +463,30 @@ struct PromoProductDetailSheet: View {
     private var addToListButton: some View {
         let isInList = groceryStore.contains(item: item, storeName: storeName)
         return Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                if isInList {
-                    groceryStore.removeByPromo(item: item, storeName: storeName)
-                } else {
-                    groceryStore.add(item: item, storeName: storeName)
-                }
-                addTrigger.toggle()
+            if isInList {
+                groceryStore.removeByPromo(item: item, storeName: storeName)
+            } else {
+                groceryStore.add(item: item, storeName: storeName)
             }
+            addTrigger.toggle()
+            dismiss()
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: isInList ? "checkmark.circle.fill" : "plus.circle.fill")
-                    .font(.system(size: 17, weight: .semibold))
+                Image(systemName: isInList ? "trash.fill" : "plus")
+                    .font(.system(size: 15, weight: .bold))
                     .contentTransition(.symbolEffect(.replace))
-                Text(isInList ? "Added to Shopping List" : "Add to Shopping List")
-                    .font(.system(size: 16, weight: .bold))
+                Text(isInList ? "Remove from Grocery List" : "Add to Grocery List")
+                    .font(.system(size: 16, weight: .semibold))
             }
-            .foregroundColor(isInList ? detailGreen : .black)
+            .foregroundColor(isInList ? Color(red: 0.95, green: 0.30, blue: 0.30) : .black)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(
-                Capsule().fill(isInList ? detailGreen.opacity(0.15) : detailGreen)
+                Capsule().fill(isInList ? Color(red: 0.95, green: 0.30, blue: 0.30).opacity(0.12) : detailGreen)
             )
             .overlay(
                 isInList
-                    ? Capsule().stroke(detailGreen, lineWidth: 1.5)
+                    ? Capsule().stroke(Color(red: 0.95, green: 0.30, blue: 0.30).opacity(0.35), lineWidth: 1)
                     : nil
             )
         }
