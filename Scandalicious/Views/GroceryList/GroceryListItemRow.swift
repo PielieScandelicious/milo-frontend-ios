@@ -102,25 +102,24 @@ struct GroceryListCard: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         onRemove()
                     } label: {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.00, green: 0.42, blue: 0.60),
-                                        Color(red: 0.96, green: 0.22, blue: 0.44)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white.opacity(0.85))
+                            .frame(width: 22, height: 22)
+                            .background(
+                                Circle()
+                                    .fill(Color.black.opacity(0.45))
                             )
-                            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                            )
+                            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
                     }
                     .buttonStyle(.plain)
                     .contentShape(Circle())
-                    .padding(.top, 0)
-                    .padding(.trailing, 2)
+                    .padding(.top, 6)
+                    .padding(.trailing, 6)
                 }
                 Spacer()
             }
