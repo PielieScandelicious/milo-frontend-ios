@@ -27,6 +27,7 @@ struct GroceryListContentView<Leading: View>: View {
     @ObservedObject private var store = GroceryListStore.shared
     @State private var checkedTrigger = false
     @State private var isCartExpanded: Bool = false
+    @State private var selectedDetailItem: GroceryListItem?
     @ViewBuilder let leadingToolbar: () -> Leading
     let onBrowseTapped: () -> Void
 
@@ -59,19 +60,15 @@ struct GroceryListContentView<Leading: View>: View {
             ToolbarItem(placement: .topBarLeading) {
                 leadingToolbar()
             }
-            if store.activeItems.contains(where: { $0.isChecked }) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            store.removeChecked()
-                        }
-                    } label: {
-                        Text(L("clear_checked"))
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.red.opacity(0.8))
-                    }
-                }
-            }
+        }
+        .sheet(item: $selectedDetailItem) { item in
+            PromoProductDetailSheet(
+                gridItem: PromoGridItem(
+                    id: item.id,
+                    item: item.toPromoStoreItem(),
+                    storeName: item.storeName
+                )
+            )
         }
         .sensoryFeedback(.impact(weight: .light), trigger: checkedTrigger)
         .onAppear {
@@ -118,41 +115,32 @@ struct GroceryListContentView<Leading: View>: View {
     // MARK: - Main content
 
     private var mainContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 20, pinnedViews: []) {
-                    savingsHeader
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-
-                    storeChipRail(proxy: proxy)
-
-                    if uncheckedGroups.isEmpty && checkedItems.isEmpty {
-                        emptyFilterState
-                            .padding(.top, 40)
-                    }
-
-                    // One horizontal lane per store (shows unchecked items; header shows totals)
-                    ForEach(store.itemsByStore, id: \.storeName) { group in
-                        let unchecked = group.items
-                            .filter { !$0.isChecked }
-                            .sorted { $0.addedAt < $1.addedAt }
-                        if !unchecked.isEmpty {
-                            storeLane(group: group, uncheckedItems: unchecked)
-                                .id("lane-\(group.storeName)")
-                        }
-                    }
-
-                    if !checkedItems.isEmpty {
-                        cartSection
-                            .padding(.top, 4)
-                    }
-
-                    Color.clear.frame(height: 40)
+        ScrollView {
+            LazyVStack(spacing: 20, pinnedViews: []) {
+                if uncheckedGroups.isEmpty && checkedItems.isEmpty {
+                    emptyFilterState
+                        .padding(.top, 40)
                 }
+
+                ForEach(store.itemsByStore, id: \.storeName) { group in
+                    let unchecked = group.items
+                        .filter { !$0.isChecked }
+                        .sorted { $0.addedAt < $1.addedAt }
+                    if !unchecked.isEmpty {
+                        storeLane(group: group, uncheckedItems: unchecked)
+                    }
+                }
+
+                if !checkedItems.isEmpty {
+                    cartSection
+                        .padding(.top, 4)
+                }
+
+                Color.clear.frame(height: 40)
             }
-            .scrollIndicators(.hidden)
+            .padding(.top, 8)
         }
+        .scrollIndicators(.hidden)
     }
 
     // MARK: - Store lane
@@ -171,7 +159,7 @@ struct GroceryListContentView<Leading: View>: View {
                     ForEach(uncheckedItems) { item in
                         GroceryListCard(
                             item: item,
-                            onToggleChecked: { toggle(item) },
+                            onTap: { selectedDetailItem = item },
                             onRemove: { remove(item) }
                         )
                         .frame(width: cardWidth)
@@ -187,7 +175,6 @@ struct GroceryListContentView<Leading: View>: View {
         accent: Color
     ) -> some View {
         let savings = group.items.reduce(0) { $0 + $1.savings }
-        let remaining = group.items.filter { !$0.isChecked }.count
         let total = group.items.count
         let displayName = GroceryStore.fromCanonical(group.storeName)?.displayName
             ?? group.storeName.capitalized
@@ -201,7 +188,7 @@ struct GroceryListContentView<Leading: View>: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.white)
                 HStack(spacing: 6) {
-                    Text("\(remaining) of \(total) to find")
+                    Text("\(total) \(total == 1 ? "item" : "items")")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.55))
                     if savings > 0 {
@@ -214,134 +201,7 @@ struct GroceryListContentView<Leading: View>: View {
                 }
             }
             Spacer()
-            Capsule()
-                .fill(accent.opacity(0.2))
-                .overlay(Capsule().stroke(accent.opacity(0.4), lineWidth: 0.5))
-                .frame(width: 40, height: 4)
         }
-    }
-
-    // MARK: - Savings header
-
-    private var savingsHeader: some View {
-        let total = visibleSavings
-        let checkedCount = visibleItemCount - visibleUncheckedCount
-        let progress: Double = visibleItemCount > 0 ? Double(checkedCount) / Double(visibleItemCount) : 0
-
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("total_savings").uppercased())
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.0)
-                        .foregroundColor(.white.opacity(0.5))
-                    Text(String(format: "€%.2f", total))
-                        .font(.system(size: 34, weight: .heavy, design: .rounded))
-                        .foregroundColor(promoGreen)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(visibleItemCount)")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                    Text(visibleItemCount == 1 ? "item" : "items")
-                        .font(.system(size: 10, weight: .medium))
-                        .tracking(0.8)
-                        .foregroundColor(.white.opacity(0.5))
-                        .textCase(.uppercase)
-                }
-            }
-
-            // Progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.08))
-                    Capsule()
-                        .fill(promoGreen)
-                        .frame(width: max(4, geo.size.width * progress))
-                }
-            }
-            .frame(height: 6)
-
-            HStack {
-                Text("\(visibleUncheckedCount) to find")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.55))
-                Spacer()
-                if visibleItemCount > 0 {
-                    Text("\(checkedCount) / \(visibleItemCount) collected")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.55))
-                }
-            }
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(promoGreen.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(promoGreen.opacity(0.2), lineWidth: 0.5)
-        )
-    }
-
-    // MARK: - Store chip rail
-
-    private func storeChipRail(proxy: ScrollViewProxy) -> some View {
-        let groups = store.itemsByStore
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(groups, id: \.storeName) { group in
-                    let accent = GroceryStore.fromCanonical(group.storeName)?.accentColor ?? promoGreen
-                    let remaining = group.items.filter { !$0.isChecked }.count
-                    chip(
-                        isSelected: false,
-                        accent: accent,
-                        action: {
-                            withAnimation(.snappy) {
-                                proxy.scrollTo("lane-\(group.storeName)", anchor: .top)
-                            }
-                        }
-                    ) {
-                        HStack(spacing: 6) {
-                            StoreLogoView(storeName: group.storeName, height: 14)
-                                .frame(height: 14)
-                            Text("\(remaining)")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundColor(accent)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(Capsule().fill(accent.opacity(0.15)))
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-        }
-    }
-
-    @ViewBuilder
-    private func chip<Content: View>(
-        isSelected: Bool,
-        accent: Color,
-        action: @escaping () -> Void,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        Button(action: action) {
-            content()
-                .foregroundColor(isSelected ? .white : .white.opacity(0.8))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule().fill(isSelected ? accent : Color.white.opacity(0.06))
-                )
-                .overlay(
-                    Capsule().stroke(isSelected ? accent : Color.white.opacity(0.08), lineWidth: 0.5)
-                )
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Cart section

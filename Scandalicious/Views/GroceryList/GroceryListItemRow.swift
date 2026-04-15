@@ -19,7 +19,7 @@ private var promoGreenGradient: LinearGradient {
 
 struct GroceryListCard: View {
     let item: GroceryListItem
-    let onToggleChecked: () -> Void
+    let onTap: () -> Void
     let onRemove: () -> Void
 
     private var storeAccent: Color {
@@ -35,7 +35,7 @@ struct GroceryListCard: View {
     }
 
     var body: some View {
-        Button(action: onToggleChecked) {
+        Button(action: onTap) {
             VStack(alignment: .leading, spacing: 0) {
                 imageSection
                 infoSection
@@ -57,11 +57,6 @@ struct GroceryListCard: View {
                 onRemove()
             } label: {
                 Label(L("delete"), systemImage: "trash")
-            }
-            Button {
-                onToggleChecked()
-            } label: {
-                Label("Mark as in cart", systemImage: "cart.badge.plus")
             }
         }
     }
@@ -104,11 +99,11 @@ struct GroceryListCard: View {
                 HStack {
                     Spacer()
                     Button(action: onRemove) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(width: 26, height: 26)
-                            .background(Circle().fill(Color.black.opacity(0.55)))
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(discountRed)
+                            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                            .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
                     .contentShape(Circle())
@@ -170,7 +165,7 @@ struct GroceryListCard: View {
                 Text(item.brand.uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.8)
-                    .foregroundColor(.white.opacity(0.55))
+                    .foregroundColor(Color(red: 1.0, green: 0.72, blue: 0.20))
                     .lineLimit(1)
             }
 

@@ -39,6 +39,35 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         return endDate < Calendar.current.startOfDay(for: Date())
     }
 
+    func toPromoStoreItem() -> PromoStoreItem {
+        PromoStoreItem(
+            itemKey: itemKey,
+            brand: brand,
+            productName: productName,
+            originalPrice: originalPrice,
+            promoPrice: promoPrice,
+            savings: savings,
+            discountPercentage: discountPercentage,
+            mechanism: mechanism,
+            validityStart: "",
+            validityEnd: validityEnd,
+            pageNumber: nil,
+            promoFolderUrl: nil,
+            savingsAmount: savings,
+            minPurchaseQty: minPurchaseQty,
+            effectiveUnitPrice: nil,
+            displayName: displayName,
+            displayMechanism: displayMechanism,
+            displayDescription: nil,
+            displayUnitPrice: nil,
+            displaySavingsLabel: nil,
+            bucket: nil,
+            bucketLabel: nil,
+            thumbnailUrl: imageUrl,
+            imageUrl: imageUrl
+        )
+    }
+
     static func from(item: PromoStoreItem, storeName: String) -> GroceryListItem {
         GroceryListItem(
             id: UUID().uuidString,
