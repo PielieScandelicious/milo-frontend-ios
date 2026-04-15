@@ -623,12 +623,17 @@ struct ScanTab: View {
 // MARK: - Folders Tab
 struct FoldersTab: View {
     @StateObject private var viewModel = PromoFoldersViewModel()
+    @State private var stackResetToken = 0
 
     var body: some View {
         NavigationStack {
             FolderHomeView(viewModel: viewModel)
         }
-        .id("FoldersTab")
+        .id("FoldersTab-\(stackResetToken)")
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("app.switchToFoldersTab"))) { _ in
+            // Always land on the folders overview, even if a folder was previously open.
+            stackResetToken &+= 1
+        }
     }
 }
 

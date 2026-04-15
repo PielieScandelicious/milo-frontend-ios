@@ -98,7 +98,10 @@ struct GroceryListCard: View {
             VStack {
                 HStack {
                     Spacer()
-                    Button(action: onRemove) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onRemove()
+                    } label: {
                         Image(systemName: "heart.fill")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct PromoFolderPageViewer: View {
     let folder: PromoFolder
@@ -199,6 +200,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
         context.coordinator.storeName = storeName
         context.coordinator.groceryStore = groceryStore
         context.coordinator.onInfoTap = onInfoTap
+        context.coordinator.observeGroceryStore()
         context.coordinator.loadImage(url: imageUrl, containerSize: containerSize)
 
         return scrollView
@@ -224,6 +226,35 @@ struct ZoomableImageContainer: UIViewRepresentable {
         var groceryStore: GroceryListStore?
         var onInfoTap: ((PromoFolderHotspot) -> Void)?
         private var hotspotDots: [UIView] = []
+        private var groceryCancellable: AnyCancellable?
+
+        func observeGroceryStore() {
+            groceryCancellable = groceryStore?.$items
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.refreshAllDotStates()
+                }
+        }
+
+        /// Re-sync every hotspot's visual state against the grocery list.
+        /// Keeps the folder viewer consistent with changes made in the detail
+        /// sheet or the Grocery List tab.
+        private func refreshAllDotStates() {
+            guard let store = groceryStore else { return }
+            for region in hotspotDots {
+                guard let itemId = region.accessibilityIdentifier,
+                      let hotspot = hotspots.first(where: { $0.itemId == itemId }) else { continue }
+                let item = hotspot.toPromoStoreItem()
+                let isAdded = store.contains(item: item, storeName: storeName)
+                UIView.animate(withDuration: 0.2) {
+                    if isAdded {
+                        self.applyAddedStyle(to: region)
+                    } else {
+                        self.applyDefaultStyle(to: region)
+                    }
+                }
+            }
+        }
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
             imageView
@@ -331,11 +362,51 @@ struct ZoomableImageContainer: UIViewRepresentable {
 
             guard let hotspot = bestHotspot else { return }
 
+            // If the tap landed on the "+" add button, add to grocery list directly
+            // and skip opening the detail sheet.
+            if plusBadgeHitRect(for: hotspot, imageRect: imageRect).contains(tapPoint) {
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+
+                let item = hotspot.toPromoStoreItem()
+                if let store = groceryStore, store.contains(item: item, storeName: storeName) {
+                    // Tapping the button again removes the item and reverts styling.
+                    store.removeByPromo(item: item, storeName: storeName)
+                    revertDotForRemovedItem(hotspot: hotspot)
+                } else {
+                    groceryStore?.add(item: item, storeName: storeName)
+                    showAddedFeedback(for: hotspot, in: imageView)
+                }
+                return
+            }
+
             let impact = UIImpactFeedbackGenerator(style: .soft)
             impact.impactOccurred()
 
             onInfoTap?(hotspot)
         }
+
+        /// Hit-test rect (in imageView coords) for the "+" add button on a hotspot.
+        /// Kept in sync with the badge geometry in `addHotspotDots`.
+        private func plusBadgeHitRect(for hotspot: PromoFolderHotspot, imageRect: CGRect) -> CGRect {
+            let rect = hotspot.tileRect(in: imageRect)
+            let insetRect = rect.insetBy(dx: 2, dy: 2)
+            let badgeWidth = Self.badgeWidth
+            let badgeHeight = Self.badgeHeight
+            let badgeX = insetRect.maxX - badgeWidth + 4
+            let badgeY = insetRect.minY - 4
+            // Expand hit target slightly so it's forgiving to tap.
+            return CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
+                .insetBy(dx: -6, dy: -6)
+        }
+
+        static let badgeWidth: CGFloat = 66
+        static let badgeHeight: CGFloat = 22
+
+        /// Unified premium accent used for hotspot outlines and the ADD pill
+        /// across every store's folder — a refined graphite ink that reads
+        /// high-end on any background.
+        static let premiumAccentColor = UIColor(red: 0.09, green: 0.10, blue: 0.12, alpha: 1.0)
 
         // MARK: - Visual Feedback
 
@@ -469,47 +540,63 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 let inset: CGFloat = 2
                 let insetRect = rect.insetBy(dx: inset, dy: inset)
 
-                // Highlighted region covering the whole hotspot area
+                // Highlighted region covering the whole hotspot area —
+                // uses a unified premium graphite accent across all stores.
+                let accent = Self.premiumAccentColor
                 let region = UIView(frame: insetRect)
-                region.backgroundColor = storeAccentColor.withAlphaComponent(0.08)
+                region.backgroundColor = accent.withAlphaComponent(0.06)
                 region.layer.cornerRadius = 8
-                region.layer.borderColor = storeAccentColor.withAlphaComponent(0.35).cgColor
-                region.layer.borderWidth = 1.5
+                region.layer.borderColor = accent.withAlphaComponent(0.30).cgColor
+                region.layer.borderWidth = 1.0
                 region.alpha = 0
                 region.accessibilityIdentifier = hotspot.itemId
                 region.isUserInteractionEnabled = false
 
-                // "+" badge in the top-right corner
-                let badgeSize: CGFloat = 24
+                // "+ ADD" pill in the top-right corner — clearly tappable shortcut
+                // that adds the item to the grocery list directly (bypasses detail sheet).
+                let badgeWidth = Coordinator.badgeWidth
+                let badgeHeight = Coordinator.badgeHeight
                 let badge = UIView(frame: CGRect(
-                    x: insetRect.width - badgeSize + 4,
-                    y: -4,
-                    width: badgeSize,
-                    height: badgeSize
+                    x: insetRect.width - badgeWidth + 3,
+                    y: -3,
+                    width: badgeWidth,
+                    height: badgeHeight
                 ))
-                badge.backgroundColor = storeAccentColor
-                badge.layer.cornerRadius = badgeSize / 2
+                badge.backgroundColor = accent.withAlphaComponent(0.88)
+                badge.layer.cornerRadius = badgeHeight / 2
                 badge.layer.shadowColor = UIColor.black.cgColor
-                badge.layer.shadowOpacity = 0.3
+                badge.layer.shadowOpacity = 0.22
                 badge.layer.shadowOffset = CGSize(width: 0, height: 1)
                 badge.layer.shadowRadius = 3
                 badge.tag = 300
 
-                let iconSize: CGFloat = 13
+                let iconSize: CGFloat = 10
                 let iconView = UIImageView(image: UIImage(
                     systemName: "plus",
-                    withConfiguration: UIImage.SymbolConfiguration(weight: .bold)
+                    withConfiguration: UIImage.SymbolConfiguration(pointSize: iconSize, weight: .bold)
                 ))
                 iconView.tintColor = .white
                 iconView.contentMode = .scaleAspectFit
-                iconView.frame = CGRect(
-                    x: (badgeSize - iconSize) / 2,
-                    y: (badgeSize - iconSize) / 2,
-                    width: iconSize,
-                    height: iconSize
-                )
+                iconView.frame = CGRect(x: 8, y: (badgeHeight - iconSize) / 2, width: iconSize, height: iconSize)
                 iconView.tag = 301
                 badge.addSubview(iconView)
+
+                let labelX = 8 + iconSize + 3
+                let label = UILabel(frame: CGRect(
+                    x: labelX,
+                    y: 0,
+                    width: badgeWidth - labelX - 4,
+                    height: badgeHeight
+                ))
+                label.text = "ADD"
+                label.font = .systemFont(ofSize: 10, weight: .bold)
+                label.textColor = .white
+                label.textAlignment = .left
+                label.adjustsFontSizeToFitWidth = false
+                label.lineBreakMode = .byClipping
+                label.tag = 302
+                badge.addSubview(label)
+
                 region.addSubview(badge)
 
                 imageView.addSubview(region)
@@ -536,9 +623,51 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 if let icon = badge.viewWithTag(301) as? UIImageView {
                     icon.image = UIImage(
                         systemName: "checkmark",
-                        withConfiguration: UIImage.SymbolConfiguration(weight: .bold)
+                        withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .heavy)
                     )
                 }
+                if let label = badge.viewWithTag(302) as? UILabel {
+                    label.text = "ADDED"
+                }
+            }
+        }
+
+        private func applyDefaultStyle(to region: UIView) {
+            let accent = Self.premiumAccentColor
+            region.backgroundColor = accent.withAlphaComponent(0.06)
+            region.layer.borderColor = accent.withAlphaComponent(0.30).cgColor
+            if let badge = region.viewWithTag(300) {
+                badge.backgroundColor = accent.withAlphaComponent(0.88)
+                if let icon = badge.viewWithTag(301) as? UIImageView {
+                    icon.image = UIImage(
+                        systemName: "plus",
+                        withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .bold)
+                    )
+                }
+                if let label = badge.viewWithTag(302) as? UILabel {
+                    label.text = "ADD"
+                }
+            }
+        }
+
+        private func revertDotForRemovedItem(hotspot: PromoFolderHotspot) {
+            guard let region = hotspotDots.first(where: { $0.accessibilityIdentifier == hotspot.itemId }) else { return }
+
+            if let badge = region.viewWithTag(300) {
+                UIView.animate(withDuration: 0.12, animations: {
+                    badge.transform = CGAffineTransform(scaleX: 0.88, y: 0.88)
+                }) { _ in
+                    UIView.animate(withDuration: 0.2,
+                                   delay: 0,
+                                   usingSpringWithDamping: 0.6,
+                                   initialSpringVelocity: 0.8) {
+                        badge.transform = .identity
+                    }
+                }
+            }
+
+            UIView.animate(withDuration: 0.3) {
+                self.applyDefaultStyle(to: region)
             }
         }
 
