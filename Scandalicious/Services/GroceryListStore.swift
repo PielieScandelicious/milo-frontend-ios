@@ -24,9 +24,9 @@ class GroceryListStore: ObservableObject {
 
     // MARK: - Public API
 
-    func add(item: PromoStoreItem, storeName: String) {
+    func add(item: PromoStoreItem, storeName: String, validityEndOverride: String? = nil) {
         guard !contains(item: item, storeName: storeName) else { return }
-        let groceryItem = GroceryListItem.from(item: item, storeName: storeName)
+        let groceryItem = GroceryListItem.from(item: item, storeName: storeName, validityEndOverride: validityEndOverride)
         items.append(groceryItem)
         saveToDisk()
         ImagePrefetcher.shared.prefetch(urlString: groceryItem.imageUrl)

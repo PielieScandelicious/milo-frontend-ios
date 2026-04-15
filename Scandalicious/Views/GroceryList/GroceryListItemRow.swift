@@ -213,8 +213,38 @@ struct GroceryListCard: View {
                     .foregroundColor(.white.opacity(0.5))
                     .lineLimit(1)
             }
+
+            validityBadge
         }
         .padding(10)
+    }
+
+    @ViewBuilder
+    private var validityBadge: some View {
+        if let days = item.daysRemaining {
+            let info = validityDisplay(days: days)
+            HStack(spacing: 4) {
+                if let icon = info.icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 9, weight: .bold))
+                }
+                Text(info.text)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+            }
+            .foregroundColor(info.color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(info.color.opacity(0.12)))
+            .overlay(Capsule().stroke(info.color.opacity(0.3), lineWidth: 0.5))
+        }
+    }
+
+    private func validityDisplay(days: Int) -> (text: String, color: Color, icon: String?) {
+        if days < 0 { return ("Expired", .white.opacity(0.35), nil) }
+        if days == 0 { return ("Last day!", Color(red: 0.95, green: 0.25, blue: 0.25), "exclamationmark.circle.fill") }
+        if days <= 2 { return ("\(days) day\(days == 1 ? "" : "s") left", Color(red: 0.95, green: 0.40, blue: 0.30), "clock.badge.exclamationmark") }
+        if days <= 5 { return ("\(days) days left", Color(red: 1.0, green: 0.75, blue: 0.25), "clock") }
+        return ("\(days) days left", .white.opacity(0.5), "clock")
     }
 }
 

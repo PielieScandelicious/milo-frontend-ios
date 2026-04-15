@@ -32,6 +32,22 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         (displayMechanism?.isEmpty == false ? displayMechanism : mechanism) ?? mechanism
     }
 
+    var daysRemaining: Int? {
+        let parts = validityEnd.split(separator: "-")
+        guard parts.count == 3,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              let day = Int(parts[2]) else { return nil }
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        guard let endDate = Calendar.current.date(from: components) else { return nil }
+        let today = Calendar.current.startOfDay(for: Date())
+        let end = Calendar.current.startOfDay(for: endDate)
+        return Calendar.current.dateComponents([.day], from: today, to: end).day
+    }
+
     var isExpired: Bool {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -68,7 +84,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         )
     }
 
-    static func from(item: PromoStoreItem, storeName: String) -> GroceryListItem {
+    static func from(item: PromoStoreItem, storeName: String, validityEndOverride: String? = nil) -> GroceryListItem {
         GroceryListItem(
             id: UUID().uuidString,
             itemKey: item.itemKey,
@@ -84,7 +100,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
             mechanism: item.mechanism,
             displayMechanism: item.displayMechanism,
             minPurchaseQty: item.minPurchaseQty,
-            validityEnd: item.validityEnd,
+            validityEnd: validityEndOverride ?? item.validityEnd,
             addedAt: Date(),
             isChecked: false
         )

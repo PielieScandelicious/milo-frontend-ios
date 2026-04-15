@@ -39,6 +39,7 @@ struct PromoFolderPageViewer: View {
                         hotspots: page.hotspots,
                         storeAccentColor: storeAccentColor,
                         storeName: folder.storeId,
+                        folderValidityEnd: folder.validityEnd,
                         groceryStore: groceryStore,
                         onInfoTap: { selectedHotspot = $0 }
                     )
@@ -128,6 +129,7 @@ struct ZoomablePageView: View {
     let hotspots: [PromoFolderHotspot]
     let storeAccentColor: Color
     let storeName: String
+    let folderValidityEnd: String
     let groceryStore: GroceryListStore
     let onInfoTap: (PromoFolderHotspot) -> Void
 
@@ -139,6 +141,7 @@ struct ZoomablePageView: View {
                 hotspots: hotspots,
                 storeAccentColor: UIColor(storeAccentColor),
                 storeName: storeName,
+                folderValidityEnd: folderValidityEnd,
                 groceryStore: groceryStore,
                 onInfoTap: onInfoTap
             )
@@ -156,6 +159,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
     let hotspots: [PromoFolderHotspot]
     let storeAccentColor: UIColor
     let storeName: String
+    let folderValidityEnd: String
     let groceryStore: GroceryListStore
     let onInfoTap: (PromoFolderHotspot) -> Void
 
@@ -198,6 +202,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
         context.coordinator.hotspots = hotspots
         context.coordinator.storeAccentColor = storeAccentColor
         context.coordinator.storeName = storeName
+        context.coordinator.folderValidityEnd = folderValidityEnd
         context.coordinator.groceryStore = groceryStore
         context.coordinator.onInfoTap = onInfoTap
         context.coordinator.observeGroceryStore()
@@ -223,6 +228,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
         var hotspots: [PromoFolderHotspot] = []
         var storeAccentColor: UIColor = .systemGreen
         var storeName: String = ""
+        var folderValidityEnd: String = ""
         var groceryStore: GroceryListStore?
         var onInfoTap: ((PromoFolderHotspot) -> Void)?
         private var hotspotDots: [UIView] = []
@@ -374,7 +380,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
                     store.removeByPromo(item: item, storeName: storeName)
                     revertDotForRemovedItem(hotspot: hotspot)
                 } else {
-                    groceryStore?.add(item: item, storeName: storeName)
+                    groceryStore?.add(item: item, storeName: storeName, validityEndOverride: folderValidityEnd.isEmpty ? nil : folderValidityEnd)
                     showAddedFeedback(for: hotspot, in: imageView)
                 }
                 return
