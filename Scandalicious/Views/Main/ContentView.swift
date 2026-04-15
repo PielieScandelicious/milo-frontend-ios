@@ -34,6 +34,7 @@ struct ContentView: View {
     @ObservedObject private var groceryStore = GroceryListStore.shared
 
     @State private var cartToast: CartToast? = nil
+    @State private var cartToastQueue: [CartToast] = []
     @State private var cartToastDismissTask: Task<Void, Never>? = nil
 
     // Unified overlay queue — all reward overlays flow through here in order
@@ -466,16 +467,30 @@ struct ContentView: View {
             title: item.label,
             imageUrl: item.imageUrl
         )
-        cartToastDismissTask?.cancel()
+        if cartToast == nil {
+            presentCartToast(toast)
+        } else {
+            cartToastQueue.append(toast)
+        }
+    }
+
+    private func presentCartToast(_ toast: CartToast) {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.78)) {
             cartToast = toast
         }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        cartToastDismissTask?.cancel()
         cartToastDismissTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard !Task.isCancelled, cartToast?.id == toast.id else { return }
             withAnimation(.easeInOut(duration: 0.28)) {
                 cartToast = nil
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            if !cartToastQueue.isEmpty {
+                let next = cartToastQueue.removeFirst()
+                presentCartToast(next)
             }
         }
     }
