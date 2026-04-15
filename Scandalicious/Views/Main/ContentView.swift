@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 import FirebaseAuth
 
 // MARK: - Environment key for active tab (used by MiniBudgetRing to replay animation)
@@ -30,6 +31,10 @@ struct ContentView: View {
     @State private var hasLoadedInitialData = false
     @StateObject private var brandCashbackViewModel = BrandCashbackViewModel()
     @ObservedObject private var gm = GamificationManager.shared
+    @ObservedObject private var groceryStore = GroceryListStore.shared
+
+    @State private var cartToast: CartToast? = nil
+    @State private var cartToastDismissTask: Task<Void, Never>? = nil
 
     // Unified overlay queue — all reward overlays flow through here in order
     private enum OverlayItem {
@@ -60,6 +65,7 @@ struct ContentView: View {
                     .tabItem {
                         Label("Grocery List", systemImage: "cart.fill")
                     }
+                    .badge(groceryStore.activeItemCount)
                     .tag(Tab.groceryList)
 
                 PromosTab()
@@ -89,6 +95,18 @@ struct ContentView: View {
             if !hasLoadedInitialData {
                 SyncLoadingView()
                     .transition(.opacity)
+            }
+
+            // Grocery list "added to cart" toast
+            if let toast = cartToast {
+                VStack {
+                    AddedToCartToastView(toast: toast)
+                        .padding(.top, 8)
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(90)
+                .allowsHitTesting(false)
             }
 
             // Unified reward overlay queue — brand cashback → referral → badges
@@ -133,6 +151,9 @@ struct ContentView: View {
             }
         }
         .onChange(of: selectedTab) { oldValue, newValue in
+        }
+        .onReceive(groceryStore.itemAddedPublisher) { item in
+            showCartToast(for: item)
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchToDealsTab)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -434,6 +455,146 @@ struct ContentView: View {
 
         await MainActor.run {
             cache.receiptsByPeriod[period] = allReceipts
+        }
+    }
+
+    // MARK: - Cart toast
+
+    private func showCartToast(for item: GroceryListItem) {
+        let toast = CartToast(
+            id: UUID(),
+            title: item.label,
+            imageUrl: item.imageUrl
+        )
+        cartToastDismissTask?.cancel()
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.78)) {
+            cartToast = toast
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        cartToastDismissTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            guard !Task.isCancelled, cartToast?.id == toast.id else { return }
+            withAnimation(.easeInOut(duration: 0.28)) {
+                cartToast = nil
+            }
+        }
+    }
+}
+
+// MARK: - Added-to-cart toast
+
+struct CartToast: Equatable, Identifiable {
+    let id: UUID
+    let title: String
+    let imageUrl: String?
+}
+
+private struct AddedToCartToastView: View {
+    let toast: CartToast
+
+    @State private var appeared: Bool = false
+    @State private var checkPulse: Int = 0
+
+    var body: some View {
+        HStack(spacing: 12) {
+            thumbnail
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Added to List")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(toast.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
+            Spacer(minLength: 4)
+
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(red: 0.26, green: 0.88, blue: 0.47),
+                                     Color(red: 0.10, green: 0.72, blue: 0.36)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 26, height: 26)
+                    .shadow(color: Color.green.opacity(0.5), radius: 6, y: 2)
+
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .symbolEffect(.bounce, value: checkPulse)
+            }
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 14)
+        .padding(.vertical, 8)
+        .frame(maxWidth: 320)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.black.opacity(0.55))
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                )
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.25), Color.white.opacity(0.05)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.6
+                )
+        )
+        .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
+        .scaleEffect(appeared ? 1.0 : 0.85)
+        .opacity(appeared ? 1.0 : 0.0)
+        .offset(y: appeared ? 0 : -14)
+        .onAppear {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) {
+                appeared = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                checkPulse &+= 1
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var thumbnail: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white)
+                .frame(width: 38, height: 38)
+                .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+
+            if let urlString = toast.imageUrl, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFit().padding(3)
+                    default:
+                        Image(systemName: "bag.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 38, height: 38)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+                Image(systemName: "bag.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

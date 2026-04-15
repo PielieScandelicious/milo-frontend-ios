@@ -12,6 +12,9 @@ class GroceryListStore: ObservableObject {
 
     @Published private(set) var items: [GroceryListItem] = []
 
+    /// Fires whenever a new item is successfully added. Used to trigger UI feedback (e.g. tab-bar toast).
+    let itemAddedPublisher = PassthroughSubject<GroceryListItem, Never>()
+
     private let storageKey = "grocery_list_items_v1"
 
     private init() {
@@ -27,6 +30,7 @@ class GroceryListStore: ObservableObject {
         items.append(groceryItem)
         saveToDisk()
         ImagePrefetcher.shared.prefetch(urlString: groceryItem.imageUrl)
+        itemAddedPublisher.send(groceryItem)
     }
 
     func remove(id: String) {

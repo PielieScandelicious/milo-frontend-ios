@@ -11,7 +11,6 @@ import SwiftUI
 struct PromoFolderPageViewer: View {
     let folder: PromoFolder
     @State private var currentPage: Int = 0
-    @State private var showGroceryList = false
     @State private var selectedHotspot: PromoFolderHotspot?
     @ObservedObject private var groceryStore = GroceryListStore.shared
     @Environment(\.dismiss) private var dismiss
@@ -67,19 +66,8 @@ struct PromoFolderPageViewer: View {
                 }
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                ShoppingListPremiumButton(
-                    count: groceryStore.activeItemCount,
-                    accent: storeAccentColor
-                ) {
-                    showGroceryList = true
-                }
-            }
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-        .sheet(isPresented: $showGroceryList) {
-            GroceryListSheet()
-        }
         .sheet(item: $selectedHotspot) { hotspot in
             PromoProductDetailSheet(
                 gridItem: PromoGridItem(
@@ -90,50 +78,6 @@ struct PromoFolderPageViewer: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
-        }
-    }
-
-    // MARK: - Shopping List Button
-
-    private struct ShoppingListPremiumButton: View {
-        let count: Int
-        let accent: Color
-        let action: () -> Void
-
-        @State private var bumpTrigger: Int = 0
-        private var hasItems: Bool { count > 0 }
-
-        var body: some View {
-            if #available(iOS 26.0, *) {
-                Button(action: action) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "cart.fill")
-                            .symbolEffect(.bounce.up.byLayer, value: bumpTrigger)
-                        
-                        if hasItems {
-                            Text("\(count)")
-                                .monospacedDigit()
-                                .contentTransition(.numericText(value: Double(count)))
-                                .transition(.asymmetric(
-                                    insertion: .scale(scale: 0.5).combined(with: .opacity),
-                                    removal: .opacity
-                                ))
-                        }
-                    }
-                    .font(.subheadline.weight(.semibold))
-                }
-                .buttonStyle(.glass)
-                .tint(.white)
-                .accessibilityLabel("Grocery list")
-                .accessibilityValue(hasItems ? "\(count) items" : "empty")
-                .sensoryFeedback(.increase, trigger: count)
-                .animation(.spring(response: 0.35, dampingFraction: 0.65), value: count)
-                .onChange(of: count) { _, newValue in
-                    if newValue > 0 { bumpTrigger &+= 1 }
-                }
-            } else {
-                // Fallback on earlier versions
-            }
         }
     }
 

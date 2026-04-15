@@ -101,13 +101,23 @@ struct GroceryListCard: View {
                     Button(action: onRemove) {
                         Image(systemName: "heart.fill")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(discountRed)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.00, green: 0.42, blue: 0.60),
+                                        Color(red: 0.96, green: 0.22, blue: 0.44)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                             .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
                             .frame(width: 28, height: 28)
                     }
                     .buttonStyle(.plain)
                     .contentShape(Circle())
-                    .padding(6)
+                    .padding(.top, 0)
+                    .padding(.trailing, 2)
                 }
                 Spacer()
             }
