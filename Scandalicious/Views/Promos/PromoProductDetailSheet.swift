@@ -379,15 +379,6 @@ struct PromoProductDetailSheet: View {
             // Validity with urgency coloring
             validityRow
 
-            // Date range (secondary info)
-            HStack(spacing: 6) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 11, weight: .medium))
-                Text("Valid \(formatDate(item.validityStart)) – \(formatDate(item.validityEnd))")
-                    .font(.system(size: 13, weight: .regular))
-            }
-            .foregroundColor(.white.opacity(0.35))
-
             // Folder link
             folderLink
         }
