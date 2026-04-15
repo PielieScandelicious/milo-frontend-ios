@@ -179,19 +179,10 @@ struct PromoProductDetailSheet: View {
             VStack {
                 Spacer()
                 HStack {
-                    HStack(spacing: 8) {
-                        StoreLogoView(storeName: storeName, height: 20)
-                            .frame(width: 30, height: 30)
-                            .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                        Text(store?.displayName ?? storeName.capitalized)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(Color(white: 0.3))
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .padding(12)
+                    StoreLogoView(storeName: storeName, height: 20)
+                        .frame(width: 30, height: 30)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .padding(12)
 
                     Spacer()
                 }
