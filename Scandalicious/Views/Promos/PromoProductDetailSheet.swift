@@ -117,25 +117,44 @@ struct PromoProductDetailSheet: View {
             .overlay(alignment: .bottom) {
                 addToListButton
             }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 28))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
-                }
+            .overlay(alignment: .topTrailing) {
+                closeButton
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
+    }
+
+    // MARK: - Close Button
+
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                )
+                .overlay(
+                    Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
+        .padding(.trailing, 16)
+        .padding(.top, 12)
     }
 
     // MARK: - Hero Image
 
     private var heroImage: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .topLeading) {
             // White background
             Color(white: 0.97)
                 .frame(height: 300)
