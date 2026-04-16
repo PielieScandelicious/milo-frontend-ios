@@ -42,7 +42,7 @@ struct GroceryListContentView<Leading: View>: View {
 
     private let promoGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 
-    private let cardWidth: CGFloat = 128
+    private let cardWidth: CGFloat = 160
 
     var body: some View {
         ZStack {
@@ -177,9 +177,9 @@ struct GroceryListContentView<Leading: View>: View {
         uncheckedItems: [GroceryListItem]
     ) -> some View {
         let isExpanded = expandedStores.contains(group.storeName)
-        return VStack(alignment: .leading, spacing: 0) {
+        return VStack(alignment: .leading, spacing: 10) {
             Button {
-                withAnimation(.snappy(duration: 0.3)) {
+                withAnimation(.easeInOut(duration: 0.2)) {
                     if isExpanded {
                         expandedStores.remove(group.storeName)
                     } else {
@@ -206,8 +206,6 @@ struct GroceryListContentView<Leading: View>: View {
                     }
                     .padding(.horizontal, 16)
                 }
-                .padding(.top, 10)
-                .transition(.opacity)
             }
         }
     }

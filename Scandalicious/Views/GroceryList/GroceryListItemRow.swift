@@ -42,14 +42,14 @@ struct GroceryListCard: View {
             }
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white.opacity(0.06))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -66,15 +66,15 @@ struct GroceryListCard: View {
     private var imageSection: some View {
         ZStack(alignment: .topLeading) {
             Color.white
-                .frame(height: 84)
+                .frame(height: 140)
 
             if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
                 RemoteImage(url: url) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: 72)
-                        .padding(6)
+                        .frame(maxWidth: .infinity, maxHeight: 120)
+                        .padding(8)
                 } placeholder: {
                     imagePlaceholder
                 }
@@ -84,12 +84,13 @@ struct GroceryListCard: View {
 
             if item.discountPercentage > 0 {
                 Text("-\(item.discountPercentage)%")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
                     .background(Capsule().fill(discountRed))
-                    .padding(5)
+                    .shadow(color: discountRed.opacity(0.3), radius: 3, y: 1)
+                    .padding(6)
             }
 
             if let days = item.daysRemaining {
@@ -98,31 +99,32 @@ struct GroceryListCard: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        HStack(spacing: 2) {
+                        HStack(spacing: 3) {
                             if let icon = style.icon {
                                 Image(systemName: icon)
-                                    .font(.system(size: 7, weight: .semibold))
+                                    .font(.system(size: 8, weight: .semibold))
                             }
                             Text(style.text)
-                                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                                .font(.system(size: 9, weight: .semibold, design: .rounded))
                         }
                         .foregroundColor(style.fg)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
                         .background(Capsule().fill(style.bg))
-                        .padding(5)
+                        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                        .padding(6)
                     }
                 }
             }
         }
-        .frame(height: 84)
+        .frame(height: 140)
         .clipped()
         .overlay(alignment: .bottomLeading) {
-            StoreLogoView(storeName: item.storeName, height: 12)
-                .frame(width: 20, height: 20)
+            StoreLogoView(storeName: item.storeName, height: 14)
+                .frame(width: 22, height: 22)
                 .background(Color.white, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
                 .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                .padding(5)
+                .padding(6)
         }
     }
 
@@ -130,38 +132,36 @@ struct GroceryListCard: View {
         ZStack {
             storeAccent.opacity(0.15)
             Text(String(item.label.prefix(1)).uppercased())
-                .font(.system(size: 26, weight: .heavy, design: .rounded))
+                .font(.system(size: 40, weight: .heavy, design: .rounded))
                 .foregroundColor(storeAccent.opacity(0.6))
         }
-        .frame(maxWidth: .infinity, maxHeight: 72)
+        .frame(maxWidth: .infinity, maxHeight: 120)
     }
 
     // MARK: - Info (compact)
 
     private var infoSection: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(item.label)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: 30, alignment: .top)
+                .frame(minHeight: 34, alignment: .top)
 
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(String(format: "€%.2f", userPays))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(promoGreenGradient)
                 if item.savings > 0 {
                     Text(String(format: "€%.2f", originalTotal))
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.35))
                         .strikethrough(true, color: .white.opacity(0.35))
                 }
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 6)
-        .padding(.bottom, 8)
+        .padding(10)
     }
 
     private func validityDisplay(days: Int) -> (text: String, color: Color, icon: String?) {
