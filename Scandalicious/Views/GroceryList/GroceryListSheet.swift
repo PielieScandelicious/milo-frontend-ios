@@ -25,11 +25,19 @@ struct GroceryListSheet: View {
 
 struct GroceryListContentView<Leading: View>: View {
     @ObservedObject private var store = GroceryListStore.shared
+    @EnvironmentObject private var foldersViewModel: PromoFoldersViewModel
     @State private var checkedTrigger = false
     @State private var isCartExpanded: Bool = false
     @State private var selectedDetailItem: GroceryListItem?
+    @State private var folderDestination: FolderDestination?
     @ViewBuilder let leadingToolbar: () -> Leading
     let onBrowseTapped: () -> Void
+
+    struct FolderDestination: Hashable {
+        let folderId: String
+        let pageIndex: Int
+        let highlightItemId: String?
+    }
 
     private let promoGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 
@@ -67,8 +75,26 @@ struct GroceryListContentView<Leading: View>: View {
                     id: item.id,
                     item: item.toPromoStoreItem(),
                     storeName: item.storeName
-                )
+                ),
+                onOpenInFolder: { folder, pageIndex, itemId in
+                    folderDestination = FolderDestination(
+                        folderId: folder.folderId,
+                        pageIndex: pageIndex,
+                        highlightItemId: itemId
+                    )
+                }
             )
+            .environmentObject(foldersViewModel)
+        }
+        .navigationDestination(item: $folderDestination) { dest in
+            if case .success(let folders) = foldersViewModel.state,
+               let folder = folders.first(where: { $0.folderId == dest.folderId }) {
+                PromoFolderPageViewer(
+                    folder: folder,
+                    initialPage: dest.pageIndex,
+                    highlightItemId: dest.highlightItemId
+                )
+            }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: checkedTrigger)
         .onAppear {

@@ -75,6 +75,26 @@ class PromoFoldersViewModel: ObservableObject {
         return folders.count
     }
 
+    // MARK: - Lookup
+
+    /// Returns the folder + zero-based page index containing the given item, or nil.
+    /// Primary match: item.itemKey ↔ hotspot.itemId. Fallback: storeId + pageNumber.
+    func findFolder(for item: PromoStoreItem, storeName: String) -> (folder: PromoFolder, pageIndex: Int)? {
+        guard case .success(let folders) = state else { return nil }
+        let normalizedStore = storeName.lowercased()
+        for folder in folders where folder.storeId.lowercased() == normalizedStore {
+            if let key = item.itemKey,
+               let idx = folder.pages.firstIndex(where: { $0.hotspots.contains { $0.itemId == key } }) {
+                return (folder, idx)
+            }
+            if let page = item.pageNumber,
+               let idx = folder.pages.firstIndex(where: { $0.pageNumber == page }) {
+                return (folder, idx)
+            }
+        }
+        return nil
+    }
+
     // MARK: - Load
 
     func loadFolders(forceRefresh: Bool = false) async {

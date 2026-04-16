@@ -10,12 +10,19 @@ import SwiftUI
 
 struct PromoProductDetailSheet: View {
     let gridItem: PromoGridItem
+    var onOpenInFolder: ((PromoFolder, Int, String?) -> Void)? = nil
+    @EnvironmentObject private var foldersViewModel: PromoFoldersViewModel
     @ObservedObject private var groceryStore = GroceryListStore.shared
     @State private var addTrigger = false
     @Environment(\.dismiss) private var dismiss
 
     private var item: PromoStoreItem { gridItem.item }
     private var storeName: String { gridItem.storeName }
+
+    private var folderMatch: (folder: PromoFolder, pageIndex: Int)? {
+        guard onOpenInFolder != nil else { return nil }
+        return foldersViewModel.findFolder(for: item, storeName: storeName)
+    }
 
     private var store: GroceryStore? {
         GroceryStore.fromCanonical(storeName)
@@ -101,12 +108,13 @@ struct PromoProductDetailSheet: View {
                     heroImage
 
                     VStack(alignment: .leading, spacing: 20) {
+                        savingsRow
                         brandAndNameSection
                         mechanismAndPriceSection
                         if hasInfoChips {
                             infoChipsSection
                         }
-                        validityAndFolderSection
+                        folderLink
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
@@ -182,33 +190,69 @@ struct PromoProductDetailSheet: View {
                 heroPlaceholder
             }
 
-            // Discount badge (top-right)
+            // Discount badge (top-left)
             if item.discountPercentage > 0 {
                 Text("-\(item.discountPercentage)%")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
                     .background(Capsule().fill(discountBadgeColor))
-                    .shadow(color: discountBadgeColor.opacity(0.4), radius: 6, y: 3)
-                    .padding(16)
+                    .shadow(color: discountBadgeColor.opacity(0.35), radius: 4, y: 2)
+                    .padding(8)
             }
 
-            // Store badge (bottom-left)
+            // Store badge (bottom-left) + Validity badge (bottom-right)
             VStack {
                 Spacer()
-                HStack {
+                HStack(alignment: .bottom) {
                     StoreLogoView(storeName: storeName, height: 20)
                         .frame(width: 30, height: 30)
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .padding(12)
 
                     Spacer()
+
+                    heroValidityBadge
                 }
+                .padding(8)
             }
         }
         .frame(height: 300)
         .clipped()
+    }
+
+    private var heroValidityStyle: (text: String, icon: String, bg: Color, fg: Color) {
+        guard let days = daysRemaining else {
+            return (validityFallbackText, "calendar", Color.black.opacity(0.55), .white.opacity(0.85))
+        }
+        switch days {
+        case _ where days < 0:
+            return ("Expired", "calendar.badge.exclamationmark", Color.black.opacity(0.55), .white.opacity(0.6))
+        case 0:
+            return ("Last day!", "exclamationmark.circle.fill", detailUrgentRed.opacity(0.85), .white)
+        case 1...2:
+            return ("\(days) day\(days == 1 ? "" : "s") left", "clock.badge.exclamationmark", detailUrgentOrange.opacity(0.85), .white)
+        case 3...5:
+            return ("\(days) days left", "clock", detailWarningAmber.opacity(0.80), .black.opacity(0.85))
+        default:
+            return ("\(days) days left", "calendar", Color.black.opacity(0.55), .white.opacity(0.9))
+        }
+    }
+
+    @ViewBuilder
+    private var heroValidityBadge: some View {
+        let style = heroValidityStyle
+        HStack(spacing: 3) {
+            Image(systemName: style.icon)
+                .font(.system(size: 8, weight: .semibold))
+            Text(style.text)
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+        }
+        .foregroundColor(style.fg)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(style.bg))
+        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
     }
 
     private var heroPlaceholder: some View {
@@ -322,26 +366,34 @@ struct PromoProductDetailSheet: View {
                 }
             }
 
-            // Savings pill
-            if item.savings > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                    if item.discountPercentage > 0 {
-                        Text(String(format: "You save €%.2f (%d%%)", item.savings, item.discountPercentage))
-                            .font(.system(size: 14, weight: .semibold))
-                    } else {
-                        Text(String(format: "You save €%.2f", item.savings))
-                            .font(.system(size: 14, weight: .semibold))
-                    }
+        }
+    }
+
+    // MARK: - Savings Row (headline)
+
+    @ViewBuilder
+    private var savingsRow: some View {
+        if item.savings > 0 {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 15, weight: .bold))
+                if item.discountPercentage > 0 {
+                    Text(String(format: "You save €%.2f (%d%%)", item.savings, item.discountPercentage))
+                        .font(.system(size: 15, weight: .bold))
+                } else {
+                    Text(String(format: "You save €%.2f", item.savings))
+                        .font(.system(size: 15, weight: .bold))
                 }
-                .foregroundColor(detailGreen)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    Capsule().fill(detailGreen.opacity(0.10))
-                )
             }
+            .foregroundColor(detailGreen)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(
+                Capsule().fill(detailGreen.opacity(0.12))
+            )
+            .overlay(
+                Capsule().stroke(detailGreen.opacity(0.25), lineWidth: 0.5)
+            )
         }
     }
 
@@ -391,40 +443,6 @@ struct PromoProductDetailSheet: View {
         )
     }
 
-    // MARK: - Validity & Folder Link
-
-    private var validityAndFolderSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Validity with urgency coloring
-            validityRow
-
-            // Folder link
-            folderLink
-        }
-    }
-
-    private var validityRow: some View {
-        let display = validityDisplay
-        let isUrgent = (daysRemaining ?? 99) <= 2
-
-        return HStack(spacing: 6) {
-            Image(systemName: display.icon)
-                .font(.system(size: 13, weight: .semibold))
-            Text(display.text)
-                .font(.system(size: 14, weight: isUrgent ? .bold : .semibold))
-        }
-        .foregroundColor(display.color)
-        .padding(.horizontal, isUrgent ? 12 : 0)
-        .padding(.vertical, isUrgent ? 7 : 0)
-        .background(
-            Group {
-                if isUrgent {
-                    Capsule().fill(display.color.opacity(0.12))
-                }
-            }
-        )
-    }
-
     private func formatDate(_ dateStr: String) -> String {
         let parts = dateStr.split(separator: "-")
         if parts.count == 3 {
@@ -437,18 +455,56 @@ struct PromoProductDetailSheet: View {
 
     @ViewBuilder
     private var folderLink: some View {
-        if let urlString = item.promoFolderUrl, let url = URL(string: urlString) {
+        if let match = folderMatch, let onOpenInFolder {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onOpenInFolder(match.folder, match.pageIndex, item.itemKey)
+                dismiss()
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(storeAccentColor.opacity(0.18))
+                        Image(systemName: "rectangle.stack.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(storeAccentColor)
+                    }
+                    .frame(width: 38, height: 38)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Find in folder")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                        Text("\(match.folder.storeDisplayName) · Page \(match.folder.pages[match.pageIndex].pageNumber)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.55))
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white.opacity(0.35))
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(FolderLinkPressStyle())
+            .accessibilityHint("Opens the promo folder on page \(match.folder.pages[match.pageIndex].pageNumber)")
+        } else if let urlString = item.promoFolderUrl, let url = URL(string: urlString) {
             Link(destination: url) {
                 HStack(spacing: 8) {
                     Image(systemName: "safari")
                         .font(.system(size: 14, weight: .medium))
-                    if let page = item.pageNumber {
-                        Text("View in promo folder — p. \(page)")
-                            .font(.system(size: 14, weight: .semibold))
-                    } else {
-                        Text("View in promo folder")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
+                    Text(item.pageNumber.map { "View in promo folder — p. \($0)" } ?? "View in promo folder")
+                        .font(.system(size: 14, weight: .semibold))
                     Spacer()
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 11, weight: .bold))
@@ -561,11 +617,22 @@ private struct FlowLayout: Layout {
     }
 }
 
+// MARK: - Button Styles
+
+private struct FolderLinkPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
 // MARK: - Detail-local color constants
 
 private let detailGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 private let detailGold = Color(red: 1.00, green: 0.80, blue: 0.20)
-private let detailBrandColor = Color(red: 0.95, green: 0.80, blue: 0.20)
+private let detailBrandColor = Color(red: 0.82, green: 0.68, blue: 0.40)
 private let detailWarningAmber = Color(red: 1.0, green: 0.75, blue: 0.25)
 private let detailUrgentOrange = Color(red: 0.95, green: 0.40, blue: 0.30)
 private let detailUrgentRed = Color(red: 0.95, green: 0.25, blue: 0.25)

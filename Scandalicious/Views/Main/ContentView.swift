@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var showSignOutConfirmation = false
     @State private var hasLoadedInitialData = false
     @StateObject private var brandCashbackViewModel = BrandCashbackViewModel()
+    @StateObject private var foldersViewModel = PromoFoldersViewModel()
     @ObservedObject private var gm = GamificationManager.shared
     @ObservedObject private var groceryStore = GroceryListStore.shared
 
@@ -142,6 +143,7 @@ struct ContentView: View {
         .environmentObject(transactionManager)
         .environmentObject(dataManager)
         .environmentObject(brandCashbackViewModel)
+        .environmentObject(foldersViewModel)
         .preferredColorScheme(.dark)
         .onAppear {
             // Configure data manager on first appear
@@ -150,6 +152,7 @@ struct ContentView: View {
                 Task {
                     await loadAllData()
                 }
+                Task { await foldersViewModel.loadFolders() }
             }
         }
         .onChange(of: selectedTab) { oldValue, newValue in
@@ -638,7 +641,7 @@ struct ScanTab: View {
 
 // MARK: - Folders Tab
 struct FoldersTab: View {
-    @StateObject private var viewModel = PromoFoldersViewModel()
+    @EnvironmentObject private var viewModel: PromoFoldersViewModel
     @State private var stackResetToken = 0
 
     var body: some View {

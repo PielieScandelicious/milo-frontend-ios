@@ -11,10 +11,19 @@ import Combine
 
 struct PromoFolderPageViewer: View {
     let folder: PromoFolder
-    @State private var currentPage: Int = 0
+    let initialPage: Int
+    let highlightItemId: String?
+    @State private var currentPage: Int
     @State private var selectedHotspot: PromoFolderHotspot?
     @ObservedObject private var groceryStore = GroceryListStore.shared
     @Environment(\.dismiss) private var dismiss
+
+    init(folder: PromoFolder, initialPage: Int = 0, highlightItemId: String? = nil) {
+        self.folder = folder
+        self.initialPage = initialPage
+        self.highlightItemId = highlightItemId
+        self._currentPage = State(initialValue: initialPage)
+    }
 
     private var storeAccentColor: Color {
         GroceryStore.fromCanonical(folder.storeId)?.accentColor ?? Color(red: 0.20, green: 0.85, blue: 0.50)
@@ -41,6 +50,7 @@ struct PromoFolderPageViewer: View {
                         storeName: folder.storeId,
                         folderValidityEnd: folder.validityEnd,
                         groceryStore: groceryStore,
+                        highlightItemId: index == initialPage ? highlightItemId : nil,
                         onInfoTap: { selectedHotspot = $0 }
                     )
                     .tag(index)
@@ -131,6 +141,7 @@ struct ZoomablePageView: View {
     let storeName: String
     let folderValidityEnd: String
     let groceryStore: GroceryListStore
+    var highlightItemId: String? = nil
     let onInfoTap: (PromoFolderHotspot) -> Void
 
     var body: some View {
@@ -143,6 +154,7 @@ struct ZoomablePageView: View {
                 storeName: storeName,
                 folderValidityEnd: folderValidityEnd,
                 groceryStore: groceryStore,
+                highlightItemId: highlightItemId,
                 onInfoTap: onInfoTap
             )
         }
@@ -161,6 +173,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
     let storeName: String
     let folderValidityEnd: String
     let groceryStore: GroceryListStore
+    var highlightItemId: String? = nil
     let onInfoTap: (PromoFolderHotspot) -> Void
 
     func makeUIView(context: Context) -> UIScrollView {
@@ -204,6 +217,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
         context.coordinator.storeName = storeName
         context.coordinator.folderValidityEnd = folderValidityEnd
         context.coordinator.groceryStore = groceryStore
+        context.coordinator.highlightItemId = highlightItemId
         context.coordinator.onInfoTap = onInfoTap
         context.coordinator.observeGroceryStore()
         context.coordinator.loadImage(url: imageUrl, containerSize: containerSize)
@@ -230,9 +244,11 @@ struct ZoomableImageContainer: UIViewRepresentable {
         var storeName: String = ""
         var folderValidityEnd: String = ""
         var groceryStore: GroceryListStore?
+        var highlightItemId: String?
         var onInfoTap: ((PromoFolderHotspot) -> Void)?
         private var hotspotDots: [UIView] = []
         private var groceryCancellable: AnyCancellable?
+        private var didRunSpotlight = false
 
         func observeGroceryStore() {
             groceryCancellable = groceryStore?.$items
@@ -760,11 +776,170 @@ struct ZoomableImageContainer: UIViewRepresentable {
                     // Add hotspot dots after image loads
                     if let imageView {
                         addHotspotDots(in: imageView)
+                        maybeRunSpotlight(in: imageView)
                     }
                 } catch {
                     print("[FolderPage] Failed to load image: \(error.localizedDescription)")
                 }
             }
+        }
+
+        // MARK: - Spotlight (deep-link highlight)
+
+        private func maybeRunSpotlight(in imageView: UIImageView) {
+            guard !didRunSpotlight,
+                  let targetId = highlightItemId,
+                  let hotspot = hotspots.first(where: { $0.itemId == targetId }) else { return }
+            didRunSpotlight = true
+            // Delay so the page transition settles and the user's eye lands on the page first
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { [weak self, weak imageView] in
+                guard let self, let imageView else { return }
+                self.showSpotlightFeedback(for: hotspot, in: imageView)
+            }
+        }
+
+        private func showSpotlightFeedback(for hotspot: PromoFolderHotspot, in imageView: UIImageView) {
+            let imageRect = displayedImageRect(in: imageView)
+            let rect = hotspot.tileRect(in: imageRect)
+            let accent = storeAccentColor
+
+            // MARK: Dim overlay with a hole cut out on the hotspot — "spotlight" effect
+            let dimView = UIView(frame: imageView.bounds)
+            dimView.backgroundColor = .clear
+            dimView.isUserInteractionEnabled = false
+
+            let holeRect = rect.insetBy(dx: -8, dy: -8)
+            let overallPath = UIBezierPath(rect: imageView.bounds)
+            let holePath = UIBezierPath(roundedRect: holeRect, cornerRadius: 12)
+            overallPath.append(holePath)
+            overallPath.usesEvenOddFillRule = true
+
+            let dimLayer = CAShapeLayer()
+            dimLayer.frame = imageView.bounds
+            dimLayer.path = overallPath.cgPath
+            dimLayer.fillRule = .evenOdd
+            dimLayer.fillColor = UIColor.black.withAlphaComponent(0.62).cgColor
+            dimView.layer.addSublayer(dimLayer)
+
+            // Bright accent border around the hole
+            let holeBorder = CAShapeLayer()
+            holeBorder.frame = imageView.bounds
+            holeBorder.path = holePath.cgPath
+            holeBorder.fillColor = UIColor.clear.cgColor
+            holeBorder.strokeColor = accent.cgColor
+            holeBorder.lineWidth = 2.5
+            holeBorder.shadowColor = accent.cgColor
+            holeBorder.shadowRadius = 8
+            holeBorder.shadowOpacity = 0.9
+            holeBorder.shadowOffset = .zero
+            dimView.layer.addSublayer(holeBorder)
+
+            dimView.alpha = 0
+            imageView.addSubview(dimView)
+
+            // MARK: Expanding ripple rings around the hotspot (on top of dim)
+            let ringSize: CGFloat = max(rect.width, rect.height) * 1.1
+            let ring1 = makeRing(size: ringSize, center: CGPoint(x: rect.midX, y: rect.midY), color: accent, borderWidth: 3, startAlpha: 0.95)
+            let ring2 = makeRing(size: ringSize, center: CGPoint(x: rect.midX, y: rect.midY), color: accent, borderWidth: 2, startAlpha: 0)
+            imageView.addSubview(ring1)
+            imageView.addSubview(ring2)
+
+            // MARK: Pointer chevron above the hotspot
+            let chevronSize: CGFloat = 34
+            let chevron = UIImageView(image: UIImage(
+                systemName: "chevron.down.circle.fill",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: chevronSize, weight: .bold)
+            ))
+            chevron.tintColor = accent
+            chevron.frame = CGRect(
+                x: rect.midX - chevronSize / 2,
+                y: max(8, rect.minY - 46),
+                width: chevronSize,
+                height: chevronSize
+            )
+            chevron.layer.shadowColor = UIColor.black.cgColor
+            chevron.layer.shadowOpacity = 0.4
+            chevron.layer.shadowRadius = 6
+            chevron.layer.shadowOffset = CGSize(width: 0, height: 2)
+            chevron.alpha = 0
+            chevron.transform = CGAffineTransform(scaleX: 0.3, y: 0.3).translatedBy(x: 0, y: -8)
+            imageView.addSubview(chevron)
+
+            // Strong haptic to pair with the visual
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+
+            // ANIMATIONS ----------------------------------
+
+            // Dim fade-in, hold, fade-out
+            UIView.animate(withDuration: 0.32) {
+                dimView.alpha = 1
+            } completion: { _ in
+                UIView.animate(withDuration: 0.45, delay: 1.3) {
+                    dimView.alpha = 0
+                } completion: { _ in dimView.removeFromSuperview() }
+            }
+
+            // Ring 1 — fast expand
+            UIView.animate(withDuration: 0.9, delay: 0.1, options: [.curveEaseOut]) {
+                ring1.transform = CGAffineTransform(scaleX: 1.7, y: 1.7)
+                ring1.alpha = 0
+            } completion: { _ in ring1.removeFromSuperview() }
+
+            // Ring 2 — slower, larger, staggered
+            UIView.animate(withDuration: 1.0, delay: 0.35, options: [.curveEaseOut]) {
+                ring2.alpha = 0.8
+                ring2.transform = CGAffineTransform(scaleX: 2.1, y: 2.1)
+            } completion: { _ in
+                UIView.animate(withDuration: 0.3) {
+                    ring2.alpha = 0
+                } completion: { _ in ring2.removeFromSuperview() }
+            }
+
+            // Chevron spring in, bob twice, fade up
+            UIView.animate(withDuration: 0.35,
+                           delay: 0.2,
+                           usingSpringWithDamping: 0.55,
+                           initialSpringVelocity: 1.2) {
+                chevron.alpha = 1
+                chevron.transform = .identity
+            } completion: { _ in
+                UIView.animateKeyframes(withDuration: 0.9, delay: 0.05, options: [.calculationModeCubic]) {
+                    UIView.addKeyframe(withRelativeStartTime: 0.00, relativeDuration: 0.25) {
+                        chevron.transform = CGAffineTransform(translationX: 0, y: 6)
+                    }
+                    UIView.addKeyframe(withRelativeStartTime: 0.25, relativeDuration: 0.25) {
+                        chevron.transform = .identity
+                    }
+                    UIView.addKeyframe(withRelativeStartTime: 0.50, relativeDuration: 0.25) {
+                        chevron.transform = CGAffineTransform(translationX: 0, y: 6)
+                    }
+                    UIView.addKeyframe(withRelativeStartTime: 0.75, relativeDuration: 0.25) {
+                        chevron.transform = .identity
+                    }
+                } completion: { _ in
+                    UIView.animate(withDuration: 0.4, delay: 0.1, options: [.curveEaseIn]) {
+                        chevron.alpha = 0
+                        chevron.transform = CGAffineTransform(translationX: 0, y: -10)
+                    } completion: { _ in chevron.removeFromSuperview() }
+                }
+            }
+        }
+
+        private func makeRing(size: CGFloat, center: CGPoint, color: UIColor, borderWidth: CGFloat, startAlpha: CGFloat) -> UIView {
+            let ring = UIView(frame: CGRect(
+                x: center.x - size / 2,
+                y: center.y - size / 2,
+                width: size,
+                height: size
+            ))
+            ring.layer.cornerRadius = size / 2
+            ring.layer.borderColor = color.cgColor
+            ring.layer.borderWidth = borderWidth
+            ring.backgroundColor = .clear
+            ring.alpha = startAlpha
+            ring.transform = CGAffineTransform(scaleX: 0.45, y: 0.45)
+            ring.isUserInteractionEnabled = false
+            return ring
         }
     }
 }

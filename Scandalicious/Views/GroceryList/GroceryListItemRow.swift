@@ -85,13 +85,13 @@ struct GroceryListCard: View {
             // Discount badge (top-left)
             if item.discountPercentage > 0 {
                 Text("-\(item.discountPercentage)%")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
                     .background(Capsule().fill(discountRed))
-                    .shadow(color: discountRed.opacity(0.35), radius: 4, y: 2)
-                    .padding(8)
+                    .shadow(color: discountRed.opacity(0.3), radius: 3, y: 1)
+                    .padding(6)
             }
 
             // Remove button (top-right)
@@ -118,26 +118,33 @@ struct GroceryListCard: View {
                     }
                     .buttonStyle(.plain)
                     .contentShape(Circle())
-                    .padding(.top, 6)
-                    .padding(.trailing, 6)
+                    .padding(.top, 4)
+                    .padding(.trailing, 4)
                 }
                 Spacer()
             }
 
-            // Savings badge (bottom-right on image)
-            if item.savings > 0 {
+            // Validity badge (bottom-right on image)
+            if let days = item.daysRemaining {
+                let style = validityBadgeStyle(days: days)
                 VStack {
                     Spacer()
                     HStack {
                         Spacer()
-                        Text(String(format: "save €%.2f", item.savings))
-                            .font(.system(size: 10, weight: .heavy, design: .rounded))
-                            .foregroundStyle(promoGreenGradient)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(.white))
-                            .shadow(color: .black.opacity(0.15), radius: 3, y: 1)
-                            .padding(8)
+                        HStack(spacing: 3) {
+                            if let icon = style.icon {
+                                Image(systemName: icon)
+                                    .font(.system(size: 7, weight: .semibold))
+                            }
+                            Text(style.text)
+                                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundColor(style.fg)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2.5)
+                        .background(Capsule().fill(style.bg))
+                        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                        .padding(6)
                     }
                 }
             }
@@ -150,7 +157,7 @@ struct GroceryListCard: View {
                         .frame(width: 22, height: 22)
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
                         .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
-                        .padding(8)
+                        .padding(6)
                     Spacer()
                 }
             }
@@ -177,7 +184,7 @@ struct GroceryListCard: View {
                 Text(item.brand.uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.8)
-                    .foregroundColor(Color(red: 1.0, green: 0.72, blue: 0.20))
+                    .foregroundColor(Color(red: 0.82, green: 0.68, blue: 0.40))
                     .lineLimit(1)
             }
 
@@ -198,36 +205,27 @@ struct GroceryListCard: View {
                     .strikethrough(true, color: .white.opacity(0.35))
             }
 
-            if !item.mechanismLabel.isEmpty {
-                Text(item.mechanismLabel)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(promoGreen)
-                    .lineLimit(1)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(promoGreen.opacity(0.12)))
-                    .overlay(Capsule().stroke(promoGreen.opacity(0.28), lineWidth: 0.5))
-            }
+            HStack(spacing: 6) {
+                if !item.mechanismLabel.isEmpty {
+                    Text(item.mechanismLabel)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.white.opacity(0.08)))
+                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                }
 
-            validityBadge
+                if item.savings > 0 {
+                    Text(String(format: "−€%.2f", item.savings))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(promoGreen)
+                        .lineLimit(1)
+                }
+            }
         }
         .padding(10)
-    }
-
-    @ViewBuilder
-    private var validityBadge: some View {
-        if let days = item.daysRemaining {
-            let info = validityDisplay(days: days)
-            HStack(spacing: 4) {
-                if let icon = info.icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 9, weight: .bold))
-                }
-                Text(info.text)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-            }
-            .foregroundColor(info.color)
-        }
     }
 
     private func validityDisplay(days: Int) -> (text: String, color: Color, icon: String?) {
@@ -236,6 +234,22 @@ struct GroceryListCard: View {
         if days <= 2 { return ("\(days) day\(days == 1 ? "" : "s") left", Color(red: 0.95, green: 0.40, blue: 0.30), "clock.badge.exclamationmark") }
         if days <= 5 { return ("\(days) days left", Color(red: 1.0, green: 0.75, blue: 0.25), "clock") }
         return ("\(days) days left", .white.opacity(0.5), "clock")
+    }
+
+    private func validityBadgeStyle(days: Int) -> (text: String, icon: String?, bg: Color, fg: Color) {
+        if days < 0 {
+            return ("Expired", "calendar.badge.exclamationmark", Color.black.opacity(0.55), .white.opacity(0.6))
+        }
+        if days == 0 {
+            return ("Last day!", "exclamationmark.circle.fill", Color(red: 0.95, green: 0.25, blue: 0.25).opacity(0.85), .white)
+        }
+        if days <= 2 {
+            return ("\(days) day\(days == 1 ? "" : "s") left", "clock.badge.exclamationmark", Color(red: 0.95, green: 0.40, blue: 0.30).opacity(0.85), .white)
+        }
+        if days <= 5 {
+            return ("\(days) days left", "clock", Color(red: 1.0, green: 0.75, blue: 0.25).opacity(0.80), .black.opacity(0.85))
+        }
+        return ("\(days) days left", "clock", Color.black.opacity(0.55), .white.opacity(0.9))
     }
 }
 
