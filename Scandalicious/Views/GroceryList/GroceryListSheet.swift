@@ -28,6 +28,7 @@ struct GroceryListContentView<Leading: View>: View {
     @EnvironmentObject private var foldersViewModel: PromoFoldersViewModel
     @State private var checkedTrigger = false
     @State private var isCartExpanded: Bool = false
+    @State private var expandedStores: Set<String> = []
     @State private var selectedDetailItem: GroceryListItem?
     @State private var folderDestination: FolderDestination?
     @ViewBuilder let leadingToolbar: () -> Leading
@@ -175,61 +176,74 @@ struct GroceryListContentView<Leading: View>: View {
         group: (storeName: String, items: [GroceryListItem]),
         uncheckedItems: [GroceryListItem]
     ) -> some View {
-        let accent = GroceryStore.fromCanonical(group.storeName)?.accentColor ?? promoGreen
-        return VStack(alignment: .leading, spacing: 10) {
-            laneHeader(group: group, accent: accent)
-                .padding(.horizontal, 16)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 12) {
-                    ForEach(uncheckedItems) { item in
-                        GroceryListCard(
-                            item: item,
-                            onTap: { selectedDetailItem = item },
-                            onRemove: { remove(item) }
-                        )
-                        .frame(width: cardWidth)
+        let isExpanded = expandedStores.contains(group.storeName)
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.snappy(duration: 0.3)) {
+                    if isExpanded {
+                        expandedStores.remove(group.storeName)
+                    } else {
+                        expandedStores.insert(group.storeName)
                     }
                 }
-                .padding(.horizontal, 16)
+            } label: {
+                laneHeader(group: group, isExpanded: isExpanded)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+
+            if isExpanded {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ForEach(uncheckedItems) { item in
+                            GroceryListCard(
+                                item: item,
+                                onTap: { selectedDetailItem = item },
+                                onRemove: { remove(item) }
+                            )
+                            .frame(width: cardWidth)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .padding(.top, 10)
+                .transition(.opacity)
             }
         }
     }
 
     private func laneHeader(
         group: (storeName: String, items: [GroceryListItem]),
-        accent: Color
+        isExpanded: Bool
     ) -> some View {
-        let savings = group.items.reduce(0) { $0 + $1.savings }
         let total = group.items.count
         let displayName = GroceryStore.fromCanonical(group.storeName)?.displayName
             ?? group.storeName.capitalized
-        return HStack(spacing: 10) {
-            StoreLogoView(storeName: group.storeName, height: 22)
-                .frame(width: 34, height: 34)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        return HStack(spacing: 12) {
+            StoreLogoView(storeName: group.storeName, height: 18)
+                .frame(width: 28, height: 28)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(displayName)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(.white)
-                HStack(spacing: 6) {
-                    Text("\(total) \(total == 1 ? "item" : "items")")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.55))
-                        .contentTransition(.numericText(value: Double(total)))
-                        .animation(.spring(response: 0.35, dampingFraction: 0.65), value: total)
-                    if savings > 0 {
-                        Text("•")
-                            .foregroundColor(.white.opacity(0.3))
-                        Text(String(format: "save €%.2f", savings))
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundColor(promoGreen.opacity(0.9))
-                    }
-                }
-            }
+            Text(displayName)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white.opacity(0.95))
+
+            Text("\(total)")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundColor(.white.opacity(0.5))
+                .monospacedDigit()
+                .contentTransition(.numericText(value: Double(total)))
+                .animation(.spring(response: 0.35, dampingFraction: 0.65), value: total)
+
             Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.35))
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
         }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Cart section

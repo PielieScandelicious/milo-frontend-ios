@@ -92,7 +92,7 @@ struct GroceryListCard: View {
                     .padding(5)
             }
 
-            if let days = item.daysRemaining, days <= 2 {
+            if let days = item.daysRemaining {
                 let style = validityBadgeStyle(days: days)
                 VStack {
                     Spacer()
@@ -180,12 +180,12 @@ struct GroceryListCard: View {
             return ("Last day!", "exclamationmark.circle.fill", Color(red: 0.95, green: 0.25, blue: 0.25).opacity(0.85), .white)
         }
         if days <= 2 {
-            return ("\(days) day\(days == 1 ? "" : "s") left", "clock.badge.exclamationmark", Color(red: 0.95, green: 0.40, blue: 0.30).opacity(0.85), .white)
+            return ("\(days)d", "clock.badge.exclamationmark", Color(red: 0.95, green: 0.40, blue: 0.30).opacity(0.85), .white)
         }
         if days <= 5 {
-            return ("\(days) days left", "clock", Color(red: 1.0, green: 0.75, blue: 0.25).opacity(0.80), .black.opacity(0.85))
+            return ("\(days)d", "clock", Color(red: 1.0, green: 0.75, blue: 0.25).opacity(0.80), .black.opacity(0.85))
         }
-        return ("\(days) days left", "clock", Color.black.opacity(0.55), .white.opacity(0.9))
+        return ("\(days)d", "clock", Color.black.opacity(0.55), .white.opacity(0.9))
     }
 }
 
