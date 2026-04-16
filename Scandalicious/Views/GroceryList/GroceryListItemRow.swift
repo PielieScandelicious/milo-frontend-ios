@@ -10,9 +10,54 @@ import SwiftUI
 private let promoGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 private let promoGreenDark = Color(red: 0.10, green: 0.65, blue: 0.40)
 private let discountRed = Color(red: 0.95, green: 0.30, blue: 0.35)
+private let giftGold = Color(red: 1.0, green: 0.82, blue: 0.30)
+private let brandGold = Color(red: 0.95, green: 0.80, blue: 0.20)
 
 private var promoGreenGradient: LinearGradient {
     LinearGradient(colors: [promoGreen, promoGreenDark], startPoint: .topLeading, endPoint: .bottomTrailing)
+}
+
+private func groceryDealBadge(for item: GroceryListItem) -> (text: String, icon: String?, bg: Color, fg: Color)? {
+    let mech = item.mechanismLabel.lowercased()
+    let qty = item.minPurchaseQty ?? 1
+
+    if qty > 1 {
+        if let r = mech.range(of: #"\d+\s*\+\s*\d+"#, options: .regularExpression) {
+            let compact = mech[r].replacingOccurrences(of: " ", with: "")
+            return (compact, nil, promoGreen, .white)
+        }
+        if let (n, price) = parseForPriceMechanism(mech) {
+            return ("\(n)×€\(price)", nil, promoGreen, .white)
+        }
+        return ("\(qty)×", nil, promoGreen, .white)
+    }
+    if mech.contains("gratis") || mech.contains("free") || mech.contains("cadeau") {
+        return ("FREE", "gift.fill", giftGold, .black.opacity(0.85))
+    }
+    if item.discountPercentage > 0 {
+        return ("-\(item.discountPercentage)%", nil, discountRed, .white)
+    }
+    if item.savings > 0 {
+        return (String(format: "-€%.2f", item.savings), nil, discountRed, .white)
+    }
+    return nil
+}
+
+private func parseForPriceMechanism(_ text: String) -> (Int, String)? {
+    let pattern = #"(\d+)\s*(?:voor|for|pour)\s*€?\s*(\d+(?:[.,]\d+)?)"#
+    guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+    let range = NSRange(text.startIndex..., in: text)
+    guard let match = regex.firstMatch(in: text, range: range),
+          match.numberOfRanges >= 3,
+          let nRange = Range(match.range(at: 1), in: text),
+          let pRange = Range(match.range(at: 2), in: text),
+          let n = Int(text[nRange]) else { return nil }
+    let priceRaw = text[pRange].replacingOccurrences(of: ",", with: ".")
+    let priceDouble = Double(priceRaw) ?? 0
+    let priceStr = priceDouble == floor(priceDouble)
+        ? "\(Int(priceDouble))"
+        : String(format: "%.2f", priceDouble)
+    return (n, priceStr)
 }
 
 // MARK: - Full Card (unchecked, "still to find")
@@ -82,15 +127,21 @@ struct GroceryListCard: View {
                 imagePlaceholder
             }
 
-            if item.discountPercentage > 0 {
-                Text("-\(item.discountPercentage)%")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(discountRed))
-                    .shadow(color: discountRed.opacity(0.3), radius: 3, y: 1)
-                    .padding(6)
+            if let badge = groceryDealBadge(for: item) {
+                HStack(spacing: 3) {
+                    if let icon = badge.icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    Text(badge.text)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                }
+                .foregroundColor(badge.fg)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(badge.bg))
+                .shadow(color: badge.bg.opacity(0.3), radius: 3, y: 1)
+                .padding(6)
             }
 
             if let days = item.daysRemaining {
@@ -126,6 +177,28 @@ struct GroceryListCard: View {
                 .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                 .padding(6)
         }
+        .overlay(alignment: .topTrailing) {
+            removeButton
+        }
+    }
+
+    private var removeButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onRemove()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+                .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                .padding(6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L("delete"))
     }
 
     private var imagePlaceholder: some View {
@@ -142,6 +215,14 @@ struct GroceryListCard: View {
 
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 4) {
+            if !item.brand.isEmpty {
+                Text(item.brand.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundColor(brandGold)
+                    .lineLimit(1)
+            }
+
             Text(item.label)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)

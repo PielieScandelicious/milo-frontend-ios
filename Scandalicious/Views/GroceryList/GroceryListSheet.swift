@@ -100,6 +100,7 @@ struct GroceryListContentView<Leading: View>: View {
         .sensoryFeedback(.impact(weight: .light), trigger: checkedTrigger)
         .onAppear {
             store.removeExpired()
+            expandedStores.removeAll()
         }
     }
 
