@@ -112,8 +112,7 @@ struct GroceryListContentView<Leading: View>: View {
 
     private var uncheckedGroups: [(storeName: String, items: [GroceryListItem])] {
         visibleGroups
-            .map { (storeName: $0.storeName, items: $0.items.filter { !$0.isChecked }
-                .sorted { $0.addedAt < $1.addedAt }) }
+            .map { (storeName: $0.storeName, items: $0.items.filter { !$0.isChecked }) }
             .filter { !$0.items.isEmpty }
     }
 
@@ -143,48 +142,57 @@ struct GroceryListContentView<Leading: View>: View {
     // MARK: - Main content
 
     private var mainContent: some View {
-        ScrollView {
-            LazyVStack(spacing: 20, pinnedViews: []) {
-                if uncheckedGroups.isEmpty && checkedItems.isEmpty {
-                    emptyFilterState
-                        .padding(.top, 40)
-                }
-
-                ForEach(store.itemsByStore, id: \.storeName) { group in
-                    let unchecked = group.items
-                        .filter { !$0.isChecked }
-                        .sorted { $0.addedAt < $1.addedAt }
-                    if !unchecked.isEmpty {
-                        storeLane(group: group, uncheckedItems: unchecked)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 20, pinnedViews: []) {
+                    if uncheckedGroups.isEmpty && checkedItems.isEmpty {
+                        emptyFilterState
+                            .padding(.top, 40)
                     }
-                }
 
-                if !checkedItems.isEmpty {
-                    cartSection
-                        .padding(.top, 4)
-                }
+                    ForEach(store.itemsByStore, id: \.storeName) { group in
+                        let unchecked = group.items.filter { !$0.isChecked }
+                        if !unchecked.isEmpty {
+                            storeLane(group: group, uncheckedItems: unchecked, proxy: proxy)
+                                .id(group.storeName)
+                        }
+                    }
 
-                Color.clear.frame(height: 40)
+                    if !checkedItems.isEmpty {
+                        cartSection
+                            .padding(.top, 4)
+                    }
+
+                    Color.clear.frame(height: 40)
+                }
+                .padding(.top, 8)
             }
-            .padding(.top, 8)
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
     }
 
     // MARK: - Store lane
 
     private func storeLane(
         group: (storeName: String, items: [GroceryListItem]),
-        uncheckedItems: [GroceryListItem]
+        uncheckedItems: [GroceryListItem],
+        proxy: ScrollViewProxy
     ) -> some View {
         let isExpanded = expandedStores.contains(group.storeName)
         return VStack(alignment: .leading, spacing: 10) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.snappy(duration: 0.3)) {
                     if isExpanded {
                         expandedStores.remove(group.storeName)
                     } else {
                         expandedStores.insert(group.storeName)
+                    }
+                }
+                if !isExpanded {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(group.storeName, anchor: .top)
+                        }
                     }
                 }
             } label: {
@@ -209,6 +217,7 @@ struct GroceryListContentView<Leading: View>: View {
                 }
             }
         }
+        .clipped()
     }
 
     private func laneHeader(

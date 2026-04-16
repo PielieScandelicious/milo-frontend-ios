@@ -93,7 +93,12 @@ class GroceryListStore: ObservableObject {
         let grouped = Dictionary(grouping: activeItems, by: \.storeName)
         return grouped
             .sorted { $0.key < $1.key }
-            .map { (storeName: $0.key, items: $0.value) }
+            .map { (storeName: $0.key, items: $0.value.sorted { a, b in
+                let dA = a.daysRemaining ?? Int.max
+                let dB = b.daysRemaining ?? Int.max
+                if dA != dB { return dA < dB }
+                return a.savings > b.savings
+            }) }
     }
 
     // MARK: - Persistence
