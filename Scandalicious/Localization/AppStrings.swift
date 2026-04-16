@@ -293,7 +293,7 @@ enum AppStrings {
         "finding_promotions": ["en": "Finding promotions", "nl": "Promoties zoeken", "fr": "Recherche de promotions"],
 
         // MARK: - Grocery List
-        "grocery_list": ["en": "Grocery List", "nl": "Boodschappenlijst", "fr": "Liste de courses"],
+        "grocery_list": ["en": "My List", "nl": "Mijn Lijst", "fr": "Ma Liste"],
         "add_to_list": ["en": "Add to list", "nl": "Toevoegen aan lijst", "fr": "Ajouter à la liste"],
         "remove_from_list": ["en": "Remove from list", "nl": "Verwijderen van lijst", "fr": "Retirer de la liste"],
         "clear_checked": ["en": "Clear Checked", "nl": "Afgevinkte wissen", "fr": "Effacer les cochés"],

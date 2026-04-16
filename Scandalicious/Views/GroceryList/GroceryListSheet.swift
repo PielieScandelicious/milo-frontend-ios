@@ -191,6 +191,8 @@ struct GroceryListContentView<Leading: View>: View {
                     Text("\(total) \(total == 1 ? "item" : "items")")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.55))
+                        .contentTransition(.numericText(value: Double(total)))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.65), value: total)
                     if savings > 0 {
                         Text("•")
                             .foregroundColor(.white.opacity(0.3))
@@ -221,9 +223,12 @@ struct GroceryListContentView<Leading: View>: View {
                     Text("\(checkedItems.count)")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(.white.opacity(0.5))
+                        .monospacedDigit()
+                        .contentTransition(.numericText(value: Double(checkedItems.count)))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
                         .background(Capsule().fill(Color.white.opacity(0.08)))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.65), value: checkedItems.count)
                     Spacer()
                     if visibleCheckedSavings > 0 {
                         Text(String(format: "saved €%.2f", visibleCheckedSavings))

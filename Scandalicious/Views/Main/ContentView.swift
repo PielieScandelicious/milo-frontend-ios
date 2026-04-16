@@ -53,6 +53,7 @@ struct ContentView: View {
         case insights = 4
     }
 
+
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
@@ -64,7 +65,7 @@ struct ContentView: View {
 
                 GroceryListTab()
                     .tabItem {
-                        Label("Grocery List", systemImage: "cart.fill")
+                        Label("My List", systemImage: "list.clipboard.fill")
                     }
                     .badge(groceryStore.activeItemCount)
                     .tag(Tab.groceryList)
