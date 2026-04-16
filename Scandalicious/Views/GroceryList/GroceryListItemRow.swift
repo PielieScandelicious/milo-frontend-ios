@@ -42,14 +42,14 @@ struct GroceryListCard: View {
             }
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.white.opacity(0.06))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -61,20 +61,20 @@ struct GroceryListCard: View {
         }
     }
 
-    // MARK: - Image
+    // MARK: - Image (thumbnail)
 
     private var imageSection: some View {
         ZStack(alignment: .topLeading) {
             Color.white
-                .frame(height: 140)
+                .frame(height: 84)
 
             if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
                 RemoteImage(url: url) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: 120)
-                        .padding(8)
+                        .frame(maxWidth: .infinity, maxHeight: 72)
+                        .padding(6)
                 } placeholder: {
                     imagePlaceholder
                 }
@@ -82,56 +82,23 @@ struct GroceryListCard: View {
                 imagePlaceholder
             }
 
-            // Discount badge (top-left)
             if item.discountPercentage > 0 {
                 Text("-\(item.discountPercentage)%")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
                     .background(Capsule().fill(discountRed))
-                    .shadow(color: discountRed.opacity(0.3), radius: 3, y: 1)
-                    .padding(6)
+                    .padding(5)
             }
 
-            // Remove button (top-right)
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        onRemove()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white.opacity(0.85))
-                            .frame(width: 22, height: 22)
-                            .background(
-                                Circle()
-                                    .fill(Color.black.opacity(0.45))
-                            )
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                            )
-                            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Circle())
-                    .padding(.top, 4)
-                    .padding(.trailing, 4)
-                }
-                Spacer()
-            }
-
-            // Validity badge (bottom-right on image)
-            if let days = item.daysRemaining {
+            if let days = item.daysRemaining, days <= 2 {
                 let style = validityBadgeStyle(days: days)
                 VStack {
                     Spacer()
                     HStack {
                         Spacer()
-                        HStack(spacing: 3) {
+                        HStack(spacing: 2) {
                             if let icon = style.icon {
                                 Image(systemName: icon)
                                     .font(.system(size: 7, weight: .semibold))
@@ -141,91 +108,60 @@ struct GroceryListCard: View {
                         }
                         .foregroundColor(style.fg)
                         .padding(.horizontal, 5)
-                        .padding(.vertical, 2.5)
+                        .padding(.vertical, 2)
                         .background(Capsule().fill(style.bg))
-                        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
-                        .padding(6)
+                        .padding(5)
                     }
                 }
             }
-
-            // Store logo (bottom-left)
-            VStack {
-                Spacer()
-                HStack {
-                    StoreLogoView(storeName: item.storeName, height: 14)
-                        .frame(width: 22, height: 22)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
-                        .padding(6)
-                    Spacer()
-                }
-            }
         }
-        .frame(height: 140)
+        .frame(height: 84)
         .clipped()
+        .overlay(alignment: .bottomLeading) {
+            StoreLogoView(storeName: item.storeName, height: 12)
+                .frame(width: 20, height: 20)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                .padding(5)
+        }
     }
 
     private var imagePlaceholder: some View {
         ZStack {
             storeAccent.opacity(0.15)
             Text(String(item.label.prefix(1)).uppercased())
-                .font(.system(size: 40, weight: .heavy, design: .rounded))
+                .font(.system(size: 26, weight: .heavy, design: .rounded))
                 .foregroundColor(storeAccent.opacity(0.6))
         }
-        .frame(maxWidth: .infinity, maxHeight: 120)
+        .frame(maxWidth: .infinity, maxHeight: 72)
     }
 
-    // MARK: - Info
+    // MARK: - Info (compact)
 
     private var infoSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if !item.brand.isEmpty {
-                Text(item.brand.uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.8)
-                    .foregroundColor(Color(red: 0.82, green: 0.68, blue: 0.40))
-                    .lineLimit(1)
-            }
-
+        VStack(alignment: .leading, spacing: 3) {
             Text(item.label)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: 34, alignment: .top)
+                .frame(minHeight: 30, alignment: .top)
 
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(String(format: "€%.2f", userPays))
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(promoGreenGradient)
-                Text(String(format: "€%.2f", originalTotal))
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.35))
-                    .strikethrough(true, color: .white.opacity(0.35))
-            }
-
-            HStack(spacing: 6) {
-                if !item.mechanismLabel.isEmpty {
-                    Text(item.mechanismLabel)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(1)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.white.opacity(0.08)))
-                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
-                }
-
                 if item.savings > 0 {
-                    Text(String(format: "−€%.2f", item.savings))
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(promoGreen)
-                        .lineLimit(1)
+                    Text(String(format: "€%.2f", originalTotal))
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.35))
+                        .strikethrough(true, color: .white.opacity(0.35))
                 }
             }
         }
-        .padding(10)
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
     }
 
     private func validityDisplay(days: Int) -> (text: String, color: Color, icon: String?) {

@@ -41,7 +41,7 @@ struct GroceryListContentView<Leading: View>: View {
 
     private let promoGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
 
-    private let cardWidth: CGFloat = 160
+    private let cardWidth: CGFloat = 128
 
     var body: some View {
         ZStack {
