@@ -118,10 +118,9 @@ struct PromoProductDetailSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     heroImage
 
-                    VStack(alignment: .leading, spacing: 20) {
-                        savingsRow
+                    VStack(alignment: .leading, spacing: 18) {
                         brandAndNameSection
-                        mechanismAndPriceSection
+                        offerCard
                         if hasInfoChips {
                             infoChipsSection
                         }
@@ -129,8 +128,8 @@ struct PromoProductDetailSheet: View {
                         similarPromosSection
                     }
                     .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 100)
+                    .padding(.top, 22)
+                    .padding(.bottom, 160)
                 }
             }
             .background(Color(white: 0.05).ignoresSafeArea())
@@ -351,102 +350,129 @@ struct PromoProductDetailSheet: View {
         }
     }
 
-    // MARK: - Mechanism & Price Section
+    // MARK: - Offer Card (unified price + savings + mechanism)
 
-    private var mechanismAndPriceSection: some View {
+    private var offerCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Mechanism pill — solid filled
-            HStack(spacing: 6) {
-                if (item.minPurchaseQty ?? 1) > 1 {
-                    Image(systemName: "cart.badge.plus")
-                        .font(.system(size: 12, weight: .semibold))
-                } else if isSpecialDeal {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                Text(item.mechanismLabel)
-                    .font(.system(size: 14, weight: .bold))
+            // Top row: mechanism pill + optional urgency badge
+            HStack(spacing: 8) {
+                mechanismPill
+                Spacer(minLength: 8)
+                inlineUrgencyBadge
             }
-            .foregroundColor(mechanismTextColor)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Capsule().fill(mechanismPillColor))
 
-            // Price row
-            priceSection
+            // Price block
+            priceBlock
+
+            // Savings pill — subtle, inline with price
+            if item.savings > 0 {
+                savingsPill
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(white: 0.08))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(white: 0.09))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
         )
+        .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
     }
 
-    // MARK: - Price Section
+    private var mechanismPill: some View {
+        HStack(spacing: 6) {
+            if (item.minPurchaseQty ?? 1) > 1 {
+                Image(systemName: "cart.badge.plus")
+                    .font(.system(size: 12, weight: .semibold))
+            } else if isSpecialDeal {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12, weight: .semibold))
+            } else {
+                Image(systemName: "tag.fill")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            Text(item.mechanismLabel)
+                .font(.system(size: 13, weight: .bold))
+                .lineLimit(1)
+        }
+        .foregroundColor(mechanismTextColor)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Capsule().fill(mechanismPillColor))
+    }
 
     @ViewBuilder
-    private var priceSection: some View {
+    private var inlineUrgencyBadge: some View {
+        if let days = daysRemaining, days >= 0, days <= 2 {
+            let color: Color = days == 0 ? detailUrgentRed : detailUrgentOrange
+            let text = days == 0 ? "Ends today" : "\(days) day\(days == 1 ? "" : "s") left"
+            HStack(spacing: 4) {
+                Image(systemName: "clock.badge.exclamationmark")
+                    .font(.system(size: 10, weight: .bold))
+                Text(text)
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(color))
+        }
+    }
+
+    @ViewBuilder
+    private var priceBlock: some View {
         let qty = item.minPurchaseQty ?? 1
 
-        VStack(alignment: .leading, spacing: 8) {
-            if qty > 1 {
-                let totalOriginal = item.originalPrice * Double(qty)
-                let totalUserPays = totalOriginal - item.savings
+        if qty > 1 {
+            let totalOriginal = item.originalPrice * Double(qty)
+            let totalUserPays = totalOriginal - item.savings
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(String(format: "€%.2f", totalUserPays))
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .font(.system(size: 36, weight: .heavy, design: .rounded))
                         .foregroundColor(detailGreen)
                     Text(String(format: "€%.2f", totalOriginal))
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(.white.opacity(0.3))
-                        .strikethrough(true, color: .white.opacity(0.3))
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundColor(.white.opacity(0.35))
+                        .strikethrough(true, color: .white.opacity(0.35))
                 }
-            } else if item.hasPrices {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(String(format: "€%.2f", item.promoPrice))
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(detailGreen)
-                    Text(String(format: "€%.2f", item.originalPrice))
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundColor(.white.opacity(0.3))
-                        .strikethrough(true, color: .white.opacity(0.3))
-                }
+                Text("for \(qty)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.5))
             }
-
+        } else if item.hasPrices {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(String(format: "€%.2f", item.promoPrice))
+                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    .foregroundColor(detailGreen)
+                Text(String(format: "€%.2f", item.originalPrice))
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(.white.opacity(0.35))
+                    .strikethrough(true, color: .white.opacity(0.35))
+            }
         }
     }
 
-    // MARK: - Savings Row (headline)
-
-    @ViewBuilder
-    private var savingsRow: some View {
-        if item.savings > 0 {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 15, weight: .bold))
-                if item.discountPercentage > 0 {
-                    Text(String(format: "You save €%.2f (%d%%)", item.savings, item.discountPercentage))
-                        .font(.system(size: 15, weight: .bold))
-                } else {
-                    Text(String(format: "You save €%.2f", item.savings))
-                        .font(.system(size: 15, weight: .bold))
-                }
+    private var savingsPill: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 12, weight: .bold))
+            if item.discountPercentage > 0 {
+                Text(String(format: "Save €%.2f · %d%%", item.savings, item.discountPercentage))
+                    .font(.system(size: 13, weight: .bold))
+            } else {
+                Text(String(format: "Save €%.2f", item.savings))
+                    .font(.system(size: 13, weight: .bold))
             }
-            .foregroundColor(detailGreen)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .background(
-                Capsule().fill(detailGreen.opacity(0.12))
-            )
-            .overlay(
-                Capsule().stroke(detailGreen.opacity(0.25), lineWidth: 0.5)
-            )
         }
+        .foregroundColor(detailGreen)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .background(Capsule().fill(detailGreen.opacity(0.14)))
+        .overlay(Capsule().stroke(detailGreen.opacity(0.28), lineWidth: 0.5))
     }
 
     // MARK: - Info Chips
@@ -576,7 +602,7 @@ struct PromoProductDetailSheet: View {
         }
     }
 
-    // MARK: - Similar Promos Carousel
+    // MARK: - Similar Promos Carousel (auto-scroll + infinite loop)
 
     @ViewBuilder
     private var similarPromosSection: some View {
@@ -597,18 +623,10 @@ struct PromoProductDetailSheet: View {
         } else if !similarPromos.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 similarHeader
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(Array(similarPromos.enumerated()), id: \.element.id) { index, promo in
-                            SimilarPromoCard(promo: promo) {
-                                handleSimilarTap(promo, position: index)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
+                AutoScrollingSimilarCarousel(items: similarPromos) { promo, index in
+                    handleSimilarTap(promo, position: index)
                 }
                 .padding(.horizontal, -20)
-                .scrollClipDisabled()
             }
         }
     }
@@ -705,7 +723,7 @@ struct PromoProductDetailSheet: View {
                 Image(systemName: isInList ? "trash.fill" : "plus")
                     .font(.system(size: 15, weight: .bold))
                     .contentTransition(.symbolEffect(.replace))
-                Text(isInList ? "Remove from Grocery List" : "Add to Grocery List")
+                Text(isInList ? "Remove from my list" : "Add to my list")
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundColor(isInList ? Color(red: 0.95, green: 0.30, blue: 0.30) : .black)
@@ -921,6 +939,102 @@ private struct SimilarCardPressStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .opacity(configuration.isPressed ? 0.88 : 1.0)
             .animation(.spring(response: 0.28, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Auto-Scrolling Infinite-Loop Carousel
+
+private struct AutoScrollingSimilarCarousel: View {
+    let items: [PromoStoreItem]
+    let onTap: (PromoStoreItem, Int) -> Void
+
+    @State private var offsetX: CGFloat = 0
+    @State private var isDragging: Bool = false
+    @State private var dragStartOffset: CGFloat = 0
+    @State private var flingVelocity: CGFloat = 0
+
+    private let cardWidth: CGFloat = 150
+    private let cardHeight: CGFloat = 220
+    private let spacing: CGFloat = 12
+    private let leadingInset: CGFloat = 20
+    private let pointsPerSecond: CGFloat = 28
+    private let frameInterval: Double = 1.0 / 60.0
+    private let flingDecayPerFrame: CGFloat = 0.92
+    private let maxFlingVelocity: CGFloat = 3000
+
+    private var itemStride: CGFloat { cardWidth + spacing }
+    private var contentWidth: CGFloat { itemStride * CGFloat(items.count) }
+
+    // Wrap offset into (-contentWidth, 0] so two back-to-back copies
+    // render identically at the seam — the loop stays invisible whether
+    // the user is scrolling forward or dragging backward.
+    private func wrap(_ x: CGFloat) -> CGFloat {
+        guard contentWidth > 0 else { return 0 }
+        var r = x.truncatingRemainder(dividingBy: contentWidth)
+        if r > 0 { r -= contentWidth }
+        return r
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if items.count >= 2 {
+            // Color.clear takes proposed width, fixed height — gives the
+            // parent a deterministic size. The wide HStack lives in an
+            // overlay so its ideal width never influences outer layout.
+            Color.clear
+                .frame(height: cardHeight)
+                .contentShape(Rectangle())
+                .overlay(alignment: .leading) {
+                    HStack(alignment: .center, spacing: spacing) {
+                        ForEach(0..<2, id: \.self) { cycle in
+                            ForEach(Array(items.enumerated()), id: \.offset) { index, promo in
+                                SimilarPromoCard(promo: promo) {
+                                    onTap(promo, index)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.leading, leadingInset)
+                    .offset(x: offsetX)
+                }
+                .highPriorityGesture(
+                    DragGesture(minimumDistance: 8)
+                        .onChanged { value in
+                            if !isDragging {
+                                isDragging = true
+                                dragStartOffset = offsetX
+                                flingVelocity = 0
+                            }
+                            offsetX = wrap(dragStartOffset + value.translation.width)
+                        }
+                        .onEnded { value in
+                            // predictedEndTranslation - translation ≈ remaining distance
+                            // over UIKit's ~0.3s prediction window → convert to pts/sec.
+                            let predictedDelta = value.predictedEndTranslation.width - value.translation.width
+                            let rawVelocity = predictedDelta / 0.3
+                            flingVelocity = max(min(rawVelocity, maxFlingVelocity), -maxFlingVelocity)
+                            isDragging = false
+                        }
+                )
+                .task(id: items.count) {
+                    let sleepNs: UInt64 = UInt64(frameInterval * 1_000_000_000)
+                    let dt = CGFloat(frameInterval)
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: sleepNs)
+                        guard !isDragging else { continue }
+                        // Baseline auto-scroll + decaying user fling, same assignment path.
+                        offsetX = wrap(offsetX - pointsPerSecond * dt + flingVelocity * dt)
+                        flingVelocity *= flingDecayPerFrame
+                        if abs(flingVelocity) < 0.5 { flingVelocity = 0 }
+                    }
+                }
+        } else if let single = items.first {
+            HStack(spacing: 0) {
+                Spacer().frame(width: leadingInset)
+                SimilarPromoCard(promo: single) { onTap(single, 0) }
+                Spacer(minLength: 0)
+            }
+        }
     }
 }
 
