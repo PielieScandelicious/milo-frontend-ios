@@ -9,15 +9,26 @@
 import SwiftUI
 
 struct PromoProductDetailSheet: View {
-    let gridItem: PromoGridItem
+    let initialItem: PromoGridItem
     var onOpenInFolder: ((PromoFolder, Int, String?) -> Void)? = nil
     @EnvironmentObject private var foldersViewModel: PromoFoldersViewModel
     @ObservedObject private var groceryStore = GroceryListStore.shared
     @State private var addTrigger = false
+    @State private var currentItem: PromoGridItem
+    @State private var history: [PromoGridItem] = []
+    @State private var similarPromos: [PromoStoreItem] = []
+    @State private var similarLoading = true
+    @State private var loggedOpenForItemIds: Set<String> = []
     @Environment(\.dismiss) private var dismiss
 
-    private var item: PromoStoreItem { gridItem.item }
-    private var storeName: String { gridItem.storeName }
+    init(gridItem: PromoGridItem, onOpenInFolder: ((PromoFolder, Int, String?) -> Void)? = nil) {
+        self.initialItem = gridItem
+        self.onOpenInFolder = onOpenInFolder
+        self._currentItem = State(initialValue: gridItem)
+    }
+
+    private var item: PromoStoreItem { currentItem.item }
+    private var storeName: String { currentItem.storeName }
 
     private var folderMatch: (folder: PromoFolder, pageIndex: Int)? {
         guard onOpenInFolder != nil else { return nil }
@@ -115,6 +126,7 @@ struct PromoProductDetailSheet: View {
                             infoChipsSection
                         }
                         folderLink
+                        similarPromosSection
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
@@ -128,9 +140,49 @@ struct PromoProductDetailSheet: View {
             .overlay(alignment: .topTrailing) {
                 closeButton
             }
+            .overlay(alignment: .topLeading) {
+                if !history.isEmpty {
+                    backButton
+                }
+            }
             .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
+        .task(id: currentItem.id) {
+            await loadSimilar(for: currentItem)
+        }
+    }
+
+    // MARK: - Back Button (similar-promo breadcrumb)
+
+    private var backButton: some View {
+        Button {
+            guard let previous = history.popLast() else { return }
+            withAnimation(.easeInOut(duration: 0.22)) {
+                currentItem = previous
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 12, weight: .bold))
+                Text("Back")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+            )
+            .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Back to previous promo")
+        .padding(.leading, 16)
+        .padding(.top, 12)
     }
 
     // MARK: - Close Button
@@ -524,6 +576,118 @@ struct PromoProductDetailSheet: View {
         }
     }
 
+    // MARK: - Similar Promos Carousel
+
+    @ViewBuilder
+    private var similarPromosSection: some View {
+        if similarLoading {
+            VStack(alignment: .leading, spacing: 12) {
+                similarHeader
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            SimilarPromoShimmerCard()
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .padding(.horizontal, -20)
+                .scrollClipDisabled()
+            }
+        } else if !similarPromos.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                similarHeader
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Array(similarPromos.enumerated()), id: \.element.id) { index, promo in
+                            SimilarPromoCard(promo: promo) {
+                                handleSimilarTap(promo, position: index)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .padding(.horizontal, -20)
+                .scrollClipDisabled()
+            }
+        }
+    }
+
+    private var similarHeader: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 12, weight: .semibold))
+            Text("Similar deals")
+                .font(.system(size: 14, weight: .semibold))
+        }
+        .foregroundStyle(.white.opacity(0.7))
+        .padding(.top, 4)
+    }
+
+    private func handleSimilarTap(_ promo: PromoStoreItem, position: Int) {
+        guard let targetId = promo.itemKey else { return }
+
+        // Telemetry: record the tap with source + target + position
+        Task {
+            await PromoAPIService.shared.logInteractionEvent(
+                eventType: .similarPromoClicked,
+                promoItemId: targetId,
+                sourceItemId: currentItem.item.itemKey,
+                storeName: promo.storeName,
+                metadata: ["position": "\(position)"]
+            )
+        }
+
+        // Push current onto history and swap
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let newItem = PromoGridItem(
+            id: targetId,
+            item: promo,
+            storeName: promo.storeName ?? currentItem.storeName
+        )
+        withAnimation(.easeInOut(duration: 0.25)) {
+            history.append(currentItem)
+            currentItem = newItem
+        }
+    }
+
+    private func loadSimilar(for gridItem: PromoGridItem) async {
+        // Fire deal_opened exactly once per unique item in this sheet session
+        if let itemKey = gridItem.item.itemKey, !loggedOpenForItemIds.contains(itemKey) {
+            loggedOpenForItemIds.insert(itemKey)
+            Task {
+                await PromoAPIService.shared.logInteractionEvent(
+                    eventType: .dealOpened,
+                    promoItemId: itemKey,
+                    storeName: gridItem.storeName,
+                    metadata: ["source": "folder_viewer"]
+                )
+            }
+        }
+
+        similarLoading = true
+        similarPromos = []
+        guard let promoId = gridItem.item.itemKey else {
+            similarLoading = false
+            return
+        }
+
+        do {
+            let response = try await PromoAPIService.shared.getSimilarPromos(promoId: promoId, limit: 10)
+            if !Task.isCancelled && gridItem.id == currentItem.id {
+                similarPromos = response.items
+            }
+        } catch {
+            // Silent failure — section hides if empty
+            if !Task.isCancelled && gridItem.id == currentItem.id {
+                similarPromos = []
+            }
+        }
+        if !Task.isCancelled && gridItem.id == currentItem.id {
+            similarLoading = false
+        }
+    }
+
     // MARK: - Add to List Button
 
     private var addToListButton: some View {
@@ -625,6 +789,179 @@ private struct FolderLinkPressStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Similar Promo Card
+
+private struct SimilarPromoCard: View {
+    let promo: PromoStoreItem
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .topLeading) {
+                    Color(white: 0.97)
+                        .frame(height: 120)
+
+                    if let urlStr = promo.imageUrl ?? promo.thumbnailUrl,
+                       let url = URL(string: urlStr) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxWidth: .infinity, maxHeight: 100)
+                                    .padding(10)
+                            case .failure:
+                                cardPlaceholder
+                            case .empty:
+                                ProgressView()
+                                    .frame(maxWidth: .infinity, maxHeight: 100)
+                            @unknown default:
+                                cardPlaceholder
+                            }
+                        }
+                    } else {
+                        cardPlaceholder
+                    }
+
+                    if promo.discountPercentage > 0 {
+                        Text("-\(promo.discountPercentage)%")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule().fill(
+                                    promo.discountPercentage > 30
+                                        ? Color(red: 0.95, green: 0.25, blue: 0.25)
+                                        : Color(red: 0.20, green: 0.85, blue: 0.50)
+                                )
+                            )
+                            .padding(6)
+                    }
+
+                    // Store logo overlay (bottom-left)
+                    if let storeName = promo.storeName {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                StoreLogoView(storeName: storeName, height: 12)
+                                    .frame(width: 22, height: 22)
+                                    .background(Color.white, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                Spacer()
+                            }
+                            .padding(6)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    if !promo.brand.isEmpty {
+                        Text(promo.brand.uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.6)
+                            .foregroundColor(.white.opacity(0.55))
+                            .lineLimit(1)
+                    }
+                    Text(promo.label)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Spacer(minLength: 2)
+
+                    if promo.hasPrices {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(String(format: "€%.2f", promo.promoPrice))
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundColor(Color(red: 0.20, green: 0.85, blue: 0.50))
+                            if promo.originalPrice > promo.promoPrice {
+                                Text(String(format: "€%.2f", promo.originalPrice))
+                                    .font(.system(size: 10, weight: .regular))
+                                    .foregroundColor(.white.opacity(0.3))
+                                    .strikethrough(true, color: .white.opacity(0.3))
+                            }
+                        }
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(width: 150, height: 220)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(white: 0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(SimilarCardPressStyle())
+    }
+
+    private var cardPlaceholder: some View {
+        Image(systemName: "photo")
+            .font(.system(size: 28, weight: .light))
+            .foregroundColor(Color(white: 0.8))
+            .frame(maxWidth: .infinity, maxHeight: 100)
+    }
+}
+
+private struct SimilarCardPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.88 : 1.0)
+            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+private struct SimilarPromoShimmerCard: View {
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 120)
+            VStack(alignment: .leading, spacing: 6) {
+                Capsule().fill(Color.white.opacity(0.06)).frame(width: 40, height: 8)
+                Capsule().fill(Color.white.opacity(0.06)).frame(maxWidth: .infinity, minHeight: 10, maxHeight: 10)
+                Capsule().fill(Color.white.opacity(0.06)).frame(width: 80, height: 10)
+                Spacer(minLength: 2)
+                Capsule().fill(Color.white.opacity(0.06)).frame(width: 50, height: 12)
+            }
+            .padding(10)
+        }
+        .frame(width: 150, height: 220)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(white: 0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+        )
+        .mask(
+            LinearGradient(
+                colors: [.black.opacity(0.6), .white, .black.opacity(0.6)],
+                startPoint: UnitPoint(x: phase, y: 0.5),
+                endPoint: UnitPoint(x: phase + 0.8, y: 0.5)
+            )
+        )
+        .onAppear {
+            withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
+                phase = 1
+            }
+        }
     }
 }
 

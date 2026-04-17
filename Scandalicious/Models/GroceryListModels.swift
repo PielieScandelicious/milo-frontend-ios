@@ -80,7 +80,8 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
             bucket: nil,
             bucketLabel: nil,
             thumbnailUrl: imageUrl,
-            imageUrl: imageUrl
+            imageUrl: imageUrl,
+            storeName: storeName
         )
     }
 

@@ -2,69 +2,16 @@
 //  PromoModels.swift
 //  Scandalicious
 //
-//  Created by Claude on 09/02/2026.
+//  Promo item + similar-promos models. Weekly personalized report is gone;
+//  the folder browser is now the primary discovery surface, and similar-promo
+//  recommendations live inside the folder detail sheet.
 //
 
 import Foundation
 
-// MARK: - Promo Recommendation Response
+// MARK: - Promo Store Item (single promo from a folder or similar-promos list)
 
-enum PromoReportStatus: String, Codable {
-    case ready
-    case noEnrichedProfile = "no_enriched_profile"
-    case noReportAvailable = "no_report_available"
-}
-
-struct PromoRecommendationResponse: Codable {
-    let reportId: String?
-    let reportStatus: PromoReportStatus
-    let message: String
-    let generatedAt: String?
-    let weeklySavings: Double
-    let dealCount: Int
-    let promoWeek: PromoWeek
-    let stores: [PromoStore]
-    let preferredStores: [String]?
-    let summary: PromoSummary
-
-    var isReady: Bool { reportStatus == .ready }
-    var weekKey: String { "\(promoWeek.isoYear)-W\(String(format: "%02d", promoWeek.isoWeek))" }
-
-    enum CodingKeys: String, CodingKey {
-        case reportId = "report_id"
-        case reportStatus = "report_status"
-        case message
-        case generatedAt = "generated_at"
-        case weeklySavings = "weekly_savings"
-        case dealCount = "deal_count"
-        case promoWeek = "promo_week"
-        case stores
-        case preferredStores = "preferred_stores"
-        case summary
-    }
-}
-
-// MARK: - Promo Week
-
-struct PromoWeek: Codable {
-    let start: String   // DD/MM format
-    let end: String     // DD/MM format
-    let label: String   // e.g. "Week 5"
-    let isoYear: Int
-    let isoWeek: Int
-
-    enum CodingKeys: String, CodingKey {
-        case start
-        case end
-        case label
-        case isoYear = "iso_year"
-        case isoWeek = "iso_week"
-    }
-}
-
-// MARK: - Store Item
-
-struct PromoStoreItem: Codable, Identifiable {
+struct PromoStoreItem: Codable, Identifiable, Hashable {
     let itemKey: String?
     let brand: String
     let productName: String
@@ -89,19 +36,16 @@ struct PromoStoreItem: Codable, Identifiable {
     let bucketLabel: String?
     let thumbnailUrl: String?
     let imageUrl: String?
+    let storeName: String?
 
-    var id: String { "\(brand)-\(productName)-\(mechanism)" }
+    var id: String { itemKey ?? "\(brand)-\(productName)-\(mechanism)" }
 
-    /// Whether both original and promo prices are available for display
     var hasPrices: Bool { originalPrice > 0 && promoPrice > 0 }
 
-    /// Best available product label: display_name if available, else product_name
     var label: String { (displayName?.isEmpty == false ? displayName : productName) ?? productName }
 
-    /// Best available mechanism text
     var mechanismLabel: String { (displayMechanism?.isEmpty == false ? displayMechanism : mechanism) ?? mechanism }
 
-    /// Savings text — always use the backend's localized label
     var savingsLabel: String? { displaySavingsLabel }
 
     enum CodingKeys: String, CodingKey {
@@ -129,53 +73,46 @@ struct PromoStoreItem: Codable, Identifiable {
         case bucketLabel = "bucket_label"
         case thumbnailUrl = "thumbnail_url"
         case imageUrl = "image_url"
-    }
-}
-
-// MARK: - Promo Store
-
-struct PromoStore: Codable, Identifiable {
-    let storeName: String
-    let totalSavings: Double
-    let validityEnd: String
-    let items: [PromoStoreItem]
-
-    var id: String { storeName }
-
-    enum CodingKeys: String, CodingKey {
         case storeName = "store_name"
-        case totalSavings = "total_savings"
-        case validityEnd = "validity_end"
-        case items
     }
 }
 
-// MARK: - Promo Summary
+// MARK: - Grid Item (view-layer wrapper binding an item to its store)
 
-struct PromoSummary: Codable {
-    let totalItems: Int
-    let totalSavings: Double
-    let storesBreakdown: [PromoStoreBreakdown]
-    let bestValueStore: String?
-    let bestValueSavings: Double
-    let bestValueItems: Int
+struct PromoGridItem: Identifiable, Hashable {
+    let id: String
+    let item: PromoStoreItem
+    let storeName: String
+}
+
+// MARK: - Similar Promos Response
+
+struct SimilarPromosSource: Codable, Hashable {
+    let id: String
+    let displayName: String
+    let displayBrand: String?
+    let normalizedBrand: String?
+    let granularCategory: String
+    let sourceRetailer: String
 
     enum CodingKeys: String, CodingKey {
-        case totalItems = "total_items"
-        case totalSavings = "total_savings"
-        case storesBreakdown = "stores_breakdown"
-        case bestValueStore = "best_value_store"
-        case bestValueSavings = "best_value_savings"
-        case bestValueItems = "best_value_items"
+        case id
+        case displayName = "display_name"
+        case displayBrand = "display_brand"
+        case normalizedBrand = "normalized_brand"
+        case granularCategory = "granular_category"
+        case sourceRetailer = "source_retailer"
     }
 }
 
-// MARK: - Store Breakdown (in summary)
+struct SimilarPromosResponse: Codable {
+    let source: SimilarPromosSource
+    let items: [PromoStoreItem]
+    let generatedAt: String
 
-struct PromoStoreBreakdown: Codable, Identifiable {
-    let store: String
-    let items: Int
-    let savings: Double
-
-    var id: String { store }
+    enum CodingKeys: String, CodingKey {
+        case source
+        case items
+        case generatedAt = "generated_at"
+    }
 }

@@ -69,7 +69,8 @@ struct PromoFolderHotspot: Codable, Identifiable {
             bucket: nil,
             bucketLabel: nil,
             thumbnailUrl: thumbnailUrl,
-            imageUrl: imageUrl
+            imageUrl: imageUrl,
+            storeName: storeName
         )
     }
 

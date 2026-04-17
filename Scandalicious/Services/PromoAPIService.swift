@@ -2,20 +2,15 @@
 //  PromoAPIService.swift
 //  Scandalicious
 //
-//  Created by Claude on 09/02/2026.
+//  Folder browsing, similar-promo recommendations, and interaction telemetry.
 //
 
 import Foundation
 import FirebaseAuth
 
-enum PromoEventType: String, Encodable {
-    case reportViewed = "report_viewed"
+enum PromoInteractionEventType: String, Encodable {
     case dealOpened = "deal_opened"
-    case dealClaimed = "deal_claimed"
-    case folderOpened = "folder_opened"
-    case storeSectionOpened = "store_section_opened"
-    case feedbackPositive = "feedback_positive"
-    case feedbackNegative = "feedback_negative"
+    case similarPromoClicked = "similar_promo_clicked"
 }
 
 actor PromoAPIService {
@@ -24,7 +19,6 @@ actor PromoAPIService {
     private var baseURL: String { AppConfiguration.apiBase }
 
     enum PromoError: LocalizedError {
-        case unauthorized
         case notFound
         case serviceUnavailable
         case invalidResponse
@@ -34,10 +28,8 @@ actor PromoAPIService {
 
         var errorDescription: String? {
             switch self {
-            case .unauthorized:
-                return "You must be signed in to view deals"
             case .notFound:
-                return "Keep scanning receipts to unlock personalized deals"
+                return "Promo not found"
             case .serviceUnavailable:
                 return "Deals service is temporarily unavailable"
             case .invalidResponse:
@@ -45,29 +37,29 @@ actor PromoAPIService {
             case .serverError(let message):
                 return message
             case .decodingError(let message):
-                return "Failed to parse deals: \(message)"
+                return "Failed to parse response: \(message)"
             case .networkError(let error):
                 return error.localizedDescription
             }
         }
     }
 
-    // MARK: - Fetch Promos
+    // MARK: - Similar Promos
 
-    func getRecommendations() async throws -> PromoRecommendationResponse {
-        guard let token = try await getFirebaseToken() else {
-            throw PromoError.unauthorized
-        }
-
-        guard let url = URL(string: "\(baseURL)/promos") else {
+    func getSimilarPromos(promoId: String, limit: Int = 10) async throws -> SimilarPromosResponse {
+        guard let url = URL(string: "\(baseURL)/promos/\(promoId)/similar?limit=\(limit)&personalize=true") else {
             throw PromoError.invalidResponse
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 30
+        request.timeoutInterval = 20
+
+        // Attach bearer if available (optional — endpoint personalizes only if present)
+        if let token = try? await getFirebaseToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -79,23 +71,14 @@ actor PromoAPIService {
             switch httpResponse.statusCode {
             case 200:
                 do {
-                    let decoder = JSONDecoder()
-                    return try decoder.decode(PromoRecommendationResponse.self, from: data)
+                    return try JSONDecoder().decode(SimilarPromosResponse.self, from: data)
                 } catch {
                     throw PromoError.decodingError(error.localizedDescription)
                 }
-            case 401:
-                throw PromoError.unauthorized
             case 404:
                 throw PromoError.notFound
             case 503:
                 throw PromoError.serviceUnavailable
-            case 400..<500:
-                if let errorDict = try? JSONDecoder().decode([String: String].self, from: data),
-                   let message = errorDict["detail"] ?? errorDict["error"] {
-                    throw PromoError.serverError(message)
-                }
-                throw PromoError.invalidResponse
             default:
                 throw PromoError.serverError("Server error: \(httpResponse.statusCode)")
             }
@@ -106,58 +89,56 @@ actor PromoAPIService {
         }
     }
 
-    // MARK: - Promo Events
+    // MARK: - Interaction Events (telemetry)
 
-    func logEvent(
-        reportId: String,
-        eventType: PromoEventType,
-        itemKey: String? = nil,
+    func logInteractionEvent(
+        eventType: PromoInteractionEventType,
+        promoItemId: String? = nil,
+        sourceItemId: String? = nil,
         storeName: String? = nil,
         metadata: [String: String]? = nil
     ) async {
-        guard let token = try? await getFirebaseToken() else { return }
-        guard let url = URL(string: "\(baseURL)/promos/events") else { return }
+        guard let url = URL(string: "\(baseURL)/promos/interactions") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 15
+        request.timeoutInterval = 10
 
-        struct PromoEventRequest: Encodable {
-            let reportId: String
-            let eventType: PromoEventType
-            let itemKey: String?
+        // Attach bearer if signed in; if not, event is logged anonymously.
+        if let token = try? await getFirebaseToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        struct Body: Encodable {
+            let eventType: PromoInteractionEventType
+            let promoItemId: String?
+            let sourceItemId: String?
             let storeName: String?
             let metadata: [String: String]?
 
             enum CodingKeys: String, CodingKey {
-                case reportId = "report_id"
                 case eventType = "event_type"
-                case itemKey = "item_key"
+                case promoItemId = "promo_item_id"
+                case sourceItemId = "source_item_id"
                 case storeName = "store_name"
                 case metadata
             }
         }
 
         do {
-            request.httpBody = try JSONEncoder().encode(
-                PromoEventRequest(
-                    reportId: reportId,
-                    eventType: eventType,
-                    itemKey: itemKey,
-                    storeName: storeName,
-                    metadata: metadata
-                )
-            )
-            let (_, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else { return }
-            if httpResponse.statusCode >= 300 {
-                print("[PromoAPI] event logging failed with status \(httpResponse.statusCode)")
-            }
+            request.httpBody = try JSONEncoder().encode(Body(
+                eventType: eventType,
+                promoItemId: promoItemId,
+                sourceItemId: sourceItemId,
+                storeName: storeName,
+                metadata: metadata
+            ))
+            _ = try? await URLSession.shared.data(for: request)
         } catch {
-            print("[PromoAPI] event logging failed: \(error.localizedDescription)")
+            // Telemetry is best-effort; never surface errors
+            print("[PromoAPI] interaction event failed: \(error.localizedDescription)")
         }
     }
 
@@ -202,9 +183,7 @@ actor PromoAPIService {
     // MARK: - Helper
 
     private func getFirebaseToken() async throws -> String? {
-        guard let user = Auth.auth().currentUser else {
-            return nil
-        }
+        guard let user = Auth.auth().currentUser else { return nil }
         return try await user.getIDToken()
     }
 }

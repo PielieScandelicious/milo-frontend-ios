@@ -49,9 +49,8 @@ struct ContentView: View {
     enum Tab: Int, Hashable {
         case folders = 0
         case groceryList = 1
-        case promos = 2
-        case receipts = 3
-        case insights = 4
+        case receipts = 2
+        case insights = 3
     }
 
 
@@ -60,7 +59,7 @@ struct ContentView: View {
             TabView(selection: $selectedTab) {
                 FoldersTab()
                     .tabItem {
-                        Label("Folders", systemImage: "newspaper.fill")
+                        Label("Deals", systemImage: "tag.fill")
                     }
                     .tag(Tab.folders)
 
@@ -70,12 +69,6 @@ struct ContentView: View {
                     }
                     .badge(groceryStore.activeItemCount)
                     .tag(Tab.groceryList)
-
-                PromosTab()
-                    .tabItem {
-                        Label("For You", systemImage: "tag.fill")
-                    }
-                    .tag(Tab.promos)
 
                 ScanTab()
                     .tabItem {
@@ -162,7 +155,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchToDealsTab)) { _ in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                selectedTab = .promos
+                selectedTab = .folders
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("app.switchToFoldersTab"))) { _ in
@@ -321,15 +314,6 @@ struct ContentView: View {
                 if let periods = try? await AnalyticsAPIService.shared.getPeriods(periodType: .month, numPeriods: 52) {
                     await MainActor.run {
                         cache.insightsPeriodMetadata = periods.periods
-                    }
-                }
-            }
-
-            // Deals: promo recommendations
-            group.addTask {
-                if let promos = try? await PromoAPIService.shared.getRecommendations() {
-                    await MainActor.run {
-                        cache.promoData = promos
                     }
                 }
             }
@@ -672,17 +656,6 @@ struct GroceryListTab: View {
 }
 
 // MARK: - Promos Tab
-struct PromosTab: View {
-    @StateObject private var viewModel = PromosViewModel()
-
-    var body: some View {
-        NavigationStack {
-            PromosView(viewModel: viewModel)
-        }
-        .id("PromosTab") // Prevent recreation
-    }
-}
-
 #Preview {
     ContentView()
         .environmentObject(AuthenticationManager())
