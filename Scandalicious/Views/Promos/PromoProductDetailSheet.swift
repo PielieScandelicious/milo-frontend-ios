@@ -43,71 +43,8 @@ struct PromoProductDetailSheet: View {
         store?.accentColor ?? detailGreen
     }
 
-    private var isSpecialDeal: Bool {
-        let mech = item.mechanismLabel.lowercased()
-        return mech.contains("gratis") || mech.contains("free") || mech.contains("cadeau")
-    }
-
-    private var mechanismPillColor: Color {
-        if (item.minPurchaseQty ?? 1) > 1 { return detailGreen }
-        if isSpecialDeal { return detailGold }
-        return Color(white: 0.22)
-    }
-
-    private var mechanismTextColor: Color {
-        if isSpecialDeal { return .black.opacity(0.8) }
-        if (item.minPurchaseQty ?? 1) > 1 { return .white }
-        return .white.opacity(0.85)
-    }
-
     private var discountBadgeColor: Color {
-        item.discountPercentage > 30
-            ? Color(red: 0.95, green: 0.25, blue: 0.25)
-            : detailGreen
-    }
-
-    // MARK: - Validity computation
-
-    private var daysRemaining: Int? {
-        let parts = item.validityEnd.split(separator: "-")
-        guard parts.count == 3,
-              let year = Int(parts[0]),
-              let month = Int(parts[1]),
-              let day = Int(parts[2]) else { return nil }
-        var components = DateComponents()
-        components.year = year
-        components.month = month
-        components.day = day
-        guard let endDate = Calendar.current.date(from: components) else { return nil }
-        let today = Calendar.current.startOfDay(for: Date())
-        let end = Calendar.current.startOfDay(for: endDate)
-        return Calendar.current.dateComponents([.day], from: today, to: end).day
-    }
-
-    private var validityDisplay: (text: String, color: Color, icon: String) {
-        guard let days = daysRemaining else {
-            return (validityFallbackText, .white.opacity(0.4), "calendar")
-        }
-        switch days {
-        case _ where days < 0:
-            return ("Expired", .white.opacity(0.25), "calendar.badge.exclamationmark")
-        case 0:
-            return ("Last day!", detailUrgentRed, "exclamationmark.circle.fill")
-        case 1...2:
-            return ("\(days) day\(days == 1 ? "" : "s") left", detailUrgentOrange, "clock.badge.exclamationmark")
-        case 3...5:
-            return ("\(days) days left", detailWarningAmber, "clock")
-        default:
-            return ("\(days) days left", .white.opacity(0.5), "calendar")
-        }
-    }
-
-    private var validityFallbackText: String {
-        let parts = item.validityEnd.split(separator: "-")
-        if parts.count == 3 {
-            return "Until \(parts[2])/\(parts[1])"
-        }
-        return item.validityEnd
+        item.discountPercentage > 30 ? PromoDesign.urgencyUrgent : PromoDesign.accentGreen
     }
 
     // MARK: - Body
@@ -118,12 +55,10 @@ struct PromoProductDetailSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     heroImage
 
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 20) {
                         brandAndNameSection
-                        offerCard
-                        if hasInfoChips {
-                            infoChipsSection
-                        }
+                        pricingHeroCard
+                        crossStorePanel
                         folderLink
                         similarPromosSection
                     }
@@ -241,8 +176,8 @@ struct PromoProductDetailSheet: View {
                 heroPlaceholder
             }
 
-            // Discount badge (top-left)
-            if item.discountPercentage > 0 {
+            // Discount badge (top-left) — suppressed for price_unavailable
+            if item.discountPercentage > 0 && !item.priceUnavailable {
                 Text("-\(item.discountPercentage)%")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -253,57 +188,26 @@ struct PromoProductDetailSheet: View {
                     .padding(8)
             }
 
-            // Store badge (bottom-left) + Validity badge (bottom-right)
+            // Store badge (bottom-left) + Validity chip (bottom-right)
             VStack {
                 Spacer()
                 HStack(alignment: .bottom) {
-                    StoreLogoView(storeName: storeName, height: 20)
-                        .frame(width: 30, height: 30)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
+                    StoreBadge(storeName: storeName, size: .large)
                     Spacer()
-
-                    heroValidityBadge
+                    ValidityChip(validityEnd: item.validityEnd)
+                        .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
                 }
-                .padding(8)
+                .padding(10)
             }
         }
         .frame(height: 300)
         .clipped()
-    }
-
-    private var heroValidityStyle: (text: String, icon: String, bg: Color, fg: Color) {
-        guard let days = daysRemaining else {
-            return (validityFallbackText, "calendar", Color.black.opacity(0.55), .white.opacity(0.85))
+        .overlay(alignment: .leading) {
+            // Store accent rail on the left edge
+            Rectangle()
+                .fill(storeAccentColor)
+                .frame(width: 4)
         }
-        switch days {
-        case _ where days < 0:
-            return ("Expired", "calendar.badge.exclamationmark", Color.black.opacity(0.55), .white.opacity(0.6))
-        case 0:
-            return ("Last day!", "exclamationmark.circle.fill", detailUrgentRed.opacity(0.85), .white)
-        case 1...2:
-            return ("\(days) day\(days == 1 ? "" : "s") left", "clock.badge.exclamationmark", detailUrgentOrange.opacity(0.85), .white)
-        case 3...5:
-            return ("\(days) days left", "clock", detailWarningAmber.opacity(0.80), .black.opacity(0.85))
-        default:
-            return ("\(days) days left", "calendar", Color.black.opacity(0.55), .white.opacity(0.9))
-        }
-    }
-
-    @ViewBuilder
-    private var heroValidityBadge: some View {
-        let style = heroValidityStyle
-        HStack(spacing: 3) {
-            Image(systemName: style.icon)
-                .font(.system(size: 8, weight: .semibold))
-            Text(style.text)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-        }
-        .foregroundColor(style.fg)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(style.bg))
-        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
     }
 
     private var heroPlaceholder: some View {
@@ -316,57 +220,120 @@ struct PromoProductDetailSheet: View {
     // MARK: - Brand & Name Section
 
     private var brandAndNameSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             // Brand — prominent, in store accent color
-            if !item.brand.isEmpty {
-                Text(item.brand.uppercased())
-                    .font(.system(size: 12, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundColor(detailBrandColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        Capsule().fill(detailBrandColor.opacity(0.15))
-                    )
-                    .overlay(
-                        Capsule().stroke(detailBrandColor.opacity(0.25), lineWidth: 0.5)
-                    )
+            if !item.primaryBrandLabel.isEmpty {
+                HStack(spacing: 6) {
+                    Text(item.primaryBrandLabel.uppercased())
+                        .font(.system(size: 12, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(storeAccentColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule().fill(storeAccentColor.opacity(0.15))
+                        )
+                        .overlay(
+                            Capsule().stroke(storeAccentColor.opacity(0.25), lineWidth: 0.5)
+                        )
+                    // Multi-brand promo: show sibling brands next to the primary.
+                    if let extra = item.additionalBrands, !extra.isEmpty {
+                        Text("+ \(extra.joined(separator: ", "))")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(PromoDesign.secondaryText)
+                    }
+                }
             }
 
             // Product name — large, clear
             Text(item.label)
                 .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundStyle(PromoDesign.primaryText)
                 .fixedSize(horizontal: false, vertical: true)
+
+            // Pack size tag — "500 g", "6 × 25 cl", "12 stuks"
+            if let packLabel = item.packSizeLabel {
+                HStack(spacing: 6) {
+                    Image(systemName: "shippingbox.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(packLabel)
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(PromoDesign.secondaryText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: PromoDesign.chipCorner, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+            }
 
             // Description
             if let desc = item.displayDescription, !desc.isEmpty {
                 Text(desc)
                     .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundStyle(PromoDesign.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .lineSpacing(2)
             }
         }
     }
 
-    // MARK: - Offer Card (unified price + savings + mechanism)
+    // MARK: - Pricing hero card (cross-store anchor)
 
-    private var offerCard: some View {
+    private var pricingHeroCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Top row: mechanism pill + optional urgency badge
+            // Top row: mechanism pill + min-qty hint
             HStack(spacing: 8) {
-                mechanismPill
-                Spacer(minLength: 8)
-                inlineUrgencyBadge
+                MechanismPill(item: item)
+                if let qty = item.minPurchaseQty, qty > 1 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "cart.badge.plus").font(.system(size: 10, weight: .semibold))
+                        Text("min. \(qty)").font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(PromoDesign.secondaryText)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.white.opacity(0.06)))
+                }
+                Spacer(minLength: 4)
             }
 
-            // Price block
-            priceBlock
+            if item.priceUnavailable {
+                // Assortment / zero-price case: clean italic label, no fake numbers.
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Prijs in winkel")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .italic()
+                        .foregroundStyle(PromoDesign.primaryText)
+                    Text("Zie deal in de winkel voor de exacte prijs.")
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(PromoDesign.secondaryText)
+                }
+            } else {
+                // HERO: the cross-store comparison anchor.
+                if item.unitPriceValue != nil || (item.displayUnitPrice?.isEmpty == false) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        EffectiveUnitPriceView(item: item, size: .hero)
+                        Text("effectieve prijs per eenheid")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.5)
+                            .foregroundStyle(PromoDesign.tertiaryText)
+                    }
+                }
 
-            // Savings pill — subtle, inline with price
-            if item.savings > 0 {
-                savingsPill
+                Rectangle()
+                    .fill(Color.white.opacity(0.06))
+                    .frame(height: 1)
+
+                // Pack price (promo + struck original) — secondary
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    PromoPriceStack(item: item, size: .hero)
+                    if item.savings > 0 {
+                        savingsPill
+                    }
+                    Spacer(minLength: 0)
+                }
             }
         }
         .padding(18)
@@ -375,6 +342,12 @@ struct PromoProductDetailSheet: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color(white: 0.09))
         )
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(storeAccentColor)
+                .frame(height: 3)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
@@ -382,151 +355,38 @@ struct PromoProductDetailSheet: View {
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
     }
 
-    private var mechanismPill: some View {
-        HStack(spacing: 6) {
-            if (item.minPurchaseQty ?? 1) > 1 {
-                Image(systemName: "cart.badge.plus")
-                    .font(.system(size: 12, weight: .semibold))
-            } else if isSpecialDeal {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 12, weight: .semibold))
-            } else {
-                Image(systemName: "tag.fill")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            Text(item.mechanismLabel)
-                .font(.system(size: 13, weight: .bold))
-                .lineLimit(1)
-        }
-        .foregroundColor(mechanismTextColor)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(Capsule().fill(mechanismPillColor))
-    }
-
-    @ViewBuilder
-    private var inlineUrgencyBadge: some View {
-        if let days = daysRemaining, days >= 0, days <= 2 {
-            let color: Color = days == 0 ? detailUrgentRed : detailUrgentOrange
-            let text = days == 0 ? "Ends today" : "\(days) day\(days == 1 ? "" : "s") left"
-            HStack(spacing: 4) {
-                Image(systemName: "clock.badge.exclamationmark")
-                    .font(.system(size: 10, weight: .bold))
-                Text(text)
-                    .font(.system(size: 11, weight: .bold))
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(Capsule().fill(color))
-        }
-    }
-
-    @ViewBuilder
-    private var priceBlock: some View {
-        let qty = item.minPurchaseQty ?? 1
-
-        if qty > 1 {
-            let totalOriginal = item.originalPrice * Double(qty)
-            let totalUserPays = totalOriginal - item.savings
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(String(format: "€%.2f", totalUserPays))
-                        .font(.system(size: 36, weight: .heavy, design: .rounded))
-                        .foregroundColor(detailGreen)
-                    Text(String(format: "€%.2f", totalOriginal))
-                        .font(.system(size: 17, weight: .regular))
-                        .foregroundColor(.white.opacity(0.35))
-                        .strikethrough(true, color: .white.opacity(0.35))
-                }
-                Text("for \(qty)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.5))
-            }
-        } else if item.hasPrices {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(String(format: "€%.2f", item.promoPrice))
-                    .font(.system(size: 36, weight: .heavy, design: .rounded))
-                    .foregroundColor(detailGreen)
-                Text(String(format: "€%.2f", item.originalPrice))
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundColor(.white.opacity(0.35))
-                    .strikethrough(true, color: .white.opacity(0.35))
-            }
-        }
-    }
-
     private var savingsPill: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 12, weight: .bold))
-            if item.discountPercentage > 0 {
-                Text(String(format: "Save €%.2f · %d%%", item.savings, item.discountPercentage))
-                    .font(.system(size: 13, weight: .bold))
-            } else {
-                Text(String(format: "Save €%.2f", item.savings))
-                    .font(.system(size: 13, weight: .bold))
-            }
-        }
-        .foregroundColor(detailGreen)
-        .padding(.horizontal, 11)
-        .padding(.vertical, 7)
-        .background(Capsule().fill(detailGreen.opacity(0.14)))
-        .overlay(Capsule().stroke(detailGreen.opacity(0.28), lineWidth: 0.5))
-    }
-
-    // MARK: - Info Chips
-
-    private var hasInfoChips: Bool {
-        (item.displayUnitPrice != nil && !(item.displayUnitPrice?.isEmpty ?? true))
-        || (item.effectiveUnitPrice ?? 0) > 0
-        || (item.minPurchaseQty ?? 0) > 1
-        || (item.savingsLabel != nil && !(item.savingsLabel?.isEmpty ?? true))
-        || (item.bucketLabel != nil && !(item.bucketLabel?.isEmpty ?? true))
-    }
-
-    private var infoChipsSection: some View {
-        FlowLayout(spacing: 8) {
-            if let unitPrice = item.displayUnitPrice, !unitPrice.isEmpty {
-                detailChip(icon: "scalemass", text: unitPrice)
-            }
-            if let unitPrice = item.effectiveUnitPrice, unitPrice > 0 {
-                detailChip(icon: "tag", text: String(format: "€%.2f/pc", unitPrice))
-            }
-            if let qty = item.minPurchaseQty, qty > 1 {
-                detailChip(icon: "number", text: "Min. \(qty)")
-            }
-            if let label = item.savingsLabel, !label.isEmpty {
-                detailChip(icon: "arrow.down.circle", text: label, isAccented: true)
-            }
-            if let bucket = item.bucketLabel, !bucket.isEmpty {
-                detailChip(icon: "folder", text: bucket)
-            }
-        }
-    }
-
-    private func detailChip(icon: String, text: String, isAccented: Bool = false) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-            Text(text)
-                .font(.system(size: 13, weight: .medium))
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 11, weight: .bold))
+            if item.discountPercentage > 0 {
+                Text(String(format: "Bespaar €%.2f · %d%%", item.savings, item.discountPercentage))
+                    .font(.system(size: 12, weight: .bold))
+            } else {
+                Text(String(format: "Bespaar €%.2f", item.savings))
+                    .font(.system(size: 12, weight: .bold))
+            }
         }
-        .foregroundColor(isAccented ? detailGreen : .white.opacity(0.6))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isAccented ? detailGreen.opacity(0.10) : Color.white.opacity(0.06))
-        )
+        .foregroundStyle(PromoDesign.accentGreen)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(PromoDesign.accentGreen.opacity(0.14)))
+        .overlay(Capsule().stroke(PromoDesign.accentGreen.opacity(0.28), lineWidth: 0.5))
     }
 
-    private func formatDate(_ dateStr: String) -> String {
-        let parts = dateStr.split(separator: "-")
-        if parts.count == 3 {
-            return "\(parts[2])/\(parts[1])"
+    // MARK: - Cross-store comparison panel
+
+    @ViewBuilder
+    private var crossStorePanel: some View {
+        if !item.priceUnavailable {
+            CrossStoreComparisonView(
+                current: item,
+                currentStoreName: storeName,
+                siblings: similarPromos
+            ) { target in
+                handleSimilarTap(target, position: -1)
+            }
         }
-        return dateStr
     }
 
     // MARK: - Folder Link
@@ -750,52 +610,6 @@ struct PromoProductDetailSheet: View {
             .frame(height: 90)
             .allowsHitTesting(false)
         )
-    }
-}
-
-// MARK: - Flow Layout (simple wrapping layout for chips)
-
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        let height = rows.enumerated().reduce(CGFloat.zero) { total, entry in
-            let rowHeight = entry.element.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            return total + rowHeight + (entry.offset > 0 ? spacing : 0)
-        }
-        return CGSize(width: proposal.width ?? 0, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        var y = bounds.minY
-        for row in rows {
-            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-            var x = bounds.minX
-            for subview in row {
-                let size = subview.sizeThatFits(.unspecified)
-                subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
-            }
-            y += rowHeight + spacing
-        }
-    }
-
-    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[LayoutSubviews.Element]] {
-        let maxWidth = proposal.width ?? .infinity
-        var rows: [[LayoutSubviews.Element]] = [[]]
-        var currentWidth: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentWidth + size.width > maxWidth && !rows[rows.count - 1].isEmpty {
-                rows.append([])
-                currentWidth = 0
-            }
-            rows[rows.count - 1].append(subview)
-            currentWidth += size.width + spacing
-        }
-        return rows
     }
 }
 
@@ -1079,12 +893,7 @@ private struct SimilarPromoShimmerCard: View {
     }
 }
 
-// MARK: - Detail-local color constants
+// MARK: - Detail-local color constants (only colors not in PromoDesign)
 
-private let detailGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
-private let detailGold = Color(red: 1.00, green: 0.80, blue: 0.20)
-private let detailBrandColor = Color(red: 0.82, green: 0.68, blue: 0.40)
-private let detailWarningAmber = Color(red: 1.0, green: 0.75, blue: 0.25)
-private let detailUrgentOrange = Color(red: 0.95, green: 0.40, blue: 0.30)
-private let detailUrgentRed = Color(red: 0.95, green: 0.25, blue: 0.25)
+private let detailGreen = PromoDesign.accentGreen
 private let detailLinkBlue = Color(red: 0.4, green: 0.65, blue: 1.0)

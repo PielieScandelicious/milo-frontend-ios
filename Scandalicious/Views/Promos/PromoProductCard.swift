@@ -2,8 +2,14 @@
 //  PromoProductCard.swift
 //  Scandalicious
 //
-//  Premium product card for the 2-column promo grid.
-//  Fixed-height card with brand-forward design and urgency-aware validity.
+//  Thumbnail card for the 2-column promo grid (340pt fixed height).
+//  Rebuilt around the cross-store design language:
+//    · store accent rail + store badge (always visible → immediate store ID)
+//    · mechanism pill coloured by MechanismKind (consistent colour language)
+//    · effective €/unit as the PRIMARY visual element (cross-store anchor)
+//    · pack price + struck original underneath (secondary)
+//    · savings chip + validity chip + add button at the bottom
+//    · `price_unavailable` → italic "Prijs in winkel" instead of fake €0.00
 //
 
 import SwiftUI
@@ -20,125 +26,53 @@ struct PromoProductCard: View {
     private var item: PromoStoreItem { gridItem.item }
     private var storeName: String { gridItem.storeName }
 
-    private var storeAccentColor: Color {
-        GroceryStore.fromCanonical(storeName)?.accentColor ?? promoCardGreen
+    private var storeAccent: Color {
+        GroceryStore.fromCanonical(storeName)?.accentColor ?? PromoDesign.accentGreen
     }
-
-    private var isSpecialDeal: Bool {
-        let mech = item.mechanismLabel.lowercased()
-        return mech.contains("gratis") || mech.contains("free") || mech.contains("cadeau")
-    }
-
-    private var mechanismPillColor: Color {
-        if (item.minPurchaseQty ?? 1) > 1 { return promoCardGreen }
-        if isSpecialDeal { return promoCardGold }
-        return Color(white: 0.18)
-    }
-
-    private var mechanismTextColor: Color {
-        if isSpecialDeal { return .black.opacity(0.8) }
-        if (item.minPurchaseQty ?? 1) > 1 { return .white }
-        return .white.opacity(0.8)
-    }
-
-    private var discountBadgeColor: Color {
-        item.discountPercentage > 30
-            ? Color(red: 0.95, green: 0.25, blue: 0.25)
-            : promoCardGreen
-    }
-
-    // MARK: - Validity computation
-
-    private var daysRemaining: Int? {
-        let parts = item.validityEnd.split(separator: "-")
-        guard parts.count == 3,
-              let year = Int(parts[0]),
-              let month = Int(parts[1]),
-              let day = Int(parts[2]) else { return nil }
-        var components = DateComponents()
-        components.year = year
-        components.month = month
-        components.day = day
-        guard let endDate = Calendar.current.date(from: components) else { return nil }
-        let today = Calendar.current.startOfDay(for: Date())
-        let end = Calendar.current.startOfDay(for: endDate)
-        return Calendar.current.dateComponents([.day], from: today, to: end).day
-    }
-
-    private var validityDisplay: (text: String, color: Color, icon: String?) {
-        guard let days = daysRemaining else {
-            return (validityFallbackText, .white.opacity(0.4), nil)
-        }
-        switch days {
-        case _ where days < 0:
-            return ("Expired", .white.opacity(0.25), nil)
-        case 0:
-            return ("Last day!", promoUrgentRed, "exclamationmark.circle.fill")
-        case 1...2:
-            return ("\(days) day\(days == 1 ? "" : "s") left", promoUrgentOrange, "clock.badge.exclamationmark")
-        case 3...5:
-            return ("\(days) days left", promoWarningAmber, "clock")
-        default:
-            return ("\(days) days left", .white.opacity(0.4), nil)
-        }
-    }
-
-    private var validityFallbackText: String {
-        let parts = item.validityEnd.split(separator: "-")
-        if parts.count == 3 {
-            return "Until \(parts[2])/\(parts[1])"
-        }
-        return item.validityEnd
-    }
-
-    // MARK: - Body
 
     static let cardHeight: CGFloat = 340
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 0) {
-                imageSection
-                infoSection
+            ZStack(alignment: .leading) {
+                // Store accent rail on the left edge (always visible identity).
+                Rectangle()
+                    .fill(storeAccent)
+                    .frame(width: 3)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    imageSection
+                    infoSection
+                }
             }
             .frame(height: Self.cardHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: PromoDesign.cardCorner, style: .continuous))
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(white: 0.09))
+                RoundedRectangle(cornerRadius: PromoDesign.cardCorner, style: .continuous)
+                    .fill(PromoDesign.cardBackground)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: PromoDesign.cardCorner, style: .continuous)
+                    .stroke(PromoDesign.cardBorder, lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
         .opacity(appeared ? 1 : 0)
         .scaleEffect(appeared ? 1 : 0.94)
-        .onAppear {
-            triggerEntrance()
-        }
+        .onAppear { triggerEntrance() }
     }
 
-    // MARK: - Entrance Animation
+    // MARK: - Entrance animation (unchanged)
 
-    /// Stagger delay follows reading order: left→right across each row, then next row.
-    /// In a 2-column grid, index 0 = row0-left, 1 = row0-right, 2 = row1-left, etc.
-    /// Each card gets a small incremental delay for a smooth cascade effect.
     private func triggerEntrance() {
         let row = index / 2
         let col = index % 2
-        let sequentialPosition = row * 2 + col  // reading order: L, R, L, R...
-        let delay = Double(sequentialPosition) * 0.06
-        // Cap the delay so cards far down the list don't wait too long
-        let cappedDelay = min(delay, 0.6)
-
-        withAnimation(.smooth(duration: 0.35).delay(cappedDelay)) {
-            appeared = true
-        }
+        let sequentialPosition = row * 2 + col
+        let delay = min(Double(sequentialPosition) * 0.06, 0.6)
+        withAnimation(.smooth(duration: 0.35).delay(delay)) { appeared = true }
     }
 
-    // MARK: - Image Section
+    // MARK: - Image section
 
     private var imageSection: some View {
         ZStack(alignment: .topTrailing) {
@@ -149,44 +83,39 @@ struct PromoProductCard: View {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
-                        image
-                            .resizable()
+                        image.resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(maxWidth: .infinity, maxHeight: 120)
                             .padding(10)
-                    case .failure:
-                        imagePlaceholder
-                    case .empty:
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: 120)
-                    @unknown default:
-                        imagePlaceholder
+                    case .failure: imagePlaceholder
+                    case .empty: ProgressView().frame(maxWidth: .infinity, maxHeight: 120)
+                    @unknown default: imagePlaceholder
                     }
                 }
             } else {
                 imagePlaceholder
             }
 
-            // Discount badge (top-right)
-            if item.discountPercentage > 0 {
+            // Discount badge (top-right) — only when we have a real discount %
+            if item.discountPercentage > 0 && !item.priceUnavailable {
                 Text("-\(item.discountPercentage)%")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 4)
-                    .background(Capsule().fill(discountBadgeColor))
-                    .shadow(color: discountBadgeColor.opacity(0.4), radius: 4, y: 2)
+                    .background(
+                        Capsule().fill(
+                            item.discountPercentage > 30 ? PromoDesign.urgencyUrgent : PromoDesign.accentGreen
+                        )
+                    )
                     .padding(8)
             }
 
-            // Store logo (bottom-left)
+            // Store badge (bottom-left) — compact logo always visible.
             VStack {
                 Spacer()
                 HStack {
-                    StoreLogoView(storeName: storeName, height: 16)
-                        .frame(width: 24, height: 24)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                    StoreBadge(storeName: storeName, size: .small)
                         .padding(8)
                     Spacer()
                 }
@@ -203,106 +132,69 @@ struct PromoProductCard: View {
             .frame(maxWidth: .infinity, maxHeight: 120)
     }
 
-    // MARK: - Info Section
+    // MARK: - Info section
 
     private var infoSection: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            // Brand
+        VStack(alignment: .leading, spacing: 6) {
+            // Brand eyebrow
             if !item.brand.isEmpty {
                 Text(item.brand.uppercased())
-                    .font(.system(size: 11, weight: .bold))
+                    .font(PromoDesign.eyebrow())
                     .tracking(1.0)
-                    .foregroundColor(promoBrandColor)
+                    .foregroundStyle(storeAccent)
                     .lineLimit(1)
             }
 
-            // Product name — fixed height area, scales down for long names
+            // Product name
             Text(item.label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white)
-                .lineLimit(3)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(PromoDesign.primaryText)
+                .lineLimit(2)
                 .minimumScaleFactor(0.85)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(height: 48, alignment: .topLeading)
+                .frame(height: 34, alignment: .topLeading)
 
-            // Mechanism pill — solid filled capsule
-            HStack(spacing: 4) {
-                if (item.minPurchaseQty ?? 1) > 1 {
-                    Image(systemName: "cart.badge.plus")
-                        .font(.system(size: 10, weight: .semibold))
-                } else if isSpecialDeal {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                Text(item.mechanismLabel)
-                    .font(.system(size: 11, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-            .foregroundColor(mechanismTextColor)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Capsule().fill(mechanismPillColor))
-
-            // Prices
-            if item.hasPrices {
-                priceSection
+            // Mechanism pill
+            HStack {
+                MechanismPill(item: item)
+                Spacer(minLength: 4)
             }
 
-            // Savings pill
-            if item.savings > 0 {
-                Text(String(format: "Save €%.2f", item.savings))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(promoCardGreen)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule().fill(promoCardGreen.opacity(0.10))
-                    )
-            }
+            // PRIMARY: effective €/unit (cross-store anchor)
+            EffectiveUnitPriceView(item: item, size: .card)
+
+            // SECONDARY: promo + struck original, or "Prijs in winkel"
+            PromoPriceStack(item: item, size: .card)
 
             Spacer(minLength: 0)
 
-            // Validity + Add button (pinned to bottom)
-            HStack(spacing: 4) {
-                validityLabel
-                Spacer(minLength: 4)
+            // Bottom row: savings + validity + add
+            HStack(spacing: 6) {
+                if item.savings > 0 && !item.priceUnavailable {
+                    savingsChip
+                }
+                Spacer(minLength: 0)
+                ValidityChip(validityEnd: item.validityEnd)
                 addButton
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .padding(10)
-        .background(Color(white: 0.09))
+        .background(PromoDesign.cardBackground)
     }
 
-    // MARK: - Validity Label
-
-    private var validityLabel: some View {
-        let display = validityDisplay
-        let isUrgent = (daysRemaining ?? 99) <= 2
-
-        return HStack(spacing: 3) {
-            if let icon = display.icon {
-                Image(systemName: icon)
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            Text(display.text)
-                .font(.system(size: 10, weight: isUrgent ? .semibold : .regular))
-        }
-        .foregroundColor(display.color)
-        .padding(.horizontal, isUrgent ? 6 : 0)
-        .padding(.vertical, isUrgent ? 3 : 0)
-        .background(
-            Group {
-                if isUrgent {
-                    Capsule().fill(display.color.opacity(0.12))
-                }
-            }
-        )
-        .lineLimit(1)
+    private var savingsChip: some View {
+        Text(item.savingsLabel ?? String(format: "Bespaar €%.2f", item.savings))
+            .font(PromoDesign.chip())
+            .foregroundStyle(PromoDesign.accentGreen)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: PromoDesign.chipCorner, style: .continuous)
+                    .fill(PromoDesign.accentGreen.opacity(0.15))
+            )
+            .lineLimit(1)
     }
-
-    // MARK: - Add Button
 
     private var addButton: some View {
         Button {
@@ -315,52 +207,17 @@ struct PromoProductCard: View {
                 addTrigger.toggle()
             }
         } label: {
-            Image(systemName: groceryStore.contains(item: item, storeName: storeName) ? "checkmark.circle.fill" : "plus.circle.fill")
+            Image(systemName: groceryStore.contains(item: item, storeName: storeName)
+                    ? "checkmark.circle.fill" : "plus.circle.fill")
                 .font(.system(size: 22, weight: .medium))
-                .foregroundColor(groceryStore.contains(item: item, storeName: storeName) ? promoCardGreen : promoCardGreen.opacity(0.7))
+                .foregroundStyle(
+                    groceryStore.contains(item: item, storeName: storeName)
+                        ? storeAccent
+                        : storeAccent.opacity(0.7)
+                )
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
         .sensoryFeedback(.impact(weight: .medium), trigger: addTrigger)
     }
-
-    // MARK: - Price Section
-
-    @ViewBuilder
-    private var priceSection: some View {
-        let qty = item.minPurchaseQty ?? 1
-        if qty > 1 {
-            let totalOriginal = item.originalPrice * Double(qty)
-            let totalUserPays = totalOriginal - item.savings
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(String(format: "€%.2f", totalUserPays))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundColor(promoCardGreen)
-                Text(String(format: "€%.2f", totalOriginal))
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.3))
-                    .strikethrough(true, color: .white.opacity(0.3))
-            }
-        } else {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(String(format: "€%.2f", item.promoPrice))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundColor(promoCardGreen)
-                Text(String(format: "€%.2f", item.originalPrice))
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.3))
-                    .strikethrough(true, color: .white.opacity(0.3))
-            }
-        }
-    }
 }
-
-// MARK: - Card-local color constants
-
-private let promoCardGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
-private let promoCardGreenDark = Color(red: 0.10, green: 0.65, blue: 0.40)
-private let promoCardGold = Color(red: 1.00, green: 0.80, blue: 0.20)
-private let promoBrandColor = Color(red: 0.95, green: 0.80, blue: 0.20)
-private let promoWarningAmber = Color(red: 1.0, green: 0.75, blue: 0.25)
-private let promoUrgentOrange = Color(red: 0.95, green: 0.40, blue: 0.30)
-private let promoUrgentRed = Color(red: 0.95, green: 0.25, blue: 0.25)
