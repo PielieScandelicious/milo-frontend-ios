@@ -33,6 +33,17 @@ private struct BrandCashbackDealAPIResponse: Codable {
     let userStatus: String
     let earnedAt: Date?
 
+    // New fields (all optional for backward compat with older backend)
+    let eligibleSKUs: [String]?
+    let totalRedemptionCap: Int?
+    let currentRedemptions: Int?
+    let maxRedemptionsPerUser: Int?
+    let claimedAt: Date?
+    let claimExpiresAt: Date?
+    let howItWorks: [String]?
+    let terms: String?
+    let matchedReceiptId: String?
+
     enum CodingKeys: String, CodingKey {
         case id
         case brandName = "brand_name"
@@ -46,6 +57,15 @@ private struct BrandCashbackDealAPIResponse: Codable {
         case requiresStore = "requires_store"
         case userStatus = "user_status"
         case earnedAt = "earned_at"
+        case eligibleSKUs = "eligible_skus"
+        case totalRedemptionCap = "total_redemption_cap"
+        case currentRedemptions = "current_redemptions"
+        case maxRedemptionsPerUser = "max_redemptions_per_user"
+        case claimedAt = "claimed_at"
+        case claimExpiresAt = "claim_expires_at"
+        case howItWorks = "how_it_works"
+        case terms
+        case matchedReceiptId = "matched_receipt_id"
     }
 }
 
@@ -238,7 +258,17 @@ class BrandCashbackService: ObservableObject {
             validUntil: api.validUntil,
             eligibleStores: api.eligibleStores,
             requiresStore: api.requiresStore,
-            status: status
+            status: status,
+            eligibleSKUs: api.eligibleSKUs,
+            totalRedemptionCap: api.totalRedemptionCap,
+            currentRedemptions: api.currentRedemptions,
+            maxRedemptionsPerUser: api.maxRedemptionsPerUser,
+            claimedAt: api.claimedAt,
+            claimExpiresAt: api.claimExpiresAt,
+            howItWorks: api.howItWorks,
+            terms: api.terms,
+            matchedReceiptId: api.matchedReceiptId,
+            earnedAt: api.earnedAt
         )
     }
 

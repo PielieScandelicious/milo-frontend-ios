@@ -50,7 +50,8 @@ struct ContentView: View {
         case folders = 0
         case groceryList = 1
         case receipts = 2
-        case insights = 3
+        case cashback = 3
+        case insights = 4
     }
 
 
@@ -75,6 +76,12 @@ struct ContentView: View {
                         Label("Receipts", systemImage: "doc.text.fill")
                     }
                     .tag(Tab.receipts)
+
+                CashbackTab()
+                    .tabItem {
+                        Label("Cashback", systemImage: "eurosign.circle.fill")
+                    }
+                    .tag(Tab.cashback)
 
                 ViewTab(showSignOutConfirmation: $showSignOutConfirmation, dataManager: dataManager)
                     .tabItem {
@@ -620,6 +627,25 @@ struct ScanTab: View {
     var body: some View {
         HomeTabView()
             .id("ScanTab") // Prevent recreation
+    }
+}
+
+// MARK: - Cashback Tab
+struct CashbackTab: View {
+    @EnvironmentObject private var viewModel: BrandCashbackViewModel
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                BrandCashbackView(viewModel: viewModel)
+                    .padding(.top, 8)
+            }
+            .background(Color(red: 0.06, green: 0.06, blue: 0.08).ignoresSafeArea())
+            .navigationTitle("Cashback")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        }
+        .id("CashbackTab")
     }
 }
 

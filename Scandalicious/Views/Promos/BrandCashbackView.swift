@@ -20,13 +20,28 @@ private let shareBlue     = Color(red: 0.35, green: 0.65, blue: 1.0)
 
 struct BrandCashbackView: View {
     @ObservedObject var viewModel: BrandCashbackViewModel
+    var onViewReceipt: ((String) -> Void)? = nil
+
+    @State private var selectedDeal: BrandCashbackDeal? = nil
+    @State private var showOnboarding: Bool = BrandCashbackOnboardingCard.shouldShow
 
     var body: some View {
         VStack(spacing: 20) {
 
-            // Upload hint
-            ShareExtensionHintCard()
+            // Onboarding card (first-time) OR compact upload hint
+            if showOnboarding {
+                BrandCashbackOnboardingCard(onDismiss: {
+                    showOnboarding = false
+                })
                 .padding(.horizontal, 16)
+                .transition(.asymmetric(
+                    insertion: .opacity,
+                    removal: .opacity.combined(with: .move(edge: .top))
+                ))
+            } else {
+                ShareExtensionHintCard()
+                    .padding(.horizontal, 16)
+            }
 
             // MY DEALS section
             if !viewModel.myDeals.isEmpty {
@@ -39,7 +54,8 @@ struct BrandCashbackView: View {
                             deal: deal,
                             animationDelay: Double(index) * 0.05,
                             onClaim: { viewModel.claimDeal(deal) },
-                            onUnclaim: { viewModel.unclaimDeal(deal) }
+                            onUnclaim: { viewModel.unclaimDeal(deal) },
+                            onTap: { selectedDeal = deal }
                         )
                     }
                 }
@@ -60,7 +76,8 @@ struct BrandCashbackView: View {
                             deal: deal,
                             animationDelay: Double(index) * 0.06,
                             onClaim: { viewModel.claimDeal(deal) },
-                            onUnclaim: { viewModel.unclaimDeal(deal) }
+                            onUnclaim: { viewModel.unclaimDeal(deal) },
+                            onTap: { selectedDeal = deal }
                         )
                     }
                 }
@@ -74,6 +91,20 @@ struct BrandCashbackView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 8)
+        }
+        .sheet(item: $selectedDeal) { deal in
+            BrandCashbackDealDetailSheet(
+                deal: deal,
+                onClaim: {
+                    viewModel.claimDeal(deal)
+                    selectedDeal = nil
+                },
+                onUnclaim: {
+                    viewModel.unclaimDeal(deal)
+                    selectedDeal = nil
+                },
+                onViewReceipt: onViewReceipt
+            )
         }
     }
 
@@ -101,10 +132,42 @@ struct CashbackDealCard: View {
     let animationDelay: Double
     let onClaim: () -> Void
     let onUnclaim: () -> Void
+    var onTap: (() -> Void)? = nil
 
     @State private var appeared = false
 
     var body: some View {
+        VStack(spacing: 0) {
+            cardBody
+
+            if deal.status == .available, let label = deal.capProgressLabel {
+                capProgressFooter(label: label)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap?()
+        }
+        .glassCard(
+            borderGradient: deal.status == .claimed
+                ? LinearGradient(
+                    colors: [cashbackGreen.opacity(0.35), cashbackGreen.opacity(0.10)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+                : nil
+        )
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 12)
+        .onAppear {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.8).delay(animationDelay)) {
+                appeared = true
+            }
+        }
+    }
+
+    // MARK: - Card Body
+
+    private var cardBody: some View {
         ZStack(alignment: .leading) {
             // Claimed indicator bar
             if deal.status == .claimed {
@@ -141,9 +204,7 @@ struct CashbackDealCard: View {
                     // Store pills
                     storePills
 
-                    Text(deal.formattedExpiry)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.30))
+                    expiryLine
                 }
 
                 Spacer(minLength: 8)
@@ -169,21 +230,47 @@ struct CashbackDealCard: View {
             .padding(.vertical, 14)
             .padding(.leading, deal.status == .claimed ? 6 : 0)
         }
-        .glassCard(
-            borderGradient: deal.status == .claimed
-                ? LinearGradient(
-                    colors: [cashbackGreen.opacity(0.35), cashbackGreen.opacity(0.10)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-                : nil
-        )
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 12)
-        .onAppear {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.8).delay(animationDelay)) {
-                appeared = true
+    }
+
+    // MARK: - Cap Progress Footer
+
+    @ViewBuilder
+    private func capProgressFooter(label: String) -> some View {
+        let ratio = deal.capFillRatio ?? 0
+        let nearlyFull = deal.isNearlyFull
+        let fillColor: Color = nearlyFull
+            ? Color(red: 1.0, green: 0.55, blue: 0.20)
+            : cashbackGreen
+
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack(spacing: 6) {
+                if nearlyFull {
+                    Text("Almost full")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(fillColor)
+                    Spacer()
+                } else {
+                    Spacer()
+                }
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.40))
             }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 2)
+                    Capsule()
+                        .fill(fillColor)
+                        .frame(width: geo.size.width * ratio, height: 2)
+                }
+            }
+            .frame(height: 2)
         }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
     }
 
     // MARK: - Store Pills
@@ -221,60 +308,100 @@ struct CashbackDealCard: View {
         }
     }
 
+    // MARK: - Expiry / Countdown Line
+
+    @ViewBuilder
+    private var expiryLine: some View {
+        if deal.status == .claimed, let countdown = deal.claimCountdownLabel {
+            HStack(spacing: 4) {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 9, weight: .semibold))
+                Text(countdown)
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundStyle(claimCountdownColor)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(claimCountdownColor.opacity(0.12)))
+        } else if deal.isClaimExpired {
+            Text("Claim expired")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.30))
+        } else {
+            Text(deal.formattedExpiry)
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.30))
+        }
+    }
+
+    private var claimCountdownColor: Color {
+        guard let days = deal.daysUntilClaimExpires else { return cashbackGreen }
+        return days <= 3 ? Color(red: 1.0, green: 0.72, blue: 0.20) : cashbackGreen
+    }
+
     // MARK: - Action Button
 
     @ViewBuilder
     private var actionButton: some View {
-        switch deal.status {
-        case .available:
-            Button(action: onClaim) {
-                Text("Claim")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Capsule().fill(cashbackGreen))
-            }
-        case .claimed:
-            Button(action: onUnclaim) {
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
-                    Text("Claimed")
-                        .font(.system(size: 12, weight: .bold))
-                }
-                .foregroundStyle(cashbackGreen)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Capsule().stroke(cashbackGreen, lineWidth: 1.5))
-            }
-        case .pending:
-            HStack(spacing: 4) {
-                ProgressView()
-                    .scaleEffect(0.7)
-                    .tint(cashbackGreen)
-                Text("Pending")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(cashbackGreen.opacity(0.7))
-            }
-        case .earned:
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 11))
-                Text("Earned")
-                    .font(.system(size: 12, weight: .bold))
-            }
-            .foregroundStyle(cashbackGold)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(cashbackGold.opacity(0.15)))
-        case .expired:
+        if deal.isClaimExpired {
             Text("Expired")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.3))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(Color.white.opacity(0.06)))
+        } else {
+            switch deal.status {
+            case .available:
+                Button(action: onClaim) {
+                    Text("Claim")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Capsule().fill(cashbackGreen))
+                }
+            case .claimed:
+                Button(action: onUnclaim) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("Claimed")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundStyle(cashbackGreen)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Capsule().stroke(cashbackGreen, lineWidth: 1.5))
+                }
+            case .pending:
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .tint(cashbackGreen)
+                    Text("Pending")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(cashbackGreen.opacity(0.7))
+                }
+            case .earned:
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 11))
+                    Text("Earned")
+                        .font(.system(size: 12, weight: .bold))
+                }
+                .foregroundStyle(cashbackGold)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(cashbackGold.opacity(0.15)))
+            case .expired:
+                Text("Expired")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.3))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(Color.white.opacity(0.06)))
+            }
         }
     }
 
@@ -387,7 +514,23 @@ private struct ShareExtensionHintCard: View {
 struct CashbackEarnedOverlay: View {
     let dealName: String
     let cashbackAmount: Double
+    let matchedReceiptId: String?
     let onDismiss: () -> Void
+    let onViewReceipt: ((String) -> Void)?
+
+    init(
+        dealName: String,
+        cashbackAmount: Double,
+        matchedReceiptId: String? = nil,
+        onDismiss: @escaping () -> Void,
+        onViewReceipt: ((String) -> Void)? = nil
+    ) {
+        self.dealName = dealName
+        self.cashbackAmount = cashbackAmount
+        self.matchedReceiptId = matchedReceiptId
+        self.onDismiss = onDismiss
+        self.onViewReceipt = onViewReceipt
+    }
 
     @State private var glowScale: CGFloat = 0.3
     @State private var glowOpacity: Double = 0
@@ -523,6 +666,24 @@ struct CashbackEarnedOverlay: View {
                         .foregroundStyle(.white.opacity(0.45))
                 }
                 .opacity(textOpacity)
+
+                if let receiptId = matchedReceiptId, let onViewReceipt {
+                    Button {
+                        onViewReceipt(receiptId)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "receipt.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("View receipt")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(cashbackGreen)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 9)
+                        .background(Capsule().stroke(cashbackGreen.opacity(0.5), lineWidth: 1.2))
+                    }
+                    .opacity(textOpacity)
+                }
 
                 Text("Tap anywhere to continue")
                     .font(.system(size: 12, weight: .medium))
