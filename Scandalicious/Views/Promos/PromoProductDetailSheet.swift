@@ -58,6 +58,7 @@ struct PromoProductDetailSheet: View {
                     VStack(alignment: .leading, spacing: 20) {
                         brandAndNameSection
                         pricingHeroCard
+                        promoTextSection
                         crossStorePanel
                         folderLink
                         similarPromosSection
@@ -372,6 +373,92 @@ struct PromoProductDetailSheet: View {
         .padding(.vertical, 5)
         .background(Capsule().fill(PromoDesign.accentGreen.opacity(0.14)))
         .overlay(Capsule().stroke(PromoDesign.accentGreen.opacity(0.28), lineWidth: 0.5))
+    }
+
+    // MARK: - Verbatim tile text (Markdown)
+
+    @ViewBuilder
+    private var promoTextSection: some View {
+        if let raw = item.promoTextMarkdown?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !raw.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Folder tekst")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.5)
+                    .foregroundStyle(PromoDesign.tertiaryText)
+
+                ForEach(Array(markdownBlocks(from: raw).enumerated()), id: \.offset) { _, block in
+                    promoTextBlock(block)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+            )
+        }
+    }
+
+    private enum PromoTextBlock {
+        case paragraph(String)
+        case bullets([String])
+    }
+
+    /// Split a Markdown string into paragraph/bullet blocks separated by blank lines.
+    private func markdownBlocks(from raw: String) -> [PromoTextBlock] {
+        let chunks = raw.components(separatedBy: "\n\n")
+        var blocks: [PromoTextBlock] = []
+        for chunk in chunks {
+            let trimmed = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let lines = trimmed.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+            let isBulletList = !lines.isEmpty && lines.allSatisfy { $0.hasPrefix("- ") || $0.hasPrefix("* ") }
+            if isBulletList {
+                let items = lines.map { String($0.dropFirst(2)).trimmingCharacters(in: .whitespaces) }
+                blocks.append(.bullets(items))
+            } else {
+                blocks.append(.paragraph(trimmed))
+            }
+        }
+        return blocks
+    }
+
+    @ViewBuilder
+    private func promoTextBlock(_ block: PromoTextBlock) -> some View {
+        switch block {
+        case .paragraph(let text):
+            Text(markdownAttributed(text))
+                .font(.system(size: 14))
+                .foregroundStyle(PromoDesign.primaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        case .bullets(let items):
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, line in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("•")
+                            .font(.system(size: 14))
+                            .foregroundStyle(PromoDesign.tertiaryText)
+                        Text(markdownAttributed(line))
+                            .font(.system(size: 14))
+                            .foregroundStyle(PromoDesign.primaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Parse inline Markdown (bold, italic, code) but keep any embedded newlines as line breaks.
+    private func markdownAttributed(_ text: String) -> AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(
+            interpretedSyntax: .inlineOnlyPreservingWhitespace
+        )
+        return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
     }
 
     // MARK: - Cross-store comparison panel

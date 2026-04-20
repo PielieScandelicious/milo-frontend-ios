@@ -29,6 +29,7 @@ struct PromoFolderHotspot: Codable, Identifiable {
     let thumbnailUrl: String?
     let imageUrl: String?
     let storeName: String
+    let promoTextMarkdown: String?
 
     var id: String { itemId }
 
@@ -70,7 +71,8 @@ struct PromoFolderHotspot: Codable, Identifiable {
             bucketLabel: nil,
             thumbnailUrl: thumbnailUrl,
             imageUrl: imageUrl,
-            storeName: storeName
+            storeName: storeName,
+            promoTextMarkdown: promoTextMarkdown
         )
     }
 
@@ -93,6 +95,30 @@ struct PromoFolderHotspot: Codable, Identifiable {
         case thumbnailUrl = "thumbnail_url"
         case imageUrl = "image_url"
         case storeName = "store_name"
+        case promoTextMarkdown = "promo_text_markdown"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        itemId = try c.decode(String.self, forKey: .itemId)
+        pageNumber = try c.decode(Int.self, forKey: .pageNumber)
+        tileBboxXMin = try c.decode(CGFloat.self, forKey: .tileBboxXMin)
+        tileBboxYMin = try c.decode(CGFloat.self, forKey: .tileBboxYMin)
+        tileBboxXMax = try c.decode(CGFloat.self, forKey: .tileBboxXMax)
+        tileBboxYMax = try c.decode(CGFloat.self, forKey: .tileBboxYMax)
+        displayName = try c.decode(String.self, forKey: .displayName)
+        displayBrand = try c.decodeIfPresent(String.self, forKey: .displayBrand)
+        displayMechanism = try c.decode(String.self, forKey: .displayMechanism)
+        originalPrice = try c.decodeIfPresent(Double.self, forKey: .originalPrice) ?? 0
+        promoPrice = try c.decodeIfPresent(Double.self, forKey: .promoPrice) ?? 0
+        savingsAmount = try c.decodeIfPresent(Double.self, forKey: .savingsAmount) ?? 0
+        discountPercentage = try c.decodeIfPresent(Int.self, forKey: .discountPercentage) ?? 0
+        minPurchaseQty = try c.decodeIfPresent(Int.self, forKey: .minPurchaseQty) ?? 1
+        validityEnd = try c.decodeIfPresent(String.self, forKey: .validityEnd) ?? ""
+        thumbnailUrl = try c.decodeIfPresent(String.self, forKey: .thumbnailUrl)
+        imageUrl = try c.decodeIfPresent(String.self, forKey: .imageUrl)
+        storeName = try c.decodeIfPresent(String.self, forKey: .storeName) ?? ""
+        promoTextMarkdown = try c.decodeIfPresent(String.self, forKey: .promoTextMarkdown)
     }
 }
 

@@ -57,6 +57,9 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
     /// Parent consumer category (~22 values). Distinct from the server-side granular category used for similarity.
     let category: String?
 
+    /// Verbatim promo tile text, reformatted as Markdown by Gemini. Rendered in the detail sheet.
+    let promoTextMarkdown: String?
+
     /// Brand to render in the UI — primaryBrand wins when the server provides it.
     var primaryBrandLabel: String {
         if let p = primaryBrand, !p.isEmpty { return p }
@@ -151,6 +154,7 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         case mechanismY = "mechanism_y"
         case promoCampaign = "promo_campaign"
         case category
+        case promoTextMarkdown = "promo_text_markdown"
     }
 
     // Memberwise init with defaults for new fields, so older call sites keep compiling.
@@ -193,7 +197,8 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         mechanismX: Double? = nil,
         mechanismY: Double? = nil,
         promoCampaign: String? = nil,
-        category: String? = nil
+        category: String? = nil,
+        promoTextMarkdown: String? = nil
     ) {
         self.itemKey = itemKey
         self.brand = brand
@@ -234,6 +239,7 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         self.mechanismY = mechanismY
         self.promoCampaign = promoCampaign
         self.category = category
+        self.promoTextMarkdown = promoTextMarkdown
     }
 
     // Backward-compatible decoder: older API responses (no unit-pricing fields) stay decodable.
@@ -278,6 +284,7 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         self.mechanismY = try c.decodeIfPresent(Double.self, forKey: .mechanismY)
         self.promoCampaign = try c.decodeIfPresent(String.self, forKey: .promoCampaign)
         self.category = try c.decodeIfPresent(String.self, forKey: .category)
+        self.promoTextMarkdown = try c.decodeIfPresent(String.self, forKey: .promoTextMarkdown)
     }
 }
 
