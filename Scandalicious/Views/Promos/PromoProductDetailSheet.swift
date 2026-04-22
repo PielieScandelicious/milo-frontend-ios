@@ -154,8 +154,8 @@ struct PromoProductDetailSheet: View {
             Color(white: 0.97)
                 .frame(height: 300)
 
-            // Product image
-            if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
+            // Full-tile crop (heroUrl) when available; falls back to the product-focused crop.
+            if let imageUrl = item.heroUrl ?? item.imageUrl, let url = URL(string: imageUrl) {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):

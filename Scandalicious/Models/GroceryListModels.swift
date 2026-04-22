@@ -12,6 +12,9 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
     let productName: String
     let displayName: String?
     let imageUrl: String?
+    /// Full-tile crop URL — shown in the product-detail sheet when opened from the grocery list.
+    /// Nil for entries saved before the field existed; detail sheet falls back to `imageUrl`.
+    let heroUrl: String?
     let storeName: String
     let promoPrice: Double
     let originalPrice: Double
@@ -81,6 +84,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
             bucketLabel: nil,
             thumbnailUrl: imageUrl,
             imageUrl: imageUrl,
+            heroUrl: heroUrl,
             storeName: storeName
         )
     }
@@ -93,6 +97,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
             productName: item.productName,
             displayName: item.displayName,
             imageUrl: item.imageUrl ?? item.thumbnailUrl,
+            heroUrl: item.heroUrl,
             storeName: storeName,
             promoPrice: item.promoPrice,
             originalPrice: item.originalPrice,

@@ -28,6 +28,8 @@ struct PromoFolderHotspot: Codable, Identifiable {
     let validityEnd: String
     let thumbnailUrl: String?
     let imageUrl: String?
+    /// Full-tile crop for the product-detail view (nil on older payloads).
+    let heroUrl: String?
     let storeName: String
     let promoTextMarkdown: String?
 
@@ -71,6 +73,7 @@ struct PromoFolderHotspot: Codable, Identifiable {
             bucketLabel: nil,
             thumbnailUrl: thumbnailUrl,
             imageUrl: imageUrl,
+            heroUrl: heroUrl,
             storeName: storeName,
             promoTextMarkdown: promoTextMarkdown
         )
@@ -94,6 +97,7 @@ struct PromoFolderHotspot: Codable, Identifiable {
         case validityEnd = "validity_end"
         case thumbnailUrl = "thumbnail_url"
         case imageUrl = "image_url"
+        case heroUrl = "hero_url"
         case storeName = "store_name"
         case promoTextMarkdown = "promo_text_markdown"
     }
@@ -117,6 +121,7 @@ struct PromoFolderHotspot: Codable, Identifiable {
         validityEnd = try c.decodeIfPresent(String.self, forKey: .validityEnd) ?? ""
         thumbnailUrl = try c.decodeIfPresent(String.self, forKey: .thumbnailUrl)
         imageUrl = try c.decodeIfPresent(String.self, forKey: .imageUrl)
+        heroUrl = try c.decodeIfPresent(String.self, forKey: .heroUrl)
         storeName = try c.decodeIfPresent(String.self, forKey: .storeName) ?? ""
         promoTextMarkdown = try c.decodeIfPresent(String.self, forKey: .promoTextMarkdown)
     }

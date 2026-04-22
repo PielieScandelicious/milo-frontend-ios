@@ -36,6 +36,9 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
     let bucketLabel: String?
     let thumbnailUrl: String?
     let imageUrl: String?
+    /// Full-tile crop (product + price label + brand + badge + background) — used by the product-detail view.
+    /// Nil on older payloads; callers should fall back to `imageUrl`.
+    let heroUrl: String?
     let storeName: String?
 
     // Post-promo effective unit price + pack metadata (backend >= 2026-04-20)
@@ -139,6 +142,7 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         case bucketLabel = "bucket_label"
         case thumbnailUrl = "thumbnail_url"
         case imageUrl = "image_url"
+        case heroUrl = "hero_url"
         case storeName = "store_name"
         case priceUnavailable = "price_unavailable"
         case unitPriceValue = "unit_price_value"
@@ -183,6 +187,7 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         bucketLabel: String?,
         thumbnailUrl: String?,
         imageUrl: String?,
+        heroUrl: String? = nil,
         storeName: String?,
         priceUnavailable: Bool = false,
         unitPriceValue: Double? = nil,
@@ -224,6 +229,7 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         self.bucketLabel = bucketLabel
         self.thumbnailUrl = thumbnailUrl
         self.imageUrl = imageUrl
+        self.heroUrl = heroUrl
         self.storeName = storeName
         self.priceUnavailable = priceUnavailable
         self.unitPriceValue = unitPriceValue
@@ -269,6 +275,7 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         self.bucketLabel = try c.decodeIfPresent(String.self, forKey: .bucketLabel)
         self.thumbnailUrl = try c.decodeIfPresent(String.self, forKey: .thumbnailUrl)
         self.imageUrl = try c.decodeIfPresent(String.self, forKey: .imageUrl)
+        self.heroUrl = try c.decodeIfPresent(String.self, forKey: .heroUrl)
         self.storeName = try c.decodeIfPresent(String.self, forKey: .storeName)
         self.priceUnavailable = try c.decodeIfPresent(Bool.self, forKey: .priceUnavailable) ?? false
         self.unitPriceValue = try c.decodeIfPresent(Double.self, forKey: .unitPriceValue)
