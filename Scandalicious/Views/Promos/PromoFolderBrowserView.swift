@@ -214,26 +214,44 @@ struct PromoFolderBrowserView: View {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(row, id: \.storeId) { group in
-                        StoreFolderGridCard(
-                            storeId: group.storeId,
-                            displayName: group.displayName,
-                            folders: group.folders,
-                            isSelected: expandedStoreId == group.storeId,
-                            onTap: {
-                                let willExpand = expandedStoreId != group.storeId
-                                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                                    expandedStoreId = willExpand ? group.storeId : nil
+                        Group {
+                            if group.folders.count == 1, let folder = group.folders.first {
+                                NavigationLink {
+                                    PromoFolderPageViewer(folder: folder)
+                                } label: {
+                                    StoreFolderGridCard(
+                                        storeId: group.storeId,
+                                        displayName: group.displayName,
+                                        folders: group.folders,
+                                        isSelected: false
+                                    )
                                 }
-                                if willExpand, let scrollProxy {
-                                    // Defer so the ExpandedFolderLane is inserted before we scroll to it.
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
-                                            scrollProxy.scrollTo(group.storeId, anchor: .top)
+                                .buttonStyle(PressableCardStyle())
+                            } else {
+                                Button {
+                                    let willExpand = expandedStoreId != group.storeId
+                                    withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                                        expandedStoreId = willExpand ? group.storeId : nil
+                                    }
+                                    if willExpand, let scrollProxy {
+                                        // Defer so the ExpandedFolderLane is inserted before we scroll to it.
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                                                scrollProxy.scrollTo(group.storeId, anchor: .top)
+                                            }
                                         }
                                     }
+                                } label: {
+                                    StoreFolderGridCard(
+                                        storeId: group.storeId,
+                                        displayName: group.displayName,
+                                        folders: group.folders,
+                                        isSelected: expandedStoreId == group.storeId
+                                    )
                                 }
+                                .buttonStyle(PressableCardStyle())
                             }
-                        )
+                        }
                         .id(group.storeId)
                         .frame(maxWidth: .infinity)
                     }
@@ -396,31 +414,7 @@ struct FolderCoverCard: View {
 
             // Info bar
             HStack(spacing: 6) {
-                let validity = folder.validityDisplay
-                HStack(spacing: 4) {
-                    if let icon = validity.icon {
-                        Image(systemName: icon)
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                    Text(validity.text)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .lineLimit(1)
-                }
-                .foregroundColor(validity.color)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            Capsule()
-                                .fill(validity.color.opacity(0.12))
-                        )
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(validity.color.opacity(0.25), lineWidth: 0.5)
-                        )
-                )
+                ValidityChip(validityEnd: folder.validityEnd)
 
                 Spacer()
 
@@ -459,7 +453,6 @@ private struct StoreFolderGridCard: View {
     let displayName: String
     let folders: [PromoFolder]
     let isSelected: Bool
-    let onTap: () -> Void
 
     private var accent: Color {
         GroceryStore.fromCanonical(storeId)?.accentColor
@@ -467,63 +460,63 @@ private struct StoreFolderGridCard: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 10) {
-                StackedCoversView(folders: folders, accent: accent)
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(0.88, contentMode: .fit)
+        VStack(alignment: .leading, spacing: 10) {
+            StackedCoversView(folders: folders, accent: accent)
+                .frame(maxWidth: .infinity)
+                .aspectRatio(0.88, contentMode: .fit)
 
-                // Sleek selection marker — thin accent capsule centered beneath the covers
-                Capsule()
-                    .fill(accent)
-                    .frame(width: 28, height: 3)
-                    .frame(maxWidth: .infinity)
-                    .opacity(isSelected ? 1 : 0)
-                    .scaleEffect(x: isSelected ? 1 : 0.3, anchor: .center)
+            // Sleek selection marker — thin accent capsule centered beneath the covers
+            Capsule()
+                .fill(accent)
+                .frame(width: 28, height: 3)
+                .frame(maxWidth: .infinity)
+                .opacity(isSelected ? 1 : 0)
+                .scaleEffect(x: isSelected ? 1 : 0.3, anchor: .center)
 
-                HStack(alignment: .center, spacing: 10) {
-                    StoreLogoView(storeName: storeId, height: 22)
-                        .frame(width: 38, height: 38)
-                        .background(
-                            Circle().fill(Color.white)
-                        )
-                        .overlay(
-                            Circle().stroke(Color.black.opacity(0.06), lineWidth: 0.5)
-                        )
-                        .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+            HStack(alignment: .center, spacing: 10) {
+                StoreLogoView(storeName: storeId, height: 22)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        Circle().fill(Color.white)
+                    )
+                    .overlay(
+                        Circle().stroke(Color.black.opacity(0.06), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(displayName)
-                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.75)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(displayName)
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
 
-                        HStack(spacing: 4) {
-                            Image(systemName: folders.count > 1 ? "square.stack.fill" : "square.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                            Text(folderCountText)
-                                .font(.system(.caption2, design: .rounded).weight(.semibold))
-                        }
-                        .foregroundStyle(.white.opacity(0.55))
-
-                        Spacer(minLength: 0)
+                    HStack(spacing: 4) {
+                        Image(systemName: folders.count > 1 ? "square.stack.fill" : "doc.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text(folderCountText)
+                            .font(.system(.caption2, design: .rounded).weight(.semibold))
                     }
-                    .frame(height: 54, alignment: .topLeading)
+                    .foregroundStyle(.white.opacity(0.55))
 
                     Spacer(minLength: 0)
                 }
+                .frame(height: 54, alignment: .topLeading)
+
+                Spacer(minLength: 0)
             }
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
-            .scaleEffect(isSelected ? 1.015 : 1.0)
-            .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isSelected)
         }
-        .buttonStyle(PressableCardStyle())
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .scaleEffect(isSelected ? 1.015 : 1.0)
+        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isSelected)
     }
 
     private var folderCountText: String {
-        folders.count == 1 ? "1 folder" : "\(folders.count) folders"
+        if folders.count == 1, let only = folders.first {
+            return only.pageCount == 1 ? "1 page" : "\(only.pageCount) pages"
+        }
+        return "\(folders.count) folders"
     }
 }
 

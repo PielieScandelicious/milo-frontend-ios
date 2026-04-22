@@ -60,7 +60,7 @@ struct ContentView: View {
             TabView(selection: $selectedTab) {
                 FoldersTab()
                     .tabItem {
-                        Label("Deals", systemImage: "tag.fill")
+                        Label("Folders", systemImage: "newspaper.fill")
                     }
                     .tag(Tab.folders)
 
