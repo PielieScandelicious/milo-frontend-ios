@@ -144,27 +144,13 @@ struct GroceryListCard: View {
                 .padding(6)
             }
 
-            if let days = item.daysRemaining {
-                let style = validityBadgeStyle(days: days)
-                VStack {
+            VStack {
+                Spacer()
+                HStack {
                     Spacer()
-                    HStack {
-                        Spacer()
-                        HStack(spacing: 3) {
-                            if let icon = style.icon {
-                                Image(systemName: icon)
-                                    .font(.system(size: 8, weight: .semibold))
-                            }
-                            Text(style.text)
-                                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                        }
-                        .foregroundColor(style.fg)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(style.bg))
+                    ValidityChip(validityEnd: item.validityEnd)
                         .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
                         .padding(6)
-                    }
                 }
             }
         }
@@ -245,29 +231,6 @@ struct GroceryListCard: View {
         .padding(10)
     }
 
-    private func validityDisplay(days: Int) -> (text: String, color: Color, icon: String?) {
-        if days < 0 { return ("Expired", .white.opacity(0.35), nil) }
-        if days == 0 { return ("Last day!", Color(red: 0.95, green: 0.25, blue: 0.25), "exclamationmark.circle.fill") }
-        if days <= 2 { return ("\(days) day\(days == 1 ? "" : "s") left", Color(red: 0.95, green: 0.40, blue: 0.30), "clock.badge.exclamationmark") }
-        if days <= 5 { return ("\(days) days left", Color(red: 1.0, green: 0.75, blue: 0.25), "clock") }
-        return ("\(days) days left", .white.opacity(0.5), "clock")
-    }
-
-    private func validityBadgeStyle(days: Int) -> (text: String, icon: String?, bg: Color, fg: Color) {
-        if days < 0 {
-            return ("Expired", "calendar.badge.exclamationmark", Color.black.opacity(0.55), .white.opacity(0.6))
-        }
-        if days == 0 {
-            return ("Last day!", "exclamationmark.circle.fill", Color(red: 0.95, green: 0.25, blue: 0.25).opacity(0.85), .white)
-        }
-        if days <= 2 {
-            return ("\(days)d", "clock.badge.exclamationmark", Color(red: 0.95, green: 0.40, blue: 0.30).opacity(0.85), .white)
-        }
-        if days <= 5 {
-            return ("\(days)d", "clock", Color(red: 1.0, green: 0.75, blue: 0.25).opacity(0.80), .black.opacity(0.85))
-        }
-        return ("\(days)d", "clock", Color.black.opacity(0.55), .white.opacity(0.9))
-    }
 }
 
 // MARK: - Compact Card (checked, "in cart")

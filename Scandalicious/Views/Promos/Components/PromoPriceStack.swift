@@ -26,17 +26,25 @@ struct PromoPriceStack: View {
                 .foregroundStyle(PromoDesign.secondaryText)
                 .accessibilityLabel("Prijs in winkel")
         } else if item.hasPrices {
+            // `lineLimit(1)` + `minimumScaleFactor` keep the promo + struck
+            // original on a single line even when the hero price is wide
+            // (e.g. "€14.99" + "€19.99") and shares the row with a savings
+            // pill on a compact iPhone.
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(String(format: "€%.2f", item.promoPrice))
                     .font(promoFont)
                     .foregroundStyle(PromoDesign.primaryText)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 if item.originalPrice > item.promoPrice {
                     Text(String(format: "€%.2f", item.originalPrice))
                         .font(strikeFont)
                         .foregroundStyle(PromoDesign.tertiaryText)
                         .strikethrough(true, color: PromoDesign.tertiaryText)
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
             }
             .accessibilityElement(children: .combine)

@@ -191,31 +191,6 @@ struct PromoFolder: Codable, Identifiable {
         return Calendar.current.dateComponents([.day], from: today, to: end).day
     }
 
-    /// Validity display matching the Deals tab style: text + color + optional icon
-    var validityDisplay: (text: String, color: Color, icon: String?) {
-        guard let days = daysRemaining else {
-            return (validityFallback, .white.opacity(0.4), nil)
-        }
-        switch days {
-        case _ where days < 0:
-            return ("Expired", .white.opacity(0.25), nil)
-        case 0:
-            return ("Last day!", Color(red: 0.95, green: 0.25, blue: 0.25), "exclamationmark.circle.fill")
-        case 1...2:
-            return ("\(days) day\(days == 1 ? "" : "s") left", Color(red: 0.95, green: 0.40, blue: 0.30), "clock.badge.exclamationmark")
-        case 3...5:
-            return ("\(days) days left", Color(red: 1.0, green: 0.75, blue: 0.25), "clock")
-        default:
-            return ("\(days) days left", .white.opacity(0.4), nil)
-        }
-    }
-
-    private var validityFallback: String {
-        let parts = validityEnd.split(separator: "-")
-        guard parts.count == 3 else { return validityEnd }
-        return "Until \(parts[2])/\(parts[1])"
-    }
-
     enum CodingKeys: String, CodingKey {
         case folderId = "folder_id"
         case storeId = "store_id"

@@ -187,3 +187,73 @@ actor PromoAPIService {
         return try await user.getIDToken()
     }
 }
+
+// MARK: - Similar Promos Cache
+
+/// Synchronous-peek cache + inflight dedupe for `/promos/{id}/similar` responses.
+/// Mirrors the pattern used by `ImagePrefetcher`: the folder viewer warms the
+/// cache while the user browses pages, and `PromoProductDetailSheet` checks
+/// the cache synchronously to skip the shimmer when data is already available.
+final class SimilarPromosCache {
+    static let shared = SimilarPromosCache()
+
+    private let cache: NSCache<NSString, CachedSimilarPromos> = {
+        let c = NSCache<NSString, CachedSimilarPromos>()
+        c.countLimit = 300
+        return c
+    }()
+
+    private var inflight: [NSString: Task<SimilarPromosResponse?, Never>] = [:]
+    private let queue = DispatchQueue(label: "SimilarPromosCache.inflight")
+
+    private func cacheKey(promoId: String, limit: Int) -> NSString {
+        "\(promoId)|\(limit)" as NSString
+    }
+
+    /// Synchronous lookup — safe to call from the main thread during SwiftUI init.
+    func cached(promoId: String, limit: Int = 10) -> SimilarPromosResponse? {
+        cache.object(forKey: cacheKey(promoId: promoId, limit: limit))?.response
+    }
+
+    /// Kick off a fetch if not cached or already in-flight; do not wait.
+    func prefetch(promoId: String, limit: Int = 10) {
+        _ = fetchTask(promoId: promoId, limit: limit)
+    }
+
+    /// Await-able access: returns the cached response or the result of a fresh fetch.
+    func getOrFetch(promoId: String, limit: Int = 10) async -> SimilarPromosResponse? {
+        if let cached = cached(promoId: promoId, limit: limit) { return cached }
+        return await fetchTask(promoId: promoId, limit: limit).value
+    }
+
+    @discardableResult
+    private func fetchTask(promoId: String, limit: Int) -> Task<SimilarPromosResponse?, Never> {
+        let key = cacheKey(promoId: promoId, limit: limit)
+        if let box = cache.object(forKey: key) {
+            let response = box.response
+            return Task { response }
+        }
+        return queue.sync {
+            if let existing = inflight[key] { return existing }
+            let task = Task<SimilarPromosResponse?, Never> { [weak self] in
+                defer {
+                    self?.queue.sync { _ = self?.inflight.removeValue(forKey: key) }
+                }
+                do {
+                    let response = try await PromoAPIService.shared.getSimilarPromos(promoId: promoId, limit: limit)
+                    self?.cache.setObject(CachedSimilarPromos(response: response), forKey: key)
+                    return response
+                } catch {
+                    return nil
+                }
+            }
+            inflight[key] = task
+            return task
+        }
+    }
+}
+
+private final class CachedSimilarPromos {
+    let response: SimilarPromosResponse
+    init(response: SimilarPromosResponse) { self.response = response }
+}

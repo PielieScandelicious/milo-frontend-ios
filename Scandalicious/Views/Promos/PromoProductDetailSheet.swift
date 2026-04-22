@@ -11,6 +11,12 @@ import SwiftUI
 struct PromoProductDetailSheet: View {
     let initialItem: PromoGridItem
     var onOpenInFolder: ((PromoFolder, Int, String?) -> Void)? = nil
+    /// When set, the "View in folder" button is hidden for this specific item —
+    /// used when the sheet is opened from inside the folder viewer for a
+    /// hotspot the user already sees on screen. Similar-promo navigation
+    /// within the sheet still surfaces the button because their itemKey
+    /// differs from this origin.
+    var originatingItemKey: String? = nil
     @EnvironmentObject private var foldersViewModel: PromoFoldersViewModel
     @ObservedObject private var groceryStore = GroceryListStore.shared
     @State private var addTrigger = false
@@ -21,10 +27,23 @@ struct PromoProductDetailSheet: View {
     @State private var loggedOpenForItemIds: Set<String> = []
     @Environment(\.dismiss) private var dismiss
 
-    init(gridItem: PromoGridItem, onOpenInFolder: ((PromoFolder, Int, String?) -> Void)? = nil) {
+    init(
+        gridItem: PromoGridItem,
+        onOpenInFolder: ((PromoFolder, Int, String?) -> Void)? = nil,
+        originatingItemKey: String? = nil
+    ) {
         self.initialItem = gridItem
         self.onOpenInFolder = onOpenInFolder
+        self.originatingItemKey = originatingItemKey
         self._currentItem = State(initialValue: gridItem)
+
+        // Pre-populate from the shared cache so a prefetched response renders
+        // the carousel on first paint instead of flashing the shimmer.
+        if let promoId = gridItem.item.itemKey,
+           let cached = SimilarPromosCache.shared.cached(promoId: promoId, limit: 10) {
+            self._similarPromos = State(initialValue: cached.items)
+            self._similarLoading = State(initialValue: false)
+        }
     }
 
     private var item: PromoStoreItem { currentItem.item }
@@ -155,45 +174,43 @@ struct PromoProductDetailSheet: View {
                 .frame(height: 300)
 
             // Full-tile crop (heroUrl) when available; falls back to the product-focused crop.
+            // RemoteImage hits the shared prefetch cache synchronously, so hero images
+            // prefetched on the folder page paint without a ProgressView flash.
             if let imageUrl = item.heroUrl ?? item.imageUrl, let url = URL(string: imageUrl) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: .infinity, maxHeight: 260)
-                            .padding(20)
-                    case .failure:
-                        heroPlaceholder
-                    case .empty:
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: 260)
-                    @unknown default:
-                        heroPlaceholder
-                    }
+                RemoteImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: 260)
+                        .padding(20)
+                } placeholder: {
+                    heroPlaceholder
                 }
             } else {
                 heroPlaceholder
             }
 
-            // Discount badge (top-left) — suppressed for price_unavailable
+            // Discount badge (top-left) — suppressed for price_unavailable.
+            // Leading inset clears the 4pt store accent rail so the badge
+            // reads as floating over the image, not glued to the rail.
             if item.discountPercentage > 0 && !item.priceUnavailable {
                 Text("-\(item.discountPercentage)%")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 9)
+                    .monospacedDigit()
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Capsule().fill(discountBadgeColor))
                     .shadow(color: discountBadgeColor.opacity(0.35), radius: 4, y: 2)
-                    .padding(8)
+                    .padding(.leading, 14)
+                    .padding(.top, 12)
             }
 
             // Store badge (bottom-left) + Validity chip (bottom-right)
             VStack {
                 Spacer()
                 HStack(alignment: .bottom) {
-                    StoreBadge(storeName: storeName, size: .large)
+                    StoreBadge(storeName: storeName, size: .small)
                     Spacer()
                     ValidityChip(validityEnd: item.validityEnd)
                         .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
@@ -222,26 +239,28 @@ struct PromoProductDetailSheet: View {
 
     private var brandAndNameSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Brand — prominent, in store accent color
+            // Brand — editorial-style eyebrow above the product name:
+            // small uppercase wordmark in the store accent color, no heavy
+            // pill. Additional brands follow after a thin divider so the
+            // primary brand still reads as the anchor.
             if !item.primaryBrandLabel.isEmpty {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text(item.primaryBrandLabel.uppercased())
-                        .font(.system(size: 12, weight: .bold))
-                        .tracking(1.2)
+                        .font(.system(size: 12, weight: .heavy))
+                        .tracking(1.6)
                         .foregroundStyle(storeAccentColor)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule().fill(storeAccentColor.opacity(0.15))
-                        )
-                        .overlay(
-                            Capsule().stroke(storeAccentColor.opacity(0.25), lineWidth: 0.5)
-                        )
-                    // Multi-brand promo: show sibling brands next to the primary.
+                        .lineLimit(1)
+
                     if let extra = item.additionalBrands, !extra.isEmpty {
-                        Text("+ \(extra.joined(separator: ", "))")
+                        Rectangle()
+                            .fill(PromoDesign.tertiaryText.opacity(0.35))
+                            .frame(width: 1, height: 10)
+                        Text(extra.joined(separator: " · ").uppercased())
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(PromoDesign.secondaryText)
+                            .tracking(1.0)
+                            .foregroundStyle(PromoDesign.tertiaryText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
             }
@@ -312,24 +331,11 @@ struct PromoProductDetailSheet: View {
                         .foregroundStyle(PromoDesign.secondaryText)
                 }
             } else {
-                // HERO: the cross-store comparison anchor.
-                if item.unitPriceValue != nil || (item.displayUnitPrice?.isEmpty == false) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        EffectiveUnitPriceView(item: item, size: .hero)
-                        Text("effectieve prijs per eenheid")
-                            .font(.system(size: 11, weight: .semibold))
-                            .tracking(0.5)
-                            .foregroundStyle(PromoDesign.tertiaryText)
-                    }
-                }
-
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 1)
-
-                // Pack price (promo + struck original) — secondary
+                // `layoutPriority(1)` on the price stack keeps the price on a
+                // single line even when the savings pill is wide.
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     PromoPriceStack(item: item, size: .hero)
+                        .layoutPriority(1)
                     if item.savings > 0 {
                         savingsPill
                     }
@@ -356,23 +362,21 @@ struct PromoProductDetailSheet: View {
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
     }
 
+    @ViewBuilder
     private var savingsPill: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 11, weight: .bold))
-            if item.discountPercentage > 0 {
-                Text(String(format: "Bespaar €%.2f · %d%%", item.savings, item.discountPercentage))
-                    .font(.system(size: 12, weight: .bold))
-            } else {
-                Text(String(format: "Bespaar €%.2f", item.savings))
-                    .font(.system(size: 12, weight: .bold))
-            }
+        if item.savings > 0 {
+            Text(String(format: "Bespaar €%.2f", item.savings))
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(PromoDesign.accentGreen)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(PromoDesign.accentGreen.opacity(0.14)))
+                .overlay(Capsule().stroke(PromoDesign.accentGreen.opacity(0.28), lineWidth: 0.5))
+                .accessibilityLabel(String(format: "Bespaar €%.2f", item.savings))
         }
-        .foregroundStyle(PromoDesign.accentGreen)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Capsule().fill(PromoDesign.accentGreen.opacity(0.14)))
-        .overlay(Capsule().stroke(PromoDesign.accentGreen.opacity(0.28), lineWidth: 0.5))
     }
 
     // MARK: - Verbatim tile text (Markdown)
@@ -480,72 +484,28 @@ struct PromoProductDetailSheet: View {
 
     @ViewBuilder
     private var folderLink: some View {
-        if let match = folderMatch, let onOpenInFolder {
+        // Every promo is anchored to a folder page with a bbox, so the CTA is
+        // always the in-app viewer. Styled in premium blue to match the "+"
+        // badges, contour trace, and spotlight animation inside the viewer —
+        // one visual language for "this lives in the folder".
+        //
+        // Hidden for the originating hotspot (user tapped a promo in the
+        // viewer → button would send them back to where they already are).
+        if item.itemKey != nil, item.itemKey == originatingItemKey {
+            EmptyView()
+        } else if let match = folderMatch, let onOpenInFolder {
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 onOpenInFolder(match.folder, match.pageIndex, item.itemKey)
                 dismiss()
             } label: {
-                HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(storeAccentColor.opacity(0.18))
-                        Image(systemName: "rectangle.stack.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(storeAccentColor)
-                    }
-                    .frame(width: 38, height: 38)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Find in folder")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white)
-                        Text("\(match.folder.storeDisplayName) · Page \(match.folder.pages[match.pageIndex].pageNumber)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.55))
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white.opacity(0.35))
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                FolderLinkCard(
+                    storeDisplayName: match.folder.storeDisplayName,
+                    pageNumber: match.folder.pages[match.pageIndex].pageNumber
                 )
             }
             .buttonStyle(FolderLinkPressStyle())
             .accessibilityHint("Opens the promo folder on page \(match.folder.pages[match.pageIndex].pageNumber)")
-        } else if let urlString = item.promoFolderUrl, let url = URL(string: urlString) {
-            Link(destination: url) {
-                HStack(spacing: 8) {
-                    Image(systemName: "safari")
-                        .font(.system(size: 14, weight: .medium))
-                    Text(item.pageNumber.map { "View in promo folder — p. \($0)" } ?? "View in promo folder")
-                        .font(.system(size: 14, weight: .semibold))
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .foregroundColor(detailLinkBlue)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(detailLinkBlue.opacity(0.08))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(detailLinkBlue.opacity(0.15), lineWidth: 0.5)
-                )
-            }
         }
     }
 
@@ -630,27 +590,26 @@ struct PromoProductDetailSheet: View {
             }
         }
 
-        similarLoading = true
-        similarPromos = []
         guard let promoId = gridItem.item.itemKey else {
             similarLoading = false
             return
         }
 
-        do {
-            let response = try await PromoAPIService.shared.getSimilarPromos(promoId: promoId, limit: 10)
-            if !Task.isCancelled && gridItem.id == currentItem.id {
-                similarPromos = response.items
-            }
-        } catch {
-            // Silent failure — section hides if empty
-            if !Task.isCancelled && gridItem.id == currentItem.id {
-                similarPromos = []
-            }
-        }
-        if !Task.isCancelled && gridItem.id == currentItem.id {
+        // Synchronous cache peek skips the shimmer entirely on a hit (common
+        // path when the folder viewer has prefetched similar promos).
+        if let cached = SimilarPromosCache.shared.cached(promoId: promoId, limit: 10) {
+            similarPromos = cached.items
             similarLoading = false
+            return
         }
+
+        similarLoading = true
+        similarPromos = []
+
+        let response = await SimilarPromosCache.shared.getOrFetch(promoId: promoId, limit: 10)
+        guard !Task.isCancelled, gridItem.id == currentItem.id else { return }
+        similarPromos = response?.items ?? []
+        similarLoading = false
     }
 
     // MARK: - Add to List Button
@@ -708,6 +667,68 @@ private struct FolderLinkPressStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Folder Link Card
+
+/// Sleek CTA that jumps the user to the promo's exact bbox in the folder
+/// viewer. The `viewfinder` glyph echoes the contour animation that runs on
+/// arrival — so the icon previews what happens when you tap.
+private struct FolderLinkCard: View {
+    let storeDisplayName: String
+    let pageNumber: Int
+
+    private static let folderBlue = Color(red: 0.10, green: 0.45, blue: 0.98)
+    private static let folderBlueLight = Color(red: 0.35, green: 0.62, blue: 1.00)
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "viewfinder")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Self.folderBlue)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("View in folder")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                HStack(spacing: 0) {
+                    Text(storeDisplayName)
+                    Text("  ·  page \(pageNumber)")
+                        .foregroundStyle(Self.folderBlueLight.opacity(0.9))
+                        .monospacedDigit()
+                }
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(.white.opacity(0.5))
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.35))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Self.folderBlue.opacity(0.07))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Self.folderBlueLight.opacity(0.45),
+                            Self.folderBlue.opacity(0.12)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.75
+                )
+        )
     }
 }
 
@@ -808,9 +829,11 @@ private struct SimilarPromoCard: View {
                             }
                         }
                     }
+
+                    ValidityChip(validityEnd: promo.validityEnd)
                 }
                 .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .frame(width: 150, height: 220)
             .background(
@@ -983,4 +1006,3 @@ private struct SimilarPromoShimmerCard: View {
 // MARK: - Detail-local color constants (only colors not in PromoDesign)
 
 private let detailGreen = PromoDesign.accentGreen
-private let detailLinkBlue = Color(red: 0.4, green: 0.65, blue: 1.0)

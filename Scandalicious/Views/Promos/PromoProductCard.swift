@@ -160,10 +160,7 @@ struct PromoProductCard: View {
                 Spacer(minLength: 4)
             }
 
-            // PRIMARY: effective €/unit (cross-store anchor)
-            EffectiveUnitPriceView(item: item, size: .card)
-
-            // SECONDARY: promo + struck original, or "Prijs in winkel"
+            // Promo + struck original, or "Prijs in winkel"
             PromoPriceStack(item: item, size: .card)
 
             Spacer(minLength: 0)

@@ -65,10 +65,25 @@ final class ImagePrefetcher {
 /// URLs that have already been prefetched.
 struct RemoteImage<Content: View, Placeholder: View>: View {
     let url: URL?
-    @ViewBuilder let content: (Image) -> Content
-    @ViewBuilder let placeholder: () -> Placeholder
+    let content: (Image) -> Content
+    let placeholder: () -> Placeholder
 
     @State private var image: UIImage?
+
+    init(
+        url: URL?,
+        @ViewBuilder content: @escaping (Image) -> Content,
+        @ViewBuilder placeholder: @escaping () -> Placeholder
+    ) {
+        self.url = url
+        self.content = content
+        self.placeholder = placeholder
+        // Pre-populate from the cache synchronously so the first render already
+        // shows the image instead of flashing the placeholder for one frame.
+        if let url, let cached = ImagePrefetcher.shared.cachedImage(for: url) {
+            self._image = State(initialValue: cached)
+        }
+    }
 
     var body: some View {
         Group {

@@ -78,20 +78,48 @@ class PromoFoldersViewModel: ObservableObject {
     // MARK: - Lookup
 
     /// Returns the folder + zero-based page index containing the given item, or nil.
-    /// Primary match: item.itemKey ↔ hotspot.itemId. Fallback: storeId + pageNumber.
+    ///
+    /// Match order (strongest first):
+    ///   1. itemKey ↔ hotspot.itemId across *all* folders — item_ids are globally
+    ///      unique, so a hit is authoritative even if storeName disagrees.
+    ///   2. store + validity_end + pageNumber — disambiguates stores that publish
+    ///      overlapping folders (e.g. weekly + themed) in the same week.
+    ///   3. store + pageNumber — last-resort when validity is missing.
     func findFolder(for item: PromoStoreItem, storeName: String) -> (folder: PromoFolder, pageIndex: Int)? {
         guard case .success(let folders) = state else { return nil }
-        let normalizedStore = storeName.lowercased()
-        for folder in folders where folder.storeId.lowercased() == normalizedStore {
-            if let key = item.itemKey,
-               let idx = folder.pages.firstIndex(where: { $0.hotspots.contains { $0.itemId == key } }) {
-                return (folder, idx)
+
+        // Phase 1 — authoritative itemKey match.
+        if let key = item.itemKey {
+            for folder in folders {
+                if let idx = folder.pages.firstIndex(where: { $0.hotspots.contains { $0.itemId == key } }) {
+                    return (folder, idx)
+                }
             }
-            if let page = item.pageNumber,
-               let idx = folder.pages.firstIndex(where: { $0.pageNumber == page }) {
+        }
+
+        // Phase 2/3 — fall back to pageNumber within the item's store.
+        guard let page = item.pageNumber else { return nil }
+        let normalizedStore = storeName.lowercased()
+        let candidates = folders.filter { $0.storeId.lowercased() == normalizedStore }
+
+        if !item.validityEnd.isEmpty {
+            for folder in candidates where folder.validityEnd == item.validityEnd {
+                if let idx = folder.pages.firstIndex(where: { $0.pageNumber == page }) {
+                    return (folder, idx)
+                }
+            }
+        }
+
+        for folder in candidates {
+            if let idx = folder.pages.firstIndex(where: { $0.pageNumber == page }) {
                 return (folder, idx)
             }
         }
+
+        // A non-nil pageNumber that still didn't match likely means folders for
+        // this store haven't loaded, or the promo outlived its source folder —
+        // surface it so we can investigate instead of silently hiding the CTA.
+        print("[PromoFoldersVM] findFolder miss — store=\(storeName) page=\(page) itemKey=\(item.itemKey ?? "nil") validityEnd=\(item.validityEnd)")
         return nil
     }
 
