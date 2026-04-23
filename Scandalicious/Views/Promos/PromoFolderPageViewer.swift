@@ -59,6 +59,7 @@ struct PromoFolderPageViewer: View {
                         folderValidityEnd: folder.validityEnd,
                         groceryStore: groceryStore,
                         highlightItemId: index == initialPage ? highlightItemId : nil,
+                        isActive: index == currentPage,
                         onInfoTap: { selectedHotspot = $0 }
                     )
                     .tag(index)
@@ -131,17 +132,22 @@ struct PromoFolderPageViewer: View {
             }
         }
         .task(id: currentPage) {
-            prefetchHeroImages(around: currentPage)
+            prefetchImages(around: currentPage)
             await prefetchSimilarPromos(forPage: currentPage)
         }
     }
 
-    /// Prefetch the full-tile hero crops for the visible page (and its immediate
-    /// neighbors) so that when a user taps a hotspot the detail sheet's hero
-    /// paints from cache instead of showing a ProgressView flash.
-    private func prefetchHeroImages(around pageIndex: Int) {
-        let range = max(0, pageIndex - 1)...min(folder.pages.count - 1, pageIndex + 1)
-        for index in range where index < folder.pages.count {
+    /// Warm the shared image cache for the visible page and its neighbors:
+    /// full page images (so fast-swipe lands on an already-decoded image) and
+    /// hotspot hero crops (so tapping a hotspot skips the detail-sheet spinner).
+    /// Window is biased forward — one page behind, two ahead — because swipes
+    /// usually continue in the same direction.
+    private func prefetchImages(around pageIndex: Int) {
+        let lower = max(0, pageIndex - 1)
+        let upper = min(folder.pages.count - 1, pageIndex + 2)
+        guard lower <= upper else { return }
+        for index in lower...upper {
+            ImagePrefetcher.shared.prefetch(urlString: folder.pages[index].imageUrl)
             for hotspot in folder.pages[index].hotspots {
                 ImagePrefetcher.shared.prefetch(urlString: hotspot.heroUrl ?? hotspot.imageUrl)
             }
@@ -209,6 +215,7 @@ struct ZoomablePageView: View {
     let folderValidityEnd: String
     let groceryStore: GroceryListStore
     var highlightItemId: String? = nil
+    let isActive: Bool
     let onInfoTap: (PromoFolderHotspot) -> Void
 
     var body: some View {
@@ -222,6 +229,7 @@ struct ZoomablePageView: View {
                 folderValidityEnd: folderValidityEnd,
                 groceryStore: groceryStore,
                 highlightItemId: highlightItemId,
+                isActive: isActive,
                 onInfoTap: onInfoTap
             )
         }
@@ -241,6 +249,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
     let folderValidityEnd: String
     let groceryStore: GroceryListStore
     var highlightItemId: String? = nil
+    let isActive: Bool
     let onInfoTap: (PromoFolderHotspot) -> Void
 
     func makeUIView(context: Context) -> UIScrollView {
@@ -283,6 +292,12 @@ struct ZoomableImageContainer: UIViewRepresentable {
         context.coordinator.highlightItemId = highlightItemId
         context.coordinator.onInfoTap = onInfoTap
         context.coordinator.observeGroceryStore()
+        // Seed visibility before kicking off the image load so a page that's
+        // already on-screen at create time runs the reveal as soon as the image
+        // arrives. Off-screen pages stay quiet until they slide into view.
+        if isActive {
+            context.coordinator.pageBecameVisible()
+        }
         context.coordinator.loadImage(url: imageUrl, containerSize: containerSize)
 
         return scrollView
@@ -294,6 +309,14 @@ struct ZoomableImageContainer: UIViewRepresentable {
         }
         if let spinner = scrollView.viewWithTag(200) as? UIActivityIndicatorView {
             spinner.center = CGPoint(x: containerSize.width / 2, y: containerSize.height / 2)
+        }
+        // Visibility transitions drive the reveal animation — TabView pre-renders
+        // adjacent pages, so triggering on image load fires off-screen and never
+        // re-fires on swipe-back. Routing through visibility solves both.
+        if isActive {
+            context.coordinator.pageBecameVisible()
+        } else {
+            context.coordinator.pageBecameHidden()
         }
     }
 
@@ -312,6 +335,17 @@ struct ZoomableImageContainer: UIViewRepresentable {
         private var hotspotDots: [UIView] = []
         private var groceryCancellable: AnyCancellable?
         private var didRunSpotlight = false
+
+        // Reveal-animation state. The reveal fires the first time the page is
+        // both visible AND has its image loaded, then never again — swiping
+        // back to a previously-seen page is silent. `revealLayers` and
+        // `revealCleanupItems` are tracked so a swipe-away mid-animation can
+        // tear down cleanly instead of leaving stale layers behind.
+        private var imageLoaded = false
+        private var isPageActive = false
+        private var didRunReveal = false
+        private var revealLayers: [CALayer] = []
+        private var revealCleanupItems: [DispatchWorkItem] = []
 
         func observeGroceryStore() {
             groceryCancellable = groceryStore?.$items
@@ -631,6 +665,11 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 let badgeColor: UIColor = hotspot.isCoupon ? Self.couponGoldColor : Self.premiumBlueColor
                 let badgeIcon: String = hotspot.isCoupon ? "ticket.fill" : "plus"
 
+                // Sits in the bbox's top-right corner with a small overhang.
+                // The contour-trace path is shaped to start on the badge's
+                // top-edge perimeter and end on its right-edge perimeter, so
+                // the line emerges and retracts at the badge's edge — never
+                // crossing into the icon.
                 let badgeSize = Coordinator.badgeSize
                 let badge = UIView(frame: CGRect(
                     x: insetRect.width - badgeSize + 3,
@@ -704,14 +743,62 @@ struct ZoomableImageContainer: UIViewRepresentable {
 
         // MARK: - Premium Hotspot Reveal
 
-        /// On page load, a single premium-blue stroke traces the complete
-        /// contour of every hotspot bbox, then retracts and vanishes — leaving
-        /// only the "+" badge as the persistent affordance.
+        /// Called when the page slides into view. Together with
+        /// `pageBecameHidden`, drives the reveal animation off page visibility
+        /// so it fires the first time the user actually sees the page —
+        /// regardless of whether the image was already loaded behind the scenes.
         ///
-        /// The trace is a "chasing snake": `strokeEnd` runs 0→1 to draw the
-        /// perimeter, then `strokeStart` catches up 0→1 to erase it from the
-        /// tail. Staggered across all regions for an elegant cascade, paired
-        /// with a light haptic cue.
+        /// The reveal is gated behind a short "stably visible" delay: during
+        /// fast swipes the page may flicker into view for just a few frames,
+        /// and firing the reveal (plus its haptic) on each flyby feels noisy.
+        /// Cancelling the pending work item in `pageBecameHidden` means a
+        /// flyby leaves `didRunReveal` false, so the reveal still plays when
+        /// the user actually lands on the page later.
+        func pageBecameVisible() {
+            guard !isPageActive else { return }
+            isPageActive = true
+
+            let item = DispatchWorkItem { [weak self] in
+                self?.maybeRunReveal()
+            }
+            revealCleanupItems.append(item)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: item)
+        }
+
+        /// Called when the page leaves view. Cancels any in-flight reveal (and
+        /// the pending delayed trigger) so stale layers and late haptics don't
+        /// outlive the swipe-away.
+        func pageBecameHidden() {
+            guard isPageActive else { return }
+            isPageActive = false
+            cancelInFlightReveal()
+        }
+
+        /// The reveal needs both prerequisites — the image must have arrived
+        /// (so `addHotspotDots` has run and laid out the regions) and the page
+        /// must be the visible one. Whichever trigger completes the conditions
+        /// last wins. Once it's run, `didRunReveal` keeps subsequent revisits
+        /// silent.
+        private func maybeRunReveal() {
+            guard !didRunReveal else { return }
+            guard imageLoaded, isPageActive, highlightItemId == nil else { return }
+            guard !hotspotDots.isEmpty else { return }
+            didRunReveal = true
+            animateHotspotReveal()
+        }
+
+        /// Tear down everything from a previous reveal — layers and any pending
+        /// cleanup work items — so re-entry can't accumulate state.
+        private func cancelInFlightReveal() {
+            revealCleanupItems.forEach { $0.cancel() }
+            revealCleanupItems.removeAll()
+            revealLayers.forEach { $0.removeAllAnimations(); $0.removeFromSuperlayer() }
+            revealLayers.removeAll()
+        }
+
+        /// On page reveal, a thick shiny blue arc traces the contour of every
+        /// hotspot bbox simultaneously and retracts — leaving only the "+"
+        /// badge as the persistent affordance.
         private func animateHotspotReveal() {
             guard !hotspotDots.isEmpty else { return }
 
@@ -720,106 +807,169 @@ struct ZoomableImageContainer: UIViewRepresentable {
             impact.prepare()
             impact.impactOccurred(intensity: 0.4)
 
-            let stagger: TimeInterval = 0.08
-            for (index, region) in hotspotDots.enumerated() {
-                let delay = Double(index) * stagger
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak region] in
-                    guard let self, let region else { return }
-                    self.traceContour(on: region, color: Self.premiumBlueColor)
-                }
+            for region in hotspotDots {
+                traceContour(on: region, color: Self.premiumBlueColor)
             }
         }
 
-        /// Draws a premium-blue stroke around the region's rounded-rect
-        /// perimeter, then erases it from the start — like a snake chasing
-        /// its tail. The path is anchored so the stroke emerges from and
-        /// retracts back into the top-right corner, where the "+" badge sits.
-        /// The layer is removed once both animations complete.
+        /// Draws the premium reveal as a comet sliding clockwise around the
+        /// bbox: a thick bright head with a naturally tapering tail behind it.
+        ///
+        /// The taper is built from a stack of `CAShapeLayer`s that share the
+        /// same head position (`strokeEnd`) but have different tail offsets
+        /// (`strokeStart`). Shorter, wider segments sit on top; longer, thinner
+        /// segments sit behind. Because all segments share the same leading
+        /// edge, the eye reads the stack as one continuous stroke that's thick
+        /// at the tip and fades to a point — a comet silhouette. An extra
+        /// ice-white gleam caps the very head for the nucleus.
         private func traceContour(on region: UIView, color: UIColor) {
             let bounds = region.bounds
             guard bounds.width > 0, bounds.height > 0 else { return }
 
             let path = Self.contourPath(in: bounds, cornerRadius: 8)
 
-            let line = CAShapeLayer()
-            line.frame = bounds
-            line.path = path
-            line.strokeColor = color.cgColor
-            line.fillColor = UIColor.clear.cgColor
-            line.lineWidth = 2.0
-            line.lineCap = .round
-            line.lineJoin = .round
-            line.strokeStart = 0
-            line.strokeEnd = 0
-            // Soft bloom so the line reads premium against any folder image.
-            line.shadowColor = color.cgColor
-            line.shadowOpacity = 0.85
-            line.shadowRadius = 5
-            line.shadowOffset = .zero
-            region.layer.addSublayer(line)
-
-            // A short dash (≈15% of the perimeter) travels clockwise around
-            // the bbox. Head (`strokeEnd`) and tail (`strokeStart`) are both
-            // keyframed to start at the same timestamp — the tail simply
-            // holds at 0 for the first `dashFraction` before moving, and the
-            // head holds at 1 for the last `dashFraction` after finishing.
-            // Result: the dash emerges from under the "+" badge, cruises
-            // around, and retracts back into it, with both animations
-            // beginning in unison.
-            let totalDuration: CFTimeInterval = 1.35
-            let dashFraction: Double = 0.15
-            let timing = CAMediaTimingFunction(name: .easeInEaseOut)
-            let linear = CAMediaTimingFunction(name: .linear)
+            // 0.8s total — slow enough to read as a deliberate reveal, fast
+            // enough that a page with many hotspots doesn't feel like it's
+            // stalling. headEndT splits the timeline: head sweeps 0→1 over
+            // [0, headEndT], then holds at 1 while tails catch up over the
+            // retract phase. Sharing this exact head animation across every
+            // stack layer is what keeps the comet nucleus locked to the tip.
+            let totalDuration: CFTimeInterval = 0.8
+            let headEndT: Double = 0.82
             let now = CACurrentMediaTime()
 
-            let head = CAKeyframeAnimation(keyPath: "strokeEnd")
-            head.values = [0, 1, 1]
-            head.keyTimes = [0, NSNumber(value: 1 - dashFraction), 1]
-            head.timingFunctions = [timing, linear]
-            head.duration = totalDuration
-            head.beginTime = now
-            head.fillMode = .forwards
-            head.isRemovedOnCompletion = false
-            line.add(head, forKey: "head")
-
-            let tail = CAKeyframeAnimation(keyPath: "strokeStart")
-            tail.values = [0, 0, 1]
-            tail.keyTimes = [0, NSNumber(value: dashFraction), 1]
-            tail.timingFunctions = [linear, timing]
-            tail.duration = totalDuration
-            tail.beginTime = now
-            tail.fillMode = .forwards
-            tail.isRemovedOnCompletion = false
-            line.add(tail, forKey: "tail")
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + totalDuration + 0.05) { [weak line] in
-                line?.removeFromSuperlayer()
+            func makeHeadAnim() -> CAKeyframeAnimation {
+                let head = CAKeyframeAnimation(keyPath: "strokeEnd")
+                head.values = [0, 1, 1]
+                head.keyTimes = [0, NSNumber(value: headEndT), 1]
+                head.duration = totalDuration
+                head.beginTime = now
+                head.fillMode = .forwards
+                head.isRemovedOnCompletion = false
+                return head
             }
+
+            // Per-layer tail: stays at 0 until head has pulled ahead by the
+            // dashFraction, then mirrors the head's velocity (constant-length
+            // segment), and finally catches up to 1 during the retract phase.
+            func makeTailAnim(dashFraction D: Double) -> CAKeyframeAnimation {
+                let tail = CAKeyframeAnimation(keyPath: "strokeStart")
+                tail.values = [0, 0, 1 - D, 1]
+                tail.keyTimes = [
+                    0,
+                    NSNumber(value: D * headEndT),
+                    NSNumber(value: headEndT),
+                    1
+                ]
+                tail.duration = totalDuration
+                tail.beginTime = now
+                tail.fillMode = .forwards
+                tail.isRemovedOnCompletion = false
+                return tail
+            }
+
+            // Comet segments — first entry is drawn first (furthest back, thin,
+            // long tail), last entry is drawn last (on top, thick, short tip).
+            // Opacity tapers too so the tail fades out softly.
+            struct Segment {
+                let lineWidth: CGFloat
+                let dashFraction: Double
+                let opacity: Float
+                let shadowRadius: CGFloat
+            }
+            let segments: [Segment] = [
+                .init(lineWidth: 1.2, dashFraction: 0.18, opacity: 0.40, shadowRadius: 3),
+                .init(lineWidth: 2.0, dashFraction: 0.12, opacity: 0.62, shadowRadius: 5),
+                .init(lineWidth: 3.0, dashFraction: 0.07, opacity: 0.85, shadowRadius: 7),
+                .init(lineWidth: 4.2, dashFraction: 0.03, opacity: 1.00, shadowRadius: 10),
+            ]
+
+            var createdLayers: [CAShapeLayer] = []
+
+            for seg in segments {
+                let layer = CAShapeLayer()
+                layer.frame = bounds
+                layer.path = path
+                layer.strokeColor = color.cgColor
+                layer.fillColor = UIColor.clear.cgColor
+                layer.lineWidth = seg.lineWidth
+                layer.lineCap = .round
+                layer.lineJoin = .round
+                layer.strokeStart = 0
+                layer.strokeEnd = 0
+                layer.opacity = seg.opacity
+                layer.shadowColor = color.cgColor
+                layer.shadowOpacity = 0.85
+                layer.shadowRadius = seg.shadowRadius
+                layer.shadowOffset = .zero
+                region.layer.addSublayer(layer)
+                revealLayers.append(layer)
+                createdLayers.append(layer)
+
+                layer.add(makeHeadAnim(), forKey: "head")
+                layer.add(makeTailAnim(dashFraction: seg.dashFraction), forKey: "tail")
+            }
+
+            // Ice-white nucleus — a small bright gleam at the very head, sold
+            // as the comet's bright core.
+            let shineColor = UIColor(red: 0.82, green: 0.93, blue: 1.0, alpha: 1.0)
+            let nucleus = CAShapeLayer()
+            nucleus.frame = bounds
+            nucleus.path = path
+            nucleus.strokeColor = shineColor.cgColor
+            nucleus.fillColor = UIColor.clear.cgColor
+            nucleus.lineWidth = 2.2
+            nucleus.lineCap = .round
+            nucleus.lineJoin = .round
+            nucleus.strokeStart = 0
+            nucleus.strokeEnd = 0
+            nucleus.shadowColor = UIColor.white.cgColor
+            nucleus.shadowOpacity = 0.75
+            nucleus.shadowRadius = 3
+            nucleus.shadowOffset = .zero
+            region.layer.addSublayer(nucleus)
+            revealLayers.append(nucleus)
+
+            nucleus.add(makeHeadAnim(), forKey: "head")
+            nucleus.add(makeTailAnim(dashFraction: 0.02), forKey: "tail")
+
+            // Tear everything down once the full comet has retracted.
+            let allLayers: [CALayer] = createdLayers + [nucleus]
+            let cleanup = DispatchWorkItem { [weak self] in
+                for layer in allLayers {
+                    layer.removeFromSuperlayer()
+                }
+                guard let self else { return }
+                self.revealLayers.removeAll { layer in
+                    allLayers.contains(where: { $0 === layer })
+                }
+            }
+            revealCleanupItems.append(cleanup)
+            DispatchQueue.main.asyncAfter(deadline: .now() + totalDuration + 0.05, execute: cleanup)
         }
 
-        /// Rounded-rect stroke path that starts and ends at the top-right
-        /// corner — specifically at the top-edge anchor under the "+" badge —
-        /// and runs clockwise. Because both endpoints sit under the badge,
-        /// `strokeEnd` 0→1 makes the line emerge from the "+" and grow around
-        /// the contour, while `strokeStart` 0→1 makes the tail retract back
-        /// into the "+". The stroke always appears from and vanishes into
-        /// the badge.
+        /// Open-ended rounded-rect contour: starts on the right edge at the
+        /// "+" badge's bottom perimeter intersection, runs clockwise (down →
+        /// left → up → right) around the bbox, and ends on the top edge at
+        /// the badge's left perimeter intersection. The top-right corner is
+        /// intentionally skipped because the badge sits over it, so the line
+        /// emerges from one side of the icon and retracts back into the
+        /// other side — touching the edge of the icon on both ends.
+        ///
+        /// Geometry: badge frame `(insetRect.width-17, -3, 20, 20)` →
+        /// center `(maxX - 7, 7)`, radius 10. The 7-7 offset from the corner
+        /// makes both edge intersections symmetric — each sits `7 + √51 ≈
+        /// 14.14pt` from the corner along its respective edge.
         static func contourPath(in bounds: CGRect, cornerRadius r: CGFloat) -> CGPath {
             let path = UIBezierPath()
             let minX = bounds.minX, maxX = bounds.maxX
             let minY = bounds.minY, maxY = bounds.maxY
 
-            // Anchor: top edge, just to the left of the top-right arc.
-            path.move(to: CGPoint(x: maxX - r, y: minY))
+            let badgeOffset: CGFloat = 7 + sqrt(51)
 
-            // Top-right arc: top → right
-            path.addArc(
-                withCenter: CGPoint(x: maxX - r, y: minY + r),
-                radius: r,
-                startAngle: 3 * .pi / 2,
-                endAngle: 2 * .pi,
-                clockwise: true
-            )
+            // Start on the right edge, at the badge's bottom-side perimeter.
+            path.move(to: CGPoint(x: maxX, y: minY + badgeOffset))
+
             // Right edge going down
             path.addLine(to: CGPoint(x: maxX, y: maxY - r))
             // Bottom-right arc: right → bottom
@@ -850,8 +1000,8 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 endAngle: 3 * .pi / 2,
                 clockwise: true
             )
-            // Top edge back to the anchor under the "+" badge
-            path.addLine(to: CGPoint(x: maxX - r, y: minY))
+            // Top edge going right to the badge's left-side perimeter
+            path.addLine(to: CGPoint(x: maxX - badgeOffset, y: minY))
 
             return path.cgPath
         }
@@ -938,34 +1088,45 @@ struct ZoomableImageContainer: UIViewRepresentable {
         func loadImage(url: String, containerSize: CGSize) {
             guard let imageURL = URL(string: url) else { return }
 
+            // Sync cache hit: paint on the same frame, no spinner, no async hop.
+            // This is what makes fast-swipe back to a seen page feel instant.
+            if let cached = ImagePrefetcher.shared.cachedImage(for: imageURL) {
+                applyLoadedImage(cached, containerSize: containerSize)
+                return
+            }
+
             Task { @MainActor in
-                do {
-                    let (data, _) = try await URLSession.shared.data(from: imageURL)
-                    guard let image = UIImage(data: data) else { return }
-
-                    imageView?.image = image
-                    imageView?.frame = CGRect(origin: .zero, size: containerSize)
-
-                    // Hide spinner
-                    if let spinner = scrollView?.viewWithTag(200) as? UIActivityIndicatorView {
-                        spinner.stopAnimating()
-                        spinner.isHidden = true
-                    }
-
-                    // Add hotspot dots after image loads. When the viewer was
-                    // opened to spotlight a specific promo, skip the reveal-all
-                    // trace — the single bbox contour animation is the signal,
-                    // and running both at once looked like random lines.
-                    if let imageView {
-                        addHotspotDots(in: imageView)
-                        if highlightItemId == nil {
-                            animateHotspotReveal()
-                        }
-                        maybeRunSpotlight(in: imageView)
-                    }
-                } catch {
-                    print("[FolderPage] Failed to load image: \(error.localizedDescription)")
+                // Route misses through ImagePrefetcher so concurrent page renders
+                // (TabView pre-rendering neighbors, swipe-back mid-fetch) dedupe
+                // on the same in-flight Task instead of firing parallel requests.
+                guard let image = await ImagePrefetcher.shared.prefetch(url: imageURL).value else {
+                    print("[FolderPage] Failed to load image: \(imageURL)")
+                    return
                 }
+                applyLoadedImage(image, containerSize: containerSize)
+            }
+        }
+
+        @MainActor
+        private func applyLoadedImage(_ image: UIImage, containerSize: CGSize) {
+            imageView?.image = image
+            imageView?.frame = CGRect(origin: .zero, size: containerSize)
+
+            if let spinner = scrollView?.viewWithTag(200) as? UIActivityIndicatorView {
+                spinner.stopAnimating()
+                spinner.isHidden = true
+            }
+
+            // Add hotspot dots after image loads. The reveal-all trace is
+            // driven by page visibility (`pageBecameVisible`) — see the
+            // comment above `maybeRunReveal`. The deep-link spotlight
+            // still fires here once, and is mutually exclusive with the
+            // reveal-all (running both at once looked like random lines).
+            if let imageView {
+                addHotspotDots(in: imageView)
+                imageLoaded = true
+                maybeRunReveal()
+                maybeRunSpotlight(in: imageView)
             }
         }
 

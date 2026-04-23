@@ -499,6 +499,11 @@ private struct StoreFolderGridCard: View {
                     }
                     .foregroundStyle(.white.opacity(0.55))
 
+                    if folders.count == 1, let only = folders.first {
+                        ValidityChip(validityEnd: only.validityEnd, compact: true)
+                            .opacity(0.85)
+                    }
+
                     Spacer(minLength: 0)
                 }
                 .frame(height: 54, alignment: .topLeading)
