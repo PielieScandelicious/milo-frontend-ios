@@ -23,6 +23,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
     let mechanism: String
     let displayMechanism: String?
     let minPurchaseQty: Int?
+    let promoTextMarkdown: String?
     let validityEnd: String // "yyyy-MM-dd"
     let addedAt: Date
     var isChecked: Bool
@@ -97,6 +98,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
             imageUrl: imageUrl,
             heroUrl: heroUrl,
             storeName: storeName,
+            promoTextMarkdown: promoTextMarkdown,
             isCoupon: isCoupon,
             couponType: couponType,
             couponBarcodeValue: couponBarcodeValue,
@@ -124,6 +126,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
             mechanism: item.mechanism,
             displayMechanism: item.displayMechanism,
             minPurchaseQty: item.minPurchaseQty,
+            promoTextMarkdown: item.promoTextMarkdown,
             validityEnd: validityEndOverride ?? item.validityEnd,
             addedAt: Date(),
             isChecked: false,
@@ -156,6 +159,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         self.mechanism = try c.decodeIfPresent(String.self, forKey: .mechanism) ?? ""
         self.displayMechanism = try c.decodeIfPresent(String.self, forKey: .displayMechanism)
         self.minPurchaseQty = try c.decodeIfPresent(Int.self, forKey: .minPurchaseQty)
+        self.promoTextMarkdown = try c.decodeIfPresent(String.self, forKey: .promoTextMarkdown)
         self.validityEnd = try c.decodeIfPresent(String.self, forKey: .validityEnd) ?? ""
         self.addedAt = try c.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
         self.isChecked = try c.decodeIfPresent(Bool.self, forKey: .isChecked) ?? false
@@ -185,6 +189,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         mechanism: String,
         displayMechanism: String?,
         minPurchaseQty: Int?,
+        promoTextMarkdown: String? = nil,
         validityEnd: String,
         addedAt: Date,
         isChecked: Bool,
@@ -211,6 +216,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         self.mechanism = mechanism
         self.displayMechanism = displayMechanism
         self.minPurchaseQty = minPurchaseQty
+        self.promoTextMarkdown = promoTextMarkdown
         self.validityEnd = validityEnd
         self.addedAt = addedAt
         self.isChecked = isChecked
