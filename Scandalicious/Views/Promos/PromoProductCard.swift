@@ -171,13 +171,27 @@ struct PromoProductCard: View {
                     savingsChip
                 }
                 Spacer(minLength: 0)
-                ValidityChip(validityEnd: item.validityEnd)
+                subtleValidity
                 addButton
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .padding(10)
         .background(PromoDesign.cardBackground)
+    }
+
+    private var subtleValidity: some View {
+        let d = PromoValidity.display(for: item.validityEnd)
+        return HStack(spacing: 3) {
+            if let icon = d.icon {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: .medium))
+            }
+            Text(d.text)
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(d.isUrgent ? d.color.opacity(0.85) : PromoDesign.secondaryText.opacity(0.55))
     }
 
     private var savingsChip: some View {

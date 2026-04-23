@@ -31,6 +31,7 @@ struct GroceryListContentView<Leading: View>: View {
     @State private var expandedStores: Set<String> = []
     @State private var selectedDetailItem: GroceryListItem?
     @State private var folderDestination: FolderDestination?
+    @State private var pendingScrollStore: String?
     @ViewBuilder let leadingToolbar: () -> Leading
     let onBrowseTapped: () -> Void
 
@@ -102,6 +103,10 @@ struct GroceryListContentView<Leading: View>: View {
             store.removeExpired()
             expandedStores.removeAll()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("app.scrollToStoreInList"))) { notif in
+            guard let storeName = notif.userInfo?["storeName"] as? String else { return }
+            pendingScrollStore = storeName
+        }
     }
 
     // MARK: - Filtered data
@@ -168,6 +173,27 @@ struct GroceryListContentView<Leading: View>: View {
                 .padding(.top, 8)
             }
             .scrollIndicators(.hidden)
+            .onChange(of: pendingScrollStore) { _, newValue in
+                guard let storeName = newValue else { return }
+                consumePendingScroll(storeName: storeName, proxy: proxy)
+            }
+            .onAppear {
+                if let storeName = pendingScrollStore {
+                    consumePendingScroll(storeName: storeName, proxy: proxy)
+                }
+            }
+        }
+    }
+
+    private func consumePendingScroll(storeName: String, proxy: ScrollViewProxy) {
+        withAnimation(.snappy(duration: 0.3)) {
+            expandedStores.insert(storeName)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                proxy.scrollTo(storeName, anchor: .top)
+            }
+            pendingScrollStore = nil
         }
     }
 

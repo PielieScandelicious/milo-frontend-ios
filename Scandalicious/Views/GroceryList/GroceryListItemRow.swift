@@ -84,6 +84,7 @@ struct GroceryListCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 imageSection
                 infoSection
+                validityFooter
             }
             .frame(maxWidth: .infinity)
             .background(
@@ -142,16 +143,6 @@ struct GroceryListCard: View {
                 .background(Capsule().fill(badge.bg))
                 .shadow(color: badge.bg.opacity(0.3), radius: 3, y: 1)
                 .padding(6)
-            }
-
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    ValidityChip(validityEnd: item.validityEnd)
-                        .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
-                        .padding(6)
-                }
             }
         }
         .frame(height: 140)
@@ -213,6 +204,7 @@ struct GroceryListCard: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(2)
+                .minimumScaleFactor(0.85)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(minHeight: 34, alignment: .top)
 
@@ -229,6 +221,25 @@ struct GroceryListCard: View {
             }
         }
         .padding(10)
+    }
+
+    // MARK: - Validity footer
+
+    private var validityFooter: some View {
+        let d = PromoValidity.display(for: item.validityEnd)
+        return HStack(spacing: 4) {
+            if let icon = d.icon {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: .medium))
+            }
+            Text(d.text)
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(d.isUrgent ? d.color.opacity(0.85) : Color.white.opacity(0.35))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
     }
 
 }

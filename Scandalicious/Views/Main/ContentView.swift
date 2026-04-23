@@ -102,14 +102,14 @@ struct ContentView: View {
 
             // Grocery list "added to cart" toast
             if let toast = cartToast {
-                VStack {
-                    AddedToCartToastView(toast: toast)
+                VStack(spacing: 0) {
+                    AddedToCartToastView(toast: toast, onTap: handleToastTap)
                         .padding(.top, 8)
-                    Spacer()
+                    Color.clear
+                        .allowsHitTesting(false)
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .zIndex(90)
-                .allowsHitTesting(false)
             }
 
             // Unified reward overlay queue — brand cashback → referral → badges
@@ -457,10 +457,14 @@ struct ContentView: View {
     // MARK: - Cart toast
 
     private func showCartToast(for item: GroceryListItem) {
+        let displayName = GroceryStore.fromCanonical(item.storeName)?.displayName
+            ?? item.storeName.capitalized
         let toast = CartToast(
             id: UUID(),
             title: item.label,
-            imageUrl: item.imageUrl
+            imageUrl: item.imageUrl,
+            storeName: item.storeName,
+            storeDisplayName: displayName
         )
         if cartToast == nil {
             presentCartToast(toast)
@@ -476,7 +480,7 @@ struct ContentView: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         cartToastDismissTask?.cancel()
         cartToastDismissTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
             guard !Task.isCancelled, cartToast?.id == toast.id else { return }
             withAnimation(.easeInOut(duration: 0.28)) {
                 cartToast = nil
@@ -489,6 +493,27 @@ struct ContentView: View {
             }
         }
     }
+
+    private func handleToastTap() {
+        guard let toast = cartToast else { return }
+        let targetStore = toast.storeName
+        cartToastDismissTask?.cancel()
+        cartToastQueue.removeAll()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(.easeInOut(duration: 0.22)) {
+            cartToast = nil
+        }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            selectedTab = .groceryList
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            NotificationCenter.default.post(
+                name: Notification.Name("app.scrollToStoreInList"),
+                object: nil,
+                userInfo: ["storeName": targetStore]
+            )
+        }
+    }
 }
 
 // MARK: - Added-to-cart toast
@@ -497,15 +522,41 @@ struct CartToast: Equatable, Identifiable {
     let id: UUID
     let title: String
     let imageUrl: String?
+    let storeName: String
+    let storeDisplayName: String
 }
 
 private struct AddedToCartToastView: View {
     let toast: CartToast
+    let onTap: () -> Void
 
     @State private var appeared: Bool = false
     @State private var checkPulse: Int = 0
 
+    private let promoGreen = Color(red: 0.26, green: 0.88, blue: 0.47)
+
     var body: some View {
+        Button(action: onTap) {
+            content
+        }
+        .buttonStyle(ToastPressStyle())
+        .scaleEffect(appeared ? 1.0 : 0.85)
+        .opacity(appeared ? 1.0 : 0.0)
+        .offset(y: appeared ? 0 : -14)
+        .accessibilityLabel(Text("Added \(toast.title) to list"))
+        .accessibilityHint(Text("Tap to view in \(toast.storeDisplayName) list"))
+        .accessibilityAddTraits(.isButton)
+        .onAppear {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) {
+                appeared = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                checkPulse &+= 1
+            }
+        }
+    }
+
+    private var content: some View {
         HStack(spacing: 12) {
             thumbnail
 
@@ -515,9 +566,20 @@ private struct AddedToCartToastView: View {
                     .foregroundStyle(.white)
                 Text(toast.title)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.75))
                     .lineLimit(1)
                     .truncationMode(.tail)
+                HStack(spacing: 4) {
+                    Text("Tap to view in \(toast.storeDisplayName) list")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(promoGreen)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(promoGreen)
+                }
+                .padding(.top, 1)
             }
 
             Spacer(minLength: 4)
@@ -544,7 +606,8 @@ private struct AddedToCartToastView: View {
         .padding(.leading, 8)
         .padding(.trailing, 14)
         .padding(.vertical, 8)
-        .frame(maxWidth: 320)
+        .frame(maxWidth: 340)
+        .contentShape(Capsule(style: .continuous))
         .background(
             Capsule(style: .continuous)
                 .fill(Color.black.opacity(0.55))
@@ -558,25 +621,15 @@ private struct AddedToCartToastView: View {
             Capsule(style: .continuous)
                 .strokeBorder(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.25), Color.white.opacity(0.05)],
+                        colors: [promoGreen.opacity(0.55), Color.white.opacity(0.05)],
                         startPoint: .top,
                         endPoint: .bottom
                     ),
-                    lineWidth: 0.6
+                    lineWidth: 0.8
                 )
         )
+        .shadow(color: promoGreen.opacity(0.25), radius: 14, y: 4)
         .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
-        .scaleEffect(appeared ? 1.0 : 0.85)
-        .opacity(appeared ? 1.0 : 0.0)
-        .offset(y: appeared ? 0 : -14)
-        .onAppear {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) {
-                appeared = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                checkPulse &+= 1
-            }
-        }
     }
 
     @ViewBuilder
@@ -606,6 +659,14 @@ private struct AddedToCartToastView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+private struct ToastPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
     }
 }
 

@@ -206,14 +206,12 @@ struct PromoProductDetailSheet: View {
                     .padding(.top, 12)
             }
 
-            // Store badge (bottom-left) + Validity chip (bottom-right)
+            // Store badge (bottom-left)
             VStack {
                 Spacer()
-                HStack(alignment: .bottom) {
+                HStack {
                     StoreBadge(storeName: storeName, size: .small)
                     Spacer()
-                    ValidityChip(validityEnd: item.validityEnd)
-                        .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
                 }
                 .padding(10)
             }
@@ -242,9 +240,10 @@ struct PromoProductDetailSheet: View {
             // Brand — editorial-style eyebrow above the product name:
             // small uppercase wordmark in the store accent color, no heavy
             // pill. Additional brands follow after a thin divider so the
-            // primary brand still reads as the anchor.
-            if !item.primaryBrandLabel.isEmpty {
-                HStack(spacing: 8) {
+            // primary brand still reads as the anchor. Validity label
+            // shares this row, pushed fully to the trailing edge.
+            HStack(spacing: 8) {
+                if !item.primaryBrandLabel.isEmpty {
                     Text(item.primaryBrandLabel.uppercased())
                         .font(.system(size: 12, weight: .heavy))
                         .tracking(1.6)
@@ -263,6 +262,8 @@ struct PromoProductDetailSheet: View {
                             .truncationMode(.tail)
                     }
                 }
+                Spacer(minLength: 8)
+                ValidityChip(validityEnd: item.validityEnd)
             }
 
             // Product name — large, clear
@@ -753,7 +754,7 @@ private struct SimilarPromoCard: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
-                                    .frame(maxWidth: .infinity, maxHeight: 100)
+                                    .frame(maxWidth: .infinity, maxHeight: 100, alignment: .top)
                                     .padding(10)
                             case .failure:
                                 cardPlaceholder
@@ -766,22 +767,6 @@ private struct SimilarPromoCard: View {
                         }
                     } else {
                         cardPlaceholder
-                    }
-
-                    if promo.discountPercentage > 0 {
-                        Text("-\(promo.discountPercentage)%")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule().fill(
-                                    promo.discountPercentage > 30
-                                        ? Color(red: 0.95, green: 0.25, blue: 0.25)
-                                        : Color(red: 0.20, green: 0.85, blue: 0.50)
-                                )
-                            )
-                            .padding(6)
                     }
 
                     // Store logo overlay (bottom-left)
@@ -811,6 +796,7 @@ private struct SimilarPromoCard: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -830,7 +816,7 @@ private struct SimilarPromoCard: View {
                         }
                     }
 
-                    ValidityChip(validityEnd: promo.validityEnd)
+                    ValidityChip(validityEnd: promo.validityEnd, compact: true)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -840,6 +826,20 @@ private struct SimilarPromoCard: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color(white: 0.08))
             )
+            .overlay(alignment: .topLeading) {
+                if promo.discountPercentage > 0 {
+                    Text("-\(promo.discountPercentage)%")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(Color(red: 0.95, green: 0.25, blue: 0.25))
+                        )
+                        .padding(.top, 4)
+                        .padding(.leading, 8)
+                }
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 0.5)

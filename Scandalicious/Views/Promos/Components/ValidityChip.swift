@@ -11,25 +11,20 @@ import SwiftUI
 
 struct ValidityChip: View {
     let validityEnd: String
+    var compact: Bool = false
 
     var body: some View {
         let d = PromoValidity.display(for: validityEnd)
-        HStack(spacing: 4) {
+        HStack(spacing: compact ? 3 : 4) {
             if let icon = d.icon {
                 Image(systemName: icon)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: compact ? 8 : 10, weight: .semibold))
             }
             Text(d.text)
-                .font(PromoDesign.chip())
+                .font(.system(size: compact ? 9 : 11, weight: .semibold))
                 .lineLimit(1)
         }
         .foregroundStyle(d.color)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: PromoDesign.chipCorner, style: .continuous)
-                .fill(d.color.opacity(0.15))
-        )
         .accessibilityLabel(d.text)
     }
 }
