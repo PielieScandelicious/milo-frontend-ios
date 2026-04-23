@@ -75,10 +75,19 @@ struct PromoProductDetailSheet: View {
                     heroImage
 
                     VStack(alignment: .leading, spacing: 20) {
+                        if item.isCoupon {
+                            couponSection
+                        }
                         brandAndNameSection
-                        pricingHeroCard
+                        if !item.isCoupon {
+                            // Pricing card doesn't apply to pure loyalty-points
+                            // coupons — the reward is tracked in couponSection.
+                            pricingHeroCard
+                        }
                         promoTextSection
-                        crossStorePanel
+                        if !item.isCoupon {
+                            crossStorePanel
+                        }
                         folderLink
                         similarPromosSection
                     }
@@ -231,6 +240,123 @@ struct PromoProductDetailSheet: View {
             .font(.system(size: 48, weight: .light))
             .foregroundColor(Color(white: 0.8))
             .frame(maxWidth: .infinity, maxHeight: 260)
+    }
+
+    // MARK: - Coupon Section (shown at the top of the sheet when item.isCoupon)
+
+    /// Human-readable reward label, e.g. "Loyalty Points · +75" / "Cashback · €2 off".
+    /// Generic semantic labels (no per-store program mapping) so the UI stays store-agnostic.
+    private var couponRewardLabel: String {
+        let typeName: String
+        switch item.couponType {
+        case "loyalty_points":     typeName = L("coupon_loyalty_points")
+        case "cashback":           typeName = L("coupon_cashback")
+        case "free_product":       typeName = L("coupon_free_product")
+        case "percent_off_coupon": typeName = L("coupon_discount")
+        default:                   typeName = L("coupon_generic")
+        }
+
+        guard let v = item.couponValue else { return typeName }
+        switch item.couponType {
+        case "loyalty_points":
+            let n = Int(v.rounded())
+            return "\(typeName) · +\(n) \(L("coupon_points_unit"))"
+        case "cashback":
+            return String(format: "\(typeName) · €%.2f", v).replacingOccurrences(of: ".", with: ",")
+        case "percent_off_coupon":
+            return "\(typeName) · -\(Int(v.rounded()))%"
+        default:
+            return typeName
+        }
+    }
+
+    /// Prefer the coupon's own validity (printed on the coupon itself) over the
+    /// folder-level validity when present — coupons often outlive their folder.
+    private var couponEffectiveValidityEnd: String {
+        if let coupon = item.couponValidityEnd, !coupon.isEmpty { return coupon }
+        return item.validityEnd
+    }
+
+    private var couponSection: some View {
+        let gold = Color(red: 0.95, green: 0.70, blue: 0.15)
+
+        return VStack(alignment: .leading, spacing: 14) {
+            // Reward banner
+            HStack(spacing: 10) {
+                Image(systemName: "ticket.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(gold)
+                Text(couponRewardLabel)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(PromoDesign.primaryText)
+                Spacer()
+                ValidityChip(validityEnd: couponEffectiveValidityEnd)
+            }
+
+            // Barcode — rendered natively on-device from the decoded digit string.
+            // If the backend ingested the coupon but the decoder failed, we show
+            // a neutral placeholder so the user isn't left with a misleading image.
+            if let value = item.couponBarcodeValue,
+               !value.isEmpty,
+               let image = BarcodeGenerator.image(
+                   for: value,
+                   format: BarcodeFormat.from(backendFormat: item.couponBarcodeFormat),
+                   size: CGSize(width: 320, height: 120),
+                   scale: UIScreen.main.scale
+               ) {
+                VStack(spacing: 8) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 120)
+                        .padding(12)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    Text(L("coupon_show_at_checkout"))
+                        .font(.system(size: 12, weight: .semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(PromoDesign.secondaryText)
+                        .textCase(.uppercase)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                // No scannable barcode — flag plainly instead of silently hiding.
+                Text(L("coupon_barcode_unavailable"))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(PromoDesign.secondaryText)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+            }
+
+            // Required purchase condition, if the backend captured one.
+            if let trigger = item.couponMinPurchase, !trigger.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "cart.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(PromoDesign.tertiaryText)
+                        .padding(.top, 3)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("coupon_required_purchase").uppercased())
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.8)
+                            .foregroundStyle(PromoDesign.tertiaryText)
+                        Text(trigger)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(PromoDesign.primaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(gold.opacity(0.12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(gold.opacity(0.4), lineWidth: 1)
+                )
+        )
     }
 
     // MARK: - Brand & Name Section
@@ -617,6 +743,11 @@ struct PromoProductDetailSheet: View {
 
     private var addToListButton: some View {
         let isInList = groceryStore.contains(item: item, storeName: storeName)
+        // Coupons get their own label + icon so the action reads as "save this
+        // scannable offer for later" rather than generic grocery-list toggling.
+        let addLabel: String = item.isCoupon ? L("coupon_save") : "Add to my list"
+        let removeLabel: String = item.isCoupon ? L("coupon_remove") : "Remove from my list"
+        let addIcon: String = item.isCoupon ? "ticket.fill" : "plus"
         return Button {
             if isInList {
                 groceryStore.removeByPromo(item: item, storeName: storeName)
@@ -627,10 +758,10 @@ struct PromoProductDetailSheet: View {
             dismiss()
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: isInList ? "trash.fill" : "plus")
+                Image(systemName: isInList ? "trash.fill" : addIcon)
                     .font(.system(size: 15, weight: .bold))
                     .contentTransition(.symbolEffect(.replace))
-                Text(isInList ? "Remove from my list" : "Add to my list")
+                Text(isInList ? removeLabel : addLabel)
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundColor(isInList ? Color(red: 0.95, green: 0.30, blue: 0.30) : .black)

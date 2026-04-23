@@ -63,6 +63,22 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
     /// Verbatim promo tile text, reformatted as Markdown by Gemini. Rendered in the detail sheet.
     let promoTextMarkdown: String?
 
+    // Coupon fields. Surfaced by the backend when a tile is classified as a coupon
+    // and a 1D barcode has been decoded. The iOS app renders the barcode natively
+    // on-device (CoreImage / SPM package) using `couponBarcodeValue`.
+    let isCoupon: Bool
+    let couponType: String?
+    let couponBarcodeValue: String?
+    let couponBarcodeFormat: String?
+    let couponValue: Double?
+    let couponMinPurchase: String?
+    let couponValidityEnd: String?
+
+    /// True when we have everything needed to render a scannable barcode on-device.
+    var hasScannableBarcode: Bool {
+        isCoupon && (couponBarcodeValue?.isEmpty == false)
+    }
+
     /// Brand to render in the UI — primaryBrand wins when the server provides it.
     var primaryBrandLabel: String {
         if let p = primaryBrand, !p.isEmpty { return p }
@@ -159,6 +175,13 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         case promoCampaign = "promo_campaign"
         case category
         case promoTextMarkdown = "promo_text_markdown"
+        case isCoupon = "is_coupon"
+        case couponType = "coupon_type"
+        case couponBarcodeValue = "coupon_barcode_value"
+        case couponBarcodeFormat = "coupon_barcode_format"
+        case couponValue = "coupon_value"
+        case couponMinPurchase = "coupon_min_purchase"
+        case couponValidityEnd = "coupon_validity_end"
     }
 
     // Memberwise init with defaults for new fields, so older call sites keep compiling.
@@ -203,7 +226,14 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         mechanismY: Double? = nil,
         promoCampaign: String? = nil,
         category: String? = nil,
-        promoTextMarkdown: String? = nil
+        promoTextMarkdown: String? = nil,
+        isCoupon: Bool = false,
+        couponType: String? = nil,
+        couponBarcodeValue: String? = nil,
+        couponBarcodeFormat: String? = nil,
+        couponValue: Double? = nil,
+        couponMinPurchase: String? = nil,
+        couponValidityEnd: String? = nil
     ) {
         self.itemKey = itemKey
         self.brand = brand
@@ -246,6 +276,13 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         self.promoCampaign = promoCampaign
         self.category = category
         self.promoTextMarkdown = promoTextMarkdown
+        self.isCoupon = isCoupon
+        self.couponType = couponType
+        self.couponBarcodeValue = couponBarcodeValue
+        self.couponBarcodeFormat = couponBarcodeFormat
+        self.couponValue = couponValue
+        self.couponMinPurchase = couponMinPurchase
+        self.couponValidityEnd = couponValidityEnd
     }
 
     // Backward-compatible decoder: older API responses (no unit-pricing fields) stay decodable.
@@ -292,6 +329,13 @@ struct PromoStoreItem: Codable, Identifiable, Hashable {
         self.promoCampaign = try c.decodeIfPresent(String.self, forKey: .promoCampaign)
         self.category = try c.decodeIfPresent(String.self, forKey: .category)
         self.promoTextMarkdown = try c.decodeIfPresent(String.self, forKey: .promoTextMarkdown)
+        self.isCoupon = try c.decodeIfPresent(Bool.self, forKey: .isCoupon) ?? false
+        self.couponType = try c.decodeIfPresent(String.self, forKey: .couponType)
+        self.couponBarcodeValue = try c.decodeIfPresent(String.self, forKey: .couponBarcodeValue)
+        self.couponBarcodeFormat = try c.decodeIfPresent(String.self, forKey: .couponBarcodeFormat)
+        self.couponValue = try c.decodeIfPresent(Double.self, forKey: .couponValue)
+        self.couponMinPurchase = try c.decodeIfPresent(String.self, forKey: .couponMinPurchase)
+        self.couponValidityEnd = try c.decodeIfPresent(String.self, forKey: .couponValidityEnd)
     }
 }
 

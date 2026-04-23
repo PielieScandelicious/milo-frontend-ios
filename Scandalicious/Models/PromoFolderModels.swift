@@ -32,8 +32,36 @@ struct PromoFolderHotspot: Codable, Identifiable {
     let heroUrl: String?
     let storeName: String
     let promoTextMarkdown: String?
+    // Coupon fields. When isCoupon == true, couponBarcodeValue + couponBarcodeFormat
+    // are almost always non-nil (a failed decode is logged and flagged by backend QA,
+    // but can still slip through as a coupon with no barcode — UI must guard).
+    let isCoupon: Bool
+    let couponType: String?
+    let couponBarcodeValue: String?
+    let couponBarcodeFormat: String?
+    let couponValue: Double?
+    let couponMinPurchase: String?
+    let couponValidityEnd: String?
+    let barcodeBboxXMin: CGFloat?
+    let barcodeBboxYMin: CGFloat?
+    let barcodeBboxXMax: CGFloat?
+    let barcodeBboxYMax: CGFloat?
 
     var id: String { itemId }
+
+    /// Barcode region in the page's normalized 0-1 coord space, if available.
+    /// Drawn as a secondary outline inside the tile hotspot for coupons so the
+    /// user can spot the scannable part at a glance.
+    func barcodeRect(in imageRect: CGRect) -> CGRect? {
+        guard let x1 = barcodeBboxXMin, let y1 = barcodeBboxYMin,
+              let x2 = barcodeBboxXMax, let y2 = barcodeBboxYMax else { return nil }
+        return CGRect(
+            x: imageRect.origin.x + x1 * imageRect.width,
+            y: imageRect.origin.y + y1 * imageRect.height,
+            width: (x2 - x1) * imageRect.width,
+            height: (y2 - y1) * imageRect.height
+        )
+    }
 
     /// Convert normalized 0-1 coordinates to a CGRect within the actual displayed image area,
     /// accounting for scaleAspectFit letterboxing.
@@ -75,7 +103,14 @@ struct PromoFolderHotspot: Codable, Identifiable {
             imageUrl: imageUrl,
             heroUrl: heroUrl,
             storeName: storeName,
-            promoTextMarkdown: promoTextMarkdown
+            promoTextMarkdown: promoTextMarkdown,
+            isCoupon: isCoupon,
+            couponType: couponType,
+            couponBarcodeValue: couponBarcodeValue,
+            couponBarcodeFormat: couponBarcodeFormat,
+            couponValue: couponValue,
+            couponMinPurchase: couponMinPurchase,
+            couponValidityEnd: couponValidityEnd
         )
     }
 
@@ -100,6 +135,17 @@ struct PromoFolderHotspot: Codable, Identifiable {
         case heroUrl = "hero_url"
         case storeName = "store_name"
         case promoTextMarkdown = "promo_text_markdown"
+        case isCoupon = "is_coupon"
+        case couponType = "coupon_type"
+        case couponBarcodeValue = "coupon_barcode_value"
+        case couponBarcodeFormat = "coupon_barcode_format"
+        case couponValue = "coupon_value"
+        case couponMinPurchase = "coupon_min_purchase"
+        case couponValidityEnd = "coupon_validity_end"
+        case barcodeBboxXMin = "barcode_bbox_x_min"
+        case barcodeBboxYMin = "barcode_bbox_y_min"
+        case barcodeBboxXMax = "barcode_bbox_x_max"
+        case barcodeBboxYMax = "barcode_bbox_y_max"
     }
 
     init(from decoder: Decoder) throws {
@@ -124,6 +170,17 @@ struct PromoFolderHotspot: Codable, Identifiable {
         heroUrl = try c.decodeIfPresent(String.self, forKey: .heroUrl)
         storeName = try c.decodeIfPresent(String.self, forKey: .storeName) ?? ""
         promoTextMarkdown = try c.decodeIfPresent(String.self, forKey: .promoTextMarkdown)
+        isCoupon = try c.decodeIfPresent(Bool.self, forKey: .isCoupon) ?? false
+        couponType = try c.decodeIfPresent(String.self, forKey: .couponType)
+        couponBarcodeValue = try c.decodeIfPresent(String.self, forKey: .couponBarcodeValue)
+        couponBarcodeFormat = try c.decodeIfPresent(String.self, forKey: .couponBarcodeFormat)
+        couponValue = try c.decodeIfPresent(Double.self, forKey: .couponValue)
+        couponMinPurchase = try c.decodeIfPresent(String.self, forKey: .couponMinPurchase)
+        couponValidityEnd = try c.decodeIfPresent(String.self, forKey: .couponValidityEnd)
+        barcodeBboxXMin = try c.decodeIfPresent(CGFloat.self, forKey: .barcodeBboxXMin)
+        barcodeBboxYMin = try c.decodeIfPresent(CGFloat.self, forKey: .barcodeBboxYMin)
+        barcodeBboxXMax = try c.decodeIfPresent(CGFloat.self, forKey: .barcodeBboxXMax)
+        barcodeBboxYMax = try c.decodeIfPresent(CGFloat.self, forKey: .barcodeBboxYMax)
     }
 }
 

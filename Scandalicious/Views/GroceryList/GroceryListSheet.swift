@@ -144,6 +144,119 @@ struct GroceryListContentView<Leading: View>: View {
         visibleGroups.flatMap { $0.items }.filter { !$0.isChecked }.count
     }
 
+    /// All active (non-expired) coupons the user has saved, across every store,
+    /// sorted most-recently-added first. Drives the top "Coupons" lane.
+    private var couponItems: [GroceryListItem] {
+        store.activeItems
+            .filter { $0.isCoupon }
+            .sorted { $0.addedAt > $1.addedAt }
+    }
+
+    // MARK: - Coupons top lane
+
+    private var couponsLane: some View {
+        let gold = Color(red: 0.95, green: 0.70, blue: 0.15)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "ticket.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(gold)
+                Text(L("coupons").uppercased())
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(gold)
+                Text("\(couponItems.count)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(gold))
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(couponItems) { coupon in
+                        Button {
+                            selectedDetailItem = coupon
+                        } label: {
+                            couponCard(for: coupon)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
+    private func couponCard(for coupon: GroceryListItem) -> some View {
+        let gold = Color(red: 0.95, green: 0.70, blue: 0.15)
+        let rewardLabel: String = {
+            guard let value = coupon.couponValue else { return L("coupon_generic") }
+            switch coupon.couponType {
+            case "loyalty_points": return "+\(Int(value.rounded())) \(L("coupon_points_unit"))"
+            case "cashback":       return String(format: "€%.2f", value).replacingOccurrences(of: ".", with: ",")
+            case "percent_off_coupon": return "-\(Int(value.rounded()))%"
+            default: return L("coupon_generic")
+            }
+        }()
+        let typeLabel: String = {
+            switch coupon.couponType {
+            case "loyalty_points": return L("coupon_loyalty_points")
+            case "cashback": return L("coupon_cashback")
+            case "free_product": return L("coupon_free_product")
+            case "percent_off_coupon": return L("coupon_discount")
+            default: return L("coupon_generic")
+            }
+        }()
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "ticket.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(gold)
+                Text(coupon.storeName.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(gold)
+            }
+            Text(rewardLabel)
+                .font(.system(size: 18, weight: .heavy))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            Text(typeLabel)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.7))
+                .lineLimit(1)
+            Text(coupon.label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 2)
+            if let days = coupon.daysRemaining, days >= 0 {
+                Text(String(format: L("coupon_expires_in_days"), days))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(days <= 2 ? Color(red: 1.0, green: 0.55, blue: 0.35) : .white.opacity(0.55))
+            }
+        }
+        .padding(12)
+        .frame(width: 160, height: 140, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [Color(white: 0.12), Color(white: 0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(gold.opacity(0.4), lineWidth: 1)
+                )
+        )
+    }
+
     // MARK: - Main content
 
     private var mainContent: some View {
@@ -155,10 +268,19 @@ struct GroceryListContentView<Leading: View>: View {
                             .padding(.top, 40)
                     }
 
+                    // Coupons lane — pinned above the regular grocery sections.
+                    // Coupons stay in the main items list under the hood but get
+                    // surfaced here first because redeeming them is the user's
+                    // priority at the till.
+                    if !couponItems.isEmpty {
+                        couponsLane
+                    }
+
                     ForEach(store.itemsByStore, id: \.storeName) { group in
-                        let unchecked = group.items.filter { !$0.isChecked }
+                        let unchecked = group.items.filter { !$0.isChecked && !$0.isCoupon }
                         if !unchecked.isEmpty {
-                            storeLane(group: group, uncheckedItems: unchecked, proxy: proxy)
+                            storeLane(group: (storeName: group.storeName, items: group.items.filter { !$0.isCoupon }),
+                                      uncheckedItems: unchecked, proxy: proxy)
                                 .id(group.storeName)
                         }
                     }

@@ -476,6 +476,10 @@ struct ZoomableImageContainer: UIViewRepresentable {
         /// folder background without feeling like a stock system blue.
         static let premiumBlueColor = UIColor(red: 0.10, green: 0.45, blue: 0.98, alpha: 1.0)
 
+        /// Gold accent for coupon hotspots — differentiates scannable-at-till
+        /// coupons from regular product promos at a glance.
+        static let couponGoldColor = UIColor(red: 0.95, green: 0.70, blue: 0.15, alpha: 1.0)
+
         // MARK: - Visual Feedback
 
         private func showAddedFeedback(for hotspot: PromoFolderHotspot, in imageView: UIImageView) {
@@ -621,10 +625,12 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 region.accessibilityIdentifier = hotspot.itemId
                 region.isUserInteractionEnabled = false
 
-                // Circular "+" button in the top-right corner — clearly tappable
-                // shortcut that toggles the item in the grocery list directly
-                // (bypasses detail sheet).
-                let blue = Self.premiumBlueColor
+                // Coupons get a distinct gold accent (vs regular promos' blue) and
+                // a static outline around the barcode subregion, so users can spot
+                // "this tile is scannable at the till" at a glance.
+                let badgeColor: UIColor = hotspot.isCoupon ? Self.couponGoldColor : Self.premiumBlueColor
+                let badgeIcon: String = hotspot.isCoupon ? "ticket.fill" : "plus"
+
                 let badgeSize = Coordinator.badgeSize
                 let badge = UIView(frame: CGRect(
                     x: insetRect.width - badgeSize + 3,
@@ -632,9 +638,9 @@ struct ZoomableImageContainer: UIViewRepresentable {
                     width: badgeSize,
                     height: badgeSize
                 ))
-                badge.backgroundColor = blue
+                badge.backgroundColor = badgeColor
                 badge.layer.cornerRadius = badgeSize / 2
-                badge.layer.shadowColor = blue.cgColor
+                badge.layer.shadowColor = badgeColor.cgColor
                 badge.layer.shadowOpacity = 0.35
                 badge.layer.shadowOffset = CGSize(width: 0, height: 2)
                 badge.layer.shadowRadius = 5
@@ -642,7 +648,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
 
                 let iconSize = Coordinator.badgeIconSize
                 let iconView = UIImageView(image: UIImage(
-                    systemName: "plus",
+                    systemName: badgeIcon,
                     withConfiguration: UIImage.SymbolConfiguration(pointSize: iconSize, weight: .bold)
                 ))
                 iconView.tintColor = .white
@@ -657,6 +663,34 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 badge.addSubview(iconView)
 
                 region.addSubview(badge)
+
+                // Coupons — static dashed outline around the barcode subregion,
+                // positioned relative to the region (tile_bbox offset subtracted).
+                if hotspot.isCoupon, let barcodeOnImage = hotspot.barcodeRect(in: imageRect) {
+                    let localRect = CGRect(
+                        x: barcodeOnImage.origin.x - insetRect.origin.x,
+                        y: barcodeOnImage.origin.y - insetRect.origin.y,
+                        width: barcodeOnImage.width,
+                        height: barcodeOnImage.height
+                    )
+                    if localRect.width > 4 && localRect.height > 4 {
+                        let barcodeOutline = CAShapeLayer()
+                        barcodeOutline.frame = region.bounds
+                        barcodeOutline.path = UIBezierPath(
+                            roundedRect: localRect.insetBy(dx: -2, dy: -2),
+                            cornerRadius: 3
+                        ).cgPath
+                        barcodeOutline.strokeColor = Self.couponGoldColor.cgColor
+                        barcodeOutline.fillColor = UIColor.clear.cgColor
+                        barcodeOutline.lineWidth = 1.5
+                        barcodeOutline.lineDashPattern = [4, 3]
+                        barcodeOutline.shadowColor = Self.couponGoldColor.cgColor
+                        barcodeOutline.shadowOpacity = 0.4
+                        barcodeOutline.shadowRadius = 3
+                        barcodeOutline.shadowOffset = .zero
+                        region.layer.addSublayer(barcodeOutline)
+                    }
+                }
 
                 imageView.addSubview(region)
                 hotspotDots.append(region)

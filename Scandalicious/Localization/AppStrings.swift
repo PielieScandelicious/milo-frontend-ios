@@ -292,6 +292,21 @@ enum AppStrings {
         "checking_promos": ["en": "Checking promotions across stores", "nl": "Promoties controleren in alle winkels", "fr": "Vérification des promotions dans les magasins"],
         "finding_promotions": ["en": "Finding promotions", "nl": "Promoties zoeken", "fr": "Recherche de promotions"],
 
+        // MARK: - Coupons
+        "coupons": ["en": "Coupons", "nl": "Bonnen", "fr": "Bons"],
+        "coupon_generic": ["en": "Coupon", "nl": "Bon", "fr": "Bon"],
+        "coupon_loyalty_points": ["en": "Loyalty points", "nl": "Bonuspunten", "fr": "Points de fidélité"],
+        "coupon_cashback": ["en": "Cashback", "nl": "Korting", "fr": "Remise"],
+        "coupon_free_product": ["en": "Free product", "nl": "Gratis product", "fr": "Produit gratuit"],
+        "coupon_discount": ["en": "Discount", "nl": "Korting", "fr": "Réduction"],
+        "coupon_points_unit": ["en": "pts", "nl": "punten", "fr": "pts"],
+        "coupon_show_at_checkout": ["en": "Show this barcode at the checkout", "nl": "Toon deze barcode aan de kassa", "fr": "Présentez ce code-barres à la caisse"],
+        "coupon_required_purchase": ["en": "Required purchase", "nl": "Vereiste aankoop", "fr": "Achat requis"],
+        "coupon_save": ["en": "Save coupon", "nl": "Bon opslaan", "fr": "Enregistrer le bon"],
+        "coupon_remove": ["en": "Remove coupon", "nl": "Bon verwijderen", "fr": "Retirer le bon"],
+        "coupon_barcode_unavailable": ["en": "Barcode unavailable — see the folder to redeem.", "nl": "Barcode niet beschikbaar — gebruik de folder aan de kassa.", "fr": "Code-barres indisponible — consultez le dépliant."],
+        "coupon_expires_in_days": ["en": "Expires in %d days", "nl": "Verloopt over %d dagen", "fr": "Expire dans %d jours"],
+
         // MARK: - Grocery List
         "grocery_list": ["en": "My List", "nl": "Mijn Lijst", "fr": "Ma Liste"],
         "add_to_list": ["en": "Add to list", "nl": "Toevoegen aan lijst", "fr": "Ajouter à la liste"],
