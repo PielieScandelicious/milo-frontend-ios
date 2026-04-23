@@ -244,6 +244,175 @@ struct GroceryListCard: View {
 
 }
 
+// MARK: - Coupon Card (matches promo card layout, with coupon reward label)
+
+struct GroceryListCouponCard: View {
+    let item: GroceryListItem
+    let onTap: () -> Void
+    let onRemove: () -> Void
+
+    private var storeAccent: Color {
+        GroceryStore.fromCanonical(item.storeName)?.accentColor ?? promoGreen
+    }
+
+    private var rewardLabel: String {
+        guard let value = item.couponValue else { return L("coupon_generic") }
+        switch item.couponType {
+        case "loyalty_points": return "+\(Int(value.rounded())) \(L("coupon_points_unit"))"
+        case "cashback": return String(format: "€%.2f", value).replacingOccurrences(of: ".", with: ",")
+        case "percent_off_coupon": return "-\(Int(value.rounded()))%"
+        case "free_product": return L("coupon_free_product")
+        default: return L("coupon_generic")
+        }
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                imageSection
+                infoSection
+                validityFooter
+            }
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(role: .destructive) {
+                onRemove()
+            } label: {
+                Label(L("delete"), systemImage: "trash")
+            }
+        }
+    }
+
+    private var imageSection: some View {
+        ZStack(alignment: .topLeading) {
+            Color.white
+                .frame(height: 140)
+
+            if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
+                RemoteImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: 120)
+                        .padding(8)
+                } placeholder: {
+                    imagePlaceholder
+                }
+            } else {
+                imagePlaceholder
+            }
+
+            HStack(spacing: 3) {
+                Image(systemName: "ticket.fill")
+                    .font(.system(size: 9, weight: .bold))
+                Text("COUPON")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+            }
+            .foregroundColor(.black.opacity(0.85))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(brandGold))
+            .shadow(color: brandGold.opacity(0.3), radius: 3, y: 1)
+            .padding(6)
+        }
+        .frame(height: 140)
+        .clipped()
+        .overlay(alignment: .bottomLeading) {
+            StoreLogoView(storeName: item.storeName, height: 14)
+                .frame(width: 22, height: 22)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                .padding(6)
+        }
+        .overlay(alignment: .topTrailing) {
+            removeButton
+        }
+    }
+
+    private var removeButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onRemove()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+                .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                .padding(6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L("delete"))
+    }
+
+    private var imagePlaceholder: some View {
+        ZStack {
+            storeAccent.opacity(0.15)
+            Image(systemName: "ticket.fill")
+                .font(.system(size: 40, weight: .heavy))
+                .foregroundColor(storeAccent.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity, maxHeight: 120)
+    }
+
+    private var infoSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if !item.brand.isEmpty {
+                Text(item.brand.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundColor(brandGold)
+                    .lineLimit(1)
+            }
+
+            Text(item.label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 34, alignment: .top)
+
+            Text(rewardLabel)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(promoGreenGradient)
+                .lineLimit(1)
+        }
+        .padding(10)
+    }
+
+    private var validityFooter: some View {
+        let d = PromoValidity.display(for: item.validityEnd)
+        return HStack(spacing: 4) {
+            if let icon = d.icon {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: .medium))
+            }
+            Text(d.text)
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(d.isUrgent ? d.color.opacity(0.85) : Color.white.opacity(0.35))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
+    }
+}
+
 // MARK: - Compact Card (checked, "in cart")
 
 struct GroceryListCompactCard: View {

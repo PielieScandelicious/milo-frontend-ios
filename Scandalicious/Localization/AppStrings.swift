@@ -291,6 +291,7 @@ enum AppStrings {
         "sniffing_deals": ["en": "Sniffing out your deals...", "nl": "Je aanbiedingen opsnuiven...", "fr": "On renifle vos promotions..."],
         "checking_promos": ["en": "Checking promotions across stores", "nl": "Promoties controleren in alle winkels", "fr": "Vérification des promotions dans les magasins"],
         "finding_promotions": ["en": "Finding promotions", "nl": "Promoties zoeken", "fr": "Recherche de promotions"],
+        "promos": ["en": "Promos", "nl": "Aanbiedingen", "fr": "Promos"],
 
         // MARK: - Coupons
         "coupons": ["en": "Coupons", "nl": "Bonnen", "fr": "Bons"],
