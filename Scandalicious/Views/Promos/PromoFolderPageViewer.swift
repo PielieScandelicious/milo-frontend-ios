@@ -82,7 +82,7 @@ struct PromoFolderPageViewer: View {
                     HStack(spacing: 8) {
                         StoreLogoView(storeName: folder.storeId, height: 16)
                             .frame(width: 24, height: 24)
-                        Text(folder.folderName)
+                        Text(folder.storeDisplayName)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.white)
                     }

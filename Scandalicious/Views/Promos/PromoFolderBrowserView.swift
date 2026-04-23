@@ -264,7 +264,8 @@ struct PromoFolderBrowserView: View {
                    let expandedGroup = row.first(where: { $0.storeId == expandedId }) {
                     ExpandedFolderLane(
                         folders: expandedGroup.folders,
-                        storeId: expandedGroup.storeId
+                        storeId: expandedGroup.storeId,
+                        displayName: expandedGroup.displayName
                     )
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
@@ -625,6 +626,11 @@ private struct StackedCoversView: View {
 private struct ExpandedFolderLane: View {
     let folders: [PromoFolder]
     let storeId: String
+    let displayName: String
+
+    @State private var scrollProgress: CGFloat = 0
+    @State private var contentOverflows: Bool = false
+    @State private var swipeHintPhase: CGFloat = 0
 
     private var accent: Color {
         GroceryStore.fromCanonical(storeId)?.accentColor
@@ -632,26 +638,141 @@ private struct ExpandedFolderLane: View {
     }
 
     private var sortedFolders: [PromoFolder] {
-        folders.sorted { lhs, rhs in
-            let lExpired = (lhs.daysRemaining ?? 0) < 0
-            let rExpired = (rhs.daysRemaining ?? 0) < 0
-            if lExpired != rExpired { return !lExpired }
-            return (lhs.daysRemaining ?? Int.max) < (rhs.daysRemaining ?? Int.max)
+        folders.sorted {
+            $0.folderName.localizedCaseInsensitiveCompare($1.folderName) == .orderedAscending
         }
     }
 
+    // Trailing fade strength eases out as the user scrolls to the end, so the
+    // cue disappears once it's no longer useful.
+    private var trailingFadeStrength: CGFloat {
+        guard contentOverflows else { return 0 }
+        let remaining = max(0, 1 - scrollProgress)
+        return min(1, remaining * 2.2)
+    }
+
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(sortedFolders) { folder in
-                    NavigationLink(destination: PromoFolderPageViewer(folder: folder)) {
-                        FolderCoverCard(folder: folder, storeId: storeId)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+        VStack(alignment: .leading, spacing: 8) {
+            header
+                .padding(.horizontal, 18)
+                .padding(.top, 10)
+
+            lane
         }
+        .padding(.bottom, 4)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: false)) {
+                swipeHintPhase = 1
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Capsule()
+                .fill(accent)
+                .frame(width: 3, height: 14)
+
+            Text(displayName.uppercased())
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .tracking(1.2)
+                .foregroundStyle(.white.opacity(0.85))
+
+            Text("· \(sortedFolders.count) folders")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.4))
+
+            Spacer(minLength: 8)
+
+            if contentOverflows {
+                swipeHint
+            }
+        }
+    }
+
+    // Two chevrons gently drifting right — the eye catches the motion and
+    // reads the lane as horizontally scrollable without adding chrome.
+    private var swipeHint: some View {
+        HStack(spacing: 3) {
+            Text("swipe")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.35))
+
+            ZStack {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.25 + 0.35 * (1 - swipeHintPhase)))
+                    .offset(x: -4 + 6 * swipeHintPhase)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.25 + 0.35 * swipeHintPhase))
+                    .offset(x: 2 + 6 * swipeHintPhase)
+            }
+            .frame(width: 18, height: 10)
+            .clipped()
+        }
+        .opacity(trailingFadeStrength)
+        .animation(.easeOut(duration: 0.2), value: trailingFadeStrength)
+    }
+
+    private var lane: some View {
+        GeometryReader { outer in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(sortedFolders) { folder in
+                        NavigationLink(destination: PromoFolderPageViewer(folder: folder)) {
+                            FolderCoverCard(folder: folder, storeId: storeId)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    GeometryReader { inner in
+                        Color.clear.preference(
+                            key: LaneGeometryKey.self,
+                            value: LaneGeometry(
+                                offset: -inner.frame(in: .named("expandedLane")).origin.x,
+                                contentWidth: inner.size.width
+                            )
+                        )
+                    }
+                )
+            }
+            .coordinateSpace(name: "expandedLane")
+            .onPreferenceChange(LaneGeometryKey.self) { geo in
+                let viewport = outer.size.width
+                let overflow = max(0, geo.contentWidth - viewport)
+                contentOverflows = overflow > 1
+                scrollProgress = overflow > 0
+                    ? min(1, max(0, geo.offset / overflow))
+                    : 1
+            }
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 1 - 0.12 * trailingFadeStrength),
+                        .init(color: .black.opacity(1 - Double(trailingFadeStrength)), location: 1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+        }
+        .frame(height: 234)
+    }
+}
+
+private struct LaneGeometry: Equatable {
+    var offset: CGFloat
+    var contentWidth: CGFloat
+}
+
+private struct LaneGeometryKey: PreferenceKey {
+    static var defaultValue = LaneGeometry(offset: 0, contentWidth: 0)
+    static func reduce(value: inout LaneGeometry, nextValue: () -> LaneGeometry) {
+        value = nextValue()
     }
 }
