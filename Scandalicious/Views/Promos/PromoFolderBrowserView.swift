@@ -207,8 +207,11 @@ struct PromoFolderBrowserView: View {
 
         return LazyVStack(spacing: 16) {
             if favs.isEmpty {
-                favoritesCTACard
-                    .padding(.horizontal, 16)
+                HStack {
+                    favoritesCTACard
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 16)
             } else {
                 favoritesSectionHeader
                     .padding(.horizontal, 16)
@@ -358,7 +361,7 @@ struct PromoFolderBrowserView: View {
         Button {
             showFavoritesPicker = true
         } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: 10) {
                 ZStack {
                     Circle()
                         .fill(
@@ -371,29 +374,26 @@ struct PromoFolderBrowserView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 44, height: 44)
+                        .frame(width: 28, height: 28)
                     Image(systemName: "star.fill")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
                 }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L("folders_pick_favorites_cta_title"))
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                    Text(L("folders_pick_favorites_cta_subtitle"))
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                }
-                Spacer(minLength: 0)
+
+                Text(L("folders_pick_favorites_cta_title"))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.4))
             }
-            .padding(14)
+            .padding(.leading, 6)
+            .padding(.trailing, 14)
+            .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                Capsule(style: .continuous)
                     .fill(
                         LinearGradient(
                             stops: [
@@ -405,7 +405,7 @@ struct PromoFolderBrowserView: View {
                         )
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        Capsule(style: .continuous)
                             .strokeBorder(.white.opacity(0.08), lineWidth: 1)
                     )
             )
