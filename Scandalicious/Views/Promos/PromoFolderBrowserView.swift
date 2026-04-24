@@ -361,24 +361,10 @@ struct PromoFolderBrowserView: View {
         Button {
             showFavoritesPicker = true
         } label: {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.10, green: 0.25, blue: 0.55),   // accentDeep
-                                    Color(red: 0.04, green: 0.12, blue: 0.28)    // headerBlue
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 28, height: 28)
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                }
+            HStack(spacing: 8) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.9))
 
                 Text(L("folders_pick_favorites_cta_title"))
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -389,9 +375,8 @@ struct PromoFolderBrowserView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.4))
             }
-            .padding(.leading, 6)
-            .padding(.trailing, 14)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
             .background(
                 Capsule(style: .continuous)
                     .fill(
@@ -978,23 +963,16 @@ private struct FavoriteStoresPickerSheet: View {
     // MARK: - Hero
 
     private var heroHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(L("folders_favorites_sheet_title"))
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .tracking(-0.6)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.white, .white.opacity(0.78)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+        Text(L("folders_favorites_sheet_title"))
+            .font(.system(size: 28, weight: .bold, design: .rounded))
+            .tracking(-0.6)
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [.white, .white.opacity(0.78)],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-
-            Text(L("folders_favorites_sheet_subtitle"))
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.6))
-                .fixedSize(horizontal: false, vertical: true)
-        }
+            )
     }
 
     // MARK: - Controls
