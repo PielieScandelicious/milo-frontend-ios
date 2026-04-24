@@ -70,6 +70,30 @@ class PromoFoldersViewModel: ObservableObject {
         return result
     }
 
+    /// Split the grouped folders into favorite vs. other stores, dropping
+    /// expired folders and stores that have no surviving folders. Favorites
+    /// are ordered by how the user picked them relative to the API order —
+    /// we preserve the API's store order within each partition so the layout
+    /// stays stable between refreshes.
+    func foldersByStorePartitioned(favorites: Set<String>)
+        -> (favorites: [(storeId: String, displayName: String, folders: [PromoFolder])],
+            others: [(storeId: String, displayName: String, folders: [PromoFolder])]) {
+        let active = foldersByStore
+            .map { (storeId: $0.storeId, displayName: $0.displayName, folders: $0.folders.filter { ($0.daysRemaining ?? 0) >= 0 }) }
+            .filter { !$0.folders.isEmpty }
+
+        var favs: [(storeId: String, displayName: String, folders: [PromoFolder])] = []
+        var others: [(storeId: String, displayName: String, folders: [PromoFolder])] = []
+        for group in active {
+            if favorites.contains(group.storeId) {
+                favs.append(group)
+            } else {
+                others.append(group)
+            }
+        }
+        return (favs, others)
+    }
+
     var totalFolderCount: Int {
         guard case .success(let folders) = state else { return 0 }
         return folders.count

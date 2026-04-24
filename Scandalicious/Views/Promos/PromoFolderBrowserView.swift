@@ -168,9 +168,11 @@ private struct FolderScrollOffsetKey: PreferenceKey {
 
 struct PromoFolderBrowserView: View {
     @ObservedObject var viewModel: PromoFoldersViewModel
+    @ObservedObject private var favoritesManager = FavoriteStoresManager.shared
     var scrollProxy: ScrollViewProxy? = nil
     @State private var expandedStoreId: String? = nil
     @State private var dayToken: Date = Calendar.current.startOfDay(for: Date())
+    @State private var showFavoritesPicker = false
 
     var body: some View {
         content
@@ -199,9 +201,38 @@ struct PromoFolderBrowserView: View {
     // MARK: - Content
 
     private var folderContent: some View {
-        let groups = viewModel.foldersByStore
-            .map { (storeId: $0.storeId, displayName: $0.displayName, folders: $0.folders.filter { ($0.daysRemaining ?? 0) >= 0 }) }
-            .filter { !$0.folders.isEmpty }
+        let partition = viewModel.foldersByStorePartitioned(favorites: favoritesManager.favorites)
+        let favs = partition.favorites
+        let others = partition.others
+
+        return LazyVStack(spacing: 16) {
+            if favs.isEmpty {
+                favoritesCTACard
+                    .padding(.horizontal, 16)
+            } else {
+                favoritesSectionHeader
+                    .padding(.horizontal, 16)
+                grid(for: favs)
+            }
+
+            if !others.isEmpty {
+                allStoresSectionHeader
+                    .padding(.horizontal, 16)
+                    .padding(.top, favs.isEmpty ? 4 : 6)
+                grid(for: others)
+            }
+        }
+        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: favoritesManager.favorites)
+        .sheet(isPresented: $showFavoritesPicker) {
+            FavoriteStoresPickerSheet(favoritesManager: favoritesManager)
+        }
+    }
+
+    // MARK: - Grid Builder
+
+    private func grid(
+        for groups: [(storeId: String, displayName: String, folders: [PromoFolder])]
+    ) -> some View {
         let rows = stride(from: 0, to: groups.count, by: 2).map {
             Array(groups[$0..<min($0 + 2, groups.count)])
         }
@@ -271,6 +302,106 @@ struct PromoFolderBrowserView: View {
             }
         }
         .padding(.horizontal, 16)
+    }
+
+    // MARK: - Section Headers
+
+    private var favoritesSectionHeader: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "star.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color(red: 0.95, green: 0.80, blue: 0.30))
+            Text(L("folders_your_favorites").uppercased())
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .tracking(1.4)
+                .foregroundStyle(.white.opacity(0.75))
+            Rectangle()
+                .fill(.white.opacity(0.08))
+                .frame(height: 0.5)
+            editFavoritesPill
+        }
+    }
+
+    private var allStoresSectionHeader: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text(L("folders_all_stores").uppercased())
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .tracking(1.4)
+                .foregroundStyle(.white.opacity(0.5))
+            Rectangle()
+                .fill(.white.opacity(0.08))
+                .frame(height: 0.5)
+        }
+    }
+
+    private var editFavoritesPill: some View {
+        Button {
+            showFavoritesPicker = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 9, weight: .bold))
+                Text(L("folders_edit_favorites"))
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(.white.opacity(0.8))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(.white.opacity(0.08)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Favorites CTA
+
+    private var favoritesCTACard: some View {
+        Button {
+            showFavoritesPicker = true
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.30, green: 0.55, blue: 0.95),
+                                    Color(red: 0.55, green: 0.35, blue: 0.85)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L("folders_pick_favorites_cta_title"))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(L("folders_pick_favorites_cta_subtitle"))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PressableCardStyle())
     }
 
     // MARK: - Empty State
@@ -769,5 +900,75 @@ private struct LaneGeometryKey: PreferenceKey {
     static var defaultValue = LaneGeometry(offset: 0, contentWidth: 0)
     static func reduce(value: inout LaneGeometry, nextValue: () -> LaneGeometry) {
         value = nextValue()
+    }
+}
+
+// MARK: - Favorite Stores Picker Sheet
+
+private struct FavoriteStoresPickerSheet: View {
+    @ObservedObject var favoritesManager: FavoriteStoresManager
+    @Environment(\.dismiss) private var dismiss
+
+    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+    private let accent = Color(red: 0.30, green: 0.55, blue: 0.95)
+
+    private var allStores: [GroceryStore] { GroceryStore.promoSupported }
+    private var allStoreIds: [String] { allStores.map { $0.canonicalName } }
+    private var allSelected: Bool { favoritesManager.favorites.isSuperset(of: allStoreIds) }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(L("folders_favorites_sheet_subtitle"))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                if allSelected {
+                                    favoritesManager.clear()
+                                } else {
+                                    favoritesManager.setAll(allStoreIds)
+                                }
+                            }
+                        } label: {
+                            Text(allSelected ? L("deselect_all") : L("select_all"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(accent)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    LazyVGrid(columns: gridColumns, spacing: 10) {
+                        ForEach(allStores) { store in
+                            StoreChipView(
+                                store: store,
+                                isSelected: favoritesManager.contains(store.canonicalName),
+                                onTap: {
+                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                        favoritesManager.toggle(store.canonicalName)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            }
+            .background(Color(white: 0.05).ignoresSafeArea())
+            .navigationTitle(L("folders_favorites_sheet_title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L("done")) { dismiss() }
+                        .foregroundStyle(accent)
+                }
+            }
+        }
     }
 }

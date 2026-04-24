@@ -105,6 +105,16 @@ enum AppStrings {
         "select_stores_subtitle": ["en": "Pick the stores you shop at to see relevant deals", "nl": "Kies de winkels waar je winkelt om relevante aanbiedingen te zien", "fr": "Choisissez vos magasins pour voir les promotions pertinentes"],
         "select_all": ["en": "Select all", "nl": "Alles selecteren", "fr": "Tout sélectionner"],
         "deselect_all": ["en": "Deselect all", "nl": "Alles deselecteren", "fr": "Tout désélectionner"],
+
+        // MARK: - Folders — Favorite Stores
+        "folders_your_favorites": ["en": "Your favorites", "nl": "Jouw favorieten", "fr": "Vos favoris"],
+        "folders_all_stores": ["en": "All stores", "nl": "Alle winkels", "fr": "Tous les magasins"],
+        "folders_edit_favorites": ["en": "Edit", "nl": "Bewerken", "fr": "Modifier"],
+        "folders_pick_favorites_cta_title": ["en": "Pick your favorite stores", "nl": "Kies je favoriete winkels", "fr": "Choisissez vos magasins favoris"],
+        "folders_pick_favorites_cta_subtitle": ["en": "We'll pin their folders to the top of this tab.", "nl": "We pinnen hun folders bovenaan dit tabblad vast.", "fr": "Nous épinglerons leurs dépliants en haut de cet onglet."],
+        "folders_favorites_sheet_title": ["en": "Favorite stores", "nl": "Favoriete winkels", "fr": "Magasins favoris"],
+        "folders_favorites_sheet_subtitle": ["en": "Pick the stores you shop at most. Their folders will appear at the top.", "nl": "Kies de winkels waar je het meest winkelt. Hun folders verschijnen bovenaan.", "fr": "Choisissez les magasins où vous faites le plus vos courses. Leurs dépliants apparaîtront en haut."],
+
         "expired": ["en": "Expired", "nl": "Verlopen", "fr": "Expiré"],
         "free": ["en": "Free", "nl": "Gratis", "fr": "Gratuit"],
         "premium_yearly": ["en": "Premium Yearly", "nl": "Premium Jaarlijks", "fr": "Premium Annuel"],
