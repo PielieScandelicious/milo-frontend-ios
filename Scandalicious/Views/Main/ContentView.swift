@@ -331,6 +331,9 @@ struct ContentView: View {
                     await MainActor.run {
                         cache.promoFolders = folders
                     }
+                    for folder in folders.folders {
+                        ImagePrefetcher.shared.prefetch(urlString: folder.coverImageUrl)
+                    }
                 }
             }
 

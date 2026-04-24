@@ -108,10 +108,6 @@ struct FolderHomeView: View {
             WalletPassCreatorView()
         }
         .opacity(contentOpacity)
-        .refreshable {
-            await viewModel.loadFolders(forceRefresh: true)
-        }
-        .tint(.white.opacity(0.6))
         .onAppear {
             withAnimation(.smooth(duration: 0.5)) {
                 contentOpacity = 1.0
@@ -388,24 +384,19 @@ struct FolderCoverCard: View {
             // Cover image
             Group {
                 if let coverUrl = folder.coverImageUrl, let url = URL(string: coverUrl) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: cardWidth, height: coverHeight)
-                        case .failure:
-                            folderPlaceholder
-                        default:
-                            Rectangle()
-                                .fill(Color.white.opacity(0.04))
-                                .frame(width: cardWidth, height: coverHeight)
-                                .overlay(
-                                    ProgressView()
-                                        .tint(.white.opacity(0.3))
-                                )
-                        }
+                    RemoteImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: cardWidth, height: coverHeight)
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.04))
+                            .frame(width: cardWidth, height: coverHeight)
+                            .overlay(
+                                ProgressView()
+                                    .tint(.white.opacity(0.3))
+                            )
                     }
                 } else {
                     folderPlaceholder
@@ -588,16 +579,11 @@ private struct StackedCoversView: View {
     private func coverCard(folder: PromoFolder, width: CGFloat, height: CGFloat) -> some View {
         ZStack {
             if let urlString = folder.coverImageUrl, let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        placeholder
-                    default:
-                        Color(white: 0.12)
-                            .overlay(ProgressView().tint(.white.opacity(0.3)))
-                    }
+                RemoteImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color(white: 0.12)
+                        .overlay(ProgressView().tint(.white.opacity(0.3)))
                 }
             } else {
                 placeholder
@@ -658,8 +644,21 @@ private struct ExpandedFolderLane: View {
                 .padding(.top, 10)
 
             lane
+
+            LinearGradient(
+                stops: [
+                    .init(color: .white.opacity(0), location: 0),
+                    .init(color: .white.opacity(0.10), location: 0.5),
+                    .init(color: .white.opacity(0), location: 1)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 0.5)
+            .padding(.horizontal, 24)
+            .padding(.top, 4)
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, 10)
         .onAppear {
             withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: false)) {
                 swipeHintPhase = 1
@@ -677,10 +676,6 @@ private struct ExpandedFolderLane: View {
                 .font(.system(size: 11, weight: .heavy, design: .rounded))
                 .tracking(1.2)
                 .foregroundStyle(.white.opacity(0.85))
-
-            Text("· \(sortedFolders.count) folders")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.4))
 
             Spacer(minLength: 8)
 

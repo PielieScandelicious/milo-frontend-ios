@@ -9,6 +9,15 @@
 import SwiftUI
 import Combine
 
+/// Tracks which pages have already played their reveal/spotlight animation
+/// during the current folder viewer session. Lives outside the Coordinator
+/// because TabView recycles pages past ±1 neighbor — when a recycled page
+/// comes back, a fresh Coordinator is built and its local "already ran" flags
+/// would otherwise replay the animation on revisit.
+final class PromoFolderRevealTracker {
+    var shownPageKeys: Set<String> = []
+}
+
 struct PromoFolderPageViewer: View {
     let folder: PromoFolder
     let initialPage: Int
@@ -16,6 +25,7 @@ struct PromoFolderPageViewer: View {
     @State private var currentPage: Int
     @State private var selectedHotspot: PromoFolderHotspot?
     @State private var pushedFolderDestination: FolderDestination?
+    @State private var revealTracker = PromoFolderRevealTracker()
     @ObservedObject private var groceryStore = GroceryListStore.shared
     @EnvironmentObject private var foldersViewModel: PromoFoldersViewModel
     @Environment(\.dismiss) private var dismiss
@@ -60,6 +70,7 @@ struct PromoFolderPageViewer: View {
                         groceryStore: groceryStore,
                         highlightItemId: index == initialPage ? highlightItemId : nil,
                         isActive: index == currentPage,
+                        revealTracker: revealTracker,
                         onInfoTap: { selectedHotspot = $0 }
                     )
                     .tag(index)
@@ -216,6 +227,7 @@ struct ZoomablePageView: View {
     let groceryStore: GroceryListStore
     var highlightItemId: String? = nil
     let isActive: Bool
+    let revealTracker: PromoFolderRevealTracker
     let onInfoTap: (PromoFolderHotspot) -> Void
 
     var body: some View {
@@ -230,6 +242,7 @@ struct ZoomablePageView: View {
                 groceryStore: groceryStore,
                 highlightItemId: highlightItemId,
                 isActive: isActive,
+                revealTracker: revealTracker,
                 onInfoTap: onInfoTap
             )
         }
@@ -250,6 +263,7 @@ struct ZoomableImageContainer: UIViewRepresentable {
     let groceryStore: GroceryListStore
     var highlightItemId: String? = nil
     let isActive: Bool
+    let revealTracker: PromoFolderRevealTracker
     let onInfoTap: (PromoFolderHotspot) -> Void
 
     func makeUIView(context: Context) -> UIScrollView {
@@ -290,6 +304,8 @@ struct ZoomableImageContainer: UIViewRepresentable {
         context.coordinator.folderValidityEnd = folderValidityEnd
         context.coordinator.groceryStore = groceryStore
         context.coordinator.highlightItemId = highlightItemId
+        context.coordinator.revealTracker = revealTracker
+        context.coordinator.pageKey = imageUrl
         context.coordinator.onInfoTap = onInfoTap
         context.coordinator.observeGroceryStore()
         // Seed visibility before kicking off the image load so a page that's
@@ -331,6 +347,8 @@ struct ZoomableImageContainer: UIViewRepresentable {
         var folderValidityEnd: String = ""
         var groceryStore: GroceryListStore?
         var highlightItemId: String?
+        var revealTracker: PromoFolderRevealTracker?
+        var pageKey: String = ""
         var onInfoTap: ((PromoFolderHotspot) -> Void)?
         private var hotspotDots: [UIView] = []
         private var groceryCancellable: AnyCancellable?
@@ -505,6 +523,12 @@ struct ZoomableImageContainer: UIViewRepresentable {
         static let badgeSize: CGFloat = 20
         static let badgeIconSize: CGFloat = 11
 
+        /// Alpha applied to the persistent bbox outline so it reads as a quiet
+        /// affordance (clearly visible tappable region) without competing with
+        /// the folder image or the "+" badge.
+        static let persistentOutlineAlpha: CGFloat = 0.45
+        static let persistentOutlineWidth: CGFloat = 1.8
+
         /// Premium blue used for the hotspot contour trace animation and the
         /// "+" badge — a refined, saturated azure that reads crisp on any
         /// folder background without feeling like a stock system blue.
@@ -646,11 +670,11 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 let inset: CGFloat = 2
                 let insetRect = rect.insetBy(dx: inset, dy: inset)
 
-                // Invisible region container — holds the "+" badge and is the
-                // anchor for the contour-trace reveal animation. The bbox
-                // outline itself is never drawn as a static border; it only
-                // ever appears as a premium blue stroke that traces the
-                // perimeter once and disappears.
+                // Region container — holds the "+" badge, carries the subtle
+                // persistent outline, and is the anchor for the contour-trace
+                // reveal animation. The outline traces the same open-ended
+                // path as the reveal comet at low alpha, so the tappable
+                // region stays visually marked after the comet retracts.
                 let region = UIView(frame: insetRect)
                 region.backgroundColor = .clear
                 region.layer.cornerRadius = 8
@@ -664,6 +688,31 @@ struct ZoomableImageContainer: UIViewRepresentable {
                 // till" at a glance.
                 let badgeColor: UIColor = hotspot.isCoupon ? Self.couponGoldColor : Self.premiumBlueColor
                 let badgeIcon: String = hotspot.isCoupon ? "ticket.fill" : "plus"
+
+                // Persistent subtle outline — mirrors the comet path and is
+                // literally painted by the reveal: the outline's strokeEnd
+                // animates 0→1 in lockstep with the comet head, so the line
+                // appears right where the nucleus has just been. After the
+                // comet tail retracts, this outline is what remains to mark
+                // the tappable region. Added before the badge subview so it
+                // sits below the badge in z-order and below the comet layers.
+                let outline = CAShapeLayer()
+                outline.name = "persistentOutline"
+                outline.frame = region.bounds
+                outline.path = Self.contourPath(in: region.bounds, cornerRadius: 8)
+                outline.strokeColor = badgeColor.withAlphaComponent(Self.persistentOutlineAlpha).cgColor
+                outline.fillColor = UIColor.clear.cgColor
+                outline.lineWidth = Self.persistentOutlineWidth
+                outline.lineCap = .round
+                outline.lineJoin = .round
+                // Pages that will run the comet sweep start hidden and get
+                // painted by the comet. Pages that won't (deep-link target,
+                // or already-seen pages handed back to us by TabView recycling)
+                // show the outline immediately.
+                let alreadyRevealed = revealTracker?.shownPageKeys.contains(pageKey) ?? false
+                let willSweep = highlightItemId == nil && !alreadyRevealed
+                outline.strokeEnd = willSweep ? 0 : 1
+                region.layer.addSublayer(outline)
 
                 // Sits in the bbox's top-right corner with a small overhang.
                 // The contour-trace path is shaped to start on the badge's
@@ -750,12 +799,18 @@ struct ZoomableImageContainer: UIViewRepresentable {
         /// (so `addHotspotDots` has run and laid out the regions) and the page
         /// must be the visible one. Whichever trigger completes the conditions
         /// last wins. Once it's run, `didRunReveal` keeps subsequent revisits
-        /// silent.
+        /// silent — and the session-level `revealTracker` keeps revisits
+        /// silent even when TabView recycled the page and handed us a fresh
+        /// Coordinator.
         private func maybeRunReveal() {
             guard !didRunReveal else { return }
             guard imageLoaded, isPageActive, highlightItemId == nil else { return }
             guard !hotspotDots.isEmpty else { return }
             didRunReveal = true
+            if let tracker = revealTracker, tracker.shownPageKeys.contains(pageKey) {
+                return
+            }
+            revealTracker?.shownPageKeys.insert(pageKey)
             animateHotspotReveal()
         }
 
@@ -768,9 +823,10 @@ struct ZoomableImageContainer: UIViewRepresentable {
             revealLayers.removeAll()
         }
 
-        /// On page reveal, a thick shiny blue arc traces the contour of every
-        /// hotspot bbox simultaneously and retracts — leaving only the "+"
-        /// badge as the persistent affordance.
+        /// On page reveal, a thick shiny arc traces the contour of every
+        /// hotspot bbox simultaneously and retracts. Regular promos use
+        /// premium blue; coupons use gold to match their badge and the
+        /// persistent outline.
         private func animateHotspotReveal() {
             guard !hotspotDots.isEmpty else { return }
 
@@ -780,8 +836,18 @@ struct ZoomableImageContainer: UIViewRepresentable {
             impact.impactOccurred(intensity: 0.4)
 
             for region in hotspotDots {
-                traceContour(on: region, color: Self.premiumBlueColor)
+                let color: UIColor = isCouponRegion(region) ? Self.couponGoldColor : Self.premiumBlueColor
+                traceContour(on: region, color: color)
             }
+        }
+
+        /// Looks up the hotspot backing a region view via its
+        /// `accessibilityIdentifier` (set to the hotspot's itemId in
+        /// `addHotspotDots`). Lets badge/outline styling stay coupon-aware
+        /// without threading the hotspot through every caller.
+        private func isCouponRegion(_ region: UIView) -> Bool {
+            guard let id = region.accessibilityIdentifier else { return false }
+            return hotspots.first(where: { $0.itemId == id })?.isCoupon ?? false
         }
 
         /// Draws the premium reveal as a comet sliding clockwise around the
@@ -857,6 +923,19 @@ struct ZoomableImageContainer: UIViewRepresentable {
             ]
 
             var createdLayers: [CAShapeLayer] = []
+
+            // Persistent outline rides the same head animation as the comet
+            // so it emerges exactly where the nucleus has been — the comet
+            // literally paints the line in. Don't touch the model strokeEnd
+            // (it stays at 0 from addHotspotDots): the animation carries
+            // presentation from 0 → 1 and `fillMode = .forwards` +
+            // `isRemovedOnCompletion = false` hold it there indefinitely.
+            // Bumping the model to 1 before adding the animation would make
+            // the layer composite a full outline for one frame while the
+            // implicit-action suppression settles — that's the flash.
+            if let persistentOutline = region.layer.sublayers?.first(where: { $0.name == "persistentOutline" }) as? CAShapeLayer {
+                persistentOutline.add(makeHeadAnim(), forKey: "reveal")
+            }
 
             for seg in segments {
                 let layer = CAShapeLayer()
@@ -978,9 +1057,8 @@ struct ZoomableImageContainer: UIViewRepresentable {
             return path.cgPath
         }
 
-        /// Badge → "✓" in green. Leaves the region outline alone: after the
-        /// reveal animation the bbox outline is transparent, so toggling
-        /// state must not resurrect it.
+        /// Badge → "✓" in green, and the persistent outline recolors to match
+        /// so the tappable region reads as "in your list" at a glance.
         private func applyAddedStyle(to region: UIView) {
             let green = UIColor(red: 0.2, green: 0.85, blue: 0.4, alpha: 1.0)
             if let badge = region.viewWithTag(300) {
@@ -995,24 +1073,35 @@ struct ZoomableImageContainer: UIViewRepresentable {
                     )
                 }
             }
+            updatePersistentOutlineColor(on: region, to: green)
         }
 
-        /// Badge → "+" in the premium blue. Same rule as `applyAddedStyle`:
-        /// do not touch the region outline.
+        /// Default (not-added) state: regular promos get blue badge + "+"
+        /// icon, coupons get gold badge + "ticket.fill" icon. The persistent
+        /// outline matches the badge color so coupons stay gold end-to-end
+        /// across add/remove cycles.
         private func applyDefaultStyle(to region: UIView) {
-            let blue = Self.premiumBlueColor
+            let isCoupon = isCouponRegion(region)
+            let baseColor: UIColor = isCoupon ? Self.couponGoldColor : Self.premiumBlueColor
+            let iconName: String = isCoupon ? "ticket.fill" : "plus"
             if let badge = region.viewWithTag(300) {
-                badge.backgroundColor = blue
-                badge.layer.shadowColor = blue.cgColor
+                badge.backgroundColor = baseColor
+                badge.layer.shadowColor = baseColor.cgColor
                 badge.layer.shadowOpacity = 0.35
                 badge.layer.shadowRadius = 5
                 if let icon = badge.viewWithTag(301) as? UIImageView {
                     icon.image = UIImage(
-                        systemName: "plus",
+                        systemName: iconName,
                         withConfiguration: UIImage.SymbolConfiguration(pointSize: Self.badgeIconSize, weight: .bold)
                     )
                 }
             }
+            updatePersistentOutlineColor(on: region, to: baseColor)
+        }
+
+        private func updatePersistentOutlineColor(on region: UIView, to color: UIColor) {
+            guard let outline = region.layer.sublayers?.first(where: { $0.name == "persistentOutline" }) as? CAShapeLayer else { return }
+            outline.strokeColor = color.withAlphaComponent(Self.persistentOutlineAlpha).cgColor
         }
 
         private func revertDotForRemovedItem(hotspot: PromoFolderHotspot) {
@@ -1109,6 +1198,13 @@ struct ZoomableImageContainer: UIViewRepresentable {
                   let targetId = highlightItemId,
                   let hotspot = hotspots.first(where: { $0.itemId == targetId }) else { return }
             didRunSpotlight = true
+            // Session-level de-dupe: if this page's reveal/spotlight already
+            // played and the Coordinator got recreated on swipe-back, don't
+            // fire the spotlight again.
+            if let tracker = revealTracker, tracker.shownPageKeys.contains(pageKey) {
+                return
+            }
+            revealTracker?.shownPageKeys.insert(pageKey)
             // Short delay so the push transition settles before the contour starts.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self, weak imageView] in
                 guard let self, let imageView else { return }
