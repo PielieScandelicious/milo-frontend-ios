@@ -141,7 +141,7 @@ struct PromoProductCard: View {
                 Text(item.brand.uppercased())
                     .font(PromoDesign.eyebrow())
                     .tracking(1.0)
-                    .foregroundStyle(storeAccent)
+                    .foregroundStyle(PromoDesign.brandAccent)
                     .lineLimit(1)
             }
 

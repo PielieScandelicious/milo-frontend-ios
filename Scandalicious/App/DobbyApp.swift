@@ -98,6 +98,8 @@ struct ScandaLiciousApp: App {
                 await subscriptionManager.updateSubscriptionStatus()
             }
 
+            GroceryListStore.shared.removeExpired()
+
         case .background:
             break
 

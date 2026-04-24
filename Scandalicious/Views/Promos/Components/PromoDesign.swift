@@ -26,6 +26,11 @@ enum PromoDesign {
     static let accentGreen = Color(red: 0.20, green: 0.85, blue: 0.50)
     static let accentGreenDark = Color(red: 0.10, green: 0.65, blue: 0.40)
 
+    /// Shared yellow accent for product brand wordmarks across promo cards,
+    /// promo detail sheets, and coupon detail surfaces. Matches the gold used
+    /// on coupon hotspots/sections so brand identity reads consistently.
+    static let brandAccent = Color(red: 0.95, green: 0.70, blue: 0.15)
+
     /// Mechanism-family colours — consumed by `MechanismKind.color`.
     static let mechanismGratis = Color(red: 1.0, green: 0.84, blue: 0.20)       // gold — "X+Y gratis"
     static let mechanismHalfPrice = Color(red: 0.95, green: 0.55, blue: 0.15)    // orange — "2e aan halve prijs"

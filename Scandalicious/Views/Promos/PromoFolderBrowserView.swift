@@ -142,7 +142,7 @@ struct FolderHomeView: View {
                         )
                     )
 
-                Text("We keep only what's worth flipping")
+                Text("Your weekly deal hunt starts here.")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .tracking(0.2)
                     .foregroundStyle(.white.opacity(0.55))

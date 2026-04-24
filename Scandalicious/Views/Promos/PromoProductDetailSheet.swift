@@ -25,7 +25,11 @@ struct PromoProductDetailSheet: View {
     @State private var similarPromos: [PromoStoreItem] = []
     @State private var similarLoading = true
     @State private var loggedOpenForItemIds: Set<String> = []
+    @State private var folderTextExpanded = false
+    @State private var folderTextContentHeight: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
+
+    private let folderTextCollapsedHeight: CGFloat = 140
 
     init(
         gridItem: PromoGridItem,
@@ -290,7 +294,6 @@ struct PromoProductDetailSheet: View {
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(PromoDesign.primaryText)
                 Spacer()
-                ValidityChip(validityEnd: couponEffectiveValidityEnd)
             }
 
             // Barcode — rendered natively on-device from the decoded digit string.
@@ -373,7 +376,7 @@ struct PromoProductDetailSheet: View {
                     Text(item.primaryBrandLabel.uppercased())
                         .font(.system(size: 12, weight: .heavy))
                         .tracking(1.6)
-                        .foregroundStyle(storeAccentColor)
+                        .foregroundStyle(PromoDesign.brandAccent)
                         .lineLimit(1)
 
                     if let extra = item.additionalBrands, !extra.isEmpty {
@@ -389,7 +392,7 @@ struct PromoProductDetailSheet: View {
                     }
                 }
                 Spacer(minLength: 8)
-                ValidityChip(validityEnd: item.validityEnd)
+                ValidityChip(validityEnd: item.isCoupon ? couponEffectiveValidityEnd : item.validityEnd)
             }
 
             // Product name — large, clear
@@ -512,14 +515,56 @@ struct PromoProductDetailSheet: View {
     private var promoTextSection: some View {
         if let raw = item.promoTextMarkdown?.trimmingCharacters(in: .whitespacesAndNewlines),
            !raw.isEmpty {
+            // `shouldClip` only flips true once the measured natural height
+            // exceeds the collapsed cap by a meaningful margin — avoids
+            // offering a toggle that would reveal a single extra word.
+            let shouldClip = folderTextContentHeight > folderTextCollapsedHeight + 24
+
             VStack(alignment: .leading, spacing: 10) {
                 Text("Folder tekst")
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(0.5)
                     .foregroundStyle(PromoDesign.tertiaryText)
 
-                ForEach(Array(markdownBlocks(from: raw).enumerated()), id: \.offset) { _, block in
-                    promoTextBlock(block)
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(markdownBlocks(from: raw).enumerated()), id: \.offset) { _, block in
+                        promoTextBlock(block)
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: FolderTextHeightKey.self,
+                            value: geo.size.height
+                        )
+                    }
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: (shouldClip && !folderTextExpanded) ? folderTextCollapsedHeight : nil,
+                    alignment: .topLeading
+                )
+                .clipped()
+                .onPreferenceChange(FolderTextHeightKey.self) { height in
+                    folderTextContentHeight = height
+                }
+
+                if shouldClip {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            folderTextExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(folderTextExpanded ? "Toon minder" : "Toon meer")
+                                .font(.system(size: 12, weight: .semibold))
+                            Image(systemName: folderTextExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundStyle(PromoDesign.brandAccent)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(16)
@@ -920,7 +965,7 @@ private struct SimilarPromoCard: View {
                         Text(promo.brand.uppercased())
                             .font(.system(size: 9, weight: .bold))
                             .tracking(0.6)
-                            .foregroundColor(.white.opacity(0.55))
+                            .foregroundStyle(PromoDesign.brandAccent)
                             .lineLimit(1)
                     }
                     Text(promo.label)
@@ -1137,3 +1182,12 @@ private struct SimilarPromoShimmerCard: View {
 // MARK: - Detail-local color constants (only colors not in PromoDesign)
 
 private let detailGreen = PromoDesign.accentGreen
+
+// MARK: - Folder-text measurement
+
+private struct FolderTextHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}

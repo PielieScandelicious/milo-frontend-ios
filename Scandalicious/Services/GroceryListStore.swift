@@ -20,6 +20,14 @@ class GroceryListStore: ObservableObject {
     private init() {
         loadFromDisk()
         removeExpired()
+
+        NotificationCenter.default.addObserver(
+            forName: .NSCalendarDayChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.removeExpired() }
+        }
     }
 
     // MARK: - Public API

@@ -71,14 +71,6 @@ struct GroceryListCard: View {
         GroceryStore.fromCanonical(item.storeName)?.accentColor ?? promoGreen
     }
 
-    private var qty: Int { item.minPurchaseQty ?? 1 }
-    private var userPays: Double {
-        qty > 1 ? (item.originalPrice * Double(qty) - item.savings) : item.promoPrice
-    }
-    private var originalTotal: Double {
-        qty > 1 ? item.originalPrice * Double(qty) : item.originalPrice
-    }
-
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 0) {
@@ -209,11 +201,11 @@ struct GroceryListCard: View {
                 .frame(minHeight: 34, alignment: .top)
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(String(format: "€%.2f", userPays))
+                Text(String(format: "€%.2f", item.promoPrice))
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(promoGreenGradient)
-                if item.savings > 0 {
-                    Text(String(format: "€%.2f", originalTotal))
+                if item.originalPrice > item.promoPrice {
+                    Text(String(format: "€%.2f", item.originalPrice))
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.35))
                         .strikethrough(true, color: .white.opacity(0.35))

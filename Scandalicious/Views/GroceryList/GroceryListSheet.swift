@@ -208,7 +208,9 @@ struct GroceryListContentView<Leading: View>: View {
         let coupons = group.items
             .filter { $0.isCoupon }
             .sorted { $0.addedAt > $1.addedAt }
-        let promos = group.items.filter { !$0.isCoupon && !$0.isChecked }
+        let promos = group.items
+            .filter { !$0.isCoupon && !$0.isChecked }
+            .sorted { $0.addedAt > $1.addedAt }
         let showBothLanes = !coupons.isEmpty && !promos.isEmpty
         return VStack(alignment: .leading, spacing: 10) {
             Button {
