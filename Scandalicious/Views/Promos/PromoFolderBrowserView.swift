@@ -364,8 +364,8 @@ struct PromoFolderBrowserView: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color(red: 0.30, green: 0.55, blue: 0.95),
-                                    Color(red: 0.55, green: 0.35, blue: 0.85)
+                                    Color(red: 0.10, green: 0.25, blue: 0.55),   // accentDeep
+                                    Color(red: 0.04, green: 0.12, blue: 0.28)    // headerBlue
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -394,7 +394,16 @@ struct PromoFolderBrowserView: View {
             .padding(14)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(.white.opacity(0.05))
+                    .fill(
+                        LinearGradient(
+                            stops: [
+                                .init(color: Color(red: 0.04, green: 0.12, blue: 0.28).opacity(0.70), location: 0),
+                                .init(color: Color(red: 0.04, green: 0.12, blue: 0.28).opacity(0.30), location: 1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(.white.opacity(0.08), lineWidth: 1)
@@ -909,66 +918,272 @@ private struct FavoriteStoresPickerSheet: View {
     @ObservedObject var favoritesManager: FavoriteStoresManager
     @Environment(\.dismiss) private var dismiss
 
+    private let headerBlue = Color(red: 0.04, green: 0.12, blue: 0.28)
+    private let accentBlue = Color(red: 0.30, green: 0.55, blue: 0.95)
+    private let accentDeep = Color(red: 0.10, green: 0.25, blue: 0.55)
+
     private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
-    private let accent = Color(red: 0.30, green: 0.55, blue: 0.95)
 
     private var allStores: [GroceryStore] { GroceryStore.promoSupported }
     private var allStoreIds: [String] { allStores.map { $0.canonicalName } }
     private var allSelected: Bool { favoritesManager.favorites.isSuperset(of: allStoreIds) }
+    private var selectedCount: Int {
+        favoritesManager.favorites.intersection(allStoreIds).count
+    }
 
     var body: some View {
-        NavigationStack {
+        ZStack(alignment: .top) {
+            Color(white: 0.05).ignoresSafeArea()
+
+            // Deep blue gradient — echoes the folder tab's header so the
+            // sheet reads as an extension of the same surface.
+            GeometryReader { geo in
+                LinearGradient(
+                    stops: [
+                        .init(color: headerBlue, location: 0),
+                        .init(color: headerBlue.opacity(0.45), location: 0.4),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 280 + geo.safeAreaInsets.top)
+                .offset(y: -geo.safeAreaInsets.top)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text(L("folders_favorites_sheet_subtitle"))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack {
-                        Spacer()
-                        Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                if allSelected {
-                                    favoritesManager.clear()
-                                } else {
-                                    favoritesManager.setAll(allStoreIds)
-                                }
-                            }
-                        } label: {
-                            Text(allSelected ? L("deselect_all") : L("select_all"))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(accent)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    LazyVGrid(columns: gridColumns, spacing: 10) {
-                        ForEach(allStores) { store in
-                            StoreChipView(
-                                store: store,
-                                isSelected: favoritesManager.contains(store.canonicalName),
-                                onTap: {
-                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                        favoritesManager.toggle(store.canonicalName)
-                                    }
-                                }
-                            )
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 18) {
+                    heroHeader
+                    controlsBar
+                    storeGrid
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.top, 56)  // clears the top-right close button row
+                .padding(.bottom, 140) // reserve space under sticky footer
             }
-            .background(Color(white: 0.05).ignoresSafeArea())
-            .navigationTitle(L("folders_favorites_sheet_title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L("done")) { dismiss() }
-                        .foregroundStyle(accent)
+
+            stickyFooter
+        }
+        .overlay(alignment: .topTrailing) {
+            closeButton
+                .padding(.top, 14)
+                .padding(.trailing, 16)
+        }
+        .presentationDragIndicator(.visible)
+        .sensoryFeedback(.selection, trigger: favoritesManager.favorites)
+    }
+
+    // MARK: - Hero
+
+    private var heroHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("folders_favorites_sheet_title"))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .tracking(-0.6)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.white, .white.opacity(0.78)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            Text(L("folders_favorites_sheet_subtitle"))
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - Controls
+
+    private var controlsBar: some View {
+        HStack(spacing: 10) {
+            // Live count pill
+            HStack(spacing: 6) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(accentBlue)
+                Text("\(selectedCount) / \(allStores.count)")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.88))
+                    .contentTransition(.numericText())
+                    .animation(.spring(response: 0.3, dampingFraction: 0.75), value: selectedCount)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(accentBlue.opacity(0.15)))
+            .overlay(Capsule().stroke(accentBlue.opacity(0.35), lineWidth: 0.75))
+
+            Spacer(minLength: 0)
+
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    if allSelected {
+                        favoritesManager.clear()
+                    } else {
+                        favoritesManager.setAll(allStoreIds)
+                    }
                 }
+            } label: {
+                Text(allSelected ? L("deselect_all") : L("select_all"))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(.white.opacity(0.08)))
+                    .overlay(Capsule().stroke(.white.opacity(0.06), lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Grid
+
+    private var storeGrid: some View {
+        LazyVGrid(columns: gridColumns, spacing: 10) {
+            ForEach(allStores) { store in
+                FavoriteStoreChip(
+                    store: store,
+                    isSelected: favoritesManager.contains(store.canonicalName),
+                    onTap: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                            favoritesManager.toggle(store.canonicalName)
+                        }
+                    }
+                )
             }
         }
+    }
+
+    // MARK: - Sticky Footer
+
+    private var stickyFooter: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            // Fade gradient so the scrolling grid softens into the footer
+            LinearGradient(
+                colors: [Color(white: 0.05).opacity(0), Color(white: 0.05)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 28)
+
+            doneButton
+                .padding(.horizontal, 16)
+                .padding(.bottom, 44)  // sits well above the home indicator
+                .background(Color(white: 0.05))
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    private var doneButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Text(L("done"))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .tracking(0.2)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(
+                    LinearGradient(
+                        colors: [accentDeep, headerBlue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                )
+                .shadow(color: accentDeep.opacity(0.35), radius: 14, y: 6)
+        }
+        .buttonStyle(PressableCardStyle())
+    }
+
+    // MARK: - Close Button
+
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white.opacity(0.8))
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(.white.opacity(0.10)))
+                .overlay(Circle().stroke(.white.opacity(0.08), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Favorite Store Chip
+
+private struct FavoriteStoreChip: View {
+    let store: GroceryStore
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 6) {
+                Image(store.logoImageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 60, maxHeight: 30)
+                    .frame(height: 30)
+                    .opacity(isSelected ? 1.0 : 0.7)
+
+                Text(store.displayName)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isSelected ? .white : .white.opacity(0.5))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isSelected
+                          ? store.accentColor.opacity(0.22)
+                          : Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? store.accentColor.opacity(0.55) : Color.white.opacity(0.07),
+                        lineWidth: isSelected ? 1.4 : 1
+                    )
+            )
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    ZStack {
+                        Circle()
+                            .fill(store.accentColor)
+                            .frame(width: 18, height: 18)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .overlay(
+                        Circle()
+                            .stroke(Color(white: 0.05), lineWidth: 2)
+                    )
+                    .offset(x: 7, y: -7)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+                }
+            }
+            .scaleEffect(isSelected ? 1.02 : 1.0)
+            .shadow(color: isSelected ? store.accentColor.opacity(0.30) : .clear, radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
     }
 }
