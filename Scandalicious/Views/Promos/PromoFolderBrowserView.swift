@@ -452,7 +452,7 @@ private struct StoreFolderGridCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             StackedCoversView(folders: folders, accent: accent)
                 .frame(maxWidth: .infinity)
                 .aspectRatio(0.88, contentMode: .fit)
@@ -656,9 +656,9 @@ private struct ExpandedFolderLane: View {
             )
             .frame(height: 0.5)
             .padding(.horizontal, 24)
-            .padding(.top, 4)
+            .padding(.top, 10)
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 4)
         .onAppear {
             withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: false)) {
                 swipeHintPhase = 1
