@@ -24,6 +24,7 @@ enum GroceryStore: String, CaseIterable, Identifiable {
     case spar = "Spar"
     case bioPlanet = "Bio-Planet"
     case jumbo = "Jumbo"
+    case intermarche = "Intermarché"
     case action = "Action"
     case makro = "Makro"
 
@@ -49,6 +50,7 @@ enum GroceryStore: String, CaseIterable, Identifiable {
         case .spar: return "spar"
         case .bioPlanet: return "bio-planet"
         case .jumbo: return "jumbo"
+        case .intermarche: return "intermarche"
         case .action: return "action"
         case .makro: return "makro"
         }
@@ -71,6 +73,7 @@ enum GroceryStore: String, CaseIterable, Identifiable {
         case .spar: return "store-spar"
         case .bioPlanet: return "store-bioplanet"
         case .jumbo: return "store-jumbo"
+        case .intermarche: return "store-intermarche"
         case .action: return "store-action"
         case .makro: return "store-makro"
         }
@@ -88,6 +91,7 @@ enum GroceryStore: String, CaseIterable, Identifiable {
         case .spar: return Color(red: 0.15, green: 0.60, blue: 0.30)
         case .bioPlanet: return Color(red: 0.30, green: 0.75, blue: 0.45)
         case .jumbo: return Color(red: 0.95, green: 0.75, blue: 0.05)
+        case .intermarche: return Color(red: 0.80, green: 0.15, blue: 0.10)
         case .action: return Color(red: 0.00, green: 0.45, blue: 0.80)
         case .makro: return Color(red: 0.90, green: 0.20, blue: 0.20)
         }
@@ -96,7 +100,8 @@ enum GroceryStore: String, CaseIterable, Identifiable {
     /// Stores that have promo folder pipelines configured (YAML configs on backend)
     static let promoSupported: [GroceryStore] = [
         .colruyt, .delhaize, .carrefour, .carrefourMarket,
-        .albertHeijn, .okay, .spar, .jumbo
+        .albertHeijn, .okay, .spar, .jumbo,
+        .lidl, .aldi, .intermarche
     ]
 
     static func from(rawValues: [String]?) -> Set<GroceryStore> {
