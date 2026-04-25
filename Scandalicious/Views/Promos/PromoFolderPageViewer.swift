@@ -103,6 +103,9 @@ struct PromoFolderPageViewer: View {
 
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .onAppear {
+            ReadFoldersManager.shared.markAsRead(folder.folderId)
+        }
         .sheet(item: $selectedHotspot) { hotspot in
             PromoProductDetailSheet(
                 gridItem: PromoGridItem(

@@ -497,11 +497,17 @@ struct FolderCoverCard: View {
     let folder: PromoFolder
     let storeId: String
 
+    @ObservedObject private var readManager = ReadFoldersManager.shared
+
     private let cardWidth: CGFloat = 160
     private let coverHeight: CGFloat = 210
 
     private var storeAccentColor: Color {
         GroceryStore.fromCanonical(storeId)?.accentColor ?? Color(red: 0.30, green: 0.55, blue: 0.95)
+    }
+
+    private var isRead: Bool {
+        readManager.contains(folder.folderId)
     }
 
     var body: some View {
@@ -529,6 +535,12 @@ struct FolderCoverCard: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
+            // Read-state dot lane (centered under the cover)
+            ReadStateDot(isRead: isRead)
+                .frame(width: cardWidth, alignment: .center)
+                .padding(.top, 8)
+                .padding(.bottom, 2)
+
             // Info bar
             HStack(spacing: 6) {
                 ValidityChip(validityEnd: folder.validityEnd)
@@ -545,7 +557,7 @@ struct FolderCoverCard: View {
                 }
             }
             .padding(.horizontal, 2)
-            .padding(.top, 8)
+            .padding(.top, 6)
         }
         .frame(width: cardWidth)
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
@@ -563,6 +575,29 @@ struct FolderCoverCard: View {
     }
 }
 
+// MARK: - Read State Dot
+
+struct ReadStateDot: View {
+    let isRead: Bool
+
+    static let size: CGFloat = 10
+    static let inset: CGFloat = 8
+
+    private static let readGreen   = Color(red: 0.20, green: 0.76, blue: 0.42)
+    private static let unreadGray  = Color(white: 0.55)
+
+    private var fill: Color {
+        isRead ? Self.readGreen : Self.unreadGray
+    }
+
+    var body: some View {
+        Circle()
+            .fill(fill)
+            .frame(width: Self.size, height: Self.size)
+            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+    }
+}
+
 // MARK: - Store Folder Grid Card
 
 private struct StoreFolderGridCard: View {
@@ -571,9 +606,15 @@ private struct StoreFolderGridCard: View {
     let folders: [PromoFolder]
     let isSelected: Bool
 
+    @ObservedObject private var readManager = ReadFoldersManager.shared
+
     private var accent: Color {
         GroceryStore.fromCanonical(storeId)?.accentColor
             ?? Color(red: 0.30, green: 0.55, blue: 0.95)
+    }
+
+    private var allFoldersRead: Bool {
+        !folders.isEmpty && folders.allSatisfy { readManager.contains($0.folderId) }
     }
 
     var body: some View {
@@ -582,13 +623,9 @@ private struct StoreFolderGridCard: View {
                 .frame(maxWidth: .infinity)
                 .aspectRatio(0.88, contentMode: .fit)
 
-            // Sleek selection marker — thin accent capsule centered beneath the covers
-            Capsule()
-                .fill(accent)
-                .frame(width: 28, height: 3)
-                .frame(maxWidth: .infinity)
-                .opacity(isSelected ? 1 : 0)
-                .scaleEffect(x: isSelected ? 1 : 0.3, anchor: .center)
+            // Aggregate read-state dot — green when every folder in this store has been opened
+            ReadStateDot(isRead: allFoldersRead)
+                .frame(maxWidth: .infinity, alignment: .center)
 
             HStack(alignment: .center, spacing: 10) {
                 StoreLogoView(storeName: storeId, height: 22)
