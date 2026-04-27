@@ -11,6 +11,8 @@ import FirebaseAuth
 enum PromoInteractionEventType: String, Encodable {
     case dealOpened = "deal_opened"
     case similarPromoClicked = "similar_promo_clicked"
+    case searchQuerySubmitted = "search_query_submitted"
+    case searchResultTapped = "search_result_tapped"
 }
 
 actor PromoAPIService {
@@ -142,6 +144,96 @@ actor PromoAPIService {
         }
     }
 
+    // MARK: - Promo Search (public, optional auth)
+
+    func searchPromos(
+        query: String,
+        store: String? = nil,
+        limit: Int = 20
+    ) async throws -> PromoSearchResponse {
+        guard var components = URLComponents(string: "\(baseURL)/promos/search") else {
+            throw PromoError.invalidResponse
+        }
+        var queryItems: [URLQueryItem] = [
+            .init(name: "q", value: query),
+            .init(name: "limit", value: String(limit)),
+        ]
+        if let store, !store.isEmpty {
+            queryItems.append(.init(name: "store", value: store))
+        }
+        components.queryItems = queryItems
+
+        guard let url = components.url else { throw PromoError.invalidResponse }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 15
+
+        if let token = try? await getFirebaseToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw PromoError.invalidResponse
+            }
+
+            switch httpResponse.statusCode {
+            case 200:
+                do {
+                    return try JSONDecoder().decode(PromoSearchResponse.self, from: data)
+                } catch {
+                    throw PromoError.decodingError(error.localizedDescription)
+                }
+            case 503:
+                throw PromoError.serviceUnavailable
+            default:
+                throw PromoError.serverError("Server error: \(httpResponse.statusCode)")
+            }
+        } catch let error as PromoError {
+            throw error
+        } catch {
+            throw PromoError.networkError(error)
+        }
+    }
+
+    func getPopularBrands(limit: Int = 10) async throws -> [PopularBrand] {
+        guard let url = URL(string: "\(baseURL)/promos/search/popular-brands?limit=\(limit)") else {
+            throw PromoError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 15
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw PromoError.invalidResponse
+            }
+
+            switch httpResponse.statusCode {
+            case 200:
+                do {
+                    return try JSONDecoder().decode([PopularBrand].self, from: data)
+                } catch {
+                    throw PromoError.decodingError(error.localizedDescription)
+                }
+            default:
+                throw PromoError.serverError("Server error: \(httpResponse.statusCode)")
+            }
+        } catch let error as PromoError {
+            throw error
+        } catch {
+            throw PromoError.networkError(error)
+        }
+    }
+
     // MARK: - Promo Folders (public, no auth)
 
     func getFolders() async throws -> PromoFoldersResponse {
@@ -256,4 +348,72 @@ final class SimilarPromosCache {
 private final class CachedSimilarPromos {
     let response: SimilarPromosResponse
     init(response: SimilarPromosResponse) { self.response = response }
+}
+
+// MARK: - Promo Search Cache
+
+/// Short-TTL cache + inflight dedupe for `/promos/search` responses.
+/// 5-minute TTL — promo data is fairly static within a session, but folders
+/// rotate weekly so we don't want to over-cache.
+final class PromoSearchCache {
+    static let shared = PromoSearchCache()
+
+    private let cache: NSCache<NSString, CachedSearch> = {
+        let c = NSCache<NSString, CachedSearch>()
+        c.countLimit = 100
+        return c
+    }()
+
+    private static let ttlSeconds: TimeInterval = 300
+
+    private var inflight: [NSString: Task<PromoSearchResponse?, Never>] = [:]
+    private let queue = DispatchQueue(label: "PromoSearchCache.inflight")
+
+    private func cacheKey(query: String, store: String?, limit: Int) -> NSString {
+        "\(query.lowercased())|\(store ?? "")|\(limit)" as NSString
+    }
+
+    func cached(query: String, store: String?, limit: Int) -> PromoSearchResponse? {
+        let key = cacheKey(query: query, store: store, limit: limit)
+        guard let box = cache.object(forKey: key) else { return nil }
+        if Date().timeIntervalSince(box.cachedAt) > Self.ttlSeconds {
+            cache.removeObject(forKey: key)
+            return nil
+        }
+        return box.response
+    }
+
+    func getOrFetch(query: String, store: String?, limit: Int) async -> PromoSearchResponse? {
+        if let hit = cached(query: query, store: store, limit: limit) { return hit }
+        let key = cacheKey(query: query, store: store, limit: limit)
+        let task: Task<PromoSearchResponse?, Never> = queue.sync {
+            if let existing = inflight[key] { return existing }
+            let new = Task<PromoSearchResponse?, Never> { [weak self] in
+                defer {
+                    self?.queue.sync { _ = self?.inflight.removeValue(forKey: key) }
+                }
+                do {
+                    let response = try await PromoAPIService.shared.searchPromos(
+                        query: query, store: store, limit: limit
+                    )
+                    self?.cache.setObject(CachedSearch(response: response), forKey: key)
+                    return response
+                } catch {
+                    return nil
+                }
+            }
+            inflight[key] = new
+            return new
+        }
+        return await task.value
+    }
+}
+
+private final class CachedSearch {
+    let response: PromoSearchResponse
+    let cachedAt: Date
+    init(response: PromoSearchResponse) {
+        self.response = response
+        self.cachedAt = Date()
+    }
 }

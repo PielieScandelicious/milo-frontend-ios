@@ -378,3 +378,26 @@ struct SimilarPromosResponse: Codable {
         case generatedAt = "generated_at"
     }
 }
+
+// MARK: - Promo Search
+
+struct PromoSearchResponse: Codable {
+    let items: [PromoStoreItem]
+    let total: Int
+    let query: String
+    let matchedCategories: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case total
+        case query
+        case matchedCategories = "matched_categories"
+    }
+}
+
+struct PopularBrand: Codable, Identifiable, Hashable {
+    let name: String
+    let count: Int
+
+    var id: String { name }
+}

@@ -12,10 +12,23 @@ import SwiftUI
 struct FolderHomeView: View {
     @ObservedObject var viewModel: PromoFoldersViewModel
     @EnvironmentObject var authManager: AuthenticationManager
+    @StateObject private var searchVM = PromoSearchViewModel()
     @State private var scrollOffset: CGFloat = 0
     @State private var contentOpacity: Double = 0
     @State private var showProfile = false
     @State private var showWalletPassCreator = false
+    @State private var showSearchFilter = false
+    @State private var selectedSearchResult: PromoStoreItem?
+
+    // Reserved height for the floating search pill (used as scroll-content top
+    // padding so the pill doesn't overlap the hero header).
+    private let searchPillSpace: CGFloat = 60
+
+    // Stores currently surfaced by the API (per the audit: 11 retailers).
+    private let searchableStores: [GroceryStore] = [
+        .colruyt, .delhaize, .carrefour, .carrefourMarket,
+        .lidl, .aldi, .albertHeijn, .okay, .spar, .jumbo, .intermarche,
+    ]
 
     // Deep blue gradient — distinct from Deals tab's emerald green
     private let headerBlue = Color(red: 0.04, green: 0.12, blue: 0.28)
@@ -49,6 +62,9 @@ struct FolderHomeView: View {
                 ScrollViewReader { scrollProxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 20) {
+                            // Reserve vertical space below the floating search pill
+                            Color.clear.frame(height: searchPillSpace)
+
                             // Hero header
                             heroHeader
                                 .padding(.horizontal, 16)
@@ -75,28 +91,39 @@ struct FolderHomeView: View {
             .onPreferenceChange(FolderScrollOffsetKey.self) { value in
                 scrollOffset = max(0, value)
             }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button {
-                        showProfile = true
-                    } label: {
-                        Label("Profile", systemImage: "gearshape")
+            .blur(radius: searchVM.isFocused ? 14 : 0)
+            .scaleEffect(searchVM.isFocused ? 0.98 : 1.0)
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: searchVM.isFocused)
+
+            // Focused search overlay (above blurred grid, below sticky pill)
+            if searchVM.isFocused {
+                FolderSearchOverlay(
+                    viewModel: searchVM,
+                    topInset: searchPillSpace,
+                    onPickQuery: { searchVM.submitSuggestedQuery($0) },
+                    onTapResult: { item, idx in
+                        searchVM.recordResultTap(item, position: idx)
+                        selectedSearchResult = item
                     }
-                    Button {
-                        showWalletPassCreator = true
-                    } label: {
-                        Label("Wallet Pass Creator", systemImage: "wallet.pass")
-                    }
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
+                )
+                .transition(.opacity)
+                .zIndex(1)
+            }
+
+            // Sticky top bar (search pill + gear menu) — pinned at safe-area top.
+            HStack(spacing: 10) {
+                FolderSearchBar(viewModel: searchVM, onTapFilter: { showSearchFilter = true })
+                if !searchVM.isFocused {
+                    gearMenu
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .zIndex(2)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: searchVM.isFocused)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showProfile) {
             NavigationStack {
                 ProfileView()
@@ -106,6 +133,26 @@ struct FolderHomeView: View {
         }
         .sheet(isPresented: $showWalletPassCreator) {
             WalletPassCreatorView()
+        }
+        .sheet(isPresented: $showSearchFilter) {
+            FolderSearchFilterSheet(
+                selection: Binding(
+                    get: { searchVM.storeFilter },
+                    set: { searchVM.setStoreFilter($0) }
+                ),
+                availableStores: searchableStores
+            )
+        }
+        .sheet(item: $selectedSearchResult) { item in
+            PromoProductDetailSheet(
+                gridItem: PromoGridItem(
+                    id: item.itemKey ?? item.id,
+                    item: item,
+                    storeName: item.storeName ?? "unknown"
+                )
+            )
+            .presentationDetents([.fraction(0.85), .large])
+            .presentationDragIndicator(.visible)
         }
         .opacity(contentOpacity)
         .onAppear {
@@ -144,6 +191,36 @@ struct FolderHomeView: View {
                     .foregroundStyle(.white.opacity(0.55))
             }
             .padding(.bottom, 8)
+        }
+    }
+
+    // MARK: - Gear menu (floats next to the search pill)
+
+    @ViewBuilder
+    private var gearMenu: some View {
+        Menu {
+            Button {
+                showProfile = true
+            } label: {
+                Label("Profile", systemImage: "gearshape")
+            }
+            Button {
+                showWalletPassCreator = true
+            } label: {
+                Label("Wallet Pass Creator", systemImage: "wallet.pass")
+            }
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 38, height: 38)
+                .background(
+                    Circle().fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    Circle().stroke(.white.opacity(0.10), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
         }
     }
 

@@ -542,5 +542,19 @@ enum AppStrings {
         "cat_lottery": ["en": "Lottery & Scratch Cards", "nl": "Lotto & Krasloten", "fr": "Loterie & Tickets à gratter"],
         "cat_deposits": ["en": "Deposits", "nl": "Statiegeld", "fr": "Consignes"],
         "cat_other": ["en": "Other", "nl": "Andere", "fr": "Autres"],
+
+        // MARK: - Promo Search (Folders tab search bar)
+        "promo_search_placeholder": ["en": "Search products or brands…", "nl": "Zoek producten of merken…", "fr": "Rechercher des produits ou marques…"],
+        "promo_search_recent": ["en": "Recent searches", "nl": "Recente zoekopdrachten", "fr": "Recherches récentes"],
+        "promo_search_clear_recent": ["en": "Clear", "nl": "Wissen", "fr": "Effacer"],
+        "promo_search_popular_brands": ["en": "Popular brands", "nl": "Populaire merken", "fr": "Marques populaires"],
+        "promo_search_min_chars": ["en": "Type at least 2 characters", "nl": "Typ minstens 2 tekens", "fr": "Tapez au moins 2 caractères"],
+        "promo_search_no_results": ["en": "No results", "nl": "Geen resultaten", "fr": "Aucun résultat"],
+        "promo_search_no_results_for": ["en": "No matches for", "nl": "Geen treffers voor", "fr": "Aucune correspondance pour"],
+        "promo_search_results": ["en": "results", "nl": "resultaten", "fr": "résultats"],
+        "promo_search_filter_store": ["en": "Filter by store", "nl": "Filter op winkel", "fr": "Filtrer par magasin"],
+        "promo_search_all_stores": ["en": "All stores", "nl": "Alle winkels", "fr": "Tous les magasins"],
+        "promo_search_clear_filter": ["en": "Clear filter", "nl": "Filter wissen", "fr": "Effacer le filtre"],
+        "promo_search_retry": ["en": "Try again", "nl": "Opnieuw proberen", "fr": "Réessayer"],
     ]
 }
