@@ -94,6 +94,10 @@ struct FolderHomeView: View {
             .blur(radius: searchVM.isFocused ? 14 : 0)
             .scaleEffect(searchVM.isFocused ? 0.98 : 1.0)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: searchVM.isFocused)
+            // While search is open, the underlying folder grid must not consume
+            // any touches — otherwise its own scroll view + tabbar can react to
+            // horizontal swipes that fell through the overlay.
+            .allowsHitTesting(!searchVM.isFocused)
 
             // Focused search overlay (above blurred grid, below sticky pill)
             if searchVM.isFocused {
