@@ -629,12 +629,47 @@ struct PromoProductDetailSheet: View {
         }
     }
 
-    /// Parse inline Markdown (bold, italic, code) but keep any embedded newlines as line breaks.
+    /// Parse inline Markdown (bold, italic, code) plus `~~strikethrough~~`,
+    /// keeping any embedded newlines as line breaks. `AttributedString(markdown:)`
+    /// does not parse `~~...~~`, so we splice it in manually around the segments.
     private func markdownAttributed(_ text: String) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(
             interpretedSyntax: .inlineOnlyPreservingWhitespace
         )
-        return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
+
+        func parse(_ s: String) -> AttributedString {
+            (try? AttributedString(markdown: s, options: options)) ?? AttributedString(s)
+        }
+
+        guard let regex = try? NSRegularExpression(pattern: "~~(.+?)~~", options: [.dotMatchesLineSeparators]) else {
+            return parse(text)
+        }
+
+        let nsText = text as NSString
+        let fullRange = NSRange(location: 0, length: nsText.length)
+        let matches = regex.matches(in: text, options: [], range: fullRange)
+        if matches.isEmpty {
+            return parse(text)
+        }
+
+        var result = AttributedString()
+        var cursor = 0
+        for match in matches {
+            if match.range.location > cursor {
+                let before = nsText.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+                result.append(parse(before))
+            }
+            let inner = nsText.substring(with: match.range(at: 1))
+            var strike = parse(inner)
+            strike.strikethroughStyle = .single
+            result.append(strike)
+            cursor = match.range.location + match.range.length
+        }
+        if cursor < nsText.length {
+            let trailing = nsText.substring(with: NSRange(location: cursor, length: nsText.length - cursor))
+            result.append(parse(trailing))
+        }
+        return result
     }
 
     // MARK: - Cross-store comparison panel
