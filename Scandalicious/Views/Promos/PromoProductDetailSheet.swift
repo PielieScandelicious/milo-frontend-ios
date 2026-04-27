@@ -520,11 +520,16 @@ struct PromoProductDetailSheet: View {
             // offering a toggle that would reveal a single extra word.
             let shouldClip = folderTextContentHeight > folderTextCollapsedHeight + 24
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Folder tekst")
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(0.5)
-                    .foregroundStyle(PromoDesign.tertiaryText)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(PromoDesign.secondaryText)
+                    Text("Promo Details")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(PromoDesign.primaryText)
+                    Spacer(minLength: 0)
+                }
 
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(markdownBlocks(from: raw).enumerated()), id: \.offset) { _, block in
@@ -557,7 +562,7 @@ struct PromoProductDetailSheet: View {
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text(folderTextExpanded ? "Toon minder" : "Toon meer")
+                            Text(folderTextExpanded ? "Show less" : "Show more")
                                 .font(.system(size: 12, weight: .semibold))
                             Image(systemName: folderTextExpanded ? "chevron.up" : "chevron.down")
                                 .font(.system(size: 10, weight: .bold))
