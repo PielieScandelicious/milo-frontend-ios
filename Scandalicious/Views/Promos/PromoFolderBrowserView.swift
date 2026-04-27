@@ -583,17 +583,24 @@ struct ReadStateDot: View {
     static let size: CGFloat = 10
     static let inset: CGFloat = 8
 
-    private static let readGreen   = Color(red: 0.20, green: 0.76, blue: 0.42)
-    private static let unreadGray  = Color(white: 0.55)
+    private static let readGreen  = Color(red: 0.20, green: 0.76, blue: 0.42)
+    private static let unreadRed  = Color(red: 0.92, green: 0.26, blue: 0.30)
 
     private var fill: Color {
-        isRead ? Self.readGreen : Self.unreadGray
+        isRead ? Self.readGreen : Self.unreadRed
     }
 
     var body: some View {
         Circle()
             .fill(fill)
             .frame(width: Self.size, height: Self.size)
+            .overlay {
+                if isRead {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: Self.size * 0.65, weight: .heavy))
+                        .foregroundStyle(.white)
+                }
+            }
             .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
     }
 }
