@@ -76,13 +76,13 @@ struct FolderSearchSuggestionRow: View {
 
                 // Main row: [thumbnail + validity below it] + product name + price/savings
                 HStack(alignment: .top, spacing: 14) {
-                    VStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: 6) {
                         thumbnail
                         if !item.validityEnd.isEmpty {
                             ValidityChip(validityEnd: item.validityEnd, compact: true)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                     }
-                    .frame(width: 68)
 
                     productNameText
                         .frame(maxWidth: .infinity, alignment: .leading)

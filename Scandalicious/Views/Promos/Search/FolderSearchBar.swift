@@ -24,10 +24,12 @@ struct FolderSearchBar: View {
         }
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: viewModel.isFocused)
         .onChange(of: isFieldFocused) { _, newValue in
-            // FocusState → ViewModel → phase. Only set false here when the
-            // user actually loses focus (tapped Cancel or outside). Tap-to-focus
-            // is the source of truth via .focused().
-            viewModel.setFocused(newValue)
+            // Tapping the field opens the overlay; pressing return on the
+            // keyboard sets isFieldFocused=false but should NOT close it —
+            // only the Cancel button explicitly dismisses the overlay.
+            if newValue {
+                viewModel.setFocused(true)
+            }
         }
     }
 
@@ -115,6 +117,7 @@ struct FolderSearchBar: View {
         Button {
             viewModel.clearQuery()
             isFieldFocused = false
+            viewModel.setFocused(false)
         } label: {
             Text(L("cancel"))
                 .font(.system(size: 15, weight: .semibold))
