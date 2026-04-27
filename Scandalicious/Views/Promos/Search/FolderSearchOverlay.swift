@@ -20,11 +20,6 @@ struct FolderSearchOverlay: View {
     var body: some View {
         ZStack(alignment: .top) {
             backdrop
-                // Soak up drags on the dim/blur backdrop so horizontal swipes
-                // there can't reach the parent NavigationStack edge-pop or
-                // any ancestor that listens for sideways gestures.
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0))
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -59,14 +54,12 @@ struct FolderSearchOverlay: View {
                     Color.clear.frame(height: 80)   // tab bar safe area
                 }
             }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.immediately)
+            .clipped()
         }
+        .clipped()
         .transition(.opacity)
-        // Absorb any drag the ScrollView didn't fully claim (e.g. predominantly
-        // horizontal swipes) so they can't bubble up to the parent
-        // NavigationStack / TabView. Child ScrollView still wins for vertical
-        // scrolling because SwiftUI gives child gestures priority on the
-        // gestures they actually accept.
-        .gesture(DragGesture(minimumDistance: 0).onChanged { _ in }.onEnded { _ in })
     }
 
     // MARK: - Backdrop

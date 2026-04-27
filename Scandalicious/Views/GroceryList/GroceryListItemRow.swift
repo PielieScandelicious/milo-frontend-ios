@@ -188,7 +188,7 @@ struct GroceryListCard: View {
                 Text(item.brand.uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.0)
-                    .foregroundColor(brandGold)
+                    .foregroundStyle(PromoDesign.brandAccent)
                     .lineLimit(1)
             }
 
@@ -367,7 +367,7 @@ struct GroceryListCouponCard: View {
                 Text(item.brand.uppercased())
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1.0)
-                    .foregroundColor(brandGold)
+                    .foregroundStyle(PromoDesign.brandAccent)
                     .lineLimit(1)
             }
 

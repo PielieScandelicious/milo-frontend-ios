@@ -19,6 +19,11 @@ struct FolderHomeView: View {
     @State private var showWalletPassCreator = false
     @State private var showSearchFilter = false
     @State private var selectedSearchResult: PromoStoreItem?
+    /// Bumped every time the search bar is focused; used as the overlay's
+    /// `.id()` so each open creates a fresh ScrollView (and gesture recognizer)
+    /// instance. Prevents stuck horizontal-pan state from carrying over between
+    /// open/Cancel cycles.
+    @State private var searchOpenToken: Int = 0
 
     // Reserved height for the floating search pill (used as scroll-content top
     // padding so the pill doesn't overlap the hero header).
@@ -110,6 +115,7 @@ struct FolderHomeView: View {
                         selectedSearchResult = item
                     }
                 )
+                .id(searchOpenToken)
                 .transition(.opacity)
                 .zIndex(1)
             }
@@ -128,6 +134,11 @@ struct FolderHomeView: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: searchVM.isFocused)
         .toolbar(.hidden, for: .navigationBar)
+        .onChange(of: searchVM.isFocused) { _, isFocused in
+            // Force a fresh overlay instance on every open so any stuck
+            // gesture-recognizer state from the previous session is discarded.
+            if isFocused { searchOpenToken &+= 1 }
+        }
         .sheet(isPresented: $showProfile) {
             NavigationStack {
                 ProfileView()

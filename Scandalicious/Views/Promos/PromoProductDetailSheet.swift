@@ -1049,16 +1049,7 @@ private struct SimilarPromoCard: View {
                         Text(promo.brand.uppercased())
                             .font(.system(size: 9, weight: .bold))
                             .tracking(0.6)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 1.00, green: 0.86, blue: 0.40),
-                                        Color(red: 0.95, green: 0.70, blue: 0.15)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .foregroundStyle(PromoDesign.brandAccent)
                             .lineLimit(1)
                     }
                     Text(promo.label)
