@@ -711,13 +711,53 @@ struct PromoProductDetailSheet: View {
     }
 
     private var similarHeader: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 12, weight: .semibold))
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.00, green: 0.86, blue: 0.45),
+                                Color(red: 0.85, green: 0.55, blue: 0.10)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        Circle().stroke(Color.white.opacity(0.35), lineWidth: 0.5)
+                    )
+                    .frame(width: 24, height: 24)
+                    .shadow(color: Color(red: 0.95, green: 0.70, blue: 0.20).opacity(0.45), radius: 6, x: 0, y: 2)
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundStyle(.white)
+            }
+
             Text("Similar deals")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.white, Color.white.opacity(0.78)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.95, green: 0.70, blue: 0.20).opacity(0.5),
+                            Color.clear
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 1)
+                .frame(maxWidth: .infinity)
         }
-        .foregroundStyle(.white.opacity(0.7))
         .padding(.top, 4)
     }
 
@@ -919,8 +959,12 @@ private struct SimilarPromoCard: View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    Color(white: 0.97)
-                        .frame(height: 120)
+                    LinearGradient(
+                        colors: [Color(white: 1.00), Color(white: 0.93)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 120)
 
                     if let urlStr = promo.imageUrl ?? promo.thumbnailUrl,
                        let url = URL(string: urlStr) {
@@ -965,7 +1009,16 @@ private struct SimilarPromoCard: View {
                         Text(promo.brand.uppercased())
                             .font(.system(size: 9, weight: .bold))
                             .tracking(0.6)
-                            .foregroundStyle(PromoDesign.brandAccent)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.00, green: 0.86, blue: 0.40),
+                                        Color(red: 0.95, green: 0.70, blue: 0.15)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
                             .lineLimit(1)
                     }
                     Text(promo.label)
@@ -1000,7 +1053,13 @@ private struct SimilarPromoCard: View {
             .frame(width: 150, height: 220)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(white: 0.08))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(white: 0.13), Color(white: 0.05)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
             )
             .overlay(alignment: .topLeading) {
                 if promo.discountPercentage > 0 {
@@ -1010,7 +1069,20 @@ private struct SimilarPromoCard: View {
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .background(
-                            Capsule().fill(Color(red: 0.95, green: 0.25, blue: 0.25))
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.00, green: 0.40, blue: 0.40),
+                                            Color(red: 0.85, green: 0.15, blue: 0.20)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .overlay(
+                                    Capsule().stroke(Color.white.opacity(0.30), lineWidth: 0.5)
+                                )
                         )
                         .padding(.top, 4)
                         .padding(.leading, 8)
@@ -1018,9 +1090,21 @@ private struct SimilarPromoCard: View {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.22),
+                                Color.white.opacity(0.04)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 0.75
+                    )
             )
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: Color.black.opacity(0.45), radius: 10, x: 0, y: 6)
+            .shadow(color: Color.black.opacity(0.20), radius: 1, x: 0, y: 1)
         }
         .buttonStyle(SimilarCardPressStyle())
     }
@@ -1158,11 +1242,27 @@ private struct SimilarPromoShimmerCard: View {
         .frame(width: 150, height: 220)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(white: 0.08))
+                .fill(
+                    LinearGradient(
+                        colors: [Color(white: 0.13), Color(white: 0.05)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.18),
+                            Color.white.opacity(0.04)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.75
+                )
         )
         .mask(
             LinearGradient(
