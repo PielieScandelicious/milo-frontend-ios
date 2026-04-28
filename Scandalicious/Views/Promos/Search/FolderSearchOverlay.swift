@@ -21,41 +21,37 @@ struct FolderSearchOverlay: View {
         ZStack(alignment: .top) {
             backdrop
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 4) {
+            VerticalOnlyScrollView {
+                VStack(alignment: .leading, spacing: 0) {
                     Color.clear.frame(height: topInset)
 
-                    Group {
-                        switch viewModel.phase {
-                        case .empty:
-                            FolderSearchEmptyState(
-                                viewModel: viewModel,
-                                onPickQuery: onPickQuery
-                            )
-                        case .tooShort:
-                            tooShortHint
-                        case .loading:
-                            skeletonRows
-                        case .results:
-                            VStack(alignment: .leading, spacing: 6) {
-                                resultsHeader
-                                resultsList
-                            }
-                        case .noResults:
-                            noResults
-                        case .error(let message):
-                            errorView(message)
-                        case .idle:
-                            EmptyView()
-                        }
+                    switch viewModel.phase {
+                    case .empty:
+                        FolderSearchEmptyState(
+                            viewModel: viewModel,
+                            onPickQuery: onPickQuery
+                        )
+                        .padding(.horizontal, 16)
+                    case .tooShort:
+                        tooShortHint
+                            .padding(.horizontal, 16)
+                    case .loading:
+                        skeletonRows
+                    case .results:
+                        resultsList
+                    case .noResults:
+                        noResults
+                            .padding(.horizontal, 16)
+                    case .error(let message):
+                        errorView(message)
+                            .padding(.horizontal, 16)
+                    case .idle:
+                        EmptyView()
                     }
-                    .padding(.horizontal, 16)
 
                     Color.clear.frame(height: 80)   // tab bar safe area
                 }
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.immediately)
             .clipped()
         }
         .clipped()
@@ -86,33 +82,19 @@ struct FolderSearchOverlay: View {
     }
 
     private var skeletonRows: some View {
-        VStack(spacing: 10) {
-            ForEach(0..<3, id: \.self) { _ in
+        VStack(spacing: 0) {
+            ForEach(0..<6, id: \.self) { idx in
                 SkeletonRow()
+                if idx < 5 {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.07))
+                        .frame(height: 0.5)
+                        .padding(.leading, 76)
+                        .padding(.trailing, 16)
+                        .padding(.vertical, 4)
+                }
             }
         }
-    }
-
-    private var resultsHeader: some View {
-        HStack(spacing: 6) {
-            Text("\(viewModel.results.count)")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
-            Text(L("promo_search_results"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.55))
-            if let store = viewModel.storeFilter,
-               let mapped = GroceryStore.fromCanonical(store) {
-                Text("·")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.3))
-                Text(mapped.displayName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(mapped.accentColor)
-            }
-            Spacer()
-        }
-        .padding(.top, 4)
     }
 
     private var resultsList: some View {
@@ -125,8 +107,9 @@ struct FolderSearchOverlay: View {
                     Rectangle()
                         .fill(Color.white.opacity(0.07))
                         .frame(height: 0.5)
-                        .padding(.leading, 16)
-                        .padding(.vertical, 10)
+                        .padding(.leading, 76)
+                        .padding(.trailing, 16)
+                        .padding(.vertical, 4)
                 }
             }
         }
@@ -195,22 +178,22 @@ private struct SkeletonRow: View {
     @State private var pulse = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 10).frame(width: 56, height: 56)
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 4).frame(height: 14)
-                RoundedRectangle(cornerRadius: 4).frame(width: 90, height: 11)
+        HStack(alignment: .center, spacing: 12) {
+            RoundedRectangle(cornerRadius: 10).frame(width: 48, height: 48)
+            VStack(alignment: .leading, spacing: 5) {
+                RoundedRectangle(cornerRadius: 3).frame(width: 60, height: 8)
+                RoundedRectangle(cornerRadius: 3).frame(maxWidth: .infinity).frame(height: 12)
+                RoundedRectangle(cornerRadius: 3).frame(width: 110, height: 9)
             }
-            Spacer()
-            RoundedRectangle(cornerRadius: 4).frame(width: 50, height: 14)
+            VStack(alignment: .trailing, spacing: 4) {
+                RoundedRectangle(cornerRadius: 3).frame(width: 46, height: 12)
+                RoundedRectangle(cornerRadius: 3).frame(width: 30, height: 9)
+            }
+            Circle().frame(width: 26, height: 26)
         }
         .foregroundStyle(.white.opacity(pulse ? 0.10 : 0.05))
-        .padding(.vertical, 10)
-        .padding(.horizontal, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.03))
-        )
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
                 pulse = true

@@ -108,7 +108,7 @@ struct FolderHomeView: View {
             if searchVM.isFocused {
                 FolderSearchOverlay(
                     viewModel: searchVM,
-                    topInset: searchPillSpace,
+                    topInset: 48,
                     onPickQuery: { searchVM.submitSuggestedQuery($0) },
                     onTapResult: { item, idx in
                         searchVM.recordResultTap(item, position: idx)
