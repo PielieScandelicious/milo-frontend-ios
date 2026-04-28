@@ -27,7 +27,7 @@ struct FolderHomeView: View {
 
     // Reserved height for the floating search pill (used as scroll-content top
     // padding so the pill doesn't overlap the hero header).
-    private let searchPillSpace: CGFloat = 60
+    private let searchPillSpace: CGFloat = 44
 
     // Stores currently surfaced by the API (per the audit: 11 retailers).
     private let searchableStores: [GroceryStore] = [
