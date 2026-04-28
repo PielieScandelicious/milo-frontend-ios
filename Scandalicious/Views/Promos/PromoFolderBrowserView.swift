@@ -19,11 +19,18 @@ struct FolderHomeView: View {
     @State private var showWalletPassCreator = false
     @State private var showSearchFilter = false
     @State private var selectedSearchResult: PromoStoreItem?
+    @State private var folderDestination: FolderDestination?
     /// Bumped every time the search bar is focused; used as the overlay's
     /// `.id()` so each open creates a fresh ScrollView (and gesture recognizer)
     /// instance. Prevents stuck horizontal-pan state from carrying over between
     /// open/Cancel cycles.
     @State private var searchOpenToken: Int = 0
+
+    struct FolderDestination: Hashable {
+        let folderId: String
+        let pageIndex: Int
+        let highlightItemId: String?
+    }
 
     // Reserved height for the floating search pill (used as scroll-content top
     // padding so the pill doesn't overlap the hero header).
@@ -161,10 +168,28 @@ struct FolderHomeView: View {
                     id: item.itemKey ?? item.id,
                     item: item,
                     storeName: item.storeName ?? "unknown"
-                )
+                ),
+                onOpenInFolder: { folder, pageIndex, itemId in
+                    folderDestination = FolderDestination(
+                        folderId: folder.folderId,
+                        pageIndex: pageIndex,
+                        highlightItemId: itemId
+                    )
+                }
             )
+            .environmentObject(viewModel)
             .presentationDetents([.fraction(0.85), .large])
             .presentationDragIndicator(.visible)
+        }
+        .navigationDestination(item: $folderDestination) { dest in
+            if case .success(let folders) = viewModel.state,
+               let folder = folders.first(where: { $0.folderId == dest.folderId }) {
+                PromoFolderPageViewer(
+                    folder: folder,
+                    initialPage: dest.pageIndex,
+                    highlightItemId: dest.highlightItemId
+                )
+            }
         }
         .opacity(contentOpacity)
         .onAppear {
