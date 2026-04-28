@@ -97,7 +97,7 @@ struct FolderSearchBar: View {
                 Image(systemName: "line.3.horizontal.decrease.circle")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white.opacity(0.7))
-                if viewModel.storeFilter != nil {
+                if !viewModel.storeFilters.isEmpty {
                     Circle()
                         .fill(Color.blue)
                         .frame(width: 7, height: 7)

@@ -151,10 +151,7 @@ struct FolderHomeView: View {
         }
         .sheet(isPresented: $showSearchFilter) {
             FolderSearchFilterSheet(
-                selection: Binding(
-                    get: { searchVM.storeFilter },
-                    set: { searchVM.setStoreFilter($0) }
-                ),
+                viewModel: searchVM,
                 availableStores: searchableStores
             )
         }

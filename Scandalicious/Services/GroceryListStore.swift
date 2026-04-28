@@ -10,7 +10,15 @@ import Combine
 class GroceryListStore: ObservableObject {
     static let shared = GroceryListStore()
 
-    @Published private(set) var items: [GroceryListItem] = []
+    @Published private(set) var items: [GroceryListItem] = [] {
+        didSet { refreshMembership() }
+    }
+
+    /// O(1) membership index. Keyed on `"\(brand)|\(productName)|\(storeName)"`
+    /// over non-expired items. Rebuilt whenever `items` changes, so callers can
+    /// check membership in constant time instead of scanning the array — matters
+    /// when 20 search rows each ask `contains(...)` on every render.
+    private var membershipKeys: Set<String> = []
 
     /// Fires whenever a new item is successfully added. Used to trigger UI feedback (e.g. tab-bar toast).
     let itemAddedPublisher = PassthroughSubject<GroceryListItem, Never>()
@@ -76,7 +84,19 @@ class GroceryListStore: ObservableObject {
     }
 
     func contains(item: PromoStoreItem, storeName: String) -> Bool {
-        items.contains { $0.brand == item.brand && $0.productName == item.productName && $0.storeName == storeName && !$0.isExpired }
+        membershipKeys.contains(
+            Self.membershipKey(brand: item.brand, productName: item.productName, storeName: storeName)
+        )
+    }
+
+    private static func membershipKey(brand: String, productName: String, storeName: String) -> String {
+        "\(brand)|\(productName)|\(storeName)"
+    }
+
+    private func refreshMembership() {
+        membershipKeys = Set(items.lazy.filter { !$0.isExpired }.map {
+            Self.membershipKey(brand: $0.brand, productName: $0.productName, storeName: $0.storeName)
+        })
     }
 
     // MARK: - Computed

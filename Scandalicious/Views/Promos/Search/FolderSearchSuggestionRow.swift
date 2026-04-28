@@ -48,7 +48,10 @@ struct FolderSearchSuggestionRow: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
+        // Compute membership once per render so we don't probe the
+        // GroceryListStore three times in the right column.
+        let inList = isInList
+        return Button(action: onTap) {
             HStack(alignment: .center, spacing: 12) {
                 thumbnail
 
@@ -78,7 +81,7 @@ struct FolderSearchSuggestionRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                rightColumn
+                rightColumn(isInList: inList)
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
@@ -102,8 +105,8 @@ struct FolderSearchSuggestionRow: View {
         }
     }
 
-    private var rightColumn: some View {
-        HStack(spacing: 4) {
+    private func rightColumn(isInList: Bool) -> some View {
+        HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .trailing, spacing: 2) {
                 if !priceLabel.isEmpty {
                     Text(priceLabel)
@@ -120,12 +123,12 @@ struct FolderSearchSuggestionRow: View {
             }
 
             if canAddToList {
-                addButton
+                addButton(isInList: isInList)
             }
         }
     }
 
-    private var addButton: some View {
+    private func addButton(isInList: Bool) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 if isInList {
@@ -136,12 +139,22 @@ struct FolderSearchSuggestionRow: View {
                 addTrigger.toggle()
             }
         } label: {
-            Image(systemName: isInList ? "checkmark.circle.fill" : "plus.circle.fill")
-                .font(.system(size: 26, weight: .medium))
-                .foregroundStyle(isInList ? PromoDesign.accentGreen : .white.opacity(0.85))
-                .contentTransition(.symbolEffect(.replace))
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+            ZStack {
+                Circle()
+                    .fill(isInList ? PromoDesign.accentGreen.opacity(0.18) : Color.white.opacity(0.08))
+                Circle()
+                    .strokeBorder(
+                        isInList ? PromoDesign.accentGreen.opacity(0.55) : Color.white.opacity(0.14),
+                        lineWidth: 1
+                    )
+                Image(systemName: isInList ? "checkmark" : "plus")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(isInList ? PromoDesign.accentGreen : .white.opacity(0.9))
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .frame(width: 30, height: 30)
+            .frame(width: 44, height: 44)        // outer hit target
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .sensoryFeedback(.impact(weight: .medium), trigger: addTrigger)
@@ -149,21 +162,17 @@ struct FolderSearchSuggestionRow: View {
 
     @ViewBuilder
     private var thumbnail: some View {
-        AsyncImage(url: thumbnailURL) { phase in
-            switch phase {
-            case .success(let image):
+        RemoteImage(
+            url: thumbnailURL,
+            content: { image in
                 image
                     .resizable()
                     .scaledToFill()
-            case .empty:
-                Color.white.opacity(0.06)
-            case .failure:
-                Image(systemName: "photo")
-                    .foregroundStyle(.white.opacity(0.3))
-            @unknown default:
+            },
+            placeholder: {
                 Color.white.opacity(0.06)
             }
-        }
+        )
         .frame(width: 48, height: 48)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(

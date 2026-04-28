@@ -2,14 +2,16 @@
 //  FolderSearchFilterSheet.swift
 //  Scandalicious
 //
-//  Bottom sheet to scope the search to a single retailer. Stores are mapped
-//  by canonical name (matching the backend's source_retailer column).
+//  Bottom sheet to scope the search to one or more retailers. Multi-select:
+//  tapping a chip toggles it; tapping the "All stores" chip clears the set.
+//  Stores are mapped by canonical name (matching the backend's
+//  source_retailer column).
 //
 
 import SwiftUI
 
 struct FolderSearchFilterSheet: View {
-    @Binding var selection: String?
+    @ObservedObject var viewModel: PromoSearchViewModel
     let availableStores: [GroceryStore]
     @Environment(\.dismiss) private var dismiss
 
@@ -55,9 +57,9 @@ struct FolderSearchFilterSheet: View {
     }
 
     private var allStoresChip: some View {
-        Button {
-            selection = nil
-            dismiss()
+        let allSelected = viewModel.storeFilters.isEmpty
+        return Button {
+            viewModel.clearStoreFilters()
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "square.grid.2x2.fill")
@@ -67,7 +69,7 @@ struct FolderSearchFilterSheet: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                 Spacer()
-                if selection == nil {
+                if allSelected {
                     Image(systemName: "checkmark")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.blue)
@@ -77,22 +79,21 @@ struct FolderSearchFilterSheet: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(selection == nil ? 0.10 : 0.05))
+                    .fill(Color.white.opacity(allSelected ? 0.10 : 0.05))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(selection == nil ? Color.blue.opacity(0.5) : Color.white.opacity(0.08),
-                            lineWidth: selection == nil ? 1.4 : 1)
+                    .stroke(allSelected ? Color.blue.opacity(0.5) : Color.white.opacity(0.08),
+                            lineWidth: allSelected ? 1.4 : 1)
             )
         }
         .buttonStyle(.plain)
     }
 
     private func storeChip(_ store: GroceryStore) -> some View {
-        let isSelected = selection == store.canonicalName
+        let isSelected = viewModel.storeFilters.contains(store.canonicalName)
         return Button {
-            selection = isSelected ? nil : store.canonicalName
-            dismiss()
+            viewModel.toggleStoreFilter(store.canonicalName)
         } label: {
             VStack(spacing: 6) {
                 Image(store.logoImageName)
@@ -135,6 +136,7 @@ struct FolderSearchFilterSheet: View {
                 }
             }
             .scaleEffect(isSelected ? 1.02 : 1.0)
+            .animation(.spring(response: 0.28, dampingFraction: 0.85), value: isSelected)
         }
         .buttonStyle(.plain)
     }

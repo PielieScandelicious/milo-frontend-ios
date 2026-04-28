@@ -3,8 +3,7 @@
 //  Scandalicious
 //
 //  Content shown inside the focused search overlay when the query is empty:
-//  the user's recent searches plus a horizontal chip strip of popular brands
-//  (driven by `/promos/search/popular-brands`).
+//  the user's recent searches.
 //
 
 import SwiftUI
@@ -20,22 +19,20 @@ struct FolderSearchEmptyState: View {
             if !recents.searches.isEmpty {
                 recentSection
             }
-            if !viewModel.popularBrands.isEmpty {
-                brandsSection
-            }
         }
+        .padding(.top, 28)
     }
 
     // MARK: - Recent Searches
 
     private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
                 Text(L("promo_search_recent"))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.55))
                     .textCase(.uppercase)
-                    .tracking(0.6)
+                    .tracking(0.8)
                 Spacer()
                 Button {
                     recents.clear()
@@ -47,9 +44,15 @@ struct FolderSearchEmptyState: View {
                 .buttonStyle(.plain)
             }
 
-            VStack(spacing: 4) {
-                ForEach(recents.searches, id: \.self) { query in
+            VStack(spacing: 0) {
+                ForEach(Array(recents.searches.enumerated()), id: \.element) { idx, query in
                     recentRow(query)
+                    if idx < recents.searches.count - 1 {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.07))
+                            .frame(height: 0.5)
+                            .padding(.leading, 34)
+                    }
                 }
             }
         }
@@ -80,54 +83,8 @@ struct FolderSearchEmptyState: View {
                 .buttonStyle(.plain)
             }
             .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.04))
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - Popular Brands
-
-    private var brandsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(L("promo_search_popular_brands"))
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.55))
-                .textCase(.uppercase)
-                .tracking(0.6)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(viewModel.popularBrands) { brand in
-                        Button {
-                            onPickQuery(brand.name)
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(brand.name)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                Text("\(brand.count)")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.5))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule(style: .continuous).fill(Color.white.opacity(0.08))
-                            )
-                            .overlay(
-                                Capsule(style: .continuous)
-                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-        }
     }
 }

@@ -51,11 +51,25 @@ struct FolderSearchOverlay: View {
 
                     Color.clear.frame(height: 80)   // tab bar safe area
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture { dismiss() }
             }
             .clipped()
         }
-        .clipped()
         .transition(.opacity)
+    }
+
+    /// Mirrors the search-bar Cancel button: clears the query, dismisses the
+    /// keyboard, and closes the overlay. Used by taps on the blurred backdrop
+    /// and on empty space inside the scroll view.
+    private func dismiss() {
+        viewModel.clearQuery()
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil, from: nil, for: nil
+        )
+        viewModel.setFocused(false)
     }
 
     // MARK: - Backdrop
@@ -64,6 +78,8 @@ struct FolderSearchOverlay: View {
         Color.black.opacity(0.55)
             .background(.ultraThinMaterial)
             .ignoresSafeArea()
+            .contentShape(Rectangle())
+            .onTapGesture { dismiss() }
     }
 
     // MARK: - States
@@ -98,7 +114,7 @@ struct FolderSearchOverlay: View {
     }
 
     private var resultsList: some View {
-        VStack(spacing: 0) {
+        LazyVStack(spacing: 0) {
             ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { idx, item in
                 FolderSearchSuggestionRow(item: item) {
                     onTapResult(item, idx)
@@ -127,9 +143,9 @@ struct FolderSearchOverlay: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.55))
                 .multilineTextAlignment(.center)
-            if viewModel.storeFilter != nil {
+            if !viewModel.storeFilters.isEmpty {
                 Button {
-                    viewModel.setStoreFilter(nil)
+                    viewModel.clearStoreFilters()
                 } label: {
                     Text(L("promo_search_clear_filter"))
                         .font(.system(size: 14, weight: .semibold))

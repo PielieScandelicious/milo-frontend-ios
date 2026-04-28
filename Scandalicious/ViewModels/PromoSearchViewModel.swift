@@ -23,7 +23,14 @@ final class PromoSearchViewModel: ObservableObject {
 
     @Published var query: String = ""
     @Published var isFocused: Bool = false
-    @Published var storeFilter: String? = nil
+    @Published var storeFilters: Set<String> = PromoSearchViewModel.loadPersistedStoreFilters() {
+        didSet {
+            UserDefaults.standard.set(
+                Array(storeFilters).sorted(),
+                forKey: PromoSearchViewModel.storeFiltersKey
+            )
+        }
+    }
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var results: [PromoStoreItem] = []
     @Published private(set) var matchedCategories: [String] = []
@@ -32,6 +39,11 @@ final class PromoSearchViewModel: ObservableObject {
     private static let minQueryLength = 2
     private static let debounceMs: UInt64 = 300_000_000
     private static let resultLimit = 20
+    private static let storeFiltersKey = "promo_search_store_filters_v1"
+
+    private static func loadPersistedStoreFilters() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: storeFiltersKey) ?? [])
+    }
 
     private var searchTask: Task<Void, Never>?
     private var lastSubmittedTelemetryQuery: String = ""
@@ -66,8 +78,9 @@ final class PromoSearchViewModel: ObservableObject {
         }
 
         // Cache peek — show cached results instantly without flashing a spinner.
+        let storesArray = Array(storeFilters)
         if let cached = PromoSearchCache.shared.cached(
-            query: trimmed, store: storeFilter, limit: Self.resultLimit
+            query: trimmed, stores: storesArray, limit: Self.resultLimit
         ) {
             applyResponse(cached)
             return
@@ -78,14 +91,24 @@ final class PromoSearchViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: Self.debounceMs)
             guard let self else { return }
             if Task.isCancelled { return }
-            await self.performSearch(query: trimmed, store: self.storeFilter)
+            await self.performSearch(query: trimmed, stores: Array(self.storeFilters))
         }
     }
 
-    /// Called when the user picks a different store filter.
-    func setStoreFilter(_ store: String?) {
-        guard storeFilter != store else { return }
-        storeFilter = store
+    /// Toggle a single store in the multi-select filter. Re-runs the search.
+    func toggleStoreFilter(_ store: String) {
+        if storeFilters.contains(store) {
+            storeFilters.remove(store)
+        } else {
+            storeFilters.insert(store)
+        }
+        onQueryChange()
+    }
+
+    /// Clear all store filters (the "all stores" affordance). Re-runs the search.
+    func clearStoreFilters() {
+        guard !storeFilters.isEmpty else { return }
+        storeFilters.removeAll()
         onQueryChange()
     }
 
@@ -96,6 +119,10 @@ final class PromoSearchViewModel: ObservableObject {
     }
 
     func clearQuery() {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count >= Self.minQueryLength, !results.isEmpty {
+            RecentSearchesManager.shared.add(trimmed)
+        }
         query = ""
         results = []
         matchedCategories = []
@@ -117,7 +144,7 @@ final class PromoSearchViewModel: ObservableObject {
                 metadata: [
                     "q": trimmed,
                     "position": String(position),
-                    "store_filter": storeFilter ?? "",
+                    "store_filter": Array(storeFilters).sorted().joined(separator: ","),
                 ]
             )
         }
@@ -125,9 +152,9 @@ final class PromoSearchViewModel: ObservableObject {
 
     // MARK: - Private
 
-    private func performSearch(query: String, store: String?) async {
+    private func performSearch(query: String, stores: [String]) async {
         let response = await PromoSearchCache.shared.getOrFetch(
-            query: query, store: store, limit: Self.resultLimit
+            query: query, stores: stores, limit: Self.resultLimit
         )
         if Task.isCancelled { return }
 
@@ -138,7 +165,7 @@ final class PromoSearchViewModel: ObservableObject {
         }
 
         applyResponse(response)
-        await maybeLogQueryTelemetry(query: query, store: store, response: response)
+        await maybeLogQueryTelemetry(query: query, stores: stores, response: response)
     }
 
     private func applyResponse(_ response: PromoSearchResponse) {
@@ -172,16 +199,17 @@ final class PromoSearchViewModel: ObservableObject {
 
     /// Single dwell-debounced telemetry fire per query, so we don't log every keystroke.
     private func maybeLogQueryTelemetry(
-        query: String, store: String?, response: PromoSearchResponse
+        query: String, stores: [String], response: PromoSearchResponse
     ) async {
-        let key = "\(query.lowercased())|\(store ?? "")"
+        let storesKey = stores.sorted().joined(separator: ",")
+        let key = "\(query.lowercased())|\(storesKey)"
         guard key != lastSubmittedTelemetryQuery else { return }
         lastSubmittedTelemetryQuery = key
         await PromoAPIService.shared.logInteractionEvent(
             eventType: .searchQuerySubmitted,
             metadata: [
                 "q": query,
-                "store_filter": store ?? "",
+                "store_filter": storesKey,
                 "result_count": String(response.items.count),
                 "matched_categories": response.matchedCategories.joined(separator: ","),
             ]

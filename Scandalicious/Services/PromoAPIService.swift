@@ -148,7 +148,7 @@ actor PromoAPIService {
 
     func searchPromos(
         query: String,
-        store: String? = nil,
+        stores: [String] = [],
         limit: Int = 20
     ) async throws -> PromoSearchResponse {
         guard var components = URLComponents(string: "\(baseURL)/promos/search") else {
@@ -158,7 +158,7 @@ actor PromoAPIService {
             .init(name: "q", value: query),
             .init(name: "limit", value: String(limit)),
         ]
-        if let store, !store.isEmpty {
+        for store in stores where !store.isEmpty {
             queryItems.append(.init(name: "store", value: store))
         }
         components.queryItems = queryItems
@@ -369,12 +369,15 @@ final class PromoSearchCache {
     private var inflight: [NSString: Task<PromoSearchResponse?, Never>] = [:]
     private let queue = DispatchQueue(label: "PromoSearchCache.inflight")
 
-    private func cacheKey(query: String, store: String?, limit: Int) -> NSString {
-        "\(query.lowercased())|\(store ?? "")|\(limit)" as NSString
+    private func cacheKey(query: String, stores: [String], limit: Int) -> NSString {
+        // Sort to make the key order-independent: {colruyt,delhaize} and
+        // {delhaize,colruyt} must hash to the same cache slot.
+        let normalized = stores.filter { !$0.isEmpty }.sorted().joined(separator: ",")
+        return "\(query.lowercased())|\(normalized)|\(limit)" as NSString
     }
 
-    func cached(query: String, store: String?, limit: Int) -> PromoSearchResponse? {
-        let key = cacheKey(query: query, store: store, limit: limit)
+    func cached(query: String, stores: [String], limit: Int) -> PromoSearchResponse? {
+        let key = cacheKey(query: query, stores: stores, limit: limit)
         guard let box = cache.object(forKey: key) else { return nil }
         if Date().timeIntervalSince(box.cachedAt) > Self.ttlSeconds {
             cache.removeObject(forKey: key)
@@ -383,9 +386,9 @@ final class PromoSearchCache {
         return box.response
     }
 
-    func getOrFetch(query: String, store: String?, limit: Int) async -> PromoSearchResponse? {
-        if let hit = cached(query: query, store: store, limit: limit) { return hit }
-        let key = cacheKey(query: query, store: store, limit: limit)
+    func getOrFetch(query: String, stores: [String], limit: Int) async -> PromoSearchResponse? {
+        if let hit = cached(query: query, stores: stores, limit: limit) { return hit }
+        let key = cacheKey(query: query, stores: stores, limit: limit)
         let task: Task<PromoSearchResponse?, Never> = queue.sync {
             if let existing = inflight[key] { return existing }
             let new = Task<PromoSearchResponse?, Never> { [weak self] in
@@ -394,7 +397,7 @@ final class PromoSearchCache {
                 }
                 do {
                     let response = try await PromoAPIService.shared.searchPromos(
-                        query: query, store: store, limit: limit
+                        query: query, stores: stores, limit: limit
                     )
                     self?.cache.setObject(CachedSearch(response: response), forKey: key)
                     return response
