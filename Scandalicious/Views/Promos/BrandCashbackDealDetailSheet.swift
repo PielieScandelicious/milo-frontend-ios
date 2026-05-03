@@ -2,8 +2,8 @@
 //  BrandCashbackDealDetailSheet.swift
 //  Scandalicious
 //
-//  Full-screen sheet showing a cashback deal's details: claim window,
-//  how-it-works, eligible stores, products, cap progress, and terms.
+//  Full-screen sheet showing a cashback deal's details: validity, how-it-works,
+//  eligible stores, products, cap progress, and terms.
 //
 
 import SwiftUI
@@ -12,7 +12,6 @@ import SwiftUI
 
 private let cashbackGreen = Color(red: 0.25, green: 0.90, blue: 0.55)
 private let cashbackGold  = Color(red: 1.00, green: 0.80, blue: 0.20)
-private let warningAmber  = Color(red: 1.0, green: 0.72, blue: 0.20)
 private let warningOrange = Color(red: 1.0, green: 0.55, blue: 0.20)
 
 // MARK: - BrandCashbackDealDetailSheet
@@ -27,115 +26,193 @@ struct BrandCashbackDealDetailSheet: View {
     @State private var termsExpanded = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    heroSection
-                    claimWindowSection
-                    howItWorksSection
-                    eligibleStoresSection
+        NavigationStack {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    productHero
 
-                    if let skus = deal.eligibleSKUs, !skus.isEmpty {
-                        eligibleProductsSection(skus: skus)
+                    VStack(alignment: .leading, spacing: 24) {
+                        heroTitleBlock
+                        validitySection
+                        howItWorksSection
+                        eligibleStoresSection
+
+                        if let skus = deal.eligibleSKUs, !skus.isEmpty {
+                            eligibleProductsSection(skus: skus)
+                        }
+
+                        if deal.capProgressLabel != nil {
+                            campaignStatusSection
+                        }
+
+                        termsSection
                     }
-
-                    if deal.capProgressLabel != nil {
-                        campaignStatusSection
-                    }
-
-                    termsSection
-
-                    // Padding so sticky CTA doesn't overlap last item
-                    Color.clear.frame(height: 96)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 120)  // clearance for sticky CTA
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            stickyActionButton
+            .background(
+                LinearGradient(
+                    stops: [
+                        .init(color: Color(red: 0.06, green: 0.09, blue: 0.14), location: 0.0),
+                        .init(color: Color(red: 0.04, green: 0.06, blue: 0.10), location: 0.4),
+                        .init(color: Color(red: 0.03, green: 0.04, blue: 0.07), location: 1.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            )
+            .overlay(alignment: .bottom) {
+                stickyActionButton
+            }
+            .overlay(alignment: .topTrailing) {
+                closeButton
+            }
+            .toolbar(.hidden, for: .navigationBar)
         }
-        .presentationDetents([.medium, .large])
+        .preferredColorScheme(.dark)
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .background(Color(red: 0.06, green: 0.06, blue: 0.08))
     }
 
     // MARK: - Hero
 
-    private var heroSection: some View {
-        VStack(alignment: .center, spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(cashbackGreen.opacity(0.12))
-                    .frame(width: 88, height: 88)
-                Circle()
-                    .stroke(cashbackGreen.opacity(0.35), lineWidth: 1.5)
-                    .frame(width: 88, height: 88)
-                Image(systemName: deal.imageSystemName)
-                    .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(cashbackGreen)
-            }
+    private var productHero: some View {
+        ZStack {
+            Color.white
 
+            AsyncImage(url: deal.imageUrl) { phase in
+                switch phase {
+                case .empty:
+                    EmptyView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 20)
+                case .failure:
+                    Image(systemName: "tag.fill")
+                        .font(.system(size: 56, weight: .semibold))
+                        .foregroundStyle(Color.black.opacity(0.18))
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 320)
+        .clipped()
+        .overlay(alignment: .bottomTrailing) {
+            CashbackChip(amount: deal.cashbackAmount, size: .large, emphasis: .filled)
+                .padding(.trailing, 20)
+                .padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Close button (sheet dismiss affordance)
+
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                )
+                .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
+        .padding(.trailing, 16)
+        .padding(.top, 12)
+    }
+
+    // MARK: - Title Block
+
+    private var heroTitleBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
             Text(deal.brandName.uppercased())
                 .font(.system(size: 11, weight: .heavy))
                 .tracking(1.5)
                 .foregroundStyle(cashbackGold)
 
             Text(deal.productName)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-
-            Text(deal.formattedCashback)
-                .font(.system(size: 40, weight: .heavy, design: .rounded))
-                .foregroundStyle(cashbackGreen)
-                .padding(.top, 4)
 
             if !deal.description.isEmpty {
                 Text(deal.description)
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.65))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Claim Window
+    // MARK: - Validity (campaign expiration + per-user progress + review state)
 
-    private var claimWindowSection: some View {
+    private var validitySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(title: "CLAIM WINDOW", icon: "clock.fill")
+            sectionHeader(title: "VALIDITY", icon: "calendar")
 
             VStack(alignment: .leading, spacing: 8) {
-                if deal.isClaimExpired {
-                    claimWindowRow(
-                        icon: "xmark.circle.fill",
-                        text: "Your claim window expired",
-                        color: .white.opacity(0.35)
+                validityRow(
+                    icon: "calendar",
+                    text: "Valid \(deal.formattedExpiry.lowercased())",
+                    color: deal.isExpired ? .white.opacity(0.35) : cashbackGreen
+                )
+
+                if deal.isPartiallyEarned, let max = deal.maxRedemptionsPerUser {
+                    let earnedSoFar = Double(deal.earningsCount) * deal.cashbackAmount
+                    let perEarning = String(format: "€%.2f", deal.cashbackAmount)
+                    validityRow(
+                        icon: "seal.fill",
+                        text: "Earned \(deal.earningsCount) of \(max) · \(String(format: "€%.2f", earnedSoFar)) in your wallet so far",
+                        color: cashbackGold
                     )
-                } else if deal.status == .claimed, let days = deal.daysUntilClaimExpires {
-                    let color: Color = days <= 3 ? warningAmber : cashbackGreen
-                    claimWindowRow(
-                        icon: "clock.fill",
-                        text: days == 0 ? "Last day to buy and scan your receipt" :
-                              days == 1 ? "1 day left to buy and scan your receipt" :
-                              "\(days) days left to buy and scan your receipt",
-                        color: color
+                    validityRow(
+                        icon: "cart.fill",
+                        text: "Buy this product again to earn another \(perEarning)",
+                        color: .white.opacity(0.70)
                     )
-                    claimProgressBar(remaining: days, total: 14, color: color)
+                } else if deal.status == .claimed, let progress = deal.redemptionProgressLabel {
+                    validityRow(
+                        icon: "checkmark.circle.fill",
+                        text: progress,
+                        color: cashbackGreen
+                    )
                 } else if deal.status == .earned {
-                    claimWindowRow(
+                    validityRow(
                         icon: "checkmark.seal.fill",
                         text: "Cashback earned and added to your wallet",
                         color: cashbackGold
                     )
-                } else {
-                    claimWindowRow(
-                        icon: "hourglass",
-                        text: "Buy within 14 days of claiming",
-                        color: .white.opacity(0.70)
+                }
+
+                if deal.pendingReview != nil {
+                    validityRow(
+                        icon: "hourglass.bottomhalf.filled",
+                        text: "Receipt under review — usually within 24h",
+                        color: warningOrange
+                    )
+                }
+                if let denial = deal.recentDenial {
+                    validityRow(
+                        icon: "xmark.octagon.fill",
+                        text: "Last receipt: not eligible — \(denial.reason)",
+                        color: .white.opacity(0.55)
                     )
                 }
             }
@@ -144,7 +221,7 @@ struct BrandCashbackDealDetailSheet: View {
         }
     }
 
-    private func claimWindowRow(icon: String, text: String, color: Color) -> some View {
+    private func validityRow(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .semibold))
@@ -154,20 +231,6 @@ struct BrandCashbackDealDetailSheet: View {
                 .foregroundStyle(.white)
             Spacer()
         }
-    }
-
-    private func claimProgressBar(remaining: Int, total: Int, color: Color) -> some View {
-        let ratio = max(0, min(1, Double(remaining) / Double(total)))
-        return GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.white.opacity(0.08))
-                Capsule()
-                    .fill(color)
-                    .frame(width: geo.size.width * ratio)
-            }
-        }
-        .frame(height: 4)
     }
 
     // MARK: - How It Works
@@ -369,7 +432,7 @@ struct BrandCashbackDealDetailSheet: View {
 
     private var defaultTerms: String {
         """
-        Cashback is paid to your Milo wallet within 48 hours of receipt verification. Limited to once per household per campaign. Receipt must be dated within the campaign period and no older than 14 days at time of scan. Milo reserves the right to reject fraudulent submissions. By claiming this offer, you consent to sharing anonymised purchase data with the sponsoring brand for campaign analytics.
+        Cashback is paid to your Milo wallet within 48 hours of receipt verification. Limited per campaign as set by the brand. Receipt must be dated within the campaign period. Milo reserves the right to reject fraudulent submissions. By claiming this offer, you consent to sharing anonymised purchase data with the sponsoring brand for campaign analytics.
         """
     }
 
@@ -395,52 +458,71 @@ struct BrandCashbackDealDetailSheet: View {
 
     @ViewBuilder
     private var primaryCTA: some View {
-        switch (deal.status, deal.isClaimExpired) {
-        case (_, true):
-            disabledCTA(text: "Claim expired")
-        case (.available, false):
-            Button {
-                onClaim()
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            } label: {
-                ctaLabel(
-                    text: "Claim \(deal.formattedCashback)",
-                    textColor: .black,
-                    fill: cashbackGreen
-                )
-            }
-        case (.claimed, false):
-            Button {
-                onUnclaim()
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            } label: {
-                let daysText = deal.claimCountdownLabel ?? "Claimed"
-                ctaLabel(
-                    text: "Claimed · \(daysText)",
-                    textColor: cashbackGreen,
-                    fill: .clear,
-                    border: cashbackGreen
-                )
-            }
-        case (.pending, false):
-            disabledCTA(text: "Processing...")
-        case (.earned, false):
-            if let matchedId = deal.matchedReceiptId, let onViewReceipt {
+        if deal.isExpired {
+            disabledCTA(text: "Campaign expired")
+        } else {
+            switch deal.status {
+            case .available:
                 Button {
-                    dismiss()
-                    onViewReceipt(matchedId)
+                    onClaim()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } label: {
                     ctaLabel(
-                        text: "Earned — view receipt",
+                        text: "Claim \(deal.formattedCashback)",
                         textColor: .black,
-                        fill: cashbackGold
+                        fill: cashbackGreen
                     )
                 }
-            } else {
-                disabledCTA(text: "Earned", textColor: cashbackGold)
+            case .claimed:
+                if deal.isPartiallyEarned, let max = deal.maxRedemptionsPerUser {
+                    // Mid-progress: celebrate the win, invite repeat purchase.
+                    // Tap still releases the claim — earnings already in the
+                    // wallet are preserved by the backend.
+                    Button {
+                        onUnclaim()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        ctaLabel(
+                            text: "Earned \(deal.earningsCount) of \(max) · tap to release",
+                            textColor: cashbackGold,
+                            fill: .clear,
+                            border: cashbackGold
+                        )
+                    }
+                } else {
+                    Button {
+                        onUnclaim()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        let label = deal.redemptionProgressLabel ?? "Claimed"
+                        ctaLabel(
+                            text: "Claimed · \(label)",
+                            textColor: cashbackGreen,
+                            fill: .clear,
+                            border: cashbackGreen
+                        )
+                    }
+                }
+            case .pendingReview:
+                // Disabled while a review is open — claim/unclaim would
+                // interfere with the in-flight admin decision.
+                disabledCTA(text: "Pending review", textColor: warningOrange)
+            case .earned:
+                if let matchedId = deal.matchedReceiptId, let onViewReceipt {
+                    Button {
+                        dismiss()
+                        onViewReceipt(matchedId)
+                    } label: {
+                        ctaLabel(
+                            text: "Earned — view receipt",
+                            textColor: .black,
+                            fill: cashbackGold
+                        )
+                    }
+                } else {
+                    disabledCTA(text: "Earned", textColor: cashbackGold)
+                }
             }
-        case (.expired, false):
-            disabledCTA(text: "Expired")
         }
     }
 

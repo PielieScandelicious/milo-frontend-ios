@@ -3,9 +3,10 @@
 //  Scandalicious
 //
 //  Brand cashback feature views:
-//  - BrandCashbackView      — scrollable deal list (available + my deals)
-//  - CashbackDealCard       — individual deal card
+//  - BrandCashbackView      — feed (filter bar + rails + grid)
 //  - CashbackEarnedOverlay  — full-screen celebration when cashback is credited
+//
+//  The grid card itself lives in Components/BrandCashbackGridCard.swift.
 //
 
 import SwiftUI
@@ -23,66 +24,71 @@ struct BrandCashbackView: View {
     var onViewReceipt: ((String) -> Void)? = nil
 
     @State private var selectedDeal: BrandCashbackDeal? = nil
+    @State private var selectedCategory: CashbackCategory = .all
     @State private var showOnboarding: Bool = BrandCashbackOnboardingCard.shouldShow
+
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12),
+    ]
 
     var body: some View {
         VStack(spacing: 20) {
 
-            // Onboarding card (first-time) OR compact upload hint
+            // Onboarding / share-extension hint
             if showOnboarding {
-                BrandCashbackOnboardingCard(onDismiss: {
-                    showOnboarding = false
-                })
-                .padding(.horizontal, 16)
-                .transition(.asymmetric(
-                    insertion: .opacity,
-                    removal: .opacity.combined(with: .move(edge: .top))
-                ))
+                BrandCashbackOnboardingCard(onDismiss: { showOnboarding = false })
+                    .padding(.horizontal, 16)
+                    .transition(.asymmetric(
+                        insertion: .opacity,
+                        removal: .opacity.combined(with: .move(edge: .top))
+                    ))
             } else {
                 ShareExtensionHintCard()
                     .padding(.horizontal, 16)
             }
 
-            // MY DEALS section
-            if !viewModel.myDeals.isEmpty {
-                VStack(spacing: 12) {
-                    PromoSectionHeader(title: "MY DEALS", icon: "checkmark.seal.fill")
-                        .padding(.horizontal, 4)
+            // Category filter
+            CashbackCategoryFilterBar(
+                selected: $selectedCategory,
+                availableCategories: availableCategories
+            )
 
-                    ForEach(Array(viewModel.myDeals.enumerated()), id: \.element.id) { index, deal in
-                        CashbackDealCard(
-                            deal: deal,
-                            animationDelay: Double(index) * 0.05,
-                            onClaim: { viewModel.claimDeal(deal) },
-                            onUnclaim: { viewModel.unclaimDeal(deal) },
-                            onTap: { selectedDeal = deal }
-                        )
-                    }
+            // MY DEALS rail (horizontal scroll)
+            if !filteredMyDeals.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    PromoSectionHeader(title: "MY DEALS", icon: "checkmark.seal.fill")
+                        .padding(.horizontal, 20)
+                    horizontalRail(deals: filteredMyDeals)
                 }
-                .padding(.horizontal, 16)
             }
 
-            // AVAILABLE DEALS section
-            VStack(spacing: 12) {
-                PromoSectionHeader(title: "AVAILABLE DEALS", icon: "tag.fill")
-                    .padding(.horizontal, 4)
+            // FEATURED rail (horizontal scroll)
+            if !featuredDeals.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    PromoSectionHeader(title: "FEATURED", icon: "star.fill")
+                        .padding(.horizontal, 20)
+                    horizontalRail(deals: featuredDeals)
+                }
+            }
 
-                if viewModel.availableDeals.isEmpty {
+            // AVAILABLE grid (2-col)
+            VStack(alignment: .leading, spacing: 10) {
+                PromoSectionHeader(title: availableHeaderTitle, icon: "tag.fill")
+                    .padding(.horizontal, 20)
+
+                if regularAvailable.isEmpty && filteredMyDeals.isEmpty && featuredDeals.isEmpty {
                     emptyState
                         .transition(.opacity)
-                } else {
-                    ForEach(Array(viewModel.availableDeals.enumerated()), id: \.element.id) { index, deal in
-                        CashbackDealCard(
-                            deal: deal,
-                            animationDelay: Double(index) * 0.06,
-                            onClaim: { viewModel.claimDeal(deal) },
-                            onUnclaim: { viewModel.unclaimDeal(deal) },
-                            onTap: { selectedDeal = deal }
-                        )
+                } else if !regularAvailable.isEmpty {
+                    LazyVGrid(columns: gridColumns, spacing: 12) {
+                        ForEach(regularAvailable) { deal in
+                            BrandCashbackGridCard(deal: deal, onTap: { selectedDeal = deal })
+                        }
                     }
+                    .padding(.horizontal, 16)
                 }
             }
-            .padding(.horizontal, 16)
 
             // Disclaimer
             Text("Deals are sponsored by brands. Cashback is credited to your Milo wallet after receipt verification.")
@@ -106,337 +112,92 @@ struct BrandCashbackView: View {
                 onViewReceipt: onViewReceipt
             )
         }
+        .overlay(alignment: .bottom) {
+            if let toast = viewModel.deniedToast {
+                CashbackDeniedToast(toast: toast) {
+                    withAnimation { viewModel.deniedToast = nil }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .id(toast.id)
+                .task(id: toast.id) {
+                    try? await Task.sleep(for: .seconds(5))
+                    withAnimation { viewModel.deniedToast = nil }
+                }
+            }
+        }
     }
+
+    // MARK: - Derived collections
+
+    private var availableCategories: Set<CashbackCategory> {
+        Set((viewModel.availableDeals + viewModel.myDeals).compactMap {
+            $0.category.flatMap(CashbackCategory.init(rawValue:))
+        })
+    }
+
+    private func matchesCategory(_ deal: BrandCashbackDeal) -> Bool {
+        if selectedCategory == .all { return true }
+        return deal.category == selectedCategory.rawValue
+    }
+
+    private var filteredMyDeals: [BrandCashbackDeal] {
+        viewModel.myDeals.filter(matchesCategory)
+    }
+
+    private var featuredDeals: [BrandCashbackDeal] {
+        viewModel.availableDeals.filter { $0.featured && matchesCategory($0) }
+    }
+
+    private var regularAvailable: [BrandCashbackDeal] {
+        viewModel.availableDeals.filter { !$0.featured && matchesCategory($0) }
+    }
+
+    private var availableHeaderTitle: String {
+        selectedCategory == .all
+            ? "AVAILABLE"
+            : selectedCategory.label.uppercased()
+    }
+
+    // MARK: - Rail
+
+    private func horizontalRail(deals: [BrandCashbackDeal]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(deals) { deal in
+                    BrandCashbackGridCard(deal: deal, onTap: { selectedDeal = deal })
+                        .frame(width: 220)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    // MARK: - Empty state
 
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "tag.slash.fill")
                 .font(.system(size: 36))
                 .foregroundStyle(.white.opacity(0.15))
-            Text("No deals available right now")
+            Text(selectedCategory == .all
+                ? "No deals available right now"
+                : "No \(selectedCategory.label.lowercased()) deals right now")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.white.opacity(0.4))
-            Text("Check back soon for new brand offers")
+            Text(selectedCategory == .all
+                ? "Check back soon for new brand offers"
+                : "Try a different category")
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.25))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 48)
-    }
-}
-
-// MARK: - CashbackDealCard
-
-struct CashbackDealCard: View {
-    let deal: BrandCashbackDeal
-    let animationDelay: Double
-    let onClaim: () -> Void
-    let onUnclaim: () -> Void
-    var onTap: (() -> Void)? = nil
-
-    @State private var appeared = false
-
-    var body: some View {
-        VStack(spacing: 0) {
-            cardBody
-
-            if deal.status == .available, let label = deal.capProgressLabel {
-                capProgressFooter(label: label)
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onTap?()
-        }
-        .glassCard(
-            borderGradient: deal.status == .claimed
-                ? LinearGradient(
-                    colors: [cashbackGreen.opacity(0.35), cashbackGreen.opacity(0.10)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-                : nil
-        )
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 12)
-        .onAppear {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.8).delay(animationDelay)) {
-                appeared = true
-            }
-        }
-    }
-
-    // MARK: - Card Body
-
-    private var cardBody: some View {
-        ZStack(alignment: .leading) {
-            // Claimed indicator bar
-            if deal.status == .claimed {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(cashbackGreen)
-                    .frame(width: 3)
-                    .padding(.vertical, 12)
-                    .padding(.leading, 0)
-            }
-
-            HStack(alignment: .top, spacing: 12) {
-                // Brand icon
-                ZStack {
-                    Circle()
-                        .fill(iconBackgroundColor)
-                        .frame(width: 44, height: 44)
-                    Image(systemName: deal.imageSystemName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(iconForegroundColor)
-                }
-
-                // Deal info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(deal.brandName.uppercased())
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(0.8)
-                        .foregroundStyle(Color(red: 0.95, green: 0.80, blue: 0.20))
-
-                    Text(deal.productName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-
-                    // Store pills
-                    storePills
-
-                    expiryLine
-                }
-
-                Spacer(minLength: 8)
-
-                // Right side: badge + action
-                VStack(alignment: .trailing, spacing: 8) {
-                    // Cashback amount badge
-                    Text(deal.formattedCashback)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(badgeTextColor)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule().fill(badgeFillColor)
-                        )
-
-                    // Action button
-                    actionButton
-                }
-                .padding(.leading, deal.status == .claimed ? 3 : 0)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .padding(.leading, deal.status == .claimed ? 6 : 0)
-        }
-    }
-
-    // MARK: - Cap Progress Footer
-
-    @ViewBuilder
-    private func capProgressFooter(label: String) -> some View {
-        let ratio = deal.capFillRatio ?? 0
-        let nearlyFull = deal.isNearlyFull
-        let fillColor: Color = nearlyFull
-            ? Color(red: 1.0, green: 0.55, blue: 0.20)
-            : cashbackGreen
-
-        VStack(alignment: .trailing, spacing: 4) {
-            HStack(spacing: 6) {
-                if nearlyFull {
-                    Text("Almost full")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(fillColor)
-                    Spacer()
-                } else {
-                    Spacer()
-                }
-                Text(label)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.40))
-            }
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.06))
-                        .frame(height: 2)
-                    Capsule()
-                        .fill(fillColor)
-                        .frame(width: geo.size.width * ratio, height: 2)
-                }
-            }
-            .frame(height: 2)
-        }
         .padding(.horizontal, 16)
-        .padding(.bottom, 10)
-    }
-
-    // MARK: - Store Pills
-
-    @ViewBuilder
-    private var storePills: some View {
-        if deal.requiresStore && !deal.eligibleStores.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 5) {
-                    ForEach(deal.eligibleStores, id: \.self) { storeName in
-                        let storeColor = GroceryStore(rawValue: storeName)?.accentColor ?? .white.opacity(0.5)
-                        HStack(spacing: 4) {
-                            StoreLogoView(storeName: storeName, height: 12)
-
-                            Text(storeName)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(storeColor)
-                        }
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule().fill(storeColor.opacity(0.12))
-                        )
-                    }
-                }
-            }
-            .frame(height: 22)
-        } else {
-            Text("All stores")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(cashbackGreen.opacity(0.8))
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(cashbackGreen.opacity(0.12)))
-        }
-    }
-
-    // MARK: - Expiry / Countdown Line
-
-    @ViewBuilder
-    private var expiryLine: some View {
-        if deal.status == .claimed, let countdown = deal.claimCountdownLabel {
-            HStack(spacing: 4) {
-                Image(systemName: "clock.fill")
-                    .font(.system(size: 9, weight: .semibold))
-                Text(countdown)
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .foregroundStyle(claimCountdownColor)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(claimCountdownColor.opacity(0.12)))
-        } else if deal.isClaimExpired {
-            Text("Claim expired")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(0.30))
-        } else {
-            Text(deal.formattedExpiry)
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.30))
-        }
-    }
-
-    private var claimCountdownColor: Color {
-        guard let days = deal.daysUntilClaimExpires else { return cashbackGreen }
-        return days <= 3 ? Color(red: 1.0, green: 0.72, blue: 0.20) : cashbackGreen
-    }
-
-    // MARK: - Action Button
-
-    @ViewBuilder
-    private var actionButton: some View {
-        if deal.isClaimExpired {
-            Text("Expired")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.3))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(Color.white.opacity(0.06)))
-        } else {
-            switch deal.status {
-            case .available:
-                Button(action: onClaim) {
-                    Text("Claim")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(Capsule().fill(cashbackGreen))
-                }
-            case .claimed:
-                Button(action: onUnclaim) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                        Text("Claimed")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundStyle(cashbackGreen)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(Capsule().stroke(cashbackGreen, lineWidth: 1.5))
-                }
-            case .pending:
-                HStack(spacing: 4) {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                        .tint(cashbackGreen)
-                    Text("Pending")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(cashbackGreen.opacity(0.7))
-                }
-            case .earned:
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 11))
-                    Text("Earned")
-                        .font(.system(size: 12, weight: .bold))
-                }
-                .foregroundStyle(cashbackGold)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(cashbackGold.opacity(0.15)))
-            case .expired:
-                Text("Expired")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(Capsule().fill(Color.white.opacity(0.06)))
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var iconBackgroundColor: Color {
-        switch deal.status {
-        case .earned: return cashbackGold.opacity(0.15)
-        default: return cashbackGreen.opacity(0.12)
-        }
-    }
-
-    private var iconForegroundColor: Color {
-        switch deal.status {
-        case .earned: return cashbackGold
-        default: return cashbackGreen
-        }
-    }
-
-    private var badgeFillColor: Color {
-        switch deal.status {
-        case .earned: return cashbackGold.opacity(0.20)
-        case .available: return cashbackGreen.opacity(0.20)
-        default: return Color.white.opacity(0.08)
-        }
-    }
-
-    private var badgeTextColor: Color {
-        switch deal.status {
-        case .earned: return cashbackGold
-        case .available: return cashbackGreen
-        default: return .white.opacity(0.5)
-        }
     }
 }
+
 
 // MARK: - ShareExtensionHintCard
 
@@ -509,11 +270,58 @@ private struct ShareExtensionHintCard: View {
     }
 }
 
+// MARK: - CashbackDeniedToast
+
+/// Bottom-sheet toast shown for ~5s when a previously-pending review is denied.
+/// Tappable to dismiss; auto-dismisses via the .task on the parent overlay.
+struct CashbackDeniedToast: View {
+    let toast: DeniedToast
+    let onDismiss: () -> Void
+
+    private static let denialRed = Color(red: 1.0, green: 0.40, blue: 0.40)
+
+    var body: some View {
+        Button(action: onDismiss) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "xmark.octagon.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Self.denialRed)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(toast.brandName) cashback not approved")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(toast.reason)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(red: 0.10, green: 0.06, blue: 0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Self.denialRed.opacity(0.35), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+
 // MARK: - CashbackEarnedOverlay
 
 struct CashbackEarnedOverlay: View {
     let dealName: String
     let cashbackAmount: Double
+    let imageUrl: URL?
     let matchedReceiptId: String?
     let onDismiss: () -> Void
     let onViewReceipt: ((String) -> Void)?
@@ -521,12 +329,14 @@ struct CashbackEarnedOverlay: View {
     init(
         dealName: String,
         cashbackAmount: Double,
+        imageUrl: URL? = nil,
         matchedReceiptId: String? = nil,
         onDismiss: @escaping () -> Void,
         onViewReceipt: ((String) -> Void)? = nil
     ) {
         self.dealName = dealName
         self.cashbackAmount = cashbackAmount
+        self.imageUrl = imageUrl
         self.matchedReceiptId = matchedReceiptId
         self.onDismiss = onDismiss
         self.onViewReceipt = onViewReceipt
@@ -608,28 +418,47 @@ struct CashbackEarnedOverlay: View {
                         .frame(width: 110, height: 110)
                         .rotationEffect(.degrees(rotationAngle))
 
-                    // Icon circle
-                    Circle()
-                        .fill(cashbackGreen.opacity(0.12))
-                        .frame(width: 100, height: 100)
-                        .overlay(Circle().stroke(cashbackGreen.opacity(0.35), lineWidth: 2))
-                        .overlay(
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.clear, .white.opacity(0.2), .clear],
-                                        startPoint: .topLeading, endPoint: .bottomTrailing
-                                    )
-                                )
-                                .offset(x: shimmerOffset)
-                                .mask(Circle())
-                        )
+                    // Product image circle (or SF Symbol fallback)
+                    ZStack {
+                        Circle()
+                            .fill(cashbackGreen.opacity(0.12))
+                            .frame(width: 100, height: 100)
+                            .overlay(Circle().stroke(cashbackGreen.opacity(0.35), lineWidth: 2))
 
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 44, weight: .bold))
-                        .foregroundStyle(cashbackGreen)
-                        .shadow(color: cashbackGreen.opacity(0.7), radius: 16)
-                        .shadow(color: cashbackGreen.opacity(0.3), radius: 30)
+                        Group {
+                            if let url = imageUrl {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image.resizable().scaledToFill()
+                                    default:
+                                        Image(systemName: "checkmark.seal.fill")
+                                            .font(.system(size: 44, weight: .bold))
+                                            .foregroundStyle(cashbackGreen)
+                                    }
+                                }
+                            } else {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 44, weight: .bold))
+                                    .foregroundStyle(cashbackGreen)
+                            }
+                        }
+                        .frame(width: 92, height: 92)
+                        .clipShape(Circle())
+
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.clear, .white.opacity(0.2), .clear],
+                                    startPoint: .topLeading, endPoint: .bottomTrailing
+                                )
+                            )
+                            .offset(x: shimmerOffset)
+                            .frame(width: 100, height: 100)
+                            .mask(Circle())
+                    }
+                    .shadow(color: cashbackGreen.opacity(0.5), radius: 16)
+                    .shadow(color: cashbackGreen.opacity(0.25), radius: 30)
 
                     if showCheckmark {
                         Image(systemName: "eurosign.circle.fill")

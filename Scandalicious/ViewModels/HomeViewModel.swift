@@ -21,7 +21,7 @@ struct RecentReceipt: Identifiable {
     var isReferralReward: Bool = false
     var isStreakReward: Bool = false
     var isBrandCashback: Bool = false
-    var brandImageSystemName: String? = nil
+    var brandImageUrl: URL? = nil
 
     /// Map a backend cashback transaction to a displayable receipt.
     static func from(_ tx: CashbackTransactionResponse) -> RecentReceipt {
@@ -75,7 +75,7 @@ struct RecentReceipt: Identifiable {
             spinsAwarded: 0,
             date: entry.earnedAt,
             isBrandCashback: true,
-            brandImageSystemName: entry.imageSystemName
+            brandImageUrl: entry.imageUrl
         )
     }
 }

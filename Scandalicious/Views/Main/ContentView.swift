@@ -40,7 +40,7 @@ struct ContentView: View {
 
     // Unified overlay queue — all reward overlays flow through here in order
     private enum OverlayItem {
-        case brandCashback(dealName: String, amount: Double)
+        case brandCashback(dealName: String, amount: Double, imageUrl: URL?)
         case referral(amount: Double)
     }
     @State private var overlayQueue: [OverlayItem] = []
@@ -116,10 +116,11 @@ struct ContentView: View {
             if let overlay = activeOverlay {
                 Group {
                     switch overlay {
-                    case .brandCashback(let name, let amount):
+                    case .brandCashback(let name, let amount, let imageUrl):
                         CashbackEarnedOverlay(
                             dealName: name,
                             cashbackAmount: amount,
+                            imageUrl: imageUrl,
                             onDismiss: {
                                 brandCashbackViewModel.dismissEarnedOverlay()
                                 dequeueOverlay()
@@ -179,7 +180,8 @@ struct ContentView: View {
             if showing {
                 enqueueOverlay(.brandCashback(
                     dealName: brandCashbackViewModel.lastEarnedDealName,
-                    amount: brandCashbackViewModel.lastEarnedAmount
+                    amount: brandCashbackViewModel.lastEarnedAmount,
+                    imageUrl: brandCashbackViewModel.lastEarnedImageUrl
                 ))
             }
         }
@@ -700,11 +702,24 @@ struct CashbackTab: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                BrandCashbackView(viewModel: viewModel)
-                    .padding(.top, 8)
+            ZStack {
+                LinearGradient(
+                    stops: [
+                        .init(color: Color(red: 0.06, green: 0.09, blue: 0.14), location: 0.0),
+                        .init(color: Color(red: 0.04, green: 0.06, blue: 0.10), location: 0.4),
+                        .init(color: Color(red: 0.03, green: 0.04, blue: 0.07), location: 1.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                ScrollView {
+                    BrandCashbackView(viewModel: viewModel)
+                        .padding(.top, 8)
+                }
+                .scrollContentBackground(.hidden)
             }
-            .background(Color(red: 0.06, green: 0.06, blue: 0.08).ignoresSafeArea())
             .navigationTitle("Cashback")
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)

@@ -3,7 +3,8 @@
 //  Scandalicious
 //
 //  Data models for the brand cashback system.
-//  FMCG brands sponsor deals; users claim them before uploading receipts.
+//  Users claim a deal once; every uploaded receipt is matched against the
+//  claim until the campaign expires or the per-user redemption cap is hit.
 //
 
 import Foundation
@@ -11,11 +12,30 @@ import Foundation
 // MARK: - Deal Status
 
 enum DealStatus: String, Codable, CaseIterable {
-    case available  // Not yet claimed by this user
-    case claimed    // User tapped "Claim" — waiting for a matching receipt
-    case pending    // Receipt uploaded, backend matching in progress
-    case earned     // Cashback credited to wallet
-    case expired    // Past validUntil date OR claim window elapsed
+    case available     // No claim from this user yet
+    case claimed       // Claim exists; user can still earn (earnings < max)
+    case pendingReview // A receipt for this campaign is queued for admin review
+    case earned        // User has reached max_redemptions_per_user
+}
+
+// MARK: - Pending review / denial side-cars
+
+/// Set on a BrandCashbackDeal when the user has an open admin review for it.
+/// Drives the "Reviewing receipt" UI on the grid card and detail sheet.
+struct PendingReviewInfo: Codable {
+    let id: String
+    let receiptId: String
+    let candidateString: String
+    let createdAt: Date
+}
+
+/// Set on a BrandCashbackDeal when the user has a denial in the last 7 days
+/// for this campaign and no later approval. Drives the "not eligible" banner.
+struct RecentDenialInfo: Codable {
+    let id: String
+    let receiptId: String
+    let deniedAt: Date
+    let reason: String
 }
 
 // MARK: - Segment
@@ -33,11 +53,20 @@ struct BrandCashbackDeal: Identifiable, Codable {
     let productName: String       // e.g. "Alpro Soya Original 1L"
     let description: String       // Short marketing copy
     let cashbackAmount: Double    // e.g. 1.00
-    let imageSystemName: String   // SF Symbol name
+    let imageUrl: URL?            // Hero (original aspect, ≤1200px) — used in detail sheet
+    let imageThumbUrl: URL?       // Thumbnail (400x400 square crop) — used in grid card
     let validUntil: Date          // Campaign end
     let eligibleStores: [String]  // GroceryStore rawValues; empty = all stores
     let requiresStore: Bool       // false when available everywhere
     var status: DealStatus
+
+    // MARK: Curation
+
+    /// Backend-provided category tag for filtering (food, drinks, household, ...).
+    let category: String?
+
+    /// Promote this campaign to the featured rail / hero spot.
+    let featured: Bool
 
     // MARK: User-facing product variants
 
@@ -57,14 +86,13 @@ struct BrandCashbackDeal: Identifiable, Codable {
     /// Max redemptions per user per campaign. Defaults to 1 if omitted.
     let maxRedemptionsPerUser: Int?
 
-    // MARK: Claim window
+    /// How many times the current user has earned this cashback so far.
+    let earningsCount: Int
+
+    // MARK: Claim metadata (informational)
 
     /// When the current user claimed this deal (nil if not claimed).
     let claimedAt: Date?
-
-    /// When the user's claim expires — they must buy+scan before this.
-    /// Typically `claimedAt + 14 days` but brand-configurable.
-    let claimExpiresAt: Date?
 
     // MARK: Terms + explainer
 
@@ -76,11 +104,23 @@ struct BrandCashbackDeal: Identifiable, Codable {
 
     // MARK: Earning traceability
 
-    /// Set once the user has earned: the receipt ID that matched this claim.
+    /// The receipt that produced the most recent earning, if any.
     let matchedReceiptId: String?
 
-    /// When the cashback was credited (status == .earned).
+    /// When the most recent earning happened (status == .earned or partial).
     let earnedAt: Date?
+
+    // MARK: Manual-review queue
+
+    /// Open admin review for this user+campaign. When non-nil the iOS layer
+    /// resolves `status` to `.pendingReview` regardless of the server's
+    /// underlying user_status string (which still describes the data model:
+    /// claim row exists, just hasn't earned yet).
+    let pendingReview: PendingReviewInfo?
+
+    /// Latest denial (within 7 days) — drives the "Last receipt: not eligible"
+    /// banner under the validity section of the detail sheet.
+    let recentDenial: RecentDenialInfo?
 
     // MARK: - Computed properties
 
@@ -99,28 +139,26 @@ struct BrandCashbackDeal: Identifiable, Codable {
         requiresStore ? eligibleStores.joined(separator: ", ") : "All stores"
     }
 
-    // MARK: Claim countdown
+    // MARK: Per-user redemption progress
 
-    /// Days remaining on the user's claim window. nil if not claimed.
-    /// Returns 0 if already expired.
-    var daysUntilClaimExpires: Int? {
-        guard let expires = claimExpiresAt else { return nil }
-        let days = Calendar.current.dateComponents([.day], from: Date(), to: expires).day ?? 0
-        return max(0, days)
+    /// True when the campaign allows multiple redemptions per user.
+    var supportsMultipleRedemptions: Bool {
+        (maxRedemptionsPerUser ?? 1) > 1
     }
 
-    /// True if the claim window has elapsed (user claimed but didn't shop in time).
-    var isClaimExpired: Bool {
-        guard let expires = claimExpiresAt else { return false }
-        return Date() > expires
+    /// Short label shown when max > 1 — e.g. "1 of 3 earned". nil for single-use deals.
+    var redemptionProgressLabel: String? {
+        guard supportsMultipleRedemptions, let max = maxRedemptionsPerUser else { return nil }
+        return "\(earningsCount) of \(max) earned"
     }
 
-    /// Short label for the card: "8 days left" / "2 days left" / "Today" / nil.
-    var claimCountdownLabel: String? {
-        guard let days = daysUntilClaimExpires else { return nil }
-        if days == 0 { return "Last day" }
-        if days == 1 { return "1 day left" }
-        return "\(days) days left"
+    /// True for multi-redemption campaigns where the user has earned at least
+    /// one but not all of their allowance. UI-only derived state — backend
+    /// `user_status` is still "claimed" in this case (the persistent intent
+    /// row exists and they can earn more).
+    var isPartiallyEarned: Bool {
+        let max = maxRedemptionsPerUser ?? 1
+        return earningsCount > 0 && max > 1 && earningsCount < max
     }
 
     // MARK: Cap progress
@@ -143,9 +181,23 @@ struct BrandCashbackDeal: Identifiable, Codable {
     var isNearlyFull: Bool {
         (capFillRatio ?? 0) >= 0.85
     }
+
+    // MARK: Banner copy for review states
+
+    /// Short user-facing line for the pending/denial banners. Returns nil when
+    /// neither a pending review nor a recent denial is attached to the deal.
+    var reviewBannerLabel: String? {
+        if pendingReview != nil {
+            return "Receipt under review — usually within 24h"
+        }
+        if let denial = recentDenial {
+            return "Last receipt: not eligible — \(denial.reason)"
+        }
+        return nil
+    }
 }
 
-// MARK: - Claimed Deal (persisted locally, legacy lightweight mirror)
+// MARK: - Claimed Deal (persisted locally, lightweight mirror)
 
 struct ClaimedDeal: Codable, Identifiable {
     let id: String          // == BrandCashbackDeal.id

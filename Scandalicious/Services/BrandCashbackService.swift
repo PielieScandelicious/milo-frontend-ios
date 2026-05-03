@@ -15,6 +15,7 @@ import FirebaseAuth
 
 extension Notification.Name {
     static let brandCashbackEarned = Notification.Name("brandCashback.earned")
+    static let brandCashbackDenied = Notification.Name("brandCashback.denied")
 }
 
 // MARK: - API Response Models
@@ -25,7 +26,8 @@ private struct BrandCashbackDealAPIResponse: Codable {
     let productName: String
     let description: String
     let cashbackAmount: Double
-    let imageSystemName: String
+    let imageUrl: URL?
+    let imageThumbUrl: URL?
     let validFrom: Date
     let validUntil: Date
     let eligibleStores: [String]
@@ -33,16 +35,19 @@ private struct BrandCashbackDealAPIResponse: Codable {
     let userStatus: String
     let earnedAt: Date?
 
-    // New fields (all optional for backward compat with older backend)
     let eligibleSKUs: [String]?
     let totalRedemptionCap: Int?
     let currentRedemptions: Int?
     let maxRedemptionsPerUser: Int?
+    let earningsCount: Int?
     let claimedAt: Date?
-    let claimExpiresAt: Date?
     let howItWorks: [String]?
     let terms: String?
     let matchedReceiptId: String?
+    let category: String?
+    let featured: Bool?
+    let pendingReview: PendingReviewAPI?
+    let recentDenial: RecentDenialAPI?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -50,7 +55,8 @@ private struct BrandCashbackDealAPIResponse: Codable {
         case productName = "product_name"
         case description
         case cashbackAmount = "cashback_amount"
-        case imageSystemName = "image_system_name"
+        case imageUrl = "image_url"
+        case imageThumbUrl = "image_thumb_url"
         case validFrom = "valid_from"
         case validUntil = "valid_until"
         case eligibleStores = "eligible_stores"
@@ -61,11 +67,43 @@ private struct BrandCashbackDealAPIResponse: Codable {
         case totalRedemptionCap = "total_redemption_cap"
         case currentRedemptions = "current_redemptions"
         case maxRedemptionsPerUser = "max_redemptions_per_user"
+        case earningsCount = "earnings_count"
         case claimedAt = "claimed_at"
-        case claimExpiresAt = "claim_expires_at"
         case howItWorks = "how_it_works"
         case terms
         case matchedReceiptId = "matched_receipt_id"
+        case category
+        case featured
+        case pendingReview = "pending_review"
+        case recentDenial = "recent_denial"
+    }
+}
+
+private struct PendingReviewAPI: Codable {
+    let id: String
+    let receiptId: String
+    let candidateString: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case receiptId = "receipt_id"
+        case candidateString = "candidate_string"
+        case createdAt = "created_at"
+    }
+}
+
+private struct RecentDenialAPI: Codable {
+    let id: String
+    let receiptId: String
+    let deniedAt: Date
+    let reason: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case receiptId = "receipt_id"
+        case deniedAt = "denied_at"
+        case reason
     }
 }
 
@@ -76,18 +114,16 @@ struct EarnedBrandCashbackEntry {
     let productName: String
     let brandName: String
     let cashbackAmount: Double
-    let imageSystemName: String
+    let imageUrl: URL?
     let earnedAt: Date
 }
 
 private struct ClaimAPIResponse: Codable {
     let campaignId: String
-    let status: String
     let claimedAt: Date
 
     enum CodingKeys: String, CodingKey {
         case campaignId = "campaign_id"
-        case status
         case claimedAt = "claimed_at"
     }
 }
@@ -133,8 +169,8 @@ class BrandCashbackService: ObservableObject {
 
         allDeals = apiDeals.map { mapAPIDeal($0) }
         claimedDeals = allDeals
-            .filter { $0.status == .claimed || $0.status == .pending }
-            .map { ClaimedDeal(id: $0.id, claimedAt: Date(), status: $0.status) }
+            .filter { $0.status == .claimed }
+            .map { ClaimedDeal(id: $0.id, claimedAt: $0.claimedAt ?? Date(), status: $0.status) }
     }
 
     // MARK: - Claim / Unclaim
@@ -176,18 +212,20 @@ class BrandCashbackService: ObservableObject {
 
     // MARK: - Refresh and Detect Earnings
 
-    /// Reloads deals from server. Any deal that transitioned from claimed → earned
-    /// triggers the earned overlay and notification.
+    /// Reloads deals from server. Detects three transitions and fires the
+    /// matching notification (the iOS layer cares about all three because they
+    /// represent distinct user-visible outcomes after a receipt upload):
+    ///   • previously claimed (or pending) → earned  →  .brandCashbackEarned
+    ///   • previously claimed → pending review        →  no notification (UI
+    ///     just renders the new state next time the tab opens)
+    ///   • previously pending → denied (recentDenial) →  .brandCashbackDenied
     func refreshAndDetectEarnings(receiptId: String) async {
         let previousClaimedIds = Set(allDeals.filter { $0.status == .claimed }.map { $0.id })
-        await loadDeals()
-        let nowEarned = allDeals.filter { deal in
-            // Backend excludes earned deals; so if a previously claimed deal is gone, check via claimedDeals
-            false
-        }
-        _ = nowEarned  // suppress warning; earnings detected via my-claims diff below
+        let previousPendingIds = Set(allDeals.filter { $0.status == .pendingReview }.map { $0.id })
 
-        // Re-fetch my-claims to detect newly earned ones
+        await loadDeals()
+
+        // Re-fetch my-claims to detect newly earned and newly denied ones.
         guard let token = try? await getAuthToken() else { return }
         var req = URLRequest(url: URL(string: "\(baseURL)/brand-cashback/my-claims")!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -196,8 +234,9 @@ class BrandCashbackService: ObservableObject {
         guard let (data, _) = try? await URLSession.shared.data(for: req),
               let myClaims = try? decoder.decode([BrandCashbackDealAPIResponse].self, from: data) else { return }
 
-        // Any claim from the previous set that is now .earned
-        for claim in myClaims where claim.userStatus == "earned" && previousClaimedIds.contains(claim.id) {
+        // Earned: claim/pending row from before is now earned.
+        for claim in myClaims where claim.userStatus == "earned"
+            && (previousClaimedIds.contains(claim.id) || previousPendingIds.contains(claim.id)) {
             let deal = mapAPIDeal(claim)
             lastEarnedDeal = (deal: deal, earned: deal.cashbackAmount)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -206,6 +245,18 @@ class BrandCashbackService: ObservableObject {
                 "cashbackAmount": deal.cashbackAmount,
             ])
             break  // surface one at a time
+        }
+
+        // Denied: previously pending row now carries a recent_denial.
+        for claim in myClaims where previousPendingIds.contains(claim.id) {
+            guard let denial = claim.recentDenial else { continue }
+            NotificationCenter.default.post(name: .brandCashbackDenied, object: nil, userInfo: [
+                "dealId": claim.id,
+                "brandName": claim.brandName,
+                "productName": claim.productName,
+                "reason": denial.reason,
+            ])
+            break
         }
     }
 
@@ -231,7 +282,7 @@ class BrandCashbackService: ObservableObject {
                     productName: $0.productName,
                     brandName: $0.brandName,
                     cashbackAmount: $0.cashbackAmount,
-                    imageSystemName: $0.imageSystemName,
+                    imageUrl: $0.imageUrl,
                     earnedAt: $0.earnedAt ?? Date()
                 )
             }
@@ -240,13 +291,34 @@ class BrandCashbackService: ObservableObject {
     // MARK: - Private Helpers
 
     private func mapAPIDeal(_ api: BrandCashbackDealAPIResponse) -> BrandCashbackDeal {
+        // Resolve display status: pending_review takes precedence over the
+        // server's data-model status ("claimed"), since for the UI a pending
+        // review is the most actionable state.
         let status: DealStatus
-        switch api.userStatus {
-        case "claimed":  status = .claimed
-        case "pending":  status = .pending
-        case "earned":   status = .earned
-        case "expired":  status = .expired
-        default:         status = .available
+        if api.pendingReview != nil {
+            status = .pendingReview
+        } else {
+            switch api.userStatus {
+            case "claimed":  status = .claimed
+            case "earned":   status = .earned
+            default:         status = .available
+            }
+        }
+        let pending = api.pendingReview.map {
+            PendingReviewInfo(
+                id: $0.id,
+                receiptId: $0.receiptId,
+                candidateString: $0.candidateString,
+                createdAt: $0.createdAt
+            )
+        }
+        let denial = api.recentDenial.map {
+            RecentDenialInfo(
+                id: $0.id,
+                receiptId: $0.receiptId,
+                deniedAt: $0.deniedAt,
+                reason: $0.reason
+            )
         }
         return BrandCashbackDeal(
             id: api.id,
@@ -254,21 +326,26 @@ class BrandCashbackService: ObservableObject {
             productName: api.productName,
             description: api.description,
             cashbackAmount: api.cashbackAmount,
-            imageSystemName: api.imageSystemName,
+            imageUrl: api.imageUrl,
+            imageThumbUrl: api.imageThumbUrl,
             validUntil: api.validUntil,
             eligibleStores: api.eligibleStores,
             requiresStore: api.requiresStore,
             status: status,
+            category: api.category,
+            featured: api.featured ?? false,
             eligibleSKUs: api.eligibleSKUs,
             totalRedemptionCap: api.totalRedemptionCap,
             currentRedemptions: api.currentRedemptions,
             maxRedemptionsPerUser: api.maxRedemptionsPerUser,
+            earningsCount: api.earningsCount ?? 0,
             claimedAt: api.claimedAt,
-            claimExpiresAt: api.claimExpiresAt,
             howItWorks: api.howItWorks,
             terms: api.terms,
             matchedReceiptId: api.matchedReceiptId,
-            earnedAt: api.earnedAt
+            earnedAt: api.earnedAt,
+            pendingReview: pending,
+            recentDenial: denial
         )
     }
 

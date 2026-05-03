@@ -131,7 +131,7 @@ private struct RecentReceiptRow: View {
     private var iconName: String {
         if receipt.isStreakReward { return "flame.fill" }
         if receipt.isReferralReward { return "person.2.fill" }
-        if receipt.isBrandCashback { return receipt.brandImageSystemName ?? "tag.fill" }
+        if receipt.isBrandCashback { return "tag.fill" }
         return "storefront.fill"
     }
 
