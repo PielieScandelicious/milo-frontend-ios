@@ -186,12 +186,30 @@ struct BrandCashbackDeal: Identifiable, Codable {
 
     /// Short user-facing line for the pending/denial banners. Returns nil when
     /// neither a pending review nor a recent denial is attached to the deal.
+    ///
+    /// Deprecated: use `bannerKind` and let `DealStatusBanner` render the surface.
     var reviewBannerLabel: String? {
         if pendingReview != nil {
             return "Receipt under review — usually within 24h"
         }
         if let denial = recentDenial {
             return "Last receipt: not eligible — \(denial.reason)"
+        }
+        return nil
+    }
+
+    /// Priority-resolved kind consumed by `DealStatusBanner`.
+    /// earned > denied > pending > nil. A `recentDenial` is suppressed
+    /// while a fresh `pendingReview` is in flight (newer signal wins).
+    var bannerKind: DealStatusKind? {
+        if status == .earned || isPartiallyEarned {
+            return .earned(amountFormatted: formattedCashback)
+        }
+        if pendingReview != nil {
+            return .pending
+        }
+        if let denial = recentDenial {
+            return .denied(reason: denial.reason)
         }
         return nil
     }

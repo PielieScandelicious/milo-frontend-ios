@@ -32,6 +32,9 @@ struct BrandCashbackDealDetailSheet: View {
                     productHero
 
                     VStack(alignment: .leading, spacing: 24) {
+                        if let kind = deal.bannerKind {
+                            DealStatusBanner(kind: kind, size: .full)
+                        }
                         heroTitleBlock
                         validitySection
                         howItWorksSection
@@ -174,17 +177,14 @@ struct BrandCashbackDealDetailSheet: View {
                     color: deal.isExpired ? .white.opacity(0.35) : cashbackGreen
                 )
 
+                // Status (pending/denied/earned) is rendered by `DealStatusBanner`
+                // at the top of the sheet — keep this section to expiry +
+                // partial-earn progress only, no duplication.
                 if deal.isPartiallyEarned, let max = deal.maxRedemptionsPerUser {
-                    let earnedSoFar = Double(deal.earningsCount) * deal.cashbackAmount
                     let perEarning = String(format: "€%.2f", deal.cashbackAmount)
                     validityRow(
-                        icon: "seal.fill",
-                        text: "Earned \(deal.earningsCount) of \(max) · \(String(format: "€%.2f", earnedSoFar)) in your wallet so far",
-                        color: cashbackGold
-                    )
-                    validityRow(
                         icon: "cart.fill",
-                        text: "Buy this product again to earn another \(perEarning)",
+                        text: "Buy this product again to earn another \(perEarning) (\(deal.earningsCount)/\(max))",
                         color: .white.opacity(0.70)
                     )
                 } else if deal.status == .claimed, let progress = deal.redemptionProgressLabel {
@@ -192,27 +192,6 @@ struct BrandCashbackDealDetailSheet: View {
                         icon: "checkmark.circle.fill",
                         text: progress,
                         color: cashbackGreen
-                    )
-                } else if deal.status == .earned {
-                    validityRow(
-                        icon: "checkmark.seal.fill",
-                        text: "Cashback earned and added to your wallet",
-                        color: cashbackGold
-                    )
-                }
-
-                if deal.pendingReview != nil {
-                    validityRow(
-                        icon: "hourglass.bottomhalf.filled",
-                        text: "Receipt under review — usually within 24h",
-                        color: warningOrange
-                    )
-                }
-                if let denial = deal.recentDenial {
-                    validityRow(
-                        icon: "xmark.octagon.fill",
-                        text: "Last receipt: not eligible — \(denial.reason)",
-                        color: .white.opacity(0.55)
                     )
                 }
             }

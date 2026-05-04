@@ -36,8 +36,6 @@ class BudgetTabPreloadCache {
     var promoFolders: PromoFoldersResponse?
 
     // Home tab prefetch
-    var cashbackSummary: CashbackSummaryResponse?
-    var earnedBrandDeals: [EarnedBrandCashbackEntry] = []
     var recentUploadedReceipts: [APIReceipt] = []
 
     // Track whether preloading has completed
@@ -55,8 +53,6 @@ class BudgetTabPreloadCache {
         trendData = nil
         insightsPeriodMetadata = []
         promoFolders = nil
-        cashbackSummary = nil
-        earnedBrandDeals = []
         recentUploadedReceipts = []
         hasPreloaded = false
     }

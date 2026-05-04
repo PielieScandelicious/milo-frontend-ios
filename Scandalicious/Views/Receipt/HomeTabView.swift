@@ -10,12 +10,10 @@ import SwiftUI
 
 struct HomeTabView: View {
     @ObservedObject private var processingManager = ReceiptProcessingManager.shared
-    @ObservedObject private var gamificationManager = GamificationManager.shared
 
     @State private var viewModel = HomeViewModel()
 
     @State private var contentOpacity: Double = 0
-    @State private var showMiloGame = false
     @Environment(\.scenePhase) private var scenePhase
 
     private let headerBlueColor = Color(red: 0.04, green: 0.15, blue: 0.30)
@@ -44,54 +42,15 @@ struct HomeTabView: View {
     private var mainContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
-                // Milo dachshund easter egg (always visible when game not open)
-                if !showMiloGame {
-                    MiloDachshundEasterEgg {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                            showMiloGame = true
-                        }
-                    }
+                // Decorative Milo dachshund header — kept as a brand element.
+                MiloDachshundEasterEgg(onTap: {})
                     .zIndex(1)
-                }
-
-                // Inline Milo Game (when active) - on top of processing card
-                if showMiloGame {
-                    MiloDogGameView()
-                        .padding(.horizontal, 16)
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-
-                    // Close game button
-                    Button {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            showMiloGame = false
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("Close game")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .foregroundStyle(.white.opacity(0.35))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.06))
-                        )
-                    }
-                }
 
                 // Multi-receipt processing cards
                 if !processingManager.processingReceipts.isEmpty {
-                    ProcessingReceiptsCard(
-                        manager: processingManager,
-                        onClaimReceipt: { receipt in
-                            viewModel.claimReward(for: receipt)
-                        }
-                    )
-                    .padding(.horizontal, 20)
-                    .transition(.opacity)
+                    ProcessingReceiptsCard(manager: processingManager)
+                        .padding(.horizontal, 20)
+                        .transition(.opacity)
                 }
 
                 // Recent uploaded receipts
@@ -112,7 +71,6 @@ struct HomeTabView: View {
         .background(backgroundGradient)
         .opacity(contentOpacity)
         .animation(.spring(response: 0.5, dampingFraction: 0.85), value: processingManager.processingReceipts.count)
-        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: showMiloGame)
     }
 
     // MARK: - Background

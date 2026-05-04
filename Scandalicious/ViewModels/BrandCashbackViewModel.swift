@@ -143,7 +143,7 @@ class BrandCashbackViewModel: ObservableObject {
     }
 
     /// Wait 3 seconds after a receipt finishes, then refresh deals to detect new earnings.
-    /// (GamificationManager syncs the wallet at 1s, cashback check runs in backend at ~2s.)
+    /// (Backend brand-cashback matching runs in the receipt worker at ~2s post-OCR.)
     private func observeReceiptNotification() {
         receiptObserver = NotificationCenter.default.addObserver(
             forName: .receiptUploadedSuccessfully,

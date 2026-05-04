@@ -11,7 +11,6 @@ import Combine
 
 struct ProcessingReceiptsCard: View {
     @ObservedObject var manager: ReceiptProcessingManager
-    let onClaimReceipt: (ProcessingReceipt) -> Void
 
     private var activeCount: Int {
         manager.processingReceipts.filter { !$0.isTerminal }.count
@@ -36,8 +35,7 @@ struct ProcessingReceiptsCard: View {
                     ProcessingReceiptRow(
                         receipt: receipt,
                         queuePosition: queuePosition(for: receipt),
-                        onDismiss: { manager.dismiss(receipt.id) },
-                        onClaim: { onClaimReceipt(receipt) }
+                        onDismiss: { manager.dismiss(receipt.id) }
                     )
                     .transition(.asymmetric(
                         insertion: .move(edge: .top).combined(with: .opacity),
@@ -165,7 +163,6 @@ struct ProcessingReceiptRow: View {
     let receipt: ProcessingReceipt
     let queuePosition: Int?
     let onDismiss: () -> Void
-    let onClaim: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {

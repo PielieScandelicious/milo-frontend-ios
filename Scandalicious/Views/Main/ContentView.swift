@@ -31,17 +31,15 @@ struct ContentView: View {
     @State private var hasLoadedInitialData = false
     @StateObject private var brandCashbackViewModel = BrandCashbackViewModel()
     @StateObject private var foldersViewModel = PromoFoldersViewModel()
-    @ObservedObject private var gm = GamificationManager.shared
     @ObservedObject private var groceryStore = GroceryListStore.shared
 
     @State private var cartToast: CartToast? = nil
     @State private var cartToastQueue: [CartToast] = []
     @State private var cartToastDismissTask: Task<Void, Never>? = nil
 
-    // Unified overlay queue — all reward overlays flow through here in order
+    // Reward overlay (single — only brand cashback earnings produce one).
     private enum OverlayItem {
         case brandCashback(dealName: String, amount: Double, imageUrl: URL?)
-        case referral(amount: Double)
     }
     @State private var overlayQueue: [OverlayItem] = []
     @State private var activeOverlay: OverlayItem? = nil
@@ -112,7 +110,7 @@ struct ContentView: View {
                 .zIndex(90)
             }
 
-            // Unified reward overlay queue — brand cashback → referral → badges
+            // Brand cashback earned overlay
             if let overlay = activeOverlay {
                 Group {
                     switch overlay {
@@ -123,14 +121,6 @@ struct ContentView: View {
                             imageUrl: imageUrl,
                             onDismiss: {
                                 brandCashbackViewModel.dismissEarnedOverlay()
-                                dequeueOverlay()
-                            }
-                        )
-                    case .referral(let amount):
-                        ReferralRevealOverlay(
-                            cashbackAmount: amount,
-                            onDismiss: {
-                                gm.dismissReferralEarnedOverlay()
                                 dequeueOverlay()
                             }
                         )
@@ -183,11 +173,6 @@ struct ContentView: View {
                     amount: brandCashbackViewModel.lastEarnedAmount,
                     imageUrl: brandCashbackViewModel.lastEarnedImageUrl
                 ))
-            }
-        }
-        .onChange(of: gm.showReferralEarnedOverlay) { _, showing in
-            if showing {
-                enqueueOverlay(.referral(amount: gm.pendingOverlayEuros))
             }
         }
         .confirmationDialog(L("sign_out"), isPresented: $showSignOutConfirmation) {
@@ -339,20 +324,7 @@ struct ContentView: View {
                 }
             }
 
-            // Home tab: cashback summary, brand deals, recent receipts
-            group.addTask {
-                if let summary = try? await CashbackAPIService.shared.getSummary() {
-                    await MainActor.run {
-                        cache.cashbackSummary = summary
-                    }
-                }
-            }
-            group.addTask {
-                let deals = await BrandCashbackService.shared.fetchEarnedDeals()
-                await MainActor.run {
-                    cache.earnedBrandDeals = deals
-                }
-            }
+            // Home tab: recent uploaded receipts
             group.addTask {
                 let filters = ReceiptFilters(page: 1, pageSize: 15)
                 if let response = try? await AnalyticsAPIService.shared.getReceipts(filters: filters) {

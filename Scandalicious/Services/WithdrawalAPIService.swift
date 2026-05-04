@@ -9,6 +9,7 @@ import FirebaseAuth
 // MARK: - Response Models
 
 struct WithdrawalInfoResponse: Codable {
+    let balanceCents: Int
     let currentBalance: Double
     let maxWithdrawable: Double
     let availableAmounts: [Double]
@@ -18,9 +19,10 @@ struct WithdrawalInfoResponse: Codable {
     let lastIbanLast4: String?
     let canWithdraw: Bool
     let cannotWithdrawReason: String?
-    let confirmedCashbackCount: Int?
+    let processedReceiptCount: Int?
 
     enum CodingKeys: String, CodingKey {
+        case balanceCents = "balance_cents"
         case currentBalance = "current_balance"
         case maxWithdrawable = "max_withdrawable"
         case availableAmounts = "available_amounts"
@@ -30,7 +32,7 @@ struct WithdrawalInfoResponse: Codable {
         case lastIbanLast4 = "last_iban_last4"
         case canWithdraw = "can_withdraw"
         case cannotWithdrawReason = "cannot_withdraw_reason"
-        case confirmedCashbackCount = "confirmed_cashback_count"
+        case processedReceiptCount = "processed_receipt_count"
     }
 }
 
@@ -64,6 +66,7 @@ struct WithdrawalCreateResponse: Codable {
     let fraudCheckPassed: Bool
     let fraudCheckDetails: [String: AnyCodable]?
     let newBalance: Double
+    let newBalanceCents: Int
 
     enum CodingKeys: String, CodingKey {
         case id, amount, status
@@ -71,6 +74,7 @@ struct WithdrawalCreateResponse: Codable {
         case fraudCheckPassed = "fraud_check_passed"
         case fraudCheckDetails = "fraud_check_details"
         case newBalance = "new_balance"
+        case newBalanceCents = "new_balance_cents"
     }
 }
 
@@ -180,13 +184,13 @@ actor WithdrawalAPIService {
         queryItems: [URLQueryItem] = []
     ) async throws -> T {
         guard var urlComponents = URLComponents(string: "\(baseURL)\(endpoint)") else {
-            throw CashbackAPIError.invalidURL
+            throw WalletAPIError.invalidURL
         }
         if !queryItems.isEmpty {
             urlComponents.queryItems = queryItems
         }
         guard let url = urlComponents.url else {
-            throw CashbackAPIError.invalidURL
+            throw WalletAPIError.invalidURL
         }
 
         let token = try await getAuthToken()
@@ -200,7 +204,7 @@ actor WithdrawalAPIService {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw CashbackAPIError.invalidResponse
+                throw WalletAPIError.invalidResponse
             }
 
             switch httpResponse.statusCode {
@@ -208,20 +212,20 @@ actor WithdrawalAPIService {
                 do {
                     return try decoder.decode(T.self, from: data)
                 } catch {
-                    throw CashbackAPIError.decodingError(error.localizedDescription)
+                    throw WalletAPIError.decodingError(error.localizedDescription)
                 }
             case 401:
-                throw CashbackAPIError.unauthorized
+                throw WalletAPIError.unauthorized
             case 400...499:
                 let msg = parseErrorMessage(from: data) ?? "Client error: \(httpResponse.statusCode)"
-                throw CashbackAPIError.serverError(msg)
+                throw WalletAPIError.serverError(msg)
             default:
-                throw CashbackAPIError.serverError("Server error: \(httpResponse.statusCode)")
+                throw WalletAPIError.serverError("Server error: \(httpResponse.statusCode)")
             }
-        } catch let error as CashbackAPIError {
+        } catch let error as WalletAPIError {
             throw error
         } catch {
-            throw CashbackAPIError.networkError(error)
+            throw WalletAPIError.networkError(error)
         }
     }
 
@@ -230,7 +234,7 @@ actor WithdrawalAPIService {
         body: B
     ) async throws -> T {
         guard let url = URL(string: "\(baseURL)\(endpoint)") else {
-            throw CashbackAPIError.invalidURL
+            throw WalletAPIError.invalidURL
         }
 
         let token = try await getAuthToken()
@@ -246,7 +250,7 @@ actor WithdrawalAPIService {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw CashbackAPIError.invalidResponse
+                throw WalletAPIError.invalidResponse
             }
 
             switch httpResponse.statusCode {
@@ -254,20 +258,20 @@ actor WithdrawalAPIService {
                 do {
                     return try decoder.decode(T.self, from: data)
                 } catch {
-                    throw CashbackAPIError.decodingError(error.localizedDescription)
+                    throw WalletAPIError.decodingError(error.localizedDescription)
                 }
             case 401:
-                throw CashbackAPIError.unauthorized
+                throw WalletAPIError.unauthorized
             case 400...499:
                 let msg = parseErrorMessage(from: data) ?? "Client error: \(httpResponse.statusCode)"
-                throw CashbackAPIError.serverError(msg)
+                throw WalletAPIError.serverError(msg)
             default:
-                throw CashbackAPIError.serverError("Server error: \(httpResponse.statusCode)")
+                throw WalletAPIError.serverError("Server error: \(httpResponse.statusCode)")
             }
-        } catch let error as CashbackAPIError {
+        } catch let error as WalletAPIError {
             throw error
         } catch {
-            throw CashbackAPIError.networkError(error)
+            throw WalletAPIError.networkError(error)
         }
     }
 
@@ -276,7 +280,7 @@ actor WithdrawalAPIService {
         bodyData: Data
     ) async throws -> T {
         guard let url = URL(string: "\(baseURL)\(endpoint)") else {
-            throw CashbackAPIError.invalidURL
+            throw WalletAPIError.invalidURL
         }
 
         let token = try await getAuthToken()
@@ -292,7 +296,7 @@ actor WithdrawalAPIService {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw CashbackAPIError.invalidResponse
+                throw WalletAPIError.invalidResponse
             }
 
             switch httpResponse.statusCode {
@@ -300,26 +304,26 @@ actor WithdrawalAPIService {
                 do {
                     return try decoder.decode(T.self, from: data)
                 } catch {
-                    throw CashbackAPIError.decodingError(error.localizedDescription)
+                    throw WalletAPIError.decodingError(error.localizedDescription)
                 }
             case 401:
-                throw CashbackAPIError.unauthorized
+                throw WalletAPIError.unauthorized
             case 400...499:
                 let msg = parseErrorMessage(from: data) ?? "Client error: \(httpResponse.statusCode)"
-                throw CashbackAPIError.serverError(msg)
+                throw WalletAPIError.serverError(msg)
             default:
-                throw CashbackAPIError.serverError("Server error: \(httpResponse.statusCode)")
+                throw WalletAPIError.serverError("Server error: \(httpResponse.statusCode)")
             }
-        } catch let error as CashbackAPIError {
+        } catch let error as WalletAPIError {
             throw error
         } catch {
-            throw CashbackAPIError.networkError(error)
+            throw WalletAPIError.networkError(error)
         }
     }
 
     private func getAuthToken() async throws -> String {
         guard let user = Auth.auth().currentUser else {
-            throw CashbackAPIError.noAuthToken
+            throw WalletAPIError.noAuthToken
         }
         return try await user.getIDToken()
     }

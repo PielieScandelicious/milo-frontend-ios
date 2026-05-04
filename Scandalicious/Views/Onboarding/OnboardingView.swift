@@ -437,11 +437,12 @@ struct OnboardingView: View {
                     preferredStores: storeValues
                 )
 
-                // Apply referral code if provided
-                let trimmedReferral = referralCode.trimmingCharacters(in: .whitespaces)
-                if !trimmedReferral.isEmpty {
-                    let _ = await GamificationManager.shared.applyReferralCode(trimmedReferral)
-                }
+                // Referral codes were part of the legacy gamification flow; that
+                // entire system was removed when the app collapsed to brand
+                // cashback only. Any value typed in the onboarding referral
+                // field is ignored — the field itself is being phased out
+                // from this screen.
+                _ = referralCode
 
                 await MainActor.run {
                     LanguageManager.shared.currentLanguage = selectedLanguage

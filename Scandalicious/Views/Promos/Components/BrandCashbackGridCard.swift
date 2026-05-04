@@ -117,8 +117,13 @@ struct BrandCashbackGridCard: View {
         }
         .overlay(alignment: .topTrailing) {
             statusBadge
-                .overlay(alignment: .topTrailing) { denialDot }
                 .padding(8)
+        }
+        .overlay(alignment: .bottomLeading) {
+            if let kind = deal.bannerKind {
+                DealStatusBanner(kind: kind, size: .compact)
+                    .padding(8)
+            }
         }
         .overlay(alignment: .bottomTrailing) {
             CashbackChip(amount: deal.cashbackAmount, size: .small, emphasis: chipEmphasis)
@@ -194,12 +199,16 @@ struct BrandCashbackGridCard: View {
             }
             .foregroundStyle(Self.cashbackGreen)
         case .pendingReview:
+            // Status now rendered by the bottom-leading DealStatusBanner ribbon
+            // overlaid on the photo — leave the footer free for store/expiry text.
             HStack(spacing: 4) {
-                Image(systemName: "hourglass.bottomhalf.filled").font(.system(size: 9, weight: .bold))
-                Text("Reviewing receipt")
-                    .font(.system(size: 10, weight: .heavy))
+                Text(deal.requiresStore ? deal.eligibleStores.first ?? "All stores" : "All stores")
+                Text("·")
+                Text(deal.formattedExpiry)
             }
-            .foregroundStyle(Self.warningOrange)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.white.opacity(0.4))
+            .lineLimit(1)
         case .partiallyEarned:
             HStack(spacing: 4) {
                 Image(systemName: "seal.fill").font(.system(size: 9, weight: .bold))
@@ -297,21 +306,6 @@ struct BrandCashbackGridCard: View {
         case .earned: return Self.cashbackGold
         case .expired, .soldOut: return .white.opacity(0.35)
         default: return Self.cashbackGold
-        }
-    }
-
-    /// Notification-badge-style red dot on the status badge when the user has a
-    /// recent denial. Hidden in the `.pendingReview` state (a fresher receipt
-    /// is in flight, so the prior denial is no longer the most recent signal)
-    /// and in `.available` (no claim → nothing to nudge about).
-    @ViewBuilder
-    private var denialDot: some View {
-        if deal.recentDenial != nil, state != .pendingReview, state != .available {
-            Circle()
-                .fill(Color.red)
-                .frame(width: 8, height: 8)
-                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
-                .offset(x: 2, y: -2)
         }
     }
 

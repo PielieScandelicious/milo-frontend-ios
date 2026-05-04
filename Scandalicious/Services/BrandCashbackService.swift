@@ -107,17 +107,6 @@ private struct RecentDenialAPI: Codable {
     }
 }
 
-// MARK: - Earned Brand Cashback Entry (for Recent Rewards display)
-
-struct EarnedBrandCashbackEntry {
-    let id: String
-    let productName: String
-    let brandName: String
-    let cashbackAmount: Double
-    let imageUrl: URL?
-    let earnedAt: Date
-}
-
 private struct ClaimAPIResponse: Codable {
     let campaignId: String
     let claimedAt: Date
@@ -262,30 +251,6 @@ class BrandCashbackService: ObservableObject {
 
     func clearEarnedDeal() {
         lastEarnedDeal = nil
-    }
-
-    /// Fetches earned brand cashback claims for display in Recent Rewards.
-    func fetchEarnedDeals() async -> [EarnedBrandCashbackEntry] {
-        guard let token = try? await getAuthToken() else { return [] }
-        var req = URLRequest(url: URL(string: "\(baseURL)/brand-cashback/my-claims")!)
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        guard let (data, _) = try? await URLSession.shared.data(for: req),
-              let claims = try? decoder.decode([BrandCashbackDealAPIResponse].self, from: data) else { return [] }
-
-        return claims
-            .filter { $0.userStatus == "earned" }
-            .map {
-                EarnedBrandCashbackEntry(
-                    id: $0.id,
-                    productName: $0.productName,
-                    brandName: $0.brandName,
-                    cashbackAmount: $0.cashbackAmount,
-                    imageUrl: $0.imageUrl,
-                    earnedAt: $0.earnedAt ?? Date()
-                )
-            }
     }
 
     // MARK: - Private Helpers

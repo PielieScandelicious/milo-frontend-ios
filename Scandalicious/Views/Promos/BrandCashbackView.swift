@@ -35,6 +35,11 @@ struct BrandCashbackView: View {
     var body: some View {
         VStack(spacing: 20) {
 
+            // Wallet entry card — sits above onboarding to anchor the tab on the
+            // user's collected cashback balance.
+            BrandCashbackWalletEntryCard()
+                .padding(.horizontal, 16)
+
             // Onboarding / share-extension hint
             if showOnboarding {
                 BrandCashbackOnboardingCard(onDismiss: { showOnboarding = false })
@@ -272,46 +277,20 @@ private struct ShareExtensionHintCard: View {
 
 // MARK: - CashbackDeniedToast
 
-/// Bottom-sheet toast shown for ~5s when a previously-pending review is denied.
+/// Transient denial banner shown when a previously-pending review flips to
+/// denied. Visual language is shared with `DealStatusBanner.full` so the
+/// toast and the persistent surface on the deal sheet feel like one system.
 /// Tappable to dismiss; auto-dismisses via the .task on the parent overlay.
 struct CashbackDeniedToast: View {
     let toast: DeniedToast
     let onDismiss: () -> Void
 
-    private static let denialRed = Color(red: 1.0, green: 0.40, blue: 0.40)
-
     var body: some View {
-        Button(action: onDismiss) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "xmark.octagon.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Self.denialRed)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(toast.brandName) cashback not approved")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text(toast.reason)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.4))
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(red: 0.10, green: 0.06, blue: 0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Self.denialRed.opacity(0.35), lineWidth: 1)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
+        DealStatusBanner(
+            kind: .denied(reason: "\(toast.brandName) — \(toast.reason)"),
+            size: .full,
+            onDismiss: onDismiss
+        )
     }
 }
 
