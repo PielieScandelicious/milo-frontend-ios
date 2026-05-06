@@ -28,6 +28,7 @@ private struct BrandCashbackDealAPIResponse: Codable {
     let cashbackAmount: Double
     let imageUrl: URL?
     let imageThumbUrl: URL?
+    let brandLogoUrl: URL?
     let validFrom: Date
     let validUntil: Date
     let eligibleStores: [String]
@@ -57,6 +58,7 @@ private struct BrandCashbackDealAPIResponse: Codable {
         case cashbackAmount = "cashback_amount"
         case imageUrl = "image_url"
         case imageThumbUrl = "image_thumb_url"
+        case brandLogoUrl = "brand_logo_url"
         case validFrom = "valid_from"
         case validUntil = "valid_until"
         case eligibleStores = "eligible_stores"
@@ -293,6 +295,7 @@ class BrandCashbackService: ObservableObject {
             cashbackAmount: api.cashbackAmount,
             imageUrl: api.imageUrl,
             imageThumbUrl: api.imageThumbUrl,
+            brandLogoUrl: api.brandLogoUrl,
             validUntil: api.validUntil,
             eligibleStores: api.eligibleStores,
             requiresStore: api.requiresStore,

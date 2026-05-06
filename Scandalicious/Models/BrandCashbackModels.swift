@@ -55,6 +55,7 @@ struct BrandCashbackDeal: Identifiable, Codable {
     let cashbackAmount: Double    // e.g. 1.00
     let imageUrl: URL?            // Hero (original aspect, ≤1200px) — used in detail sheet
     let imageThumbUrl: URL?       // Thumbnail (400x400 square crop) — used in grid card
+    let brandLogoUrl: URL?        // Brand mark (≤512px) — used in card disc
     let validUntil: Date          // Campaign end
     let eligibleStores: [String]  // GroceryStore rawValues; empty = all stores
     let requiresStore: Bool       // false when available everywhere

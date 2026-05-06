@@ -12,8 +12,9 @@ import SwiftUI
 struct CashbackCategoryFilterBar: View {
     @Binding var selected: CashbackCategory
     let availableCategories: Set<CashbackCategory>
-
-    private static let cashbackGreen = Color(red: 0.25, green: 0.90, blue: 0.55)
+    /// Optional per-category counts shown as a small mono badge on the chip.
+    /// When nil, the chip renders without a count.
+    var counts: [CashbackCategory: Int] = [:]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -31,34 +32,45 @@ struct CashbackCategoryFilterBar: View {
 
     private func chip(_ cat: CashbackCategory) -> some View {
         let isSelected = cat == selected
+        let count = counts[cat]
         return Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 selected = cat
             }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } label: {
-            HStack(spacing: 4) {
-                if let symbol = cat.symbol {
-                    Image(systemName: symbol)
-                        .font(.system(size: 10, weight: .bold))
-                }
+            HStack(spacing: 6) {
                 Text(cat.label)
-                    .font(.system(size: 12, weight: .heavy))
-                    .tracking(0.4)
+                    .font(CashbackFont.sans(13, weight: .medium))
+                    .kerning(-0.1)
+                if let count {
+                    Text("\(count)")
+                        .font(CashbackFont.mono(11, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(
+                            isSelected
+                                ? Color(red: 0.043, green: 0.043, blue: 0.055).opacity(0.45)
+                                : CashbackTokens.text40
+                        )
+                }
             }
-            .foregroundStyle(isSelected ? .black : .white.opacity(0.65))
-            .padding(.horizontal, 12)
+            .foregroundStyle(
+                isSelected
+                    ? Color(red: 0.043, green: 0.043, blue: 0.055)
+                    : CashbackTokens.text70
+            )
+            .padding(.horizontal, 13)
             .padding(.vertical, 7)
             .background(
                 Capsule().fill(
                     isSelected
-                        ? AnyShapeStyle(Self.cashbackGreen)
+                        ? AnyShapeStyle(Color.white)
                         : AnyShapeStyle(Color.white.opacity(0.06))
                 )
             )
             .overlay(
                 Capsule().stroke(
-                    isSelected ? .clear : .white.opacity(0.08),
+                    isSelected ? .clear : CashbackTokens.cardStroke,
                     lineWidth: 1
                 )
             )

@@ -25,80 +25,108 @@ struct BrandCashbackView: View {
 
     @State private var selectedDeal: BrandCashbackDeal? = nil
     @State private var selectedCategory: CashbackCategory = .all
-    @State private var showOnboarding: Bool = BrandCashbackOnboardingCard.shouldShow
-
-    private let gridColumns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12),
-    ]
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 18) {
 
-            // Wallet entry card — sits above onboarding to anchor the tab on the
-            // user's collected cashback balance.
-            BrandCashbackWalletEntryCard()
+            // Hero wallet card — anchors the tab on the user's balance and
+            // surfaces lifetime / pending / this-month stats.
+            BrandCashbackWalletEntryCard(pendingCents: pendingCents)
                 .padding(.horizontal, 16)
+                .padding(.top, 6)
 
-            // Onboarding / share-extension hint
-            if showOnboarding {
-                BrandCashbackOnboardingCard(onDismiss: { showOnboarding = false })
-                    .padding(.horizontal, 16)
-                    .transition(.asymmetric(
-                        insertion: .opacity,
-                        removal: .opacity.combined(with: .move(edge: .top))
-                    ))
-            } else {
-                ShareExtensionHintCard()
-                    .padding(.horizontal, 16)
-            }
-
-            // Category filter
-            CashbackCategoryFilterBar(
-                selected: $selectedCategory,
-                availableCategories: availableCategories
-            )
-
-            // MY DEALS rail (horizontal scroll)
-            if !filteredMyDeals.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    PromoSectionHeader(title: "MY DEALS", icon: "checkmark.seal.fill")
-                        .padding(.horizontal, 20)
-                    horizontalRail(deals: filteredMyDeals)
-                }
-            }
-
-            // FEATURED rail (horizontal scroll)
-            if !featuredDeals.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    PromoSectionHeader(title: "FEATURED", icon: "star.fill")
-                        .padding(.horizontal, 20)
-                    horizontalRail(deals: featuredDeals)
-                }
-            }
-
-            // AVAILABLE grid (2-col)
-            VStack(alignment: .leading, spacing: 10) {
-                PromoSectionHeader(title: availableHeaderTitle, icon: "tag.fill")
-                    .padding(.horizontal, 20)
-
-                if regularAvailable.isEmpty && filteredMyDeals.isEmpty && featuredDeals.isEmpty {
-                    emptyState
-                        .transition(.opacity)
-                } else if !regularAvailable.isEmpty {
-                    LazyVGrid(columns: gridColumns, spacing: 12) {
-                        ForEach(regularAvailable) { deal in
-                            BrandCashbackGridCard(deal: deal, onTap: { selectedDeal = deal })
+            // New-user state — shown when the user has never claimed and no
+            // earnings exist. Replaces filter + sections with onboarding.
+            if isFirstTimeUser {
+                CashbackEmptyNewUser(
+                    totalDeals: viewModel.availableDeals.count,
+                    teaserDeal: viewModel.availableDeals.first,
+                    onPickFirstDeal: {
+                        if let first = viewModel.availableDeals.first {
+                            selectedDeal = first
+                        }
+                    },
+                    onTeaserTap: {
+                        if let first = viewModel.availableDeals.first {
+                            selectedDeal = first
                         }
                     }
-                    .padding(.horizontal, 16)
+                )
+            } else {
+                // Category filter — counts hint at how each chip will fill
+                CashbackCategoryFilterBar(
+                    selected: $selectedCategory,
+                    availableCategories: availableCategories,
+                    counts: categoryCounts
+                )
+
+                // MY DEALS — vertical 1-per-row stack of claimed/pending deals
+                if !filteredMyDeals.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        PromoSectionHeader(title: "MY DEALS", icon: "checkmark.seal.fill")
+                            .padding(.horizontal, 20)
+                        VStack(spacing: 10) {
+                            ForEach(filteredMyDeals) { deal in
+                                DealRow(deal: deal, onTap: { selectedDeal = deal })
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                }
+
+                // FEATURED rail — horizontal scroll of 168pt featured cards
+                if !featuredDeals.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        PromoSectionHeader(title: "FEATURED", icon: "star.fill")
+                            .padding(.horizontal, 20)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(featuredDeals) { deal in
+                                    FeaturedDealCard(deal: deal, onTap: { selectedDeal = deal })
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                    }
+                }
+
+                // ALL DEALS — full vertical stack of available deals
+                VStack(alignment: .leading, spacing: 10) {
+                    PromoSectionHeader(title: availableHeaderTitle, icon: "tag.fill")
+                        .padding(.horizontal, 20)
+
+                    if regularAvailable.isEmpty && filteredMyDeals.isEmpty && featuredDeals.isEmpty {
+                        // No-match state — filter returned zero deals
+                        CashbackEmptyNoMatch(
+                            categoryLabel: selectedCategory == .all ? "" : selectedCategory.label,
+                            onShowAll: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    selectedCategory = .all
+                                }
+                            },
+                            onNotify: {
+                                // Stub — wire to push notification opt-in once
+                                // a per-category subscription endpoint exists.
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            }
+                        )
+                        .padding(.bottom, 24)
+                        .transition(.opacity)
+                    } else if !regularAvailable.isEmpty {
+                        VStack(spacing: 10) {
+                            ForEach(regularAvailable) { deal in
+                                DealRow(deal: deal, onTap: { selectedDeal = deal })
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
                 }
             }
 
             // Disclaimer
             Text("Deals are sponsored by brands. Cashback is credited to your Milo wallet after receipt verification.")
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.3))
+                .font(CashbackFont.sans(11))
+                .foregroundStyle(CashbackTokens.text30)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 8)
@@ -142,6 +170,18 @@ struct BrandCashbackView: View {
         })
     }
 
+    /// How many deals fall into each category, for the count badge on each
+    /// chip. The "All" chip totals the available + my-deals universe.
+    private var categoryCounts: [CashbackCategory: Int] {
+        let universe = viewModel.availableDeals + viewModel.myDeals
+        var counts: [CashbackCategory: Int] = [.all: universe.count]
+        for deal in universe {
+            guard let raw = deal.category, let cat = CashbackCategory(rawValue: raw) else { continue }
+            counts[cat, default: 0] += 1
+        }
+        return counts
+    }
+
     private func matchesCategory(_ deal: BrandCashbackDeal) -> Bool {
         if selectedCategory == .all { return true }
         return deal.category == selectedCategory.rawValue
@@ -161,45 +201,25 @@ struct BrandCashbackView: View {
 
     private var availableHeaderTitle: String {
         selectedCategory == .all
-            ? "AVAILABLE"
+            ? "ALL DEALS"
             : selectedCategory.label.uppercased()
     }
 
-    // MARK: - Rail
-
-    private func horizontalRail(deals: [BrandCashbackDeal]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(deals) { deal in
-                    BrandCashbackGridCard(deal: deal, onTap: { selectedDeal = deal })
-                        .frame(width: 220)
-                }
-            }
-            .padding(.horizontal, 16)
-        }
+    /// Sum of pending cashback (cents) across deals whose receipts are
+    /// awaiting review. Surfaced in the wallet hero "Pending" stat.
+    private var pendingCents: Int {
+        viewModel.myDeals
+            .filter { $0.status == .pendingReview }
+            .reduce(0) { $0 + Int(($1.cashbackAmount * 100).rounded()) }
     }
 
-    // MARK: - Empty state
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "tag.slash.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(.white.opacity(0.15))
-            Text(selectedCategory == .all
-                ? "No deals available right now"
-                : "No \(selectedCategory.label.lowercased()) deals right now")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white.opacity(0.4))
-            Text(selectedCategory == .all
-                ? "Check back soon for new brand offers"
-                : "Try a different category")
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.25))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 48)
-        .padding(.horizontal, 16)
+    /// True when the user has neither claimed nor earned anything yet — used
+    /// to switch into the new-user empty state. Available deals must exist
+    /// so we have something to teaser-render below the CTA.
+    private var isFirstTimeUser: Bool {
+        viewModel.myDeals.isEmpty
+            && viewModel.earnedDeals.isEmpty
+            && !viewModel.availableDeals.isEmpty
     }
 }
 
