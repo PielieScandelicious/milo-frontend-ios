@@ -127,6 +127,15 @@ struct BrandCashbackDeal: Identifiable, Codable {
 
     var isExpired: Bool { Date() > validUntil }
 
+    /// Whole days from start-of-today to start-of-validUntil. Negative when
+    /// expired so callers can branch on sign.
+    var daysRemaining: Int {
+        let cal = Calendar.current
+        let from = cal.startOfDay(for: Date())
+        let to = cal.startOfDay(for: validUntil)
+        return cal.dateComponents([.day], from: from, to: to).day ?? 0
+    }
+
     var formattedCashback: String { String(format: "€%.2f", cashbackAmount) }
 
     var formattedExpiry: String {

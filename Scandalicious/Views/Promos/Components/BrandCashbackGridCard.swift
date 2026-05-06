@@ -187,34 +187,38 @@ struct DealRow: View {
 
     private var contentBlock: some View {
         VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
             // Brand logo — white disc with logo on top
             BrandLogoDisc(
                 brand: deal.brandName,
                 brandColor: brandAccentColor,
                 logoURL: deal.brandLogoUrl,
-                size: 64,
+                size: 52,
                 ring: false
             )
-            .padding(.bottom, 8)
+            .padding(.bottom, 10)
 
             // Title — serif, max 2 lines
             Text(deal.productName)
-                .font(CashbackFont.serif(18))
-                .kerning(-0.4)
+                .font(CashbackFont.serif(13))
+                .kerning(-0.2)
                 .foregroundStyle(CashbackTokens.textPrimary)
                 .lineSpacing(2)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 10)
+            DaysLeftPill(days: deal.daysRemaining)
+                .padding(.top, 10)
+
+            Spacer(minLength: 0)
 
             // Bottom row: footer (left) and CTA (right, available only)
             HStack(alignment: .bottom) {
                 stateFooter
                 Spacer(minLength: 8)
             }
-            .padding(.top, 10)
         }
         .padding(.leading, 14)
         .padding(.trailing, 14)
@@ -308,6 +312,55 @@ struct DealRow: View {
         ]
         let hash = abs(deal.brandName.hashValue)
         return palette[hash % palette.count]
+    }
+}
+
+// MARK: - Days-left pill
+
+private struct DaysLeftPill: View {
+    let days: Int  // negative = expired
+
+    var body: some View {
+        Text(label)
+            .font(CashbackFont.sans(10.5, weight: .semibold))
+            .monospacedDigit()
+            .kerning(-0.05)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(background))
+            .overlay(Capsule().stroke(stroke, lineWidth: 1))
+    }
+
+    private var label: String {
+        if days < 0 { return "Expired" }
+        if days == 0 { return "Last day" }
+        return "\(days)d left"
+    }
+
+    private var foreground: Color {
+        switch days {
+        case ..<0: return CashbackTokens.text40
+        case 0: return CashbackTokens.gold
+        case 1...3: return CashbackTokens.warn
+        default: return CashbackTokens.text70
+        }
+    }
+    private var background: Color {
+        switch days {
+        case ..<0: return Color.white.opacity(0.04)
+        case 0: return CashbackTokens.gold.opacity(0.10)
+        case 1...3: return CashbackTokens.warn.opacity(0.10)
+        default: return Color.white.opacity(0.04)
+        }
+    }
+    private var stroke: Color {
+        switch days {
+        case ..<0: return CashbackTokens.text15
+        case 0: return CashbackTokens.gold.opacity(0.40)
+        case 1...3: return CashbackTokens.warn.opacity(0.40)
+        default: return CashbackTokens.text15
+        }
     }
 }
 
