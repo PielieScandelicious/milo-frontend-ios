@@ -125,14 +125,7 @@ struct DealRow: View {
     private var stateBadge: some View {
         switch state {
         case .claimed:
-            ZStack {
-                Circle().fill(CashbackTokens.green)
-                    .overlay(Circle().stroke(.black.opacity(0.15), lineWidth: 1.5))
-                Image(systemName: "checkmark")
-                    .font(.system(size: 10, weight: .black))
-                    .foregroundStyle(CashbackTokens.greenInk)
-            }
-            .frame(width: 22, height: 22)
+            EmptyView()
         case .pendingReview:
             ZStack {
                 Circle().fill(CashbackTokens.warn)
@@ -158,13 +151,7 @@ struct DealRow: View {
             }
             .frame(width: 22, height: 22)
         case .expired:
-            Text("EXPIRED")
-                .font(CashbackFont.sans(9, weight: .heavy))
-                .tracking(0.7)
-                .foregroundStyle(.white.opacity(0.55))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(.black.opacity(0.4)))
+            EmptyView()
         case .soldOut:
             Text("SOLD OUT")
                 .font(CashbackFont.sans(9, weight: .heavy))
@@ -253,9 +240,7 @@ struct DealRow: View {
             }
             .foregroundStyle(CashbackTokens.gold)
         case .expired:
-            Text("Expired")
-                .font(CashbackFont.sans(10.5, weight: .medium))
-                .foregroundStyle(.white.opacity(0.30))
+            EmptyView()
         case .soldOut:
             Text("Sold out")
                 .font(CashbackFont.sans(10.5, weight: .medium))

@@ -39,6 +39,10 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
     let couponMinPurchase: String?
     let couponValidityEnd: String?
 
+    /// True when this row was created from a `BrandCashbackDeal`. Drives the
+    /// My-List tap routing to `BrandCashbackDealDetailSheet`.
+    let isBrandCashback: Bool
+
     var label: String {
         (displayName?.isEmpty == false ? displayName : productName) ?? productName
     }
@@ -109,6 +113,33 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         )
     }
 
+    static func from(deal: BrandCashbackDeal, storeName: String) -> GroceryListItem {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return GroceryListItem(
+            id: UUID().uuidString,
+            itemKey: deal.id,
+            brand: deal.brandName,
+            productName: deal.productName,
+            displayName: nil,
+            imageUrl: deal.imageThumbUrl?.absoluteString ?? deal.imageUrl?.absoluteString,
+            heroUrl: deal.imageUrl?.absoluteString,
+            storeName: storeName,
+            promoPrice: 0,
+            originalPrice: 0,
+            savings: 0,
+            discountPercentage: 0,
+            mechanism: String(format: "€%.2f cashback", deal.cashbackAmount),
+            displayMechanism: nil,
+            minPurchaseQty: nil,
+            promoTextMarkdown: nil,
+            validityEnd: f.string(from: deal.validUntil),
+            addedAt: Date(),
+            isChecked: false,
+            isBrandCashback: true
+        )
+    }
+
     static func from(item: PromoStoreItem, storeName: String, validityEndOverride: String? = nil) -> GroceryListItem {
         GroceryListItem(
             id: UUID().uuidString,
@@ -170,6 +201,7 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         self.couponValue = try c.decodeIfPresent(Double.self, forKey: .couponValue)
         self.couponMinPurchase = try c.decodeIfPresent(String.self, forKey: .couponMinPurchase)
         self.couponValidityEnd = try c.decodeIfPresent(String.self, forKey: .couponValidityEnd)
+        self.isBrandCashback = try c.decodeIfPresent(Bool.self, forKey: .isBrandCashback) ?? false
     }
 
     // Explicit memberwise init (adds defaults for coupon fields so existing call sites compile).
@@ -199,7 +231,8 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         couponBarcodeFormat: String? = nil,
         couponValue: Double? = nil,
         couponMinPurchase: String? = nil,
-        couponValidityEnd: String? = nil
+        couponValidityEnd: String? = nil,
+        isBrandCashback: Bool = false
     ) {
         self.id = id
         self.itemKey = itemKey
@@ -227,5 +260,6 @@ struct GroceryListItem: Codable, Identifiable, Equatable {
         self.couponValue = couponValue
         self.couponMinPurchase = couponMinPurchase
         self.couponValidityEnd = couponValidityEnd
+        self.isBrandCashback = isBrandCashback
     }
 }

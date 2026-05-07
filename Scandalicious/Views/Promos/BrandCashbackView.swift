@@ -35,92 +35,33 @@ struct BrandCashbackView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 6)
 
-            // New-user state — shown when the user has never claimed and no
-            // earnings exist. Replaces filter + sections with onboarding.
-            if isFirstTimeUser {
-                CashbackEmptyNewUser(
-                    totalDeals: viewModel.availableDeals.count,
-                    teaserDeal: viewModel.availableDeals.first,
-                    onPickFirstDeal: {
-                        if let first = viewModel.availableDeals.first {
-                            selectedDeal = first
+            CashbackCategoryFilterBar(
+                selected: $selectedCategory,
+                availableCategories: availableCategories,
+                counts: categoryCounts
+            )
+
+            if filteredCampaigns.isEmpty {
+                CashbackEmptyNoMatch(
+                    categoryLabel: selectedCategory == .all ? "" : selectedCategory.label,
+                    onShowAll: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedCategory = .all
                         }
                     },
-                    onTeaserTap: {
-                        if let first = viewModel.availableDeals.first {
-                            selectedDeal = first
-                        }
+                    onNotify: {
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
                     }
                 )
+                .padding(.bottom, 24)
+                .transition(.opacity)
             } else {
-                // Category filter — counts hint at how each chip will fill
-                CashbackCategoryFilterBar(
-                    selected: $selectedCategory,
-                    availableCategories: availableCategories,
-                    counts: categoryCounts
-                )
-
-                // MY DEALS — vertical 1-per-row stack of claimed/pending deals
-                if !filteredMyDeals.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        PromoSectionHeader(title: "MY DEALS", icon: "checkmark.seal.fill")
-                            .padding(.horizontal, 20)
-                        VStack(spacing: 10) {
-                            ForEach(filteredMyDeals) { deal in
-                                DealRow(deal: deal, onTap: { selectedDeal = deal })
-                            }
-                        }
-                        .padding(.horizontal, 16)
+                VStack(spacing: 10) {
+                    ForEach(filteredCampaigns) { deal in
+                        DealRow(deal: deal, onTap: { selectedDeal = deal })
                     }
                 }
-
-                // FEATURED rail — horizontal scroll of 168pt featured cards
-                if !featuredDeals.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        PromoSectionHeader(title: "FEATURED", icon: "star.fill")
-                            .padding(.horizontal, 20)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(featuredDeals) { deal in
-                                    FeaturedDealCard(deal: deal, onTap: { selectedDeal = deal })
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                        }
-                    }
-                }
-
-                // ALL DEALS — full vertical stack of available deals
-                VStack(alignment: .leading, spacing: 10) {
-                    PromoSectionHeader(title: availableHeaderTitle, icon: "tag.fill")
-                        .padding(.horizontal, 20)
-
-                    if regularAvailable.isEmpty && filteredMyDeals.isEmpty && featuredDeals.isEmpty {
-                        // No-match state — filter returned zero deals
-                        CashbackEmptyNoMatch(
-                            categoryLabel: selectedCategory == .all ? "" : selectedCategory.label,
-                            onShowAll: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    selectedCategory = .all
-                                }
-                            },
-                            onNotify: {
-                                // Stub — wire to push notification opt-in once
-                                // a per-category subscription endpoint exists.
-                                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                            }
-                        )
-                        .padding(.bottom, 24)
-                        .transition(.opacity)
-                    } else if !regularAvailable.isEmpty {
-                        VStack(spacing: 10) {
-                            ForEach(regularAvailable) { deal in
-                                DealRow(deal: deal, onTap: { selectedDeal = deal })
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                    }
-                }
+                .padding(.horizontal, 16)
             }
 
             // Disclaimer
@@ -135,10 +76,12 @@ struct BrandCashbackView: View {
             BrandCashbackDealDetailSheet(
                 deal: deal,
                 onClaim: {
+                    GroceryListStore.shared.add(deal: deal)
                     viewModel.claimDeal(deal)
                     selectedDeal = nil
                 },
                 onUnclaim: {
+                    GroceryListStore.shared.removeByDeal(deal)
                     viewModel.unclaimDeal(deal)
                     selectedDeal = nil
                 },
@@ -165,17 +108,16 @@ struct BrandCashbackView: View {
     // MARK: - Derived collections
 
     private var availableCategories: Set<CashbackCategory> {
-        Set((viewModel.availableDeals + viewModel.myDeals).compactMap {
+        Set(viewModel.campaigns.compactMap {
             $0.category.flatMap(CashbackCategory.init(rawValue:))
         })
     }
 
     /// How many deals fall into each category, for the count badge on each
-    /// chip. The "All" chip totals the available + my-deals universe.
+    /// chip. Counts the same universe shown in the feed.
     private var categoryCounts: [CashbackCategory: Int] {
-        let universe = viewModel.availableDeals + viewModel.myDeals
-        var counts: [CashbackCategory: Int] = [.all: universe.count]
-        for deal in universe {
+        var counts: [CashbackCategory: Int] = [.all: viewModel.campaigns.count]
+        for deal in viewModel.campaigns {
             guard let raw = deal.category, let cat = CashbackCategory(rawValue: raw) else { continue }
             counts[cat, default: 0] += 1
         }
@@ -187,22 +129,8 @@ struct BrandCashbackView: View {
         return deal.category == selectedCategory.rawValue
     }
 
-    private var filteredMyDeals: [BrandCashbackDeal] {
-        viewModel.myDeals.filter(matchesCategory)
-    }
-
-    private var featuredDeals: [BrandCashbackDeal] {
-        viewModel.availableDeals.filter { $0.featured && matchesCategory($0) }
-    }
-
-    private var regularAvailable: [BrandCashbackDeal] {
-        viewModel.availableDeals.filter { !$0.featured && matchesCategory($0) }
-    }
-
-    private var availableHeaderTitle: String {
-        selectedCategory == .all
-            ? "ALL DEALS"
-            : selectedCategory.label.uppercased()
+    private var filteredCampaigns: [BrandCashbackDeal] {
+        viewModel.campaigns.filter(matchesCategory)
     }
 
     /// Sum of pending cashback (cents) across deals whose receipts are
@@ -211,15 +139,6 @@ struct BrandCashbackView: View {
         viewModel.myDeals
             .filter { $0.status == .pendingReview }
             .reduce(0) { $0 + Int(($1.cashbackAmount * 100).rounded()) }
-    }
-
-    /// True when the user has neither claimed nor earned anything yet — used
-    /// to switch into the new-user empty state. Available deals must exist
-    /// so we have something to teaser-render below the CTA.
-    private var isFirstTimeUser: Bool {
-        viewModel.myDeals.isEmpty
-            && viewModel.earnedDeals.isEmpty
-            && !viewModel.availableDeals.isEmpty
     }
 }
 

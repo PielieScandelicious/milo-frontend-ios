@@ -28,6 +28,10 @@ class BrandCashbackViewModel: ObservableObject {
     @Published private(set) var availableDeals: [BrandCashbackDeal] = []
     @Published private(set) var myDeals: [BrandCashbackDeal] = []
     @Published private(set) var earnedDeals: [BrandCashbackDeal] = []
+    /// Unified, original-order list shown in the Cashback feed. Includes
+    /// every non-expired, non-`.earned` deal in the order returned by the
+    /// backend. Status changes flip the contents of a row but never reshuffle.
+    @Published private(set) var campaigns: [BrandCashbackDeal] = []
 
     @Published var showEarnedOverlay = false
     @Published private(set) var lastEarnedAmount: Double = 0
@@ -109,6 +113,7 @@ class BrandCashbackViewModel: ObservableObject {
                 myDealsPriority(lhs) < myDealsPriority(rhs)
             }
             earnedDeals = []
+            campaigns = deals
         }
     }
 

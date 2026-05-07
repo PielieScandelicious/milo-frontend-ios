@@ -72,21 +72,39 @@ struct GroceryListContentView<Leading: View>: View {
             }
         }
         .sheet(item: $selectedDetailItem) { item in
-            PromoProductDetailSheet(
-                gridItem: PromoGridItem(
-                    id: item.id,
-                    item: item.toPromoStoreItem(),
-                    storeName: item.storeName
-                ),
-                onOpenInFolder: { folder, pageIndex, itemId in
-                    folderDestination = FolderDestination(
-                        folderId: folder.folderId,
-                        pageIndex: pageIndex,
-                        highlightItemId: itemId
-                    )
-                }
-            )
-            .environmentObject(foldersViewModel)
+            if item.isBrandCashback,
+               let deal = BrandCashbackService.shared.deal(id: item.itemKey ?? "") {
+                BrandCashbackDealDetailSheet(
+                    deal: deal,
+                    onClaim: {
+                        GroceryListStore.shared.add(deal: deal)
+                        Task { await BrandCashbackService.shared.claimDeal(id: deal.id) }
+                        selectedDetailItem = nil
+                    },
+                    onUnclaim: {
+                        GroceryListStore.shared.removeByDeal(deal)
+                        Task { await BrandCashbackService.shared.unclaimDeal(id: deal.id) }
+                        selectedDetailItem = nil
+                    },
+                    onViewReceipt: nil
+                )
+            } else {
+                PromoProductDetailSheet(
+                    gridItem: PromoGridItem(
+                        id: item.id,
+                        item: item.toPromoStoreItem(),
+                        storeName: item.storeName
+                    ),
+                    onOpenInFolder: { folder, pageIndex, itemId in
+                        folderDestination = FolderDestination(
+                            folderId: folder.folderId,
+                            pageIndex: pageIndex,
+                            highlightItemId: itemId
+                        )
+                    }
+                )
+                .environmentObject(foldersViewModel)
+            }
         }
         .navigationDestination(item: $folderDestination) { dest in
             if case .success(let folders) = foldersViewModel.state,

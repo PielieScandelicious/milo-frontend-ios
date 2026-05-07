@@ -447,7 +447,7 @@ struct BrandCashbackDealDetailSheet: View {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } label: {
                     ctaLabel(
-                        text: "Claim \(deal.formattedCashback)",
+                        text: "Activate and add to list",
                         textColor: .black,
                         fill: cashbackGreen
                     )
@@ -473,9 +473,8 @@ struct BrandCashbackDealDetailSheet: View {
                         onUnclaim()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
-                        let label = deal.redemptionProgressLabel ?? "Claimed"
                         ctaLabel(
-                            text: "Claimed · \(label)",
+                            text: "Deactivate and remove from list",
                             textColor: cashbackGreen,
                             fill: .clear,
                             border: cashbackGreen

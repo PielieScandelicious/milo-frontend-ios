@@ -164,6 +164,12 @@ class BrandCashbackService: ObservableObject {
             .map { ClaimedDeal(id: $0.id, claimedAt: $0.claimedAt ?? Date(), status: $0.status) }
     }
 
+    // MARK: - Lookup
+
+    func deal(id: String) -> BrandCashbackDeal? {
+        allDeals.first { $0.id == id }
+    }
+
     // MARK: - Claim / Unclaim
 
     func claimDeal(id: String) async {

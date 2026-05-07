@@ -25,6 +25,8 @@ class GroceryListStore: ObservableObject {
 
     private let storageKey = "grocery_list_items_v1"
 
+    static let cashbackStoreLabel = "All stores"
+
     private init() {
         loadFromDisk()
         removeExpired()
@@ -47,6 +49,34 @@ class GroceryListStore: ObservableObject {
         saveToDisk()
         ImagePrefetcher.shared.prefetch(urlString: groceryItem.imageUrl)
         itemAddedPublisher.send(groceryItem)
+    }
+
+    func add(deal: BrandCashbackDeal) {
+        guard !contains(deal: deal) else { return }
+        let groceryItem = GroceryListItem.from(deal: deal, storeName: Self.cashbackStoreLabel)
+        items.append(groceryItem)
+        saveToDisk()
+        ImagePrefetcher.shared.prefetch(urlString: groceryItem.imageUrl)
+        itemAddedPublisher.send(groceryItem)
+    }
+
+    func removeByDeal(_ deal: BrandCashbackDeal) {
+        items.removeAll {
+            $0.brand == deal.brandName
+                && $0.productName == deal.productName
+                && $0.storeName == Self.cashbackStoreLabel
+        }
+        saveToDisk()
+    }
+
+    func contains(deal: BrandCashbackDeal) -> Bool {
+        membershipKeys.contains(
+            Self.membershipKey(
+                brand: deal.brandName,
+                productName: deal.productName,
+                storeName: Self.cashbackStoreLabel
+            )
+        )
     }
 
     func remove(id: String) {
